@@ -1,0 +1,206 @@
+<div class="lorry-trip-list-container">
+  <mat-card class="header-card">
+    <mat-card-header>
+      <mat-card-title>
+        <h1>My Lorry Trips</h1>
+      </mat-card-title>
+    </mat-card-header>
+  </mat-card>
+
+  <!-- No Approved Lorries Message -->
+  <mat-card class="info-card" *ngIf="!loading && !hasApprovedLorries()">
+    <mat-card-content>
+      <div class="no-approved-lorries">
+        <mat-icon>info</mat-icon>
+        <h3>No Approved Lorries</h3>
+        <p>You need to have at least one approved lorry to view trips.</p>
+        <p>Please register your lorries and wait for admin approval.</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Filter Section -->
+  <mat-card class="filter-card" *ngIf="hasApprovedLorries()">
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filter-form">
+        <div class="filter-row">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Lorry</mat-label>
+            <mat-select formControlName="lorryId">
+              <mat-option value="">All Lorries</mat-option>
+              <mat-option *ngFor="let lorry of approvedLorries" [value]="lorry.lorryId">
+                {{ getLorryDisplay(lorry.lorryId) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Start Date</mat-label>
+            <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+            <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>End Date</mat-label>
+            <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+            <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Dispatcher ID</mat-label>
+            <input matInput formControlName="dispatcherId" placeholder="Dispatcher identifier">
+          </mat-form-field>
+        </div>
+
+        <div class="filter-row">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Broker</mat-label>
+            <mat-select formControlName="brokerId">
+              <mat-option value="">All Brokers</mat-option>
+              <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+                {{ broker.brokerName }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option *ngFor="let status of statusOptions" [value]="status">
+                {{ getStatusLabel(status) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div class="filter-actions">
+            <button mat-raised-button color="primary" (click)="onApplyFilters()" [disabled]="loading">
+              <mat-icon>search</mat-icon>
+              Apply Filters
+            </button>
+            <button mat-stroked-button (click)="onClearFilters()" [disabled]="loading || !hasActiveFilters()">
+              <mat-icon>clear</mat-icon>
+              Clear
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div class="active-filters" *ngIf="hasActiveFilters()">
+        <mat-chip-set>
+          <mat-chip *ngIf="filterForm.value.lorryId">
+            Lorry: {{ getLorryDisplay(filterForm.value.lorryId) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.startDate">
+            Start: {{ formatDate(filterForm.value.startDate) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.endDate">
+            End: {{ formatDate(filterForm.value.endDate) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.dispatcherId">
+            Dispatcher: {{ filterForm.value.dispatcherId }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.brokerId">
+            Broker: {{ getBrokerName(filterForm.value.brokerId) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.status">
+            Status: {{ getStatusLabel(filterForm.value.status) }}
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Trips Table -->
+  <mat-card class="table-card" *ngIf="hasApprovedLorries()">
+    <mat-card-content>
+      <div class="loading-container" *ngIf="loading">
+        <mat-spinner></mat-spinner>
+        <p>Loading trips...</p>
+      </div>
+
+      <div class="no-trips" *ngIf="!loading && trips.length === 0">
+        <mat-icon>inbox</mat-icon>
+        <h3>No trips found</h3>
+        <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all trips.</p>
+        <p *ngIf="!hasActiveFilters()">No trips have been scheduled for your lorries yet.</p>
+      </div>
+
+      <div class="table-container" *ngIf="!loading && trips.length > 0">
+        <table mat-table [dataSource]="trips" class="trips-table">
+          <!-- Scheduled Date Column -->
+          <ng-container matColumnDef="scheduledPickupDatetime">
+            <th mat-header-cell *matHeaderCellDef>Scheduled Pickup</th>
+            <td mat-cell *matCellDef="let trip">
+              {{ formatDate(trip.scheduledPickupDatetime) }}
+            </td>
+          </ng-container>
+
+          <!-- Pickup Location Column -->
+          <ng-container matColumnDef="pickupLocation">
+            <th mat-header-cell *matHeaderCellDef>Pickup</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.pickupLocation }}</td>
+          </ng-container>
+
+          <!-- Dropoff Location Column -->
+          <ng-container matColumnDef="dropoffLocation">
+            <th mat-header-cell *matHeaderCellDef>Dropoff</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.dropoffLocation }}</td>
+          </ng-container>
+
+          <!-- Lorry Column -->
+          <ng-container matColumnDef="lorryId">
+            <th mat-header-cell *matHeaderCellDef>Lorry</th>
+            <td mat-cell *matCellDef="let trip">
+              {{ getLorryDisplay(trip.lorryId) }}
+            </td>
+          </ng-container>
+
+          <!-- Dispatcher Column -->
+          <ng-container matColumnDef="dispatcherId">
+            <th mat-header-cell *matHeaderCellDef>Dispatcher</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.dispatcherId }}</td>
+          </ng-container>
+
+          <!-- Broker Column -->
+          <ng-container matColumnDef="brokerName">
+            <th mat-header-cell *matHeaderCellDef>Broker</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.brokerName }}</td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let trip">
+              <span class="status-chip" [ngClass]="getStatusClass(trip.status)">
+                {{ getStatusLabel(trip.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Lorry Owner Payment Column -->
+          <ng-container matColumnDef="lorryOwnerPayment">
+            <th mat-header-cell *matHeaderCellDef>Payment</th>
+            <td mat-cell *matCellDef="let trip" class="payment-cell">
+              {{ formatCurrency(trip.lorryOwnerPayment) }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="trip-row"></tr>
+        </table>
+
+        <mat-paginator
+          [length]="totalTrips"
+          [pageSize]="pageSize"
+          [pageSizeOptions]="[25, 50, 100]"
+          [pageIndex]="pageIndex"
+          (page)="onPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

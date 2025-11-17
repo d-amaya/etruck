@@ -1,0 +1,166 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>Lorry Owner Dashboard</h1>
+    <button mat-raised-button color="primary" (click)="onRegisterLorry()">
+      <mat-icon>add</mat-icon>
+      Register New Lorry
+    </button>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <mat-card class="summary-card">
+      <mat-card-content>
+        <div class="summary-icon">
+          <mat-icon>local_shipping</mat-icon>
+        </div>
+        <div class="summary-info">
+          <h2>{{ totalLorries }}</h2>
+          <p>Total Lorries</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card approved">
+      <mat-card-content>
+        <div class="summary-icon">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <div class="summary-info">
+          <h2>{{ approvedLorries }}</h2>
+          <p>Approved Lorries</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card pending">
+      <mat-card-content>
+        <div class="summary-icon">
+          <mat-icon>pending</mat-icon>
+        </div>
+        <div class="summary-info">
+          <h2>{{ pendingLorries }}</h2>
+          <p>Pending Verification</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card trips">
+      <mat-card-content>
+        <div class="summary-icon">
+          <mat-icon>route</mat-icon>
+        </div>
+        <div class="summary-info">
+          <h2>{{ recentTripsCount }}</h2>
+          <p>Trips (Last 30 Days)</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Lorries List -->
+  <mat-card class="lorries-card">
+    <mat-card-header>
+      <mat-card-title>My Lorries</mat-card-title>
+      <button mat-button color="primary" (click)="onViewLorries()" *ngIf="lorries.length > 0">
+        View All
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Loading lorries...</p>
+      </div>
+
+      <div *ngIf="!loading && lorries.length === 0" class="empty-state">
+        <mat-icon>local_shipping</mat-icon>
+        <h3>No Lorries Registered</h3>
+        <p>Get started by registering your first lorry</p>
+        <button mat-raised-button color="primary" (click)="onRegisterLorry()">
+          <mat-icon>add</mat-icon>
+          Register Lorry
+        </button>
+      </div>
+
+      <div *ngIf="!loading && lorries.length > 0" class="table-container">
+        <table mat-table [dataSource]="lorries" class="lorries-table">
+          <!-- License Plate Column -->
+          <ng-container matColumnDef="lorryId">
+            <th mat-header-cell *matHeaderCellDef>License Plate</th>
+            <td mat-cell *matCellDef="let lorry">{{ lorry.lorryId }}</td>
+          </ng-container>
+
+          <!-- Make Column -->
+          <ng-container matColumnDef="make">
+            <th mat-header-cell *matHeaderCellDef>Make</th>
+            <td mat-cell *matCellDef="let lorry">{{ lorry.make }}</td>
+          </ng-container>
+
+          <!-- Model Column -->
+          <ng-container matColumnDef="model">
+            <th mat-header-cell *matHeaderCellDef>Model</th>
+            <td mat-cell *matCellDef="let lorry">{{ lorry.model }}</td>
+          </ng-container>
+
+          <!-- Year Column -->
+          <ng-container matColumnDef="year">
+            <th mat-header-cell *matHeaderCellDef>Year</th>
+            <td mat-cell *matCellDef="let lorry">{{ lorry.year }}</td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let lorry">
+              <mat-chip [color]="getStatusColor(lorry.verificationStatus)" selected>
+                {{ getStatusLabel(lorry.verificationStatus) }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let lorry">
+              <button mat-icon-button (click)="onViewLorryDetails(lorry)" matTooltip="View Details">
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <mat-card class="action-card" (click)="onViewTrips()">
+      <mat-card-content>
+        <mat-icon>route</mat-icon>
+        <h3>View Trips</h3>
+        <p>See all trips involving your lorries</p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="action-card" (click)="onViewPayments()">
+      <mat-card-content>
+        <mat-icon>payments</mat-icon>
+        <h3>Payment Reports</h3>
+        <p>Track your earnings and payments</p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="action-card" (click)="onRegisterLorry()">
+      <mat-card-content>
+        <mat-icon>add_circle</mat-icon>
+        <h3>Register Lorry</h3>
+        <p>Add a new lorry to your fleet</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

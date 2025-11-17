@@ -1,0 +1,165 @@
+<div class="register-container">
+  <mat-card class="register-card">
+    <mat-card-header>
+      <mat-card-title>
+        <h1>Join HaulHub</h1>
+      </mat-card-title>
+      <mat-card-subtitle>Create your account to get started</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email</mat-label>
+          <input
+            matInput
+            type="email"
+            formControlName="email"
+            placeholder="Enter your email"
+            autocomplete="email"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>email</mat-icon>
+          <mat-error *ngIf="emailControl?.invalid && emailControl?.touched">
+            {{ getEmailErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Full Name</mat-label>
+          <input
+            matInput
+            type="text"
+            formControlName="fullName"
+            placeholder="Enter your full name"
+            autocomplete="name"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>person</mat-icon>
+          <mat-error *ngIf="fullNameControl?.invalid && fullNameControl?.touched">
+            {{ getFullNameErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Phone Number (Optional)</mat-label>
+          <input
+            matInput
+            type="tel"
+            formControlName="phoneNumber"
+            placeholder="+1234567890"
+            autocomplete="tel"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>phone</mat-icon>
+          <mat-hint>Include country code (e.g., +1 for US)</mat-hint>
+          <mat-error *ngIf="phoneNumberControl?.invalid && phoneNumberControl?.touched">
+            {{ getPhoneNumberErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Role</mat-label>
+          <mat-select formControlName="role" [disabled]="isLoading">
+            <mat-option *ngFor="let role of roles" [value]="role.value">
+              {{ role.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matPrefix>work</mat-icon>
+          <mat-hint>Select your role in the transportation system</mat-hint>
+          <mat-error *ngIf="roleControl?.invalid && roleControl?.touched">
+            {{ getRoleErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Driver License Number field - only shown for Driver role -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="isDriverRole()">
+          <mat-label>Driver License Number</mat-label>
+          <input
+            matInput
+            type="text"
+            formControlName="driverLicenseNumber"
+            placeholder="Enter your driver license number"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>badge</mat-icon>
+          <mat-hint>This will be used to match you with your assigned trips</mat-hint>
+          <mat-error *ngIf="driverLicenseNumberControl?.invalid && driverLicenseNumberControl?.touched">
+            {{ getDriverLicenseNumberErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            [type]="hidePassword ? 'password' : 'text'"
+            formControlName="password"
+            placeholder="Enter your password"
+            autocomplete="new-password"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>lock</mat-icon>
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="'Hide password'"
+            [attr.aria-pressed]="hidePassword"
+          >
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint>Minimum 8 characters</mat-hint>
+          <mat-error *ngIf="passwordControl?.invalid && passwordControl?.touched">
+            {{ getPasswordErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Confirm Password</mat-label>
+          <input
+            matInput
+            [type]="hideConfirmPassword ? 'password' : 'text'"
+            formControlName="confirmPassword"
+            placeholder="Confirm your password"
+            autocomplete="new-password"
+            [disabled]="isLoading"
+          />
+          <mat-icon matPrefix>lock</mat-icon>
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="toggleConfirmPasswordVisibility()"
+            [attr.aria-label]="'Hide password'"
+            [attr.aria-pressed]="hideConfirmPassword"
+          >
+            <mat-icon>{{ hideConfirmPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-error *ngIf="confirmPasswordControl?.invalid && confirmPasswordControl?.touched">
+            {{ getConfirmPasswordErrorMessage() }}
+          </mat-error>
+        </mat-form-field>
+
+        <button
+          mat-raised-button
+          color="primary"
+          type="submit"
+          class="full-width submit-button"
+          [disabled]="isLoading"
+        >
+          <span *ngIf="!isLoading">Create Account</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </button>
+      </form>
+
+      <div class="login-link">
+        <p>
+          Already have an account?
+          <a routerLink="/auth/login" mat-button color="primary">Sign in here</a>
+        </p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

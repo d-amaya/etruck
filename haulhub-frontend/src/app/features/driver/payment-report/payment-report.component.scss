@@ -1,0 +1,317 @@
+.payment-report-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.filter-card {
+  margin-bottom: 24px;
+
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 24px;
+      font-weight: 500;
+    }
+  }
+}
+
+.filter-form {
+  .filter-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    mat-form-field {
+      flex: 1;
+      min-width: 200px;
+    }
+  }
+
+  .filter-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+
+    button {
+      mat-icon {
+        margin-right: 8px;
+      }
+    }
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  gap: 16px;
+
+  p {
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 16px;
+  }
+}
+
+.report-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.summary-card {
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px !important;
+  }
+
+  .summary-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+
+    mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  .summary-details {
+    flex: 1;
+  }
+
+  .summary-label {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .summary-subtitle {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.5);
+    margin-top: 4px;
+  }
+
+  &.earnings-card {
+    .summary-icon {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+  }
+
+  &.distance-card {
+    .summary-icon {
+      background-color: #e3f2fd;
+      color: #1565c0;
+    }
+  }
+
+  &.trips-card {
+    .summary-icon {
+      background-color: #fff3e0;
+      color: #ef6c00;
+    }
+  }
+
+  &.avg-card {
+    .summary-icon {
+      background-color: #f3e5f5;
+      color: #7b1fa2;
+    }
+  }
+}
+
+.grouped-card {
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 500;
+    }
+  }
+}
+
+.grouped-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grouped-item {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #eeeeee;
+  }
+
+  .grouped-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .grouped-item-name {
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .grouped-item-value {
+    font-weight: 600;
+    font-size: 18px;
+    color: #2e7d32;
+  }
+
+  .grouped-item-subtitle {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.trips-card {
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 500;
+    }
+  }
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.trips-table {
+  width: 100%;
+  min-width: 800px;
+
+  th {
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  td {
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  .payment-cell {
+    font-weight: 600;
+    color: #2e7d32;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    background-color: #e0e0e0;
+    color: rgba(0, 0, 0, 0.87);
+  }
+}
+
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: rgba(0, 0, 0, 0.6);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 16px;
+    margin: 0;
+  }
+}
+
+.no-data-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  color: rgba(0, 0, 0, 0.6);
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 18px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .payment-report-container {
+    padding: 16px;
+  }
+
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-row {
+    flex-direction: column;
+
+    mat-form-field {
+      width: 100%;
+    }
+  }
+
+  .filter-actions {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+  }
+}

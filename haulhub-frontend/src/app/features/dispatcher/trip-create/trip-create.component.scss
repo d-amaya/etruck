@@ -1,0 +1,99 @@
+.trip-create-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  mat-card {
+    mat-card-header {
+      margin-bottom: 24px;
+
+      mat-card-title {
+        font-size: 24px;
+        font-weight: 500;
+      }
+    }
+
+    mat-card-content {
+      form {
+        .form-section {
+          margin-bottom: 32px;
+
+          h3 {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: rgba(0, 0, 0, 0.87);
+          }
+
+          .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+
+            mat-form-field {
+              &.full-width {
+                flex: 1;
+              }
+
+              &.half-width {
+                flex: 1;
+                min-width: 0;
+              }
+
+              &.third-width {
+                flex: 1;
+                min-width: 0;
+              }
+            }
+          }
+        }
+
+        .form-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 16px;
+          margin-top: 32px;
+          padding-top: 24px;
+          border-top: 1px solid rgba(0, 0, 0, 0.12);
+
+          button {
+            min-width: 120px;
+            position: relative;
+
+            .button-spinner {
+              position: absolute;
+              left: 50%;
+              top: 50%;
+              transform: translate(-50%, -50%);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .trip-create-container {
+    padding: 16px;
+
+    mat-card-content {
+      form {
+        .form-section {
+          .form-row {
+            flex-direction: column;
+            gap: 0;
+
+            mat-form-field {
+              &.half-width,
+              &.third-width {
+                width: 100%;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

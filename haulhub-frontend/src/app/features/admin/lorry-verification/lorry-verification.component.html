@@ -1,0 +1,91 @@
+<div class="lorry-verification-container">
+  <h1>Lorry Verification</h1>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading pending lorries...</p>
+  </div>
+
+  <div *ngIf="error && !loading" class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error }}</p>
+    <button mat-raised-button color="primary" (click)="loadPendingLorries()">
+      <mat-icon>refresh</mat-icon>
+      Retry
+    </button>
+  </div>
+
+  <div *ngIf="!loading && !error" class="table-container">
+    <div *ngIf="lorries.length === 0" class="empty-state">
+      <mat-icon>check_circle</mat-icon>
+      <p>No pending lorry verifications</p>
+    </div>
+
+    <table mat-table [dataSource]="lorries" *ngIf="lorries.length > 0" class="lorry-table">
+      <!-- License Plate Column -->
+      <ng-container matColumnDef="lorryId">
+        <th mat-header-cell *matHeaderCellDef>License Plate</th>
+        <td mat-cell *matCellDef="let lorry">{{ lorry.lorryId }}</td>
+      </ng-container>
+
+      <!-- Make Column -->
+      <ng-container matColumnDef="make">
+        <th mat-header-cell *matHeaderCellDef>Make</th>
+        <td mat-cell *matCellDef="let lorry">{{ lorry.make }}</td>
+      </ng-container>
+
+      <!-- Model Column -->
+      <ng-container matColumnDef="model">
+        <th mat-header-cell *matHeaderCellDef>Model</th>
+        <td mat-cell *matCellDef="let lorry">{{ lorry.model }}</td>
+      </ng-container>
+
+      <!-- Year Column -->
+      <ng-container matColumnDef="year">
+        <th mat-header-cell *matHeaderCellDef>Year</th>
+        <td mat-cell *matCellDef="let lorry">{{ lorry.year }}</td>
+      </ng-container>
+
+      <!-- Owner ID Column -->
+      <ng-container matColumnDef="ownerId">
+        <th mat-header-cell *matHeaderCellDef>Owner ID</th>
+        <td mat-cell *matCellDef="let lorry">{{ lorry.ownerId }}</td>
+      </ng-container>
+
+      <!-- Status Column -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let lorry">
+          <mat-chip [color]="getStatusColor(lorry.verificationStatus)">
+            {{ lorry.verificationStatus }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Documents Column -->
+      <ng-container matColumnDef="documents">
+        <th mat-header-cell *matHeaderCellDef>Documents</th>
+        <td mat-cell *matCellDef="let lorry">
+          <button mat-button color="primary" (click)="viewDocuments(lorry)">
+            <mat-icon>description</mat-icon>
+            View ({{ lorry.verificationDocuments.length }})
+          </button>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let lorry">
+          <button mat-raised-button color="primary" (click)="openVerificationDialog(lorry)">
+            <mat-icon>verified</mat-icon>
+            Verify
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+  </div>
+</div>

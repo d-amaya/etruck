@@ -1,0 +1,35 @@
+<h2 mat-dialog-title>Edit Broker</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="brokerForm">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Broker Name</mat-label>
+      <input 
+        matInput 
+        formControlName="brokerName" 
+        placeholder="Enter broker name"
+        required>
+      <mat-error *ngIf="brokerForm.get('brokerName')?.invalid">
+        {{ getErrorMessage('brokerName') }}
+      </mat-error>
+    </mat-form-field>
+
+    <div class="toggle-field">
+      <mat-slide-toggle formControlName="isActive" color="primary">
+        Active
+      </mat-slide-toggle>
+      <p class="toggle-hint">Inactive brokers will not appear in dispatcher trip creation</p>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button 
+    mat-raised-button 
+    color="primary" 
+    (click)="onSubmit()"
+    [disabled]="!brokerForm.valid">
+    Save Changes
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,29 @@
+{
+  "// Basic Configuration": "Required settings",
+  "environment": "dev",
+  "awsProfile": "haul-hub",
+  "allowedOrigins": "*",
+  
+  "// Custom Domain Configuration (Option 1: Automatic - Creates everything)": "",
+  "// Uncomment these to enable custom domain with automatic Route 53 and ACM setup": "",
+  "// domainName": "haulhub.com",
+  "// createHostedZone": true,
+  
+  "// Custom Domain Configuration (Option 2: Existing Hosted Zone)": "",
+  "// Use this if you already have a Route 53 hosted zone": "",
+  "// domainName": "haulhub.com",
+  "// createHostedZone": false,
+  "// hostedZoneId": "Z1234567890ABC",
+  
+  "// Custom Domain Configuration (Option 3: Manual Certificate)": "",
+  "// Use this if you want to manage the certificate yourself": "",
+  "// domainName": "haulhub.com",
+  "// certificateArn": "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERT_ID",
+  
+  "// Production Configuration Example": "",
+  "// environment": "prod",
+  "// awsProfile": "haul-hub",
+  "// domainName": "haulhub.com",
+  "// createHostedZone": true,
+  "// allowedOrigins": "https://haulhub.com,https://www.haulhub.com"
+}

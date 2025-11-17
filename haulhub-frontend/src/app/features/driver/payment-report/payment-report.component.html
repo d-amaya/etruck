@@ -1,0 +1,207 @@
+<div class="payment-report-container">
+  <mat-card class="filter-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>payments</mat-icon>
+        Payment Report
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filter-form">
+        <div class="filter-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Start Date</mat-label>
+            <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>End Date</mat-label>
+            <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <div class="filter-actions">
+          <button mat-raised-button color="primary" (click)="onApplyFilters()" [disabled]="loading">
+            <mat-icon>search</mat-icon>
+            Apply Filters
+          </button>
+          <button mat-button (click)="onClearFilters()" [disabled]="loading || !hasActiveFilters()">
+            <mat-icon>clear</mat-icon>
+            Clear Filters
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading payment report...</p>
+  </div>
+
+  <div *ngIf="!loading && report" class="report-content">
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <mat-card class="summary-card earnings-card">
+        <mat-card-content>
+          <div class="summary-icon">
+            <mat-icon>attach_money</mat-icon>
+          </div>
+          <div class="summary-details">
+            <div class="summary-label">Total Earnings</div>
+            <div class="summary-value">{{ formatCurrency(report.totalDriverPayments) }}</div>
+            <div class="summary-subtitle">{{ report.tripCount }} trips</div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="summary-card distance-card">
+        <mat-card-content>
+          <div class="summary-icon">
+            <mat-icon>route</mat-icon>
+          </div>
+          <div class="summary-details">
+            <div class="summary-label">Total Distance</div>
+            <div class="summary-value">{{ formatDistance(report.totalDistance) }}</div>
+            <div class="summary-subtitle">Across all trips</div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="summary-card trips-card">
+        <mat-card-content>
+          <div class="summary-icon">
+            <mat-icon>local_shipping</mat-icon>
+          </div>
+          <div class="summary-details">
+            <div class="summary-label">Total Trips</div>
+            <div class="summary-value">{{ report.tripCount }}</div>
+            <div class="summary-subtitle">In selected period</div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="summary-card avg-card">
+        <mat-card-content>
+          <div class="summary-icon">
+            <mat-icon>calculate</mat-icon>
+          </div>
+          <div class="summary-details">
+            <div class="summary-label">Average per Trip</div>
+            <div class="summary-value">
+              {{ formatCurrency(report.tripCount > 0 ? report.totalDriverPayments / report.tripCount : 0) }}
+            </div>
+            <div class="summary-subtitle">Payment average</div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Grouped by Dispatcher -->
+    <mat-card *ngIf="report.groupedByDispatcher && getDispatcherEntries().length > 0" class="grouped-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>person</mat-icon>
+          Payments by Dispatcher
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="grouped-list">
+          <div *ngFor="let entry of getDispatcherEntries()" class="grouped-item">
+            <div class="grouped-item-header">
+              <span class="grouped-item-name">Dispatcher: {{ entry.dispatcherId }}</span>
+              <span class="grouped-item-value">{{ formatCurrency(entry.data.totalPayment) }}</span>
+            </div>
+            <div class="grouped-item-subtitle">
+              {{ entry.data.tripCount }} trip{{ entry.data.tripCount !== 1 ? 's' : '' }}
+            </div>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Trip Details -->
+    <mat-card class="trips-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>list</mat-icon>
+          Trip Payment Details
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="table-container">
+          <table mat-table [dataSource]="report.trips" class="trips-table">
+            <!-- Date Column -->
+            <ng-container matColumnDef="scheduledPickupDatetime">
+              <th mat-header-cell *matHeaderCellDef>Date</th>
+              <td mat-cell *matCellDef="let trip">{{ formatDate(trip.scheduledPickupDatetime) }}</td>
+            </ng-container>
+
+            <!-- Pickup Column -->
+            <ng-container matColumnDef="pickupLocation">
+              <th mat-header-cell *matHeaderCellDef>Pickup</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.pickupLocation }}</td>
+            </ng-container>
+
+            <!-- Dropoff Column -->
+            <ng-container matColumnDef="dropoffLocation">
+              <th mat-header-cell *matHeaderCellDef>Dropoff</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.dropoffLocation }}</td>
+            </ng-container>
+
+            <!-- Lorry Column -->
+            <ng-container matColumnDef="lorryId">
+              <th mat-header-cell *matHeaderCellDef>Lorry</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.lorryId }}</td>
+            </ng-container>
+
+            <!-- Broker Column -->
+            <ng-container matColumnDef="brokerName">
+              <th mat-header-cell *matHeaderCellDef>Broker</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.brokerName }}</td>
+            </ng-container>
+
+            <!-- Payment Column -->
+            <ng-container matColumnDef="driverPayment">
+              <th mat-header-cell *matHeaderCellDef>Payment</th>
+              <td mat-cell *matCellDef="let trip" class="payment-cell">
+                {{ formatCurrency(trip.driverPayment) }}
+              </td>
+            </ng-container>
+
+            <!-- Distance Column -->
+            <ng-container matColumnDef="distance">
+              <th mat-header-cell *matHeaderCellDef>Distance</th>
+              <td mat-cell *matCellDef="let trip">{{ formatDistance(trip.distance) }}</td>
+            </ng-container>
+
+            <!-- Status Column -->
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Status</th>
+              <td mat-cell *matCellDef="let trip">
+                <span class="status-badge">{{ getStatusLabel(trip.status) }}</span>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          </table>
+
+          <div *ngIf="report.trips.length === 0" class="no-data">
+            <mat-icon>info</mat-icon>
+            <p>No trips found for the selected period</p>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <div *ngIf="!loading && !report" class="no-data-container">
+    <mat-icon>info</mat-icon>
+    <p>No payment data available. Apply filters to load report.</p>
+  </div>
+</div>

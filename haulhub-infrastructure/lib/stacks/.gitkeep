@@ -1,0 +1,7 @@
+# This directory will contain all CDK stack definitions
+# Stacks will be added in subsequent tasks:
+# - auth-stack.ts (Cognito User Pool)
+# - database-stack.ts (DynamoDB)
+# - storage-stack.ts (S3 buckets)
+# - api-stack.ts (API Gateway + Lambda)
+# - frontend-stack.ts (CloudFront + S3 hosting)

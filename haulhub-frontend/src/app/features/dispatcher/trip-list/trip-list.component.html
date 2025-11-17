@@ -1,0 +1,249 @@
+<div class="trip-list-container">
+  <mat-card class="header-card">
+    <mat-card-header>
+      <mat-card-title>
+        <h1>My Trips</h1>
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-raised-button color="accent" (click)="onBackToDashboard()">
+          <mat-icon>dashboard</mat-icon>
+          Back to Dashboard
+        </button>
+        <button mat-raised-button color="primary" (click)="onCreateTrip()">
+          <mat-icon>add</mat-icon>
+          Create Trip
+        </button>
+      </div>
+    </mat-card-header>
+  </mat-card>
+
+  <!-- Filter Section -->
+  <mat-card class="filter-card">
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filter-form">
+        <div class="filter-row">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Start Date</mat-label>
+            <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+            <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>End Date</mat-label>
+            <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+            <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Broker</mat-label>
+            <mat-select formControlName="brokerId">
+              <mat-option value="">All Brokers</mat-option>
+              <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+                {{ broker.brokerName }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Lorry ID</mat-label>
+            <input matInput formControlName="lorryId" placeholder="License plate">
+          </mat-form-field>
+        </div>
+
+        <div class="filter-row">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Driver ID</mat-label>
+            <input matInput formControlName="driverId" placeholder="Driver identifier">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Driver Name</mat-label>
+            <input matInput formControlName="driverName" placeholder="Driver name">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option *ngFor="let status of statusOptions" [value]="status">
+                {{ getStatusLabel(status) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div class="filter-actions">
+            <button mat-raised-button color="primary" (click)="onApplyFilters()" [disabled]="loading">
+              <mat-icon>search</mat-icon>
+              Apply Filters
+            </button>
+            <button mat-stroked-button (click)="onClearFilters()" [disabled]="loading || !hasActiveFilters()">
+              <mat-icon>clear</mat-icon>
+              Clear
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div class="active-filters" *ngIf="hasActiveFilters()">
+        <mat-chip-set>
+          <mat-chip *ngIf="filterForm.value.startDate">
+            Start: {{ formatDate(filterForm.value.startDate) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.endDate">
+            End: {{ formatDate(filterForm.value.endDate) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.brokerId">
+            Broker: {{ getBrokerName(filterForm.value.brokerId) }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.lorryId">
+            Lorry: {{ filterForm.value.lorryId }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.driverId">
+            Driver ID: {{ filterForm.value.driverId }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.driverName">
+            Driver Name: {{ filterForm.value.driverName }}
+          </mat-chip>
+          <mat-chip *ngIf="filterForm.value.status">
+            Status: {{ getStatusLabel(filterForm.value.status) }}
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Trips Table -->
+  <mat-card class="table-card">
+    <mat-card-content>
+      <div class="loading-container" *ngIf="loading">
+        <mat-spinner></mat-spinner>
+        <p>Loading trips...</p>
+      </div>
+
+      <div class="no-trips" *ngIf="!loading && trips.length === 0">
+        <mat-icon>inbox</mat-icon>
+        <h3>No trips found</h3>
+        <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all trips.</p>
+        <p *ngIf="!hasActiveFilters()">Create your first trip to get started.</p>
+        <button mat-raised-button color="primary" (click)="onCreateTrip()">
+          <mat-icon>add</mat-icon>
+          Create Trip
+        </button>
+      </div>
+
+      <div class="table-container" *ngIf="!loading && trips.length > 0">
+        <table mat-table [dataSource]="trips" class="trips-table">
+          <!-- Scheduled Date Column -->
+          <ng-container matColumnDef="scheduledPickupDatetime">
+            <th mat-header-cell *matHeaderCellDef>Scheduled Pickup</th>
+            <td mat-cell *matCellDef="let trip">
+              {{ formatDate(trip.scheduledPickupDatetime) }}
+            </td>
+          </ng-container>
+
+          <!-- Pickup Location Column -->
+          <ng-container matColumnDef="pickupLocation">
+            <th mat-header-cell *matHeaderCellDef>Pickup</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.pickupLocation }}</td>
+          </ng-container>
+
+          <!-- Dropoff Location Column -->
+          <ng-container matColumnDef="dropoffLocation">
+            <th mat-header-cell *matHeaderCellDef>Dropoff</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.dropoffLocation }}</td>
+          </ng-container>
+
+          <!-- Broker Column -->
+          <ng-container matColumnDef="brokerName">
+            <th mat-header-cell *matHeaderCellDef>Broker</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.brokerName }}</td>
+          </ng-container>
+
+          <!-- Lorry Column -->
+          <ng-container matColumnDef="lorryId">
+            <th mat-header-cell *matHeaderCellDef>Lorry</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.lorryId }}</td>
+          </ng-container>
+
+          <!-- Driver Column -->
+          <ng-container matColumnDef="driverName">
+            <th mat-header-cell *matHeaderCellDef>Driver</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.driverName }}</td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let trip">
+              <span class="status-chip" [ngClass]="getStatusClass(trip.status)">
+                {{ getStatusLabel(trip.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Broker Payment Column -->
+          <ng-container matColumnDef="brokerPayment">
+            <th mat-header-cell *matHeaderCellDef>Broker Payment</th>
+            <td mat-cell *matCellDef="let trip" class="payment-cell">
+              {{ formatCurrency(trip.brokerPayment) }}
+            </td>
+          </ng-container>
+
+          <!-- Lorry Owner Payment Column -->
+          <ng-container matColumnDef="lorryOwnerPayment">
+            <th mat-header-cell *matHeaderCellDef>Lorry Payment</th>
+            <td mat-cell *matCellDef="let trip" class="payment-cell">
+              {{ formatCurrency(trip.lorryOwnerPayment) }}
+            </td>
+          </ng-container>
+
+          <!-- Driver Payment Column -->
+          <ng-container matColumnDef="driverPayment">
+            <th mat-header-cell *matHeaderCellDef>Driver Payment</th>
+            <td mat-cell *matCellDef="let trip" class="payment-cell">
+              {{ formatCurrency(trip.driverPayment) }}
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let trip">
+              <button mat-icon-button [matMenuTriggerFor]="menu">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <button mat-menu-item (click)="onViewDetails(trip)">
+                  <mat-icon>visibility</mat-icon>
+                  <span>View Details</span>
+                </button>
+                <button mat-menu-item (click)="onEditTrip(trip)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Edit Trip</span>
+                </button>
+                <button mat-menu-item (click)="onUpdateStatus(trip)">
+                  <mat-icon>update</mat-icon>
+                  <span>Update Status</span>
+                </button>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="trip-row"></tr>
+        </table>
+
+        <mat-paginator
+          [length]="totalTrips"
+          [pageSize]="pageSize"
+          [pageSizeOptions]="[25, 50, 100]"
+          [pageIndex]="pageIndex"
+          (page)="onPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

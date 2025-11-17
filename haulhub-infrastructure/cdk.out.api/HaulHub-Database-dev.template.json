@@ -1,0 +1,247 @@
+{
+ "Resources": {
+  "HaulHubTable967E0CC2": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "PK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "SK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI1PK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI1SK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI2PK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI2SK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI3PK",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "GSI3SK",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "GSI1",
+      "KeySchema": [
+       {
+        "AttributeName": "GSI1PK",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "GSI1SK",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "GSI2",
+      "KeySchema": [
+       {
+        "AttributeName": "GSI2PK",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "GSI2SK",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "GSI3",
+      "KeySchema": [
+       {
+        "AttributeName": "GSI3PK",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "GSI3SK",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "PK",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "SK",
+      "KeyType": "RANGE"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": false
+    },
+    "SSESpecification": {
+     "SSEEnabled": true
+    },
+    "StreamSpecification": {
+     "StreamViewType": "NEW_AND_OLD_IMAGES"
+    },
+    "TableName": "HaulHub-Table-dev",
+    "Tags": [
+     {
+      "Key": "Component",
+      "Value": "Database"
+     },
+     {
+      "Key": "Environment",
+      "Value": "dev"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "HaulHub"
+     }
+    ],
+    "TimeToLiveSpecification": {
+     "AttributeName": "ttl",
+     "Enabled": true
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "HaulHub-Database-dev/HaulHubTable/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/yXISwqAIBRA0bU015dJraAFBNU8np/APho9LSLae1Cje7gSpCxBZHgS12bmi1NwdxH1zPCkwVwe12AU3D2qxbJ69B8e1loKadffalLcUnyYD8bCRPkhBRQViGwi5/iefHSrhfbvC1/ZUmNyAAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "HaulHub-Database-dev/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "TableName": {
+   "Description": "DynamoDB Table Name",
+   "Value": {
+    "Ref": "HaulHubTable967E0CC2"
+   },
+   "Export": {
+    "Name": "HaulHub-TableName-dev"
+   }
+  },
+  "TableArn": {
+   "Description": "DynamoDB Table ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "HaulHubTable967E0CC2",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "HaulHub-TableArn-dev"
+   }
+  },
+  "TableStreamArn": {
+   "Description": "DynamoDB Table Stream ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "HaulHubTable967E0CC2",
+     "StreamArn"
+    ]
+   }
+  },
+  "GSI1IndexName": {
+   "Description": "GSI1 Index Name (Driver Trip Queries)",
+   "Value": "GSI1"
+  },
+  "GSI2IndexName": {
+   "Description": "GSI2 Index Name (Lorry Trip Queries)",
+   "Value": "GSI2"
+  },
+  "GSI3IndexName": {
+   "Description": "GSI3 Index Name (Lorry Verification Status Queries)",
+   "Value": "GSI3"
+  },
+  "ExportsOutputFnGetAttHaulHubTable967E0CC2Arn25F48F3B": {
+   "Value": {
+    "Fn::GetAtt": [
+     "HaulHubTable967E0CC2",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "HaulHub-Database-dev:ExportsOutputFnGetAttHaulHubTable967E0CC2Arn25F48F3B"
+   }
+  },
+  "ExportsOutputRefHaulHubTable967E0CC2984C6E0C": {
+   "Value": {
+    "Ref": "HaulHubTable967E0CC2"
+   },
+   "Export": {
+    "Name": "HaulHub-Database-dev:ExportsOutputRefHaulHubTable967E0CC2984C6E0C"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

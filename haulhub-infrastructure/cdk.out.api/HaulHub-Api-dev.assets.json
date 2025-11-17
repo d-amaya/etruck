@@ -1,0 +1,36 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "585c49e01bd23b1b066c825b175afaed09d15c99535ef4a375c490a841371748": {
+      "displayName": "BackendFunction/Code",
+      "source": {
+        "path": "asset.585c49e01bd23b1b066c825b175afaed09d15c99535ef4a375c490a841371748",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "131451030564-us-east-1-519a36c8": {
+          "bucketName": "cdk-hnb659fds-assets-131451030564-us-east-1",
+          "objectKey": "585c49e01bd23b1b066c825b175afaed09d15c99535ef4a375c490a841371748.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::131451030564:role/cdk-hnb659fds-file-publishing-role-131451030564-us-east-1"
+        }
+      }
+    },
+    "f38e2686902200097197411365c4e5a47847c63b7086fe507b848086e8cdda4a": {
+      "displayName": "HaulHub-Api-dev Template",
+      "source": {
+        "path": "HaulHub-Api-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "131451030564-us-east-1-d18a9c14": {
+          "bucketName": "cdk-hnb659fds-assets-131451030564-us-east-1",
+          "objectKey": "f38e2686902200097197411365c4e5a47847c63b7086fe507b848086e8cdda4a.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::131451030564:role/cdk-hnb659fds-file-publishing-role-131451030564-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

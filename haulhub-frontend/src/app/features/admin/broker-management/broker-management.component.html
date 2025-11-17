@@ -1,0 +1,89 @@
+<div class="broker-management-container">
+  <div class="header">
+    <h2>Broker Management</h2>
+    <button mat-raised-button color="primary" (click)="openAddBrokerDialog()" [disabled]="loading">
+      <mat-icon>add</mat-icon>
+      Add Broker
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading brokers...</p>
+  </div>
+
+  <div *ngIf="error && !loading" class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error }}</p>
+    <button mat-raised-button color="primary" (click)="loadBrokers()">
+      <mat-icon>refresh</mat-icon>
+      Retry
+    </button>
+  </div>
+
+  <div *ngIf="!loading && !error" class="table-container">
+    <div *ngIf="brokers.length === 0" class="empty-state">
+      <mat-icon>business</mat-icon>
+      <p>No brokers found</p>
+      <button mat-raised-button color="primary" (click)="openAddBrokerDialog()">
+        <mat-icon>add</mat-icon>
+        Add First Broker
+      </button>
+    </div>
+
+    <table mat-table [dataSource]="brokers" *ngIf="brokers.length > 0" class="brokers-table">
+      <!-- Broker Name Column -->
+      <ng-container matColumnDef="brokerName">
+        <th mat-header-cell *matHeaderCellDef>Broker Name</th>
+        <td mat-cell *matCellDef="let broker">{{ broker.brokerName }}</td>
+      </ng-container>
+
+      <!-- Broker ID Column -->
+      <ng-container matColumnDef="brokerId">
+        <th mat-header-cell *matHeaderCellDef>Broker ID</th>
+        <td mat-cell *matCellDef="let broker">{{ broker.brokerId }}</td>
+      </ng-container>
+
+      <!-- Active Status Column -->
+      <ng-container matColumnDef="isActive">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let broker">
+          <mat-chip [color]="getStatusColor(broker.isActive)">
+            {{ getStatusLabel(broker.isActive) }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Created At Column -->
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>Created</th>
+        <td mat-cell *matCellDef="let broker">{{ formatDate(broker.createdAt) }}</td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let broker">
+          <button 
+            mat-icon-button 
+            color="primary" 
+            (click)="openEditBrokerDialog(broker)"
+            matTooltip="Edit broker">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button 
+            mat-icon-button 
+            color="warn" 
+            (click)="openDeleteConfirmDialog(broker)"
+            [disabled]="!broker.isActive"
+            matTooltip="Delete broker">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+  </div>
+</div>

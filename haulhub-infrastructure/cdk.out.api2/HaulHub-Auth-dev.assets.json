@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "4d5743dd9e3c1fdfd0de69f9bc15b252ad107f6d83eda4039174476713098590": {
+      "displayName": "HaulHub-Auth-dev Template",
+      "source": {
+        "path": "HaulHub-Auth-dev.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "131451030564-us-east-1-80a1aa0a": {
+          "bucketName": "cdk-hnb659fds-assets-131451030564-us-east-1",
+          "objectKey": "4d5743dd9e3c1fdfd0de69f9bc15b252ad107f6d83eda4039174476713098590.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::131451030564:role/cdk-hnb659fds-file-publishing-role-131451030564-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

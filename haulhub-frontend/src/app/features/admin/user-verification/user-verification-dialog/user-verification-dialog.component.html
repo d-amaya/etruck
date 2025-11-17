@@ -1,0 +1,57 @@
+<h2 mat-dialog-title>Verify User</h2>
+
+<mat-dialog-content>
+  <div class="user-info">
+    <h3>User Information</h3>
+    <div class="info-row">
+      <span class="label">Full Name:</span>
+      <span class="value">{{ data.user.fullName }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Email:</span>
+      <span class="value">{{ data.user.email }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Phone Number:</span>
+      <span class="value">{{ data.user.phoneNumber }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Role:</span>
+      <span class="value">{{ data.user.role }}</span>
+    </div>
+  </div>
+
+  <form [formGroup]="verificationForm" class="verification-form">
+    <mat-radio-group formControlName="decision" class="decision-group">
+      <mat-radio-button value="Verified" color="primary">
+        Verify User
+      </mat-radio-button>
+      <mat-radio-button value="Rejected" color="warn">
+        Reject User
+      </mat-radio-button>
+    </mat-radio-group>
+
+    <mat-form-field appearance="outline" class="full-width" *ngIf="isReasonRequired()">
+      <mat-label>Rejection Reason</mat-label>
+      <textarea 
+        matInput 
+        formControlName="reason" 
+        rows="4"
+        placeholder="Please provide a reason for rejection"></textarea>
+      <mat-error *ngIf="verificationForm.get('reason')?.hasError('required')">
+        Rejection reason is required
+      </mat-error>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button 
+    mat-raised-button 
+    color="primary" 
+    (click)="onSubmit()"
+    [disabled]="!verificationForm.valid">
+    Submit
+  </button>
+</mat-dialog-actions>

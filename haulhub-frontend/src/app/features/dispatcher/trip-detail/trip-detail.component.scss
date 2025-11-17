@@ -1,0 +1,226 @@
+.trip-detail-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+
+  p {
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 16px;
+  }
+}
+
+.error-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+
+  .error-card {
+    max-width: 500px;
+    text-align: center;
+
+    mat-card-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 32px;
+
+      mat-icon {
+        font-size: 64px;
+        width: 64px;
+        height: 64px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      p {
+        color: rgba(0, 0, 0, 0.6);
+        margin: 0;
+      }
+    }
+  }
+}
+
+.header-card {
+  margin-bottom: 24px;
+
+  mat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+
+    mat-card-title {
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 500;
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+  }
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+.detail-card {
+  mat-card-header {
+    padding: 16px 16px 8px 16px;
+
+    mat-card-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.87);
+    }
+  }
+
+  mat-card-content {
+    padding: 16px;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 14px;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.87);
+      text-align: right;
+      max-width: 60%;
+      word-break: break-word;
+    }
+  }
+
+  &.status-card {
+    mat-chip-set {
+      display: flex;
+      justify-content: center;
+      padding: 16px 0;
+    }
+
+    mat-chip {
+      font-size: 16px;
+      padding: 8px 16px;
+      font-weight: 500;
+    }
+  }
+
+  &.payment-card {
+    .payment-positive {
+      color: #2e7d32;
+      font-weight: 500;
+    }
+
+    .payment-negative {
+      color: #d32f2f;
+      font-weight: 500;
+    }
+
+    .profit-row {
+      margin-top: 8px;
+      padding-top: 16px;
+      font-size: 16px;
+
+      .detail-label {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .detail-value {
+        font-size: 18px;
+        font-weight: 600;
+      }
+    }
+
+    mat-divider {
+      margin: 8px 0;
+    }
+  }
+}
+
+// Status chip colors
+.status-scheduled {
+  background-color: #2196f3 !important;
+  color: white !important;
+}
+
+.status-picked-up {
+  background-color: #ff9800 !important;
+  color: white !important;
+}
+
+.status-in-transit {
+  background-color: #9c27b0 !important;
+  color: white !important;
+}
+
+.status-delivered {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.status-paid {
+  background-color: #00bcd4 !important;
+  color: white !important;
+}
+
+@media (max-width: 768px) {
+  .trip-detail-container {
+    padding: 16px;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-card {
+    mat-card-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+
+      .header-actions {
+        width: 100%;
+        flex-direction: column;
+
+        button {
+          width: 100%;
+        }
+      }
+    }
+  }
+}
