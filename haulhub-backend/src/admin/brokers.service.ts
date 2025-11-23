@@ -222,38 +222,6 @@ export class BrokersService {
   }
 
   /**
-   * Seed initial broker data
-   */
-  async seedBrokers(): Promise<void> {
-    const initialBrokers = [
-      { brokerName: 'TQL (Total Quality Logistics)' },
-      { brokerName: 'C.H. Robinson' },
-      { brokerName: 'XPO Logistics' },
-      { brokerName: 'Coyote Logistics' },
-      { brokerName: 'Echo Global Logistics' },
-    ];
-
-    try {
-      // Check if brokers already exist
-      const existingBrokers = await this.getAllBrokers();
-      if (existingBrokers.length > 0) {
-        console.log('Brokers already seeded, skipping...');
-        return;
-      }
-
-      // Create initial brokers
-      for (const brokerData of initialBrokers) {
-        await this.createBroker(brokerData);
-      }
-
-      console.log(`Successfully seeded ${initialBrokers.length} brokers`);
-    } catch (error: any) {
-      console.error('Error seeding brokers:', error);
-      // Don't throw error, just log it - seeding is optional
-    }
-  }
-
-  /**
    * Map DynamoDB item to Broker interface
    */
   private mapDynamoDBItemToBroker(item: any): Broker {

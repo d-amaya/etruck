@@ -7,6 +7,7 @@ A serverless web application for managing transportation logistics between Dispa
 - [Overview](#overview)
 - [Project Structure](#project-structure)
 - [Technology Stack](#technology-stack)
+- [Configuration Files](#configuration-files)
 - [Getting Started](#getting-started)
 - [Installation](#installation)
 - [Building](#building)
@@ -77,7 +78,91 @@ import { UserRole, Trip, CreateTripDto } from '@haulhub/shared';
 
 ---
 
+## Configuration Files
+
+HaulHub uses environment-specific configuration files that are excluded from git. These files contain your unique AWS resource URLs.
+
+### `cdk.context.json` - Infrastructure Configuration
+
+**Location**: `haulhub-infrastructure/cdk.context.json`
+
+**Purpose**: Provides runtime configuration to CDK when deploying infrastructure.
+
+**Contents**:
+```json
+{
+  "environment": "dev",
+  "awsProfile": "haul-hub",
+  "allowedOrigins": "https://YOUR_CLOUDFRONT_URL.cloudfront.net"
+}
+```
+
+**How it's used**: CDK reads this file and configures API Gateway CORS to only accept requests from your CloudFront distribution.
+
+**Why excluded from git**: Each deployment has a unique CloudFront URL. Your URL: `d23ld7dtwui8dz.cloudfront.net`, someone else's: `abc123xyz.cloudfront.net`.
+
+### `environment.prod.ts` - Frontend Configuration
+
+**Location**: `haulhub-frontend/src/environments/environment.prod.ts`
+
+**Purpose**: Tells your Angular frontend where to find your backend API in production.
+
+**Contents**:
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/dev',
+  apiBaseUrl: 'https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/dev'
+};
+```
+
+**How it's used**: Angular compiles this into your frontend code. All API calls use this URL.
+
+**Why excluded from git**: Each deployment has a unique API Gateway URL.
+
+### Two-Phase Deployment Pattern
+
+**Why two deployments?** The first deployment creates resources and outputs URLs. The second deployment uses those URLs to secure CORS.
+
+**Phase 1 - Initial Deployment**:
+- Config files have placeholders
+- CDK uses fallback: `allowedOrigins || '*'` (allow all origins - temporarily insecure)
+- Infrastructure gets created
+- CDK outputs your unique CloudFront and API Gateway URLs
+
+**Phase 2 - Secure Deployment**:
+- Update config files with actual URLs from Phase 1
+- Redeploy API stack
+- CORS now locked to your CloudFront URL only (secure)
+
+This pattern solves the chicken-and-egg problem: you need the CloudFront URL to configure CORS, but CloudFront doesn't exist until you deploy.
+
+---
+
 ## Getting Started
+
+### Quick Start Checklist
+
+For a brand new setup from scratch, follow these steps in order:
+
+- [ ] Install prerequisites (Node.js 18+, AWS CLI, AWS CDK CLI)
+- [ ] Create AWS account (if you don't have one)
+- [ ] Create AWS access keys (see [AWS Profile Configuration](#aws-profile-configuration))
+- [ ] Configure AWS CLI profile (`aws configure --profile haul-hub`)
+- [ ] Clone repository
+- [ ] Run `npm install` from root
+- [ ] Create config files from templates
+- [ ] Build shared package (`npm run build:shared`)
+- [ ] Deploy infrastructure (`cd haulhub-infrastructure && npx cdk bootstrap && npx cdk deploy --all`)
+- [ ] Save CDK outputs (User Pool ID, API URL, CloudFront URL, etc.)
+- [ ] Update configuration files with actual values
+- [ ] Build backend and frontend
+- [ ] Deploy backend to Lambda
+- [ ] Seed initial data (brokers)
+- [ ] Deploy frontend to S3/CloudFront
+- [ ] Verify deployment
+
+**Estimated Total Time**: 30-45 minutes for first-time setup
 
 ### Prerequisites
 
@@ -85,34 +170,118 @@ import { UserRole, Trip, CreateTripDto } from '@haulhub/shared';
 - **AWS CLI** - [Installation Guide](https://aws.amazon.com/cli/)
 - **AWS CDK CLI** - Install globally: `npm install -g aws-cdk`
 - **Git** - For version control
+- **AWS Account** with appropriate permissions (IAM, Lambda, DynamoDB, S3, CloudFront, Cognito, API Gateway)
 
 ### Verify Installation
 
 ```bash
 node --version    # Should be 18.x or higher
-npm --version
-aws --version
-cdk --version
+npm --version     # Should be 8.x or higher
+aws --version     # Should be 2.x
+cdk --version     # Should be 2.x
 ```
 
 ### AWS Profile Configuration
 
-This project uses the `haul-hub` AWS profile. Configure it:
+This project uses the `haul-hub` AWS profile to manage AWS credentials locally.
+
+#### Step 1: Create AWS Access Keys
+
+If you have a brand new AWS account, you need to create access keys first:
+
+**Option A: Using Root Account (Quick Start - Not Recommended for Production)**
+
+1. Sign in to [AWS Console](https://console.aws.amazon.com/)
+2. Click your account name (top right) → **Security credentials**
+3. Scroll to **Access keys** section
+4. Click **Create access key**
+5. Choose **Command Line Interface (CLI)**
+6. Check "I understand..." and click **Next**
+7. (Optional) Add description tag: "HaulHub Development"
+8. Click **Create access key**
+9. **Important**: Download the `.csv` file or copy both keys immediately (you won't see the secret key again!)
+
+**Option B: Using IAM User (Recommended for Production)**
+
+1. Sign in to [AWS Console](https://console.aws.amazon.com/)
+2. Go to **IAM** service
+3. Click **Users** → **Create user**
+4. Username: `haulhub-developer` (or your name)
+5. Click **Next**
+6. Select **Attach policies directly**
+7. Add these policies:
+   - `AdministratorAccess` (for full deployment access)
+   - Or create custom policy with specific permissions
+8. Click **Next** → **Create user**
+9. Click on the created user
+10. Go to **Security credentials** tab
+11. Click **Create access key**
+12. Choose **Command Line Interface (CLI)**
+13. Check "I understand..." and click **Next**
+14. Click **Create access key**
+15. **Important**: Download the `.csv` file or copy both keys immediately!
+
+#### Step 2: Configure AWS CLI Profile
+
+Now configure the AWS CLI with your access keys:
 
 ```bash
 aws configure --profile haul-hub
 ```
 
 You'll be prompted for:
-- AWS Access Key ID
-- AWS Secret Access Key
-- Default region (use `us-east-1`)
-- Default output format (use `json`)
+- **AWS Access Key ID**: Paste your access key (e.g., `AKIAIOSFODNN7EXAMPLE`)
+- **AWS Secret Access Key**: Paste your secret key (e.g., `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`)
+- **Default region**: Enter `us-east-1` (recommended)
+- **Default output format**: Enter `json`
 
-Verify configuration:
+#### Step 3: Verify Configuration
+
+Test that your credentials work:
+
 ```bash
 aws sts get-caller-identity --profile haul-hub
 ```
+
+Expected output:
+```json
+{
+    "UserId": "AIDAXXXXXXXXXXXXXXXXX",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/your-username"
+}
+```
+
+If you see your account number, you're all set! ✅
+
+#### Where Credentials Are Stored
+
+Your credentials are stored locally in:
+- **macOS/Linux**: `~/.aws/credentials` and `~/.aws/config`
+- **Windows**: `C:\Users\USERNAME\.aws\credentials` and `C:\Users\USERNAME\.aws\config`
+
+**Example `~/.aws/credentials`**:
+```ini
+[haul-hub]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+**Example `~/.aws/config`**:
+```ini
+[profile haul-hub]
+region = us-east-1
+output = json
+```
+
+#### Security Best Practices
+
+- ⚠️ **Never commit** these files to git (they're in `.gitignore`)
+- ⚠️ **Never share** your secret access key
+- ✅ **Use IAM users** instead of root account for production
+- ✅ **Enable MFA** (Multi-Factor Authentication) on your AWS account
+- ✅ **Rotate keys** regularly (every 90 days)
+- ✅ **Use least privilege** - only grant permissions you need
 
 ---
 
@@ -193,6 +362,36 @@ npm run clean:build   # Remove only build outputs
 
 ### Backend Development
 
+#### First Time Setup
+
+Before running the backend locally for the first time, create your `.env` file:
+
+```bash
+cd haulhub-backend
+
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and fill in your actual values from CDK outputs
+# You need: User Pool ID, Client ID, Table Names, S3 Bucket Name
+```
+
+**Quick way to get values**:
+```bash
+# Get Cognito User Pool ID
+aws cognito-idp list-user-pools --max-results 10 --profile haul-hub --region us-east-1 --query 'UserPools[?Name==`HaulHub-UserPool-dev`].Id' --output text
+
+# Get Cognito Client ID
+aws cognito-idp list-user-pool-clients --user-pool-id YOUR_POOL_ID --profile haul-hub --region us-east-1 --query 'UserPoolClients[0].ClientId' --output text
+
+# Get S3 Bucket Name
+aws s3 ls --profile haul-hub | grep haulhub-documents-dev
+
+# Table names are standard: HaulHub-TripsTable-dev, HaulHub-BrokersTable-dev, etc.
+```
+
+#### Running the Backend
+
 Start the backend in development mode with hot-reload:
 
 ```bash
@@ -205,6 +404,8 @@ Or use the script:
 ```bash
 ./scripts/dev-backend.sh
 ```
+
+**Important**: The local backend connects to your **actual AWS resources** (DynamoDB, S3, Cognito). Any data you create locally will be stored in your dev environment.
 
 ### Frontend Development
 
@@ -235,36 +436,80 @@ Open two terminal windows:
 ./scripts/dev-frontend.sh
 ```
 
+### Local vs Production
+
+| Aspect | Local Development | Production |
+|--------|------------------|------------|
+| **Backend** | Runs on your machine (`localhost:3000`) | Runs on AWS Lambda |
+| **Frontend** | Runs on your machine (`localhost:4200`) | Served from CloudFront |
+| **Data** | Uses AWS dev environment (DynamoDB, S3) | Uses AWS dev environment |
+| **Config** | `.env` file + `environment.ts` | Lambda env vars + `environment.prod.ts` |
+| **CORS** | `http://localhost:4200` | Your CloudFront URL |
+| **Hot Reload** | ✅ Yes (instant changes) | ❌ No (must redeploy) |
+| **Debugging** | ✅ Easy (console, breakpoints) | ⚠️ Harder (CloudWatch logs) |
+
+**Key Point**: Local development still uses your **real AWS resources**. Data created locally appears in your AWS DynamoDB tables.
+
 ### Environment Variables
 
-#### Backend (.env)
+Environment variables are configured differently for local development vs. production deployment.
 
-Create `haulhub-backend/.env`:
+#### Backend (.env) - Local Development
+
+Create `haulhub-backend/.env` for local development:
 
 ```bash
 AWS_REGION=us-east-1
 COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
 COGNITO_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
-DYNAMODB_TABLE_NAME=HaulHub
+TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
+BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
+LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
+USERS_TABLE_NAME=HaulHub-UsersTable-dev
 S3_DOCUMENTS_BUCKET_NAME=haulhub-documents-dev-XXXXXXXXXX
-ALLOWED_ORIGINS=https://your-cloudfront-domain.cloudfront.net
+ALLOWED_ORIGINS=http://localhost:4200
 NODE_ENV=development
 PORT=3000
 ```
 
-#### Frontend (environment.ts)
+**Note**: Get these values from CDK deployment outputs (see Step 4 in Initial Deployment).
 
-Update `haulhub-frontend/src/environments/environment.ts`:
+#### Backend - Production (Lambda)
+
+For production, environment variables are set automatically by CDK in the Lambda function configuration. No `.env` file is needed in Lambda.
+
+#### Frontend (environment.ts) - Local Development
+
+Update `haulhub-frontend/src/environments/environment.ts` for local development:
 
 ```typescript
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:3000',
-  cognitoUserPoolId: 'us-east-1_XXXXXXXXX',
-  cognitoClientId: 'XXXXXXXXXXXXXXXXXXXXXXXXXX',
-  region: 'us-east-1'
+  apiBaseUrl: 'http://localhost:3000'
 };
 ```
+
+#### Frontend (environment.prod.ts) - Production
+
+Create from template and update with actual values:
+
+```bash
+cp haulhub-frontend/src/environments/environment.prod.ts.template \
+   haulhub-frontend/src/environments/environment.prod.ts
+```
+
+Then update with your API Gateway URL:
+
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev',
+  apiBaseUrl: 'https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev'
+};
+```
+
+**Important**: The `environment.prod.ts` file is excluded from git. Each developer/environment needs their own copy.
 
 ---
 
@@ -319,24 +564,46 @@ HaulHub provides automated deployment scripts for easy deployment to AWS.
 
 ### Initial Deployment Steps
 
-#### Step 1: Install Dependencies
+#### Step 1: Clone and Install Dependencies
 
 ```bash
+# Clone the repository
+git clone <your-repo-url>
+cd HaulHub
+
+# Install all dependencies
 npm install
-npm run build:all
 ```
 
-#### Step 2: Deploy Infrastructure
+#### Step 2: Create Configuration Files from Templates
 
 ```bash
-./scripts/deploy-infrastructure.sh
+# Create CDK context file (leave placeholder values for now)
+cp haulhub-infrastructure/cdk.context.json.template haulhub-infrastructure/cdk.context.json
+
+# Create production environment file (leave placeholder values for now)
+cp haulhub-frontend/src/environments/environment.prod.ts.template \
+   haulhub-frontend/src/environments/environment.prod.ts
 ```
 
-Or manually:
+**Important Notes**:
+- These files are excluded from git
+- You can leave the placeholder values for the initial deployment
+- The first deployment will use permissive CORS settings (`allowedOrigins: '*'`)
+- After deployment, you'll update these files with actual values and redeploy to secure CORS
+
+#### Step 3: Build Shared Package
+
+The shared package must be built first as other packages depend on it:
+
+```bash
+npm run build:shared
+```
+
+#### Step 4: Deploy Infrastructure
 
 ```bash
 cd haulhub-infrastructure
-npm install
 npm run build
 npx cdk bootstrap --profile haul-hub
 npx cdk deploy --all --profile haul-hub --require-approval never
@@ -344,55 +611,185 @@ npx cdk deploy --all --profile haul-hub --require-approval never
 
 **Expected Duration**: 10-15 minutes
 
-**Outputs**: After deployment, note the following values:
-- Cognito User Pool ID
-- Cognito Client ID
-- API Gateway URL
-- S3 Bucket Names
-- CloudFront Distribution ID
+**Important**: After deployment completes, CDK will output critical values. **Save these values**:
 
-#### Step 3: Update Environment Variables
-
-Update the `.env` files with the values from Step 2.
-
-#### Step 4: Deploy Backend
-
-```bash
-./scripts/deploy-backend.sh
+```
+Outputs:
+HaulHub-Auth-dev.UserPoolId = us-east-1_XXXXXXXXX
+HaulHub-Auth-dev.UserPoolClientId = XXXXXXXXXXXXXXXXXXXXXXXXXX
+HaulHub-Api-dev.ApiEndpoint = https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev
+HaulHub-Storage-dev.DocumentsBucketName = haulhub-documents-dev-XXXXXXXXXX
+HaulHub-Frontend-dev.CloudFrontURL = https://XXXXXXXXXXXXXX.cloudfront.net
+HaulHub-Frontend-dev.FrontendBucketName = haulhub-frontend-dev-XXXXXXXXXX
+HaulHub-Database-dev.TripsTableName = HaulHub-TripsTable-dev
+HaulHub-Database-dev.BrokersTableName = HaulHub-BrokersTable-dev
+HaulHub-Database-dev.LorriesTableName = HaulHub-LorriesTable-dev
+HaulHub-Database-dev.UsersTableName = HaulHub-UsersTable-dev
 ```
 
-**Expected Duration**: 3-5 minutes
+#### Step 5: Update Configuration Files and Secure CORS
 
-#### Step 5: Seed Initial Data
+**Why this step is needed**: The initial deployment used `allowedOrigins: '*'` (allow all origins) because we didn't have the CloudFront URL yet. Now we need to lock down CORS to only allow requests from YOUR CloudFront distribution.
 
-```bash
-cd haulhub-backend
-npm run seed:brokers
+Using the outputs from Step 4, update your configuration files:
+
+**A. Update `haulhub-infrastructure/cdk.context.json`:**
+```json
+{
+  "environment": "dev",
+  "awsProfile": "haul-hub",
+  "allowedOrigins": "https://XXXXXXXXXXXXXX.cloudfront.net"
+}
 ```
 
-#### Step 6: Deploy Frontend
+**B. Create `haulhub-backend/.env`:**
+```bash
+AWS_REGION=us-east-1
+COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+COGNITO_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
+TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
+BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
+LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
+USERS_TABLE_NAME=HaulHub-UsersTable-dev
+S3_DOCUMENTS_BUCKET_NAME=haulhub-documents-dev-XXXXXXXXXX
+ALLOWED_ORIGINS=https://XXXXXXXXXXXXXX.cloudfront.net
+NODE_ENV=production
+```
+
+**C. Update `haulhub-frontend/src/environments/environment.prod.ts`:**
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev',
+  apiBaseUrl: 'https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev'
+};
+```
+
+**D. Update `haulhub-frontend/src/environments/environment.ts` (for local development):**
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:3000',
+  apiBaseUrl: 'http://localhost:3000'
+};
+```
+
+#### Step 6: Redeploy API with Secured CORS
+
+Now that you've updated `cdk.context.json` with your actual CloudFront URL, redeploy the API stack to secure CORS:
 
 ```bash
-./scripts/deploy-frontend.sh
+cd haulhub-infrastructure
+npx cdk deploy HaulHub-Api-dev --profile haul-hub
+```
+
+**What this does**:
+- Updates API Gateway CORS from `'*'` (allow all) to your specific CloudFront URL
+- Updates Lambda environment variable `ALLOWED_ORIGINS`
+- Secures your API so only YOUR frontend can call it
+
+**Expected Duration**: 2-3 minutes
+
+#### Step 7: Build Backend and Frontend
+
+```bash
+# Build backend
+cd ../haulhub-backend
+npm run build
+
+# Build frontend
+cd ../haulhub-frontend
+npm run build
+```
+
+#### Step 8: Deploy Backend Code to Lambda
+
+The Lambda function already exists from Step 4, but now we need to update it with the built backend code:
+
+```bash
+cd ../haulhub-infrastructure
+npx cdk deploy HaulHub-Api-dev --profile haul-hub
+```
+
+**Expected Duration**: 2-3 minutes
+
+**Note**: This is the second time deploying the API stack - first time was for CORS, this time is for the backend code.
+
+#### Step 9: Seed Initial Data
+
+Seed the brokers table with initial broker data (20 major US freight brokers):
+
+```bash
+cd scripts
+./seed-brokers.sh
+```
+
+This will populate the `HaulHub-BrokersTable-dev` with 20 brokers including:
+- C.H. Robinson
+- XPO Logistics
+- TQL (Total Quality Logistics)
+- J.B. Hunt Transport Services
+- And 16 more...
+
+**Expected Duration**: 1-2 minutes
+
+**What it does**:
+- Checks if table exists
+- Shows current broker count
+- Adds 20 major US freight brokers
+- Verifies seeded data
+
+**Note**: You can also seed all tables at once with `./seed-all-tables.sh` which includes brokers, test users, lorries, and trips.
+
+#### Step 10: Deploy Frontend to S3 and CloudFront
+
+```bash
+cd ../haulhub-frontend
+
+# Sync built files to S3
+aws s3 sync dist/haulhub-frontend/ s3://haulhub-frontend-dev-XXXXXXXXXX/ \
+  --profile haul-hub \
+  --delete
+
+# Invalidate CloudFront cache
+aws cloudfront create-invalidation \
+  --distribution-id XXXXXXXXXXXXXX \
+  --paths "/*" \
+  --profile haul-hub
 ```
 
 **Expected Duration**: 5-10 minutes (including CloudFront invalidation)
 
-#### Step 7: Verify Deployment
+**Note**: Get the Distribution ID from CloudFront console or from CDK outputs.
 
-1. **Test API**: 
+#### Step 11: Verify Deployment
+
+1. **Test API Health**: 
    ```bash
-   curl https://your-api-url.execute-api.us-east-1.amazonaws.com/dev/health
+   curl https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev/health
+   ```
+   
+   Expected response:
+   ```json
+   {"status":"ok","timestamp":"2024-01-01T00:00:00.000Z"}
    ```
 
-2. **Access Frontend**: 
-   Open `https://your-cloudfront-domain.cloudfront.net` in a browser
+2. **Test Brokers Endpoint**:
+   ```bash
+   curl https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev/brokers
+   ```
+   
+   Expected: List of brokers
 
-3. **Register Test User**:
+3. **Access Frontend**: 
+   Open `https://XXXXXXXXXXXXXX.cloudfront.net` in a browser
+
+4. **Register Test User**:
    - Navigate to registration page
-   - Create a test account
+   - Create a test account (Dispatcher, Driver, or Lorry Owner)
+   - Check email for verification link
    - Verify email
-   - Log in
+   - Log in and test functionality
 
 ### Updating Deployments
 
@@ -737,6 +1134,147 @@ npm run rebuild
 **Fixing dependency issues:**
 ```bash
 npm run fresh
+```
+
+### First-Time Setup Issues
+
+#### Missing Configuration Files
+
+**Error**: `Cannot find module 'environment.prod'` or CDK deployment fails
+
+**Solution**: Create configuration files from templates:
+```bash
+cp haulhub-infrastructure/cdk.context.json.template haulhub-infrastructure/cdk.context.json
+cp haulhub-frontend/src/environments/environment.prod.ts.template \
+   haulhub-frontend/src/environments/environment.prod.ts
+```
+
+#### Shared Package Not Built
+
+**Error**: `Cannot find module '@haulhub/shared'`
+
+**Solution**: Build shared package first:
+```bash
+npm run build:shared
+```
+
+#### AWS Profile Not Configured
+
+**Error**: `Unable to locate credentials` or `The config profile (haul-hub) could not be found`
+
+**Solution**: Configure AWS profile:
+```bash
+aws configure --profile haul-hub
+```
+
+If you don't have AWS access keys yet, see [AWS Profile Configuration](#aws-profile-configuration) section for detailed instructions on creating them.
+
+#### Invalid AWS Credentials
+
+**Error**: `The security token included in the request is invalid`
+
+**Possible causes**:
+1. Access keys are incorrect
+2. Access keys have been deleted or deactivated
+3. IAM user has been deleted
+
+**Solution**: 
+1. Verify your access keys in AWS Console (IAM → Users → Security credentials)
+2. If keys are invalid, create new ones and reconfigure:
+   ```bash
+   aws configure --profile haul-hub
+   ```
+
+#### Insufficient Permissions
+
+**Error**: `User: arn:aws:iam::123456789012:user/username is not authorized to perform: [action]`
+
+**Solution**: Your IAM user needs additional permissions. Add these policies in AWS Console:
+- `AdministratorAccess` (for full access)
+- Or specific policies: `AWSLambdaFullAccess`, `AmazonDynamoDBFullAccess`, `AmazonS3FullAccess`, etc.
+
+#### Wrong AWS Profile
+
+**Error**: Resources deploying to wrong account or region
+
+**Solution**: Verify you're using the correct profile:
+```bash
+# Check current profile
+aws sts get-caller-identity --profile haul-hub
+
+# Ensure CDK uses correct profile
+export AWS_PROFILE=haul-hub
+cdk deploy --profile haul-hub
+```
+
+#### CDK Not Bootstrapped
+
+**Error**: `This stack uses assets, so the toolkit stack must be deployed`
+
+**Solution**: Bootstrap CDK:
+```bash
+cd haulhub-infrastructure
+npx cdk bootstrap --profile haul-hub
+```
+
+#### Table Names Not Found
+
+**Error**: `Cannot do operations on a non-existent table`
+
+**Solution**: Ensure you're using the new table names in your `.env`:
+```bash
+TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
+BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
+LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
+USERS_TABLE_NAME=HaulHub-UsersTable-dev
+```
+
+Not the old single table name: ~~`DYNAMODB_TABLE_NAME=HaulHub`~~
+
+#### Missing .env File
+
+**Error**: `Cannot find module` or environment variables are undefined when running locally
+
+**Solution**: Create `.env` file from example:
+```bash
+cd haulhub-backend
+cp .env.example .env
+# Then edit .env with your actual values
+```
+
+#### Local Backend Can't Connect to AWS
+
+**Error**: `CredentialsProviderError` or `Unable to locate credentials`
+
+**Possible causes**:
+1. `.env` file doesn't exist
+2. AWS credentials not configured
+3. Wrong AWS profile
+
+**Solution**:
+```bash
+# Verify AWS credentials work
+aws sts get-caller-identity --profile haul-hub
+
+# Ensure .env file exists
+ls -la haulhub-backend/.env
+
+# Check .env has correct values
+cat haulhub-backend/.env
+```
+
+#### CORS Errors in Local Development
+
+**Error**: `Access to XMLHttpRequest has been blocked by CORS policy`
+
+**Solution**: Ensure your backend `.env` has:
+```bash
+ALLOWED_ORIGINS=http://localhost:4200
+```
+
+And your frontend `environment.ts` points to local backend:
+```typescript
+apiUrl: 'http://localhost:3000'
 ```
 
 ---
