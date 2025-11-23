@@ -360,11 +360,13 @@ npm run clean:build   # Remove only build outputs
 
 ## Development
 
-### Backend Development
+### First Time Setup
 
-#### First Time Setup
+Before running the application locally for the first time, you need to configure environment variables.
 
-Before running the backend locally for the first time, create your `.env` file:
+#### Backend Environment Setup
+
+Create your `.env` file in the backend directory:
 
 ```bash
 cd haulhub-backend
@@ -390,9 +392,41 @@ aws s3 ls --profile haul-hub | grep haulhub-documents-dev
 # Table names are standard: HaulHub-TripsTable-dev, HaulHub-BrokersTable-dev, etc.
 ```
 
-#### Running the Backend
+#### Frontend Environment Setup
 
-Start the backend in development mode with hot-reload:
+Update `haulhub-frontend/src/environments/environment.ts` for local development:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:3000',
+  apiBaseUrl: 'http://localhost:3000'
+};
+```
+
+This file should already exist with these values, but verify it's correct.
+
+### Running the Application
+
+Once environment variables are configured, start both servers:
+
+#### Option 1: Using Scripts (Recommended)
+
+**Terminal 1 - Backend:**
+```bash
+./scripts/dev-backend.sh
+```
+
+**Terminal 2 - Frontend:**
+```bash
+./scripts/dev-frontend.sh
+```
+
+**Note**: The dev scripts automatically rebuild the shared package before starting.
+
+#### Option 2: Manual Start
+
+**Backend:**
 
 ```bash
 cd haulhub-backend
@@ -400,41 +434,35 @@ npm run start:dev
 # Runs on http://localhost:3000
 ```
 
-Or use the script:
-```bash
-./scripts/dev-backend.sh
-```
-
-**Important**: The local backend connects to your **actual AWS resources** (DynamoDB, S3, Cognito). Any data you create locally will be stored in your dev environment.
-
-### Frontend Development
-
-Start the frontend in development mode with hot-reload:
-
+**Frontend:**
 ```bash
 cd haulhub-frontend
 npm start
 # Runs on http://localhost:4200
 ```
 
-Or use the script:
-```bash
-./scripts/dev-frontend.sh
-```
+### Accessing the Application
 
-### Running Both Simultaneously
+Once both servers are running:
+- **Frontend**: http://localhost:4200
+- **Backend API**: http://localhost:3000
 
-Open two terminal windows:
+**Important**: The local backend connects to your **actual AWS resources** (DynamoDB, S3, Cognito). Any data you create locally will be stored in your dev environment.
 
-**Terminal 1** (Backend):
-```bash
-./scripts/dev-backend.sh
-```
+### Working with the Shared Package
 
-**Terminal 2** (Frontend):
-```bash
-./scripts/dev-frontend.sh
-```
+The `haulhub-shared` package contains TypeScript types, interfaces, and DTOs used by both backend and frontend. When you modify files in `haulhub-shared/src/`:
+
+1. **Rebuild the shared package and update dependencies**:
+   ```bash
+   ./scripts/rebuild-shared.sh
+   ```
+
+2. **Restart your dev servers** (Ctrl+C and run the dev scripts again)
+
+**Why is this needed?** The shared package is compiled and cached in `node_modules/@haulhub`. Changes require rebuilding and clearing the cache.
+
+**Common issue**: If you see validation errors like `"property X should not exist"`, it means the backend/frontend is using an old cached version of the shared package. Run `./scripts/rebuild-shared.sh` to fix it.
 
 ### Local vs Production
 
@@ -450,56 +478,76 @@ Open two terminal windows:
 
 **Key Point**: Local development still uses your **real AWS resources**. Data created locally appears in your AWS DynamoDB tables.
 
-### Environment Variables
+### Development Workflow
 
-Environment variables are configured differently for local development vs. production deployment.
+#### Making Changes to Backend
 
-#### Backend (.env) - Local Development
+1. Edit files in `haulhub-backend/src/`
+2. The dev server will auto-reload (hot reload enabled)
+3. No need to restart unless you modify `package.json` or `.env`
 
-Create `haulhub-backend/.env` for local development:
+#### Making Changes to Frontend
 
+1. Edit files in `haulhub-frontend/src/`
+2. The dev server will auto-reload (hot reload enabled)
+3. No need to restart unless you modify `package.json`
+
+#### Making Changes to Shared Package
+
+When you modify files in `haulhub-shared/src/` (DTOs, interfaces, enums):
+
+1. **Rebuild and update dependencies**:
+   ```bash
+   ./scripts/rebuild-shared.sh
+   ```
+
+2. **Restart both dev servers** (Ctrl+C and run the dev scripts again)
+
+**Why?** The shared package is compiled and cached in `node_modules/@haulhub`. Changes require:
+- Recompiling TypeScript (`npm run build` in haulhub-shared)
+- Clearing cached versions in backend and frontend
+- Restarting dev servers to pick up changes
+
+#### Common Development Tasks
+
+**After pulling from git:**
 ```bash
-AWS_REGION=us-east-1
-COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
-COGNITO_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
-TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
-BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
-LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
-USERS_TABLE_NAME=HaulHub-UsersTable-dev
-S3_DOCUMENTS_BUCKET_NAME=haulhub-documents-dev-XXXXXXXXXX
-ALLOWED_ORIGINS=http://localhost:4200
-NODE_ENV=development
-PORT=3000
+npm install
+npm run build:all
 ```
 
-**Note**: Get these values from CDK deployment outputs (see Step 4 in Initial Deployment).
-
-#### Backend - Production (Lambda)
-
-For production, environment variables are set automatically by CDK in the Lambda function configuration. No `.env` file is needed in Lambda.
-
-#### Frontend (environment.ts) - Local Development
-
-Update `haulhub-frontend/src/environments/environment.ts` for local development:
-
-```typescript
-export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:3000',
-  apiBaseUrl: 'http://localhost:3000'
-};
+**After modifying shared package:**
+```bash
+./scripts/rebuild-shared.sh
+# Then restart dev servers
 ```
 
-#### Frontend (environment.prod.ts) - Production
+**Clean rebuild everything:**
+```bash
+npm run clean
+npm install
+npm run build:all
+```
 
-Create from template and update with actual values:
+**Rebuild only (keep dependencies):**
+```bash
+npm run rebuild
+```
+
+### Production Environment Configuration
+
+For production deployment, you need to configure environment files with your actual AWS resource URLs.
+
+#### Frontend Production Environment
+
+Create `haulhub-frontend/src/environments/environment.prod.ts`:
 
 ```bash
 cp haulhub-frontend/src/environments/environment.prod.ts.template \
    haulhub-frontend/src/environments/environment.prod.ts
 ```
 
-Then update with your API Gateway URL:
+Then update with your API Gateway URL (from CDK outputs):
 
 ```typescript
 export const environment = {
@@ -509,7 +557,11 @@ export const environment = {
 };
 ```
 
-**Important**: The `environment.prod.ts` file is excluded from git. Each developer/environment needs their own copy.
+**Note**: This file is excluded from git. Each deployment environment needs its own copy.
+
+#### Backend Production Environment
+
+For Lambda deployment, environment variables are set automatically by CDK. No `.env` file is needed in the Lambda function - CDK configures all environment variables during deployment.
 
 ---
 
@@ -1157,6 +1209,21 @@ cp haulhub-frontend/src/environments/environment.prod.ts.template \
 ```bash
 npm run build:shared
 ```
+
+#### Validation Errors After Modifying Shared Package
+
+**Error**: `"property X should not exist"` or validation errors in API requests
+
+**Cause**: The backend/frontend is using a cached version of the shared package from `node_modules/@haulhub`.
+
+**Solution**: Rebuild shared package and clear cache:
+```bash
+./scripts/rebuild-shared.sh
+```
+
+Then restart your dev servers (Ctrl+C and run `./scripts/dev-backend.sh` and `./scripts/dev-frontend.sh` again).
+
+**Prevention**: The dev scripts now automatically rebuild the shared package when starting, but if you modify the shared package while the servers are running, you need to manually rebuild and restart.
 
 #### AWS Profile Not Configured
 

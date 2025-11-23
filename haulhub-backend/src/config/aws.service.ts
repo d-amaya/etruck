@@ -21,17 +21,20 @@ export class AwsService {
   private initializeClients(): void {
     const region = this.configService.awsRegion;
 
-    // Initialize Cognito client
-    const cognitoConfig: CognitoIdentityProviderClientConfig = {
+    // Base configuration for all AWS clients
+    // The AWS SDK will automatically use credentials from:
+    // 1. AWS_PROFILE environment variable (if set)
+    // 2. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables
+    // 3. ~/.aws/credentials file (default profile)
+    const baseConfig = {
       region,
     };
-    this.cognitoClient = new CognitoIdentityProviderClient(cognitoConfig);
+
+    // Initialize Cognito client
+    this.cognitoClient = new CognitoIdentityProviderClient(baseConfig);
 
     // Initialize DynamoDB client
-    const dynamodbConfig: DynamoDBClientConfig = {
-      region,
-    };
-    const ddbClient = new DynamoDBClient(dynamodbConfig);
+    const ddbClient = new DynamoDBClient(baseConfig);
     this.dynamodbClient = DynamoDBDocumentClient.from(ddbClient, {
       marshallOptions: {
         removeUndefinedValues: true,
@@ -40,10 +43,7 @@ export class AwsService {
     });
 
     // Initialize S3 client
-    const s3Config: S3ClientConfig = {
-      region,
-    };
-    this.s3Client = new S3Client(s3Config);
+    this.s3Client = new S3Client(baseConfig);
   }
 
   getCognitoClient(): CognitoIdentityProviderClient {

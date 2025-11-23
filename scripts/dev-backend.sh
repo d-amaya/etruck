@@ -8,9 +8,11 @@ set -e  # Exit on error
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 BACKEND_DIR="haulhub-backend"
+SHARED_DIR="haulhub-shared"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}HaulHub Backend - Development Mode${NC}"
@@ -22,6 +24,13 @@ if [ ! -d "$BACKEND_DIR" ]; then
     echo -e "${RED}Error: Backend directory not found${NC}"
     exit 1
 fi
+
+# Build shared package first to ensure latest changes
+echo -e "${YELLOW}Building shared package...${NC}"
+cd $SHARED_DIR
+npm run build
+cd ..
+echo ""
 
 # Navigate to backend directory
 cd $BACKEND_DIR

@@ -8,9 +8,11 @@ set -e  # Exit on error
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 FRONTEND_DIR="haulhub-frontend"
+SHARED_DIR="haulhub-shared"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}HaulHub Frontend - Development Mode${NC}"
@@ -22,6 +24,13 @@ if [ ! -d "$FRONTEND_DIR" ]; then
     echo -e "${RED}Error: Frontend directory not found${NC}"
     exit 1
 fi
+
+# Build shared package first to ensure latest changes
+echo -e "${YELLOW}Building shared package...${NC}"
+cd $SHARED_DIR
+npm run build
+cd ..
+echo ""
 
 # Navigate to frontend directory
 cd $FRONTEND_DIR
