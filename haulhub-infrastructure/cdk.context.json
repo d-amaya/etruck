@@ -1,5 +1,0 @@
-{
-  "environment": "dev",
-  "awsProfile": "haul-hub",
-  "allowedOrigins": "https://d23ld7dtwui8dz.cloudfront.net"
-}

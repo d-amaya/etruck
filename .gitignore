@@ -27,6 +27,12 @@ build/
 .env.local
 .env.*.local
 
+# Production environment files
+haulhub-frontend/src/environments/environment.prod.ts
+
+# Scripts with sensitive data
+scripts/
+
 # Logs
 logs/
 *.log
@@ -41,7 +47,9 @@ Thumbs.db
 
 # CDK
 cdk.out/
+cdk.out.*/
 .cdk.staging/
+cdk.context.json
 
 # Temporary files
 *.tmp
