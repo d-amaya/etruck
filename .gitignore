@@ -30,8 +30,15 @@ build/
 # Production environment files
 haulhub-frontend/src/environments/environment.prod.ts
 
-# Scripts with sensitive data
-scripts/
+# Scripts with sensitive data (production URLs, credentials, test data)
+scripts/create-cognito-users.sh
+scripts/seed-all-tables.sh
+scripts/test-api.sh
+scripts/fix-broker-names.sh
+scripts/fix-broker-names.py
+scripts/check-sensitive-data.sh
+scripts/TEST-DATA-GUIDE.md
+scripts/README.md
 
 # Logs
 logs/
