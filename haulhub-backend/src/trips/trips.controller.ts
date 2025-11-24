@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -23,6 +24,7 @@ import {
   UpdateTripStatusDto,
   TripFilters,
   Trip,
+  TripStatus,
 } from '@haulhub/shared';
 
 @Controller('trips')
@@ -168,5 +170,81 @@ export class TripsController {
       user.role as UserRole,
       filters,
     );
+  }
+
+  /**
+   * GET /trips/dashboard/summary-by-status
+   * Get trip counts grouped by status for dashboard
+   * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
+   * 
+   * Dispatcher only - returns trip counts for each status
+   */
+  @Get('dashboard/summary-by-status')
+  @Roles(UserRole.Dispatcher)
+  async getTripSummaryByStatus(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<Record<TripStatus, number>> {
+    return this.tripsService.getTripSummaryByStatus(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/dashboard/payment-summary
+   * Get aggregated payment metrics for dashboard
+   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+   * 
+   * Dispatcher only - returns total payments and profit
+   */
+  @Get('dashboard/payment-summary')
+  @Roles(UserRole.Dispatcher)
+  async getPaymentSummary(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<{
+    totalBrokerPayments: number;
+    totalDriverPayments: number;
+    totalLorryOwnerPayments: number;
+    totalProfit: number;
+  }> {
+    return this.tripsService.getPaymentSummary(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/dashboard/payments-timeline
+   * Get time-series payment data for dashboard charts
+   * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
+   * 
+   * Dispatcher only - returns monthly payment data for charts
+   */
+  @Get('dashboard/payments-timeline')
+  @Roles(UserRole.Dispatcher)
+  async getPaymentsTimeline(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<{
+    labels: string[];
+    brokerPayments: number[];
+    driverPayments: number[];
+    lorryOwnerPayments: number[];
+    profit: number[];
+  }> {
+    return this.tripsService.getPaymentsTimeline(user.userId, filters);
+  }
+
+  /**
+   * DELETE /trips/:id
+   * Delete a trip
+   * Requirements: 18.1, 18.2, 18.3, 18.4, 18.5
+   * 
+   * Dispatcher only - hard delete the trip from database
+   */
+  @Delete(':id')
+  @Roles(UserRole.Dispatcher)
+  async deleteTrip(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') tripId: string,
+  ): Promise<{ message: string }> {
+    await this.tripsService.deleteTrip(tripId, user.userId);
+    return { message: 'Trip deleted successfully' };
   }
 }

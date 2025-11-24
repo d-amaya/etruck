@@ -1,0 +1,231 @@
+// =============================================================================
+// HAULHUB DESIGN SYSTEM - TYPOGRAPHY
+// Professional Typography System
+// =============================================================================
+
+@import 'variables';
+
+// =============================================================================
+// BASE TYPOGRAPHY
+// =============================================================================
+
+body {
+  font-family: $font-family-primary;
+  font-size: $font-size-body;
+  font-weight: $font-weight-regular;
+  line-height: $line-height-normal;
+  color: $neutral-900;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// =============================================================================
+// HEADINGS
+// =============================================================================
+
+h1, .h1 {
+  font-size: $font-size-h1;
+  font-weight: $font-weight-bold;
+  line-height: $line-height-tight;
+  color: $neutral-900;
+  margin: 0 0 $spacing-lg 0;
+  
+  &.light {
+    font-weight: $font-weight-light;
+  }
+}
+
+h2, .h2 {
+  font-size: $font-size-h2;
+  font-weight: $font-weight-medium;
+  line-height: $line-height-tight;
+  color: $neutral-900;
+  margin: 0 0 $spacing-md 0;
+}
+
+h3, .h3 {
+  font-size: $font-size-h3;
+  font-weight: $font-weight-medium;
+  line-height: $line-height-normal;
+  color: $neutral-900;
+  margin: 0 0 $spacing-md 0;
+}
+
+h4, .h4 {
+  font-size: $font-size-h4;
+  font-weight: $font-weight-medium;
+  line-height: $line-height-normal;
+  color: $neutral-700;
+  margin: 0 0 $spacing-sm 0;
+}
+
+// =============================================================================
+// BODY TEXT
+// =============================================================================
+
+p, .body {
+  font-size: $font-size-body;
+  font-weight: $font-weight-regular;
+  line-height: $line-height-normal;
+  color: $neutral-900;
+  margin: 0 0 $spacing-md 0;
+  
+  &.large {
+    font-size: $font-size-h4;
+    line-height: $line-height-relaxed;
+  }
+  
+  &.small {
+    font-size: $font-size-small;
+    color: $neutral-700;
+  }
+  
+  &.muted {
+    color: $neutral-500;
+  }
+}
+
+// =============================================================================
+// TEXT UTILITIES
+// =============================================================================
+
+.text-primary { color: $primary-blue !important; }
+.text-success { color: $success !important; }
+.text-error { color: $error !important; }
+.text-warning { color: $warning !important; }
+.text-info { color: $info !important; }
+
+.text-muted { color: $neutral-500 !important; }
+.text-secondary { color: $neutral-700 !important; }
+
+.text-center { text-align: center !important; }
+.text-left { text-align: left !important; }
+.text-right { text-align: right !important; }
+
+.text-uppercase { text-transform: uppercase !important; }
+.text-lowercase { text-transform: lowercase !important; }
+.text-capitalize { text-transform: capitalize !important; }
+
+.font-weight-light { font-weight: $font-weight-light !important; }
+.font-weight-regular { font-weight: $font-weight-regular !important; }
+.font-weight-medium { font-weight: $font-weight-medium !important; }
+.font-weight-bold { font-weight: $font-weight-bold !important; }
+
+// =============================================================================
+// LINKS
+// =============================================================================
+
+a {
+  color: $primary-blue;
+  text-decoration: none;
+  transition: color $transition-fast;
+  
+  &:hover {
+    color: $primary-dark;
+    text-decoration: underline;
+  }
+  
+  &:focus {
+    outline: 2px solid $primary-light;
+    outline-offset: 2px;
+  }
+}
+
+// =============================================================================
+// CODE & MONOSPACE
+// =============================================================================
+
+code, .code {
+  font-family: $font-family-mono;
+  font-size: 0.875em;
+  background-color: $neutral-100;
+  padding: 2px 4px;
+  border-radius: $border-radius-sm;
+  color: $neutral-900;
+}
+
+pre {
+  font-family: $font-family-mono;
+  font-size: $font-size-small;
+  background-color: $neutral-100;
+  padding: $spacing-md;
+  border-radius: $border-radius-md;
+  overflow-x: auto;
+  line-height: $line-height-relaxed;
+  
+  code {
+    background: none;
+    padding: 0;
+  }
+}
+
+// =============================================================================
+// LISTS
+// =============================================================================
+
+ul, ol {
+  margin: 0 0 $spacing-md 0;
+  padding-left: $spacing-lg;
+  
+  li {
+    margin-bottom: $spacing-xs;
+    line-height: $line-height-normal;
+  }
+}
+
+.list-unstyled {
+  list-style: none;
+  padding-left: 0;
+}
+
+.list-inline {
+  list-style: none;
+  padding-left: 0;
+  
+  li {
+    display: inline-block;
+    margin-right: $spacing-md;
+    margin-bottom: 0;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE TYPOGRAPHY
+// =============================================================================
+
+@media (max-width: $breakpoint-md) {
+  h1, .h1 {
+    font-size: $font-size-h2;
+  }
+  
+  h2, .h2 {
+    font-size: $font-size-h3;
+  }
+  
+  h3, .h3 {
+    font-size: $font-size-h4;
+  }
+}
+
+// =============================================================================
+// ACCESSIBILITY
+// =============================================================================
+
+// Screen reader only text
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Focus visible for better keyboard navigation
+.focus-visible {
+  outline: 2px solid $primary-blue;
+  outline-offset: 2px;
+}

@@ -5,10 +5,7 @@ export const DISPATCHER_ROUTES: Routes = [
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
-  {
-    path: 'trips',
-    loadComponent: () => import('./trip-list/trip-list.component').then(m => m.TripListComponent)
-  },
+  // Keep trip management routes for direct access and trip operations
   {
     path: 'trips/create',
     loadComponent: () => import('./trip-create/trip-create.component').then(m => m.TripCreateComponent)
@@ -25,9 +22,17 @@ export const DISPATCHER_ROUTES: Routes = [
     path: 'trips/:tripId',
     loadComponent: () => import('./trip-detail/trip-detail.component').then(m => m.TripDetailComponent)
   },
+  // Deprecated routes - functionality moved to dashboard
+  // Keep for backward compatibility but remove from navigation
+  {
+    path: 'trips',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
   {
     path: 'payment-reports',
-    loadComponent: () => import('./payment-report/payment-report.component').then(m => m.PaymentReportComponent)
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
   },
   {
     path: '',

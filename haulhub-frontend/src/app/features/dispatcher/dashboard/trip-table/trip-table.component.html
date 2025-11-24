@@ -1,0 +1,175 @@
+<div class="trip-table-container" role="region" aria-label="Trip list">
+  <div class="table-wrapper" *ngIf="!loading && trips.length > 0">
+    <table mat-table [dataSource]="trips" class="trip-table" 
+           role="table" [attr.aria-label]="'Trip list with ' + totalTrips + ' total trips'">
+      <!-- Date Column -->
+      <ng-container matColumnDef="scheduledPickupDatetime">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Date</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell" 
+            [attr.aria-label]="'Scheduled for ' + formatDate(trip.scheduledPickupDatetime)">
+          {{ formatDate(trip.scheduledPickupDatetime) }}
+        </td>
+      </ng-container>
+
+      <!-- Pickup Column -->
+      <ng-container matColumnDef="pickupLocation">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Pickup</th>
+        <td mat-cell *matCellDef="let trip" class="location-cell" role="gridcell"
+            [attr.aria-label]="'Pickup location: ' + trip.pickupLocation">
+          <span [matTooltip]="trip.pickupLocation" [attr.aria-label]="trip.pickupLocation">
+            {{ trip.pickupLocation }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Dropoff Column -->
+      <ng-container matColumnDef="dropoffLocation">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Dropoff</th>
+        <td mat-cell *matCellDef="let trip" class="location-cell" role="gridcell"
+            [attr.aria-label]="'Dropoff location: ' + trip.dropoffLocation">
+          <span [matTooltip]="trip.dropoffLocation" [attr.aria-label]="trip.dropoffLocation">
+            {{ trip.dropoffLocation }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Broker Column -->
+      <ng-container matColumnDef="brokerName">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Broker</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell"
+            [attr.aria-label]="'Broker: ' + trip.brokerName">
+          {{ trip.brokerName }}
+        </td>
+      </ng-container>
+
+      <!-- Lorry Column -->
+      <ng-container matColumnDef="lorryId">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Lorry</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell"
+            [attr.aria-label]="'Lorry ID: ' + trip.lorryId">
+          {{ trip.lorryId }}
+        </td>
+      </ng-container>
+
+      <!-- Driver Column -->
+      <ng-container matColumnDef="driverName">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Driver</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell"
+            [attr.aria-label]="'Driver: ' + trip.driverName">
+          {{ trip.driverName }}
+        </td>
+      </ng-container>
+
+      <!-- Status Column -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Status</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell">
+          <mat-chip [class]="getStatusClass(trip.status)"
+                    [attr.aria-label]="getStatusAriaLabel(trip.status)"
+                    role="status">
+            {{ getStatusLabel(trip.status) }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Broker Payment Column -->
+      <ng-container matColumnDef="brokerPayment">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Broker Pay</th>
+        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
+            [attr.aria-label]="'Broker payment: ' + formatCurrency(trip.brokerPayment)">
+          {{ formatCurrency(trip.brokerPayment) }}
+        </td>
+      </ng-container>
+
+      <!-- Profit Column -->
+      <ng-container matColumnDef="profit">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Profit</th>
+        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
+            [attr.aria-label]="getProfitAriaLabel(trip)">
+          <span [class.positive-profit]="calculateProfit(trip) >= 0" 
+                [class.negative-profit]="calculateProfit(trip) < 0">
+            {{ formatCurrency(calculateProfit(trip)) }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Actions</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell">
+          <div class="action-buttons" role="group" [attr.aria-label]="'Actions for trip to ' + trip.dropoffLocation">
+            <button mat-button class="action-btn view-btn" 
+                    (click)="viewTrip(trip)"
+                    [matTooltip]="'View trip details'"
+                    [attr.aria-label]="getActionAriaLabel('view', trip.tripId, trip.dropoffLocation)">
+              <mat-icon aria-hidden="true">visibility</mat-icon>
+              <span>View</span>
+            </button>
+            <button mat-button class="action-btn edit-btn" 
+                    (click)="editTrip(trip)"
+                    [matTooltip]="'Edit trip'"
+                    [attr.aria-label]="getActionAriaLabel('edit', trip.tripId, trip.dropoffLocation)">
+              <mat-icon aria-hidden="true">edit</mat-icon>
+              <span>Update</span>
+            </button>
+            <button mat-button class="action-btn delete-btn" 
+                    (click)="deleteTrip(trip)"
+                    [matTooltip]="'Delete trip'"
+                    [attr.aria-label]="getActionAriaLabel('delete', trip.tripId, trip.dropoffLocation)">
+              <mat-icon aria-hidden="true">delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns" role="row"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns; let even = even; let i = index" 
+          [class.even-row]="even" 
+          class="trip-row"
+          role="row"
+          [attr.aria-rowindex]="i + 2"
+          [attr.aria-label]="'Trip from ' + row.pickupLocation + ' to ' + row.dropoffLocation + ' on ' + formatDate(row.scheduledPickupDatetime)"></tr>
+    </table>
+
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="totalTrips"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      (page)="onPageChange($event)"
+      showFirstLastButtons
+      [attr.aria-label]="'Trip list pagination. Page ' + (pageIndex + 1) + ' of ' + Math.ceil(totalTrips / pageSize)">
+    </mat-paginator>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!loading && trips.length === 0" 
+       role="status" aria-live="polite">
+    <mat-icon aria-hidden="true">inbox</mat-icon>
+    <h3>No trips found</h3>
+    <p>{{ getEmptyStateMessage() }}</p>
+    <button mat-raised-button color="primary" (click)="createTrip()" *ngIf="!hasActiveFilters"
+            [attr.aria-label]="'Create your first trip to get started'">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      Create Your First Trip
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="skeleton-row" *ngFor="let i of [1,2,3,4,5]">
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+      <div class="skeleton-cell"></div>
+    </div>
+  </div>
+</div>

@@ -100,7 +100,7 @@ export class TripStatusUpdateComponent implements OnInit {
         this.snackBar.open('Trip status updated successfully', 'Close', {
           duration: 3000
         });
-        this.router.navigate(['/dispatcher/trips']);
+        this.router.navigate(['/dispatcher/dashboard']);
       },
       error: (error) => {
         console.error('Error updating trip status:', error);
@@ -115,7 +115,7 @@ export class TripStatusUpdateComponent implements OnInit {
   }
 
   onCancel(): void {
-    this.router.navigate(['/dispatcher/trips']);
+    this.router.navigate(['/dispatcher/dashboard']);
   }
 
   getStatusLabel(status: TripStatus): string {

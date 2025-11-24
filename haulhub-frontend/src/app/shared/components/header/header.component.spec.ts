@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { HeaderComponent } from './header.component';
@@ -22,10 +22,18 @@ describe('HeaderComponent', () => {
         role: UserRole.Dispatcher,
         email: 'test@example.com',
         fullName: 'Test User'
-      })
+      }),
+      currentUserValue: {
+        userId: 'test-user-id',
+        role: UserRole.Dispatcher,
+        email: 'test@example.com',
+        fullName: 'Test User'
+      }
     });
 
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    routerSpy = jasmine.createSpyObj('Router', ['navigate'], {
+      events: of()
+    });
 
     await TestBed.configureTestingModule({
       imports: [

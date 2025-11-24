@@ -1,145 +1,62 @@
 <div class="dashboard-container">
-  <div class="dashboard-header">
-    <h1>Dispatcher Dashboard</h1>
-    <button mat-raised-button color="primary" (click)="onCreateTrip()">
-      <mat-icon>add</mat-icon>
-      Create New Trip
-    </button>
-  </div>
+  <!-- Error State -->
+  <app-error-state 
+    *ngIf="errorState.hasError && !loadingState.isLoading"
+    [title]="'Dashboard Error'"
+    [message]="errorState.errorMessage"
+    [isRetrying]="loadingState.isLoading"
+    (retry)="onRetry()">
+  </app-error-state>
 
-  <div *ngIf="loading" class="loading-container">
-    <mat-spinner></mat-spinner>
-  </div>
+  <!-- Dashboard Content -->
+  <div *ngIf="!errorState.hasError" class="dashboard-content">
+    <!-- Filters are now integrated in the compact top row -->
 
-  <div *ngIf="!loading" class="dashboard-content">
-    <!-- Summary Cards -->
-    <div class="summary-cards">
-      <mat-card class="summary-card">
-        <mat-card-content>
-          <div class="summary-icon">
-            <mat-icon>local_shipping</mat-icon>
-          </div>
-          <div class="summary-info">
-            <div class="summary-value">{{ tripSummary.total }}</div>
-            <div class="summary-label">Total Trips</div>
-          </div>
-        </mat-card-content>
-      </mat-card>
+    <!-- Loading Overlay for Filter Updates -->
+    <div class="content-wrapper" [style.position]="loadingState.isFilterUpdate ? 'relative' : 'static'">
+      <app-loading-overlay 
+        [isVisible]="loadingState.isFilterUpdate"
+        [message]="loadingState.loadingMessage">
+      </app-loading-overlay>
 
-      <mat-card class="summary-card scheduled">
-        <mat-card-content>
-          <div class="summary-icon">
-            <mat-icon>schedule</mat-icon>
-          </div>
-          <div class="summary-info">
-            <div class="summary-value">{{ tripSummary.scheduled }}</div>
-            <div class="summary-label">Scheduled</div>
-          </div>
-        </mat-card-content>
-      </mat-card>
+      <!-- Initial Load: Show Skeleton Loaders -->
+      <div *ngIf="loadingState.isInitialLoad" class="skeleton-content">
+        <app-trip-summary-skeleton></app-trip-summary-skeleton>
+        <app-payment-summary-skeleton></app-payment-summary-skeleton>
+        <app-dashboard-charts-skeleton></app-dashboard-charts-skeleton>
+        <app-trip-table-skeleton></app-trip-table-skeleton>
+      </div>
 
-      <mat-card class="summary-card in-progress">
-        <mat-card-content>
-          <div class="summary-icon">
-            <mat-icon>directions_car</mat-icon>
+      <!-- Loaded Content -->
+      <div *ngIf="!loadingState.isInitialLoad" class="loaded-content">
+        <!-- Compact Top Row: Filters + Charts + Payment Summary -->
+        <div class="compact-top-row">
+          <!-- Compact Filters -->
+          <div class="compact-filters-section">
+            <app-filter-bar></app-filter-bar>
           </div>
-          <div class="summary-info">
-            <div class="summary-value">{{ tripSummary.inProgress }}</div>
-            <div class="summary-label">In Progress</div>
+          
+          <!-- Charts with Type Selector -->
+          <div class="compact-charts-section">
+            <app-dashboard-charts></app-dashboard-charts>
           </div>
-        </mat-card-content>
-      </mat-card>
+          
+          <!-- Compact Payment Summary -->
+          <div class="compact-payment-section">
+            <app-payment-summary></app-payment-summary>
+          </div>
+        </div>
 
-      <mat-card class="summary-card delivered">
-        <mat-card-content>
-          <div class="summary-icon">
-            <mat-icon>check_circle</mat-icon>
-          </div>
-          <div class="summary-info">
-            <div class="summary-value">{{ tripSummary.delivered }}</div>
-            <div class="summary-label">Delivered</div>
-          </div>
-        </mat-card-content>
-      </mat-card>
+        <!-- Trip Status Summary Cards (Optional - can be hidden if too crowded) -->
+        <div class="summary-cards-section">
+          <app-trip-summary-cards></app-trip-summary-cards>
+        </div>
 
-      <mat-card class="summary-card paid">
-        <mat-card-content>
-          <div class="summary-icon">
-            <mat-icon>payments</mat-icon>
-          </div>
-          <div class="summary-info">
-            <div class="summary-value">{{ tripSummary.paid }}</div>
-            <div class="summary-label">Paid</div>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>Quick Actions</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <div class="action-buttons">
-            <button mat-stroked-button (click)="onViewAllTrips()">
-              <mat-icon>list</mat-icon>
-              View All Trips
-            </button>
-            <button mat-stroked-button (click)="onViewReports()">
-              <mat-icon>assessment</mat-icon>
-              Payment Reports
-            </button>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    </div>
-
-    <!-- Recent Trips -->
-    <div class="recent-trips">
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>Recent Trips</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <div *ngIf="recentTrips.length === 0" class="no-trips">
-            <mat-icon>info</mat-icon>
-            <p>No trips yet. Create your first trip to get started!</p>
-          </div>
-
-          <div *ngIf="recentTrips.length > 0" class="trips-list">
-            <div *ngFor="let trip of recentTrips" class="trip-item">
-              <div class="trip-info">
-                <div class="trip-route">
-                  <strong>{{ trip.pickupLocation }}</strong>
-                  <mat-icon>arrow_forward</mat-icon>
-                  <strong>{{ trip.dropoffLocation }}</strong>
-                </div>
-                <div class="trip-details">
-                  <span class="trip-date">{{ formatDate(trip.scheduledPickupDatetime) }}</span>
-                  <span class="trip-separator">•</span>
-                  <span class="trip-broker">{{ trip.brokerName }}</span>
-                  <span class="trip-separator">•</span>
-                  <span class="trip-lorry">Lorry: {{ trip.lorryId }}</span>
-                </div>
-              </div>
-              <div class="trip-status">
-                <span class="status-badge" [ngClass]="getStatusClass(trip.status)">
-                  {{ trip.status }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div *ngIf="recentTrips.length > 0" class="view-all-link">
-            <button mat-button color="primary" (click)="onViewAllTrips()">
-              View All Trips
-              <mat-icon>arrow_forward</mat-icon>
-            </button>
-          </div>
-        </mat-card-content>
-      </mat-card>
+        <!-- Trip Table -->
+        <div class="table-section">
+          <app-trip-table></app-trip-table>
+        </div>
+      </div>
     </div>
   </div>
 </div>

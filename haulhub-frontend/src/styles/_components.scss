@@ -1,0 +1,387 @@
+// =============================================================================
+// HAULHUB DESIGN SYSTEM - COMPONENT STYLES
+// Professional Component Styling
+// =============================================================================
+
+@import 'variables';
+
+// =============================================================================
+// CARDS
+// =============================================================================
+
+.mat-mdc-card {
+  border-radius: $card-border-radius !important;
+  box-shadow: $card-shadow !important;
+  padding: $card-padding !important;
+  background: $white !important;
+  border: 1px solid $neutral-100 !important;
+  transition: box-shadow $transition-normal !important;
+  
+  &:hover {
+    box-shadow: $card-shadow-hover !important;
+  }
+  
+  &.clickable {
+    cursor: pointer;
+    
+    &:hover {
+      box-shadow: $shadow-lg !important;
+    }
+  }
+  
+  .mat-mdc-card-header {
+    padding-bottom: $spacing-md !important;
+    border-bottom: 1px solid $neutral-100 !important;
+    margin-bottom: $spacing-md !important;
+  }
+  
+  .mat-mdc-card-title {
+    font-size: $font-size-h3 !important;
+    font-weight: $font-weight-medium !important;
+    color: $neutral-900 !important;
+    margin: 0 !important;
+  }
+  
+  .mat-mdc-card-subtitle {
+    font-size: $font-size-small !important;
+    color: $neutral-500 !important;
+    margin: $spacing-xs 0 0 0 !important;
+  }
+  
+  .mat-mdc-card-content {
+    padding: 0 !important;
+  }
+  
+  .mat-mdc-card-actions {
+    padding: $spacing-md 0 0 0 !important;
+    border-top: 1px solid $neutral-100 !important;
+    margin-top: $spacing-md !important;
+  }
+}
+
+// =============================================================================
+// BUTTONS
+// =============================================================================
+
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button,
+.mat-mdc-fab,
+.mat-mdc-mini-fab {
+  border-radius: $button-border-radius !important;
+  text-transform: none !important;
+  font-weight: $button-font-weight !important;
+  letter-spacing: 0.5px !important;
+  transition: all $transition-fast !important;
+}
+
+// Primary buttons
+.mat-mdc-raised-button.mat-primary {
+  background-color: $primary-blue !important;
+  color: $white !important;
+  
+  &:hover {
+    background-color: $primary-dark !important;
+    box-shadow: $shadow-md !important;
+  }
+  
+  &:disabled {
+    background-color: $neutral-300 !important;
+    color: $neutral-500 !important;
+  }
+}
+
+// Outlined buttons
+.mat-mdc-outlined-button {
+  border: 1px solid $neutral-300 !important;
+  color: $neutral-700 !important;
+  
+  &:hover {
+    background-color: $neutral-50 !important;
+    border-color: $neutral-500 !important;
+  }
+  
+  &.mat-primary {
+    border-color: $primary-blue !important;
+    color: $primary-blue !important;
+    
+    &:hover {
+      background-color: $primary-light !important;
+    }
+  }
+}
+
+// Text buttons
+.mat-mdc-button {
+  color: $primary-blue !important;
+  
+  &:hover {
+    background-color: $primary-light !important;
+  }
+}
+
+// Icon buttons
+.mat-mdc-icon-button {
+  color: $neutral-700 !important;
+  
+  &:hover {
+    background-color: $neutral-100 !important;
+  }
+  
+  &.mat-primary {
+    color: $primary-blue !important;
+  }
+}
+
+// =============================================================================
+// TABLES
+// =============================================================================
+
+.mat-mdc-table {
+  background: $white !important;
+  border-radius: $border-radius-md !important;
+  overflow: hidden !important;
+  box-shadow: $shadow-sm !important;
+  
+  .mat-mdc-header-cell {
+    font-weight: $font-weight-medium !important;
+    color: $neutral-700 !important;
+    background-color: $table-header-bg !important;
+    border-bottom: 2px solid $neutral-300 !important;
+    padding: $table-cell-padding !important;
+    font-size: $font-size-small !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    
+    &.numeric {
+      text-align: right !important;
+    }
+  }
+  
+  .mat-mdc-cell {
+    color: $neutral-900 !important;
+    border-bottom: 1px solid $table-border-color !important;
+    padding: $table-cell-padding !important;
+    font-size: $font-size-body !important;
+    
+    &.numeric {
+      text-align: right !important;
+      font-family: $font-family-mono !important;
+    }
+  }
+  
+  .mat-mdc-row {
+    transition: background-color $transition-fast !important;
+    
+    &:hover {
+      background-color: $table-hover-bg !important;
+    }
+    
+    &:nth-child(even) {
+      background-color: rgba($neutral-100, 0.3) !important;
+    }
+  }
+}
+
+// =============================================================================
+// FORM FIELDS
+// =============================================================================
+
+.mat-mdc-form-field {
+  .mat-mdc-text-field-wrapper {
+    border-radius: $form-field-border-radius !important;
+  }
+  
+  .mat-mdc-form-field-outline {
+    color: $form-field-border-color !important;
+  }
+  
+  &.mat-focused .mat-mdc-form-field-outline-thick {
+    color: $form-field-focus-color !important;
+  }
+  
+  .mat-mdc-form-field-label {
+    color: $neutral-500 !important;
+  }
+  
+  &.mat-focused .mat-mdc-form-field-label {
+    color: $form-field-focus-color !important;
+  }
+  
+  .mat-mdc-input-element {
+    color: $neutral-900 !important;
+  }
+  
+  .mat-mdc-form-field-error {
+    color: $error !important;
+    font-size: $font-size-small !important;
+  }
+}
+
+// =============================================================================
+// CHIPS
+// =============================================================================
+
+.mat-mdc-chip {
+  border-radius: $border-radius-lg !important;
+  font-size: $font-size-small !important;
+  font-weight: $font-weight-medium !important;
+  
+  // Status chips
+  &.status-scheduled {
+    background-color: $status-scheduled !important;
+    color: $neutral-900 !important;
+    border: 1px solid $status-scheduled-border !important;
+  }
+  
+  &.status-picked-up {
+    background-color: $status-picked-up !important;
+    color: $neutral-900 !important;
+    border: 1px solid $status-picked-up-border !important;
+  }
+  
+  &.status-in-transit {
+    background-color: $status-in-transit !important;
+    color: $neutral-900 !important;
+    border: 1px solid $status-in-transit-border !important;
+  }
+  
+  &.status-delivered {
+    background-color: $status-delivered !important;
+    color: $neutral-900 !important;
+    border: 1px solid $status-delivered-border !important;
+  }
+  
+  &.status-paid {
+    background-color: $status-paid !important;
+    color: $neutral-900 !important;
+    border: 1px solid $status-paid-border !important;
+  }
+}
+
+// =============================================================================
+// SNACKBARS
+// =============================================================================
+
+.mat-mdc-snack-bar-container {
+  &.success-snackbar {
+    --mdc-snackbar-container-color: #{$success} !important;
+    --mdc-snackbar-supporting-text-color: #{$white} !important;
+  }
+  
+  &.error-snackbar {
+    --mdc-snackbar-container-color: #{$error} !important;
+    --mdc-snackbar-supporting-text-color: #{$white} !important;
+  }
+  
+  &.warning-snackbar {
+    --mdc-snackbar-container-color: #{$warning} !important;
+    --mdc-snackbar-supporting-text-color: #{$white} !important;
+  }
+  
+  &.info-snackbar {
+    --mdc-snackbar-container-color: #{$info} !important;
+    --mdc-snackbar-supporting-text-color: #{$white} !important;
+  }
+}
+
+// =============================================================================
+// PAGINATOR
+// =============================================================================
+
+.mat-mdc-paginator {
+  background: $white !important;
+  border-top: 1px solid $neutral-100 !important;
+  
+  .mat-mdc-paginator-page-size-label,
+  .mat-mdc-paginator-range-label {
+    color: $neutral-700 !important;
+    font-size: $font-size-small !important;
+  }
+  
+  .mat-mdc-icon-button {
+    color: $neutral-700 !important;
+    
+    &:disabled {
+      color: $neutral-300 !important;
+    }
+  }
+}
+
+// =============================================================================
+// PROGRESS INDICATORS
+// =============================================================================
+
+.mat-mdc-progress-spinner {
+  circle {
+    stroke: $primary-blue !important;
+  }
+}
+
+.mat-mdc-progress-bar {
+  .mat-mdc-progress-bar-fill::after {
+    background-color: $primary-blue !important;
+  }
+}
+
+// =============================================================================
+// DIALOGS
+// =============================================================================
+
+.mat-mdc-dialog-container {
+  border-radius: $border-radius-lg !important;
+  box-shadow: $shadow-lg !important;
+  
+  .mat-mdc-dialog-title {
+    font-size: $font-size-h3 !important;
+    font-weight: $font-weight-medium !important;
+    color: $neutral-900 !important;
+    margin-bottom: $spacing-md !important;
+  }
+  
+  .mat-mdc-dialog-content {
+    color: $neutral-700 !important;
+    line-height: $line-height-normal !important;
+  }
+  
+  .mat-mdc-dialog-actions {
+    padding-top: $spacing-lg !important;
+    border-top: 1px solid $neutral-100 !important;
+    margin-top: $spacing-lg !important;
+  }
+}
+
+// =============================================================================
+// MENUS
+// =============================================================================
+
+.mat-mdc-menu-panel {
+  border-radius: $border-radius-md !important;
+  box-shadow: $shadow-lg !important;
+  border: 1px solid $neutral-100 !important;
+  
+  .mat-mdc-menu-item {
+    color: $neutral-900 !important;
+    font-size: $font-size-body !important;
+    
+    &:hover {
+      background-color: $neutral-50 !important;
+    }
+    
+    .mat-icon {
+      color: $neutral-500 !important;
+      margin-right: $spacing-sm !important;
+    }
+  }
+}
+
+// =============================================================================
+// TOOLTIPS
+// =============================================================================
+
+.mat-mdc-tooltip {
+  background-color: $neutral-900 !important;
+  color: $white !important;
+  font-size: $font-size-small !important;
+  border-radius: $border-radius-sm !important;
+}

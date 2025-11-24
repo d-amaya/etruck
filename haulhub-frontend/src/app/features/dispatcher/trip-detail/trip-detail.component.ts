@@ -63,7 +63,7 @@ export class TripDetailComponent implements OnInit {
   }
 
   onBackToTrips(): void {
-    this.router.navigate(['/dispatcher/trips']);
+    this.router.navigate(['/dispatcher/dashboard']);
   }
 
   onEditTrip(): void {

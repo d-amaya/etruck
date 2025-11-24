@@ -1,70 +1,345 @@
-/* You can add global styles to this file, and also import other style files */
-@import '@angular/material/prebuilt-themes/indigo-pink.css';
+// =============================================================================
+// HAULHUB GLOBAL STYLES
+// Professional Corporate Design System
+// =============================================================================
+
+// Import Angular Material core
+@use '@angular/material' as mat;
+
+// Import design system
+@import 'styles/variables';
+@import 'styles/typography';
+@import 'styles/spacing';
+@import 'styles/layout';
+@import 'styles/components';
+
+// =============================================================================
+// MATERIAL THEME CONFIGURATION
+// =============================================================================
+
+// Define custom palette based on our design system
+$haulhub-primary: mat.define-palette((
+  50: #E3F2FD,
+  100: #BBDEFB,
+  200: #90CAF9,
+  300: #64B5F6,
+  400: #42A5F5,
+  500: #1976D2,  // Primary blue
+  600: #1565C0,
+  700: #0D47A1,  // Primary dark
+  800: #0D47A1,
+  900: #0D47A1,
+  contrast: (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: rgba(black, 0.87),
+    400: rgba(black, 0.87),
+    500: white,
+    600: white,
+    700: white,
+    800: white,
+    900: white,
+  )
+));
+
+$haulhub-accent: mat.define-palette((
+  50: #F5F5F5,
+  100: #E0E0E0,
+  200: #9E9E9E,
+  300: #616161,
+  400: #424242,
+  500: #212121,  // Neutral 900
+  600: #212121,
+  700: #212121,
+  800: #212121,
+  900: #212121,
+  contrast: (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: white,
+    400: white,
+    500: white,
+    600: white,
+    700: white,
+    800: white,
+    900: white,
+  )
+));
+
+$haulhub-warn: mat.define-palette((
+  50: #FFEBEE,
+  100: #FFCDD2,
+  200: #EF9A9A,
+  300: #E57373,
+  400: #EF5350,
+  500: #F44336,  // Error color
+  600: #E53935,
+  700: #D32F2F,
+  800: #C62828,
+  900: #B71C1C,
+  contrast: (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: rgba(black, 0.87),
+    400: rgba(black, 0.87),
+    500: white,
+    600: white,
+    700: white,
+    800: white,
+    900: white,
+  )
+));
+
+// Create the theme
+$haulhub-theme: mat.define-light-theme((
+  color: (
+    primary: $haulhub-primary,
+    accent: $haulhub-accent,
+    warn: $haulhub-warn,
+  ),
+  typography: mat.define-typography-config(
+    $font-family: $font-family-primary,
+    $headline-1: mat.define-typography-level($font-size-h1, $line-height-tight, $font-weight-bold),
+    $headline-2: mat.define-typography-level($font-size-h2, $line-height-tight, $font-weight-medium),
+    $headline-3: mat.define-typography-level($font-size-h3, $line-height-normal, $font-weight-medium),
+    $headline-4: mat.define-typography-level($font-size-h4, $line-height-normal, $font-weight-medium),
+    $body-1: mat.define-typography-level($font-size-body, $line-height-normal, $font-weight-regular),
+    $body-2: mat.define-typography-level($font-size-small, $line-height-normal, $font-weight-regular),
+    $button: mat.define-typography-level($font-size-body, $line-height-normal, $font-weight-medium),
+    $caption: mat.define-typography-level($font-size-small, $line-height-normal, $font-weight-regular),
+  ),
+  density: 0,
+));
+
+// Apply the theme
+@include mat.all-component-themes($haulhub-theme);
+
+// =============================================================================
+// BASE STYLES
+// =============================================================================
 
 html, body {
   height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
+  font-family: $font-family-primary;
+  font-size: $font-size-body;
+  line-height: $line-height-normal;
+  color: $neutral-900;
+  background-color: $neutral-50;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Global utility classes */
+// =============================================================================
+// GLOBAL UTILITY CLASSES
+// =============================================================================
+
 .full-width {
-  width: 100%;
+  width: 100% !important;
 }
 
 .spacer {
-  flex: 1 1 auto;
+  flex: 1 1 auto !important;
 }
 
-.text-center {
-  text-align: center;
+// =============================================================================
+// SCROLLBAR STYLING
+// =============================================================================
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.mt-1 { margin-top: 8px; }
-.mt-2 { margin-top: 16px; }
-.mt-3 { margin-top: 24px; }
-.mb-1 { margin-bottom: 8px; }
-.mb-2 { margin-bottom: 16px; }
-.mb-3 { margin-bottom: 24px; }
-.p-2 { padding: 16px; }
-.p-3 { padding: 24px; }
+::-webkit-scrollbar-track {
+  background: $neutral-100;
+}
 
-/* Snackbar styles */
-.success-snackbar {
-  background-color: #4caf50 !important;
-  color: white !important;
-
-  .mat-mdc-button {
-    color: white !important;
+::-webkit-scrollbar-thumb {
+  background: $neutral-300;
+  border-radius: $border-radius-sm;
+  
+  &:hover {
+    background: $neutral-500;
   }
 }
 
-.error-snackbar {
-  background-color: #f44336 !important;
-  color: white !important;
+// =============================================================================
+// ACCESSIBILITY & FOCUS STYLES
+// =============================================================================
 
-  .mat-mdc-button {
+// Screen reader only content
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+// Focus styles for keyboard navigation
+.keyboard-navigation {
+  *:focus {
+    outline: 3px solid $primary-blue !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2) !important;
+  }
+
+  // Enhanced focus for interactive elements
+  button:focus,
+  .mat-mdc-button:focus,
+  .mat-mdc-raised-button:focus,
+  .mat-mdc-stroked-button:focus {
+    outline: 3px solid $primary-blue !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2) !important;
+  }
+
+  // Focus for form controls
+  .mat-mdc-form-field:focus-within {
+    .mat-mdc-form-field-outline {
+      border-color: $primary-blue !important;
+      border-width: 2px !important;
+    }
+  }
+
+  // Focus for cards and clickable elements
+  .mat-mdc-card:focus,
+  .summary-card:focus {
+    outline: 3px solid $primary-blue !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2) !important;
+  }
+
+  // Focus for table rows
+  .mat-mdc-row:focus {
+    background-color: rgba(25, 118, 210, 0.08) !important;
+    outline: 2px solid $primary-blue !important;
+    outline-offset: -2px !important;
+  }
+}
+
+// Remove focus outline for mouse users
+.mouse-navigation {
+  *:focus {
+    outline: none !important;
+  }
+
+  // Keep minimal focus for form fields even with mouse
+  .mat-mdc-form-field:focus-within {
+    .mat-mdc-form-field-outline {
+      border-color: $primary-blue !important;
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  * {
+    border-color: currentColor !important;
+  }
+  
+  .mat-mdc-button,
+  .mat-mdc-raised-button,
+  .mat-mdc-stroked-button {
+    border: 2px solid currentColor !important;
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// =============================================================================
+// SELECTION STYLES
+// =============================================================================
+
+::selection {
+  background-color: $primary-light;
+  color: $neutral-900;
+}
+
+::-moz-selection {
+  background-color: $primary-light;
+  color: $neutral-900;
+}
+
+// =============================================================================
+// ERROR SNACKBAR STYLES
+// =============================================================================
+
+.error-snackbar {
+  .mat-mdc-snack-bar-container {
+    background-color: #f44336 !important;
     color: white !important;
+    
+    .mat-mdc-snack-bar-label {
+      color: white !important;
+    }
+    
+    .mat-mdc-button {
+      color: white !important;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+    }
+  }
+}
+
+.success-snackbar {
+  .mat-mdc-snack-bar-container {
+    background-color: #4caf50 !important;
+    color: white !important;
+    
+    .mat-mdc-snack-bar-label {
+      color: white !important;
+    }
+    
+    .mat-mdc-button {
+      color: white !important;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+    }
   }
 }
 
 .warning-snackbar {
-  background-color: #ff9800 !important;
-  color: white !important;
-
-  .mat-mdc-button {
+  .mat-mdc-snack-bar-container {
+    background-color: #ff9800 !important;
     color: white !important;
-  }
-}
-
-.info-snackbar {
-  background-color: #2196f3 !important;
-  color: white !important;
-
-  .mat-mdc-button {
-    color: white !important;
+    
+    .mat-mdc-snack-bar-label {
+      color: white !important;
+    }
+    
+    .mat-mdc-button {
+      color: white !important;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+    }
   }
 }

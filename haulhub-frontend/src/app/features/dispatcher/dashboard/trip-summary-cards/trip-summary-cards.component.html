@@ -1,0 +1,39 @@
+<div class="summary-cards-container" role="region" aria-label="Trip summary by status">
+  <div *ngIf="hasError" class="error-state" role="alert" aria-live="assertive">
+    <mat-card class="error-card">
+      <div class="error-content">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <p class="error-message">Unable to load trip summary</p>
+        <button mat-button color="primary" (click)="retryLoad()"
+                [attr.aria-label]="'Retry loading trip summary data'">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          Retry
+        </button>
+      </div>
+    </mat-card>
+  </div>
+  
+  <mat-card 
+    *ngFor="let card of summaryCards; trackBy: trackByStatus" 
+    class="summary-card clickable"
+    role="button"
+    tabindex="0"
+    (click)="filterByStatus(card.status)"
+    (keydown.enter)="filterByStatus(card.status)"
+    (keydown.space)="filterByStatus(card.status)"
+    [attr.aria-label]="getSummaryCardAriaLabel(card)"
+    [attr.aria-describedby]="'card-desc-' + card.status">
+    <div class="card-content">
+      <div class="card-icon" [style.background-color]="card.color">
+        <mat-icon [attr.aria-hidden]="true">{{ card.icon }}</mat-icon>
+      </div>
+      <div class="card-info">
+        <h3 class="card-count" [attr.aria-label]="card.count + ' trips'">{{ card.count }}</h3>
+        <p class="card-label">{{ card.label }}</p>
+      </div>
+    </div>
+    <div [id]="'card-desc-' + card.status" class="sr-only">
+      {{ getSummaryCardDescription(card) }}
+    </div>
+  </mat-card>
+</div>

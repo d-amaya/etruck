@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '@haulhub/shared';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-header',
@@ -25,10 +26,11 @@ export class HeaderComponent implements OnInit {
   userName: string = '';
   userRole: string = '';
   isAuthenticated: boolean = false;
+  currentRoute: string = '';
 
   constructor(
     private authService: AuthService,
-    private router: Router
+    public router: Router
   ) {}
 
   ngOnInit(): void {
@@ -43,6 +45,15 @@ export class HeaderComponent implements OnInit {
         this.userRole = '';
       }
     });
+
+    // Track current route for active navigation highlighting
+    this.router.events
+      .pipe(filter(event => event instanceof NavigationEnd))
+      .subscribe((event) => {
+        if (event instanceof NavigationEnd) {
+          this.currentRoute = event.url;
+        }
+      });
   }
 
   private formatRole(role: UserRole): string {
@@ -74,5 +85,44 @@ export class HeaderComponent implements OnInit {
 
   navigateHome(): void {
     this.authService.navigateToDashboard();
+  }
+
+  navigateToDashboard(): void {
+    this.authService.navigateToDashboard();
+  }
+
+  isActiveRoute(route: string): boolean {
+    return this.currentRoute.includes(route);
+  }
+
+  shouldShowNavigation(): boolean {
+    // Only show navigation for authenticated users with specific roles
+    const user = this.authService.currentUserValue;
+    return this.isAuthenticated && user !== null;
+  }
+
+  getNavigationItems(): Array<{label: string, route: string, action?: () => void}> {
+    const user = this.authService.currentUserValue;
+    if (!user) return [];
+
+    const items = [];
+
+    // Add Dashboard for all roles
+    switch (user.role) {
+      case UserRole.Dispatcher:
+        items.push({ label: 'Dashboard', route: '/dispatcher/dashboard' });
+        break;
+      case UserRole.LorryOwner:
+        items.push({ label: 'Dashboard', route: '/lorry-owner/dashboard' });
+        break;
+      case UserRole.Driver:
+        items.push({ label: 'Dashboard', route: '/driver/dashboard' });
+        break;
+      case UserRole.Admin:
+        items.push({ label: 'Dashboard', route: '/admin/dashboard' });
+        break;
+    }
+
+    return items;
   }
 }

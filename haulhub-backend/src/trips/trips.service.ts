@@ -10,6 +10,7 @@ import {
   GetCommand,
   UpdateCommand,
   QueryCommand,
+  DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
@@ -1289,5 +1290,181 @@ export class TripsService {
     }
 
     return grouped;
+  }
+
+  /**
+   * Get trip summary by status for dashboard
+   * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
+   * 
+   * Returns trip counts grouped by status for the dispatcher
+   */
+  async getTripSummaryByStatus(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<Record<TripStatus, number>> {
+    // Get all trips for the dispatcher with filters
+    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+
+    // Initialize counts for all statuses
+    const summary: Record<TripStatus, number> = {
+      [TripStatus.Scheduled]: 0,
+      [TripStatus.PickedUp]: 0,
+      [TripStatus.InTransit]: 0,
+      [TripStatus.Delivered]: 0,
+      [TripStatus.Paid]: 0,
+    };
+
+    // Count trips by status
+    for (const trip of trips) {
+      summary[trip.status] = (summary[trip.status] || 0) + 1;
+    }
+
+    return summary;
+  }
+
+  /**
+   * Get payment summary for dashboard
+   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+   * 
+   * Returns aggregated payment metrics for the dispatcher
+   */
+  async getPaymentSummary(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<{
+    totalBrokerPayments: number;
+    totalDriverPayments: number;
+    totalLorryOwnerPayments: number;
+    totalProfit: number;
+  }> {
+    // Get all trips for the dispatcher with filters
+    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+
+    // Calculate totals
+    const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
+    const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
+    const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments;
+
+    return {
+      totalBrokerPayments,
+      totalDriverPayments,
+      totalLorryOwnerPayments,
+      totalProfit,
+    };
+  }
+
+  /**
+   * Get payments timeline for dashboard charts
+   * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
+   * 
+   * Returns time-series payment data grouped by month for the dispatcher
+   */
+  async getPaymentsTimeline(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<{
+    labels: string[];
+    brokerPayments: number[];
+    driverPayments: number[];
+    lorryOwnerPayments: number[];
+    profit: number[];
+  }> {
+    // Get all trips for the dispatcher with filters
+    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+
+    // Group trips by month
+    const monthlyData: Record<string, {
+      brokerPayments: number;
+      driverPayments: number;
+      lorryOwnerPayments: number;
+    }> = {};
+
+    for (const trip of trips) {
+      // Extract year-month from scheduled date (YYYY-MM)
+      const date = new Date(trip.scheduledPickupDatetime);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          brokerPayments: 0,
+          driverPayments: 0,
+          lorryOwnerPayments: 0,
+        };
+      }
+
+      monthlyData[monthKey].brokerPayments += trip.brokerPayment;
+      monthlyData[monthKey].driverPayments += trip.driverPayment;
+      monthlyData[monthKey].lorryOwnerPayments += trip.lorryOwnerPayment;
+    }
+
+    // Sort months chronologically
+    const sortedMonths = Object.keys(monthlyData).sort();
+
+    // Build arrays for chart data
+    const labels: string[] = [];
+    const brokerPayments: number[] = [];
+    const driverPayments: number[] = [];
+    const lorryOwnerPayments: number[] = [];
+    const profit: number[] = [];
+
+    for (const month of sortedMonths) {
+      // Format label as "MMM YYYY" (e.g., "Jan 2024")
+      const [year, monthNum] = month.split('-');
+      const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+      const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+      labels.push(label);
+      brokerPayments.push(monthlyData[month].brokerPayments);
+      driverPayments.push(monthlyData[month].driverPayments);
+      lorryOwnerPayments.push(monthlyData[month].lorryOwnerPayments);
+      profit.push(
+        monthlyData[month].brokerPayments -
+        monthlyData[month].driverPayments -
+        monthlyData[month].lorryOwnerPayments
+      );
+    }
+
+    return {
+      labels,
+      brokerPayments,
+      driverPayments,
+      lorryOwnerPayments,
+      profit,
+    };
+  }
+
+  /**
+   * Delete a trip
+   * Requirements: 18.1, 18.2, 18.3, 18.4, 18.5
+   * 
+   * Hard delete - removes the trip from the database
+   * Only the dispatcher who created the trip can delete it
+   */
+  async deleteTrip(tripId: string, dispatcherId: string): Promise<void> {
+    // First, verify the trip exists and belongs to the dispatcher
+    await this.getTripById(tripId, dispatcherId, UserRole.Dispatcher);
+
+    try {
+      const dynamodbClient = this.awsService.getDynamoDBClient();
+
+      // Delete using new table structure: PK=TRIP#{tripId}, SK=METADATA
+      const deleteCommand = new DeleteCommand({
+        TableName: this.tripsTableName,
+        Key: {
+          PK: `TRIP#${tripId}`,
+          SK: 'METADATA',
+        },
+        ConditionExpression: 'attribute_exists(PK)',
+      });
+
+      await dynamodbClient.send(deleteCommand);
+    } catch (error: any) {
+      if (error.name === 'ConditionalCheckFailedException') {
+        throw new NotFoundException(`Trip with ID ${tripId} not found`);
+      }
+      console.error('Error deleting trip:', error);
+      throw new InternalServerErrorException('Failed to delete trip');
+    }
   }
 }

@@ -173,7 +173,7 @@ export class TripEditComponent implements OnInit {
         this.snackBar.open('Trip updated successfully!', 'Close', {
           duration: 3000
         });
-        this.router.navigate(['/dispatcher/trips']);
+        this.router.navigate(['/dispatcher/dashboard']);
       },
       error: (error) => {
         console.error('Error updating trip:', error);
@@ -187,7 +187,7 @@ export class TripEditComponent implements OnInit {
   }
 
   onCancel(): void {
-    this.router.navigate(['/dispatcher/trips']);
+    this.router.navigate(['/dispatcher/dashboard']);
   }
 
   private markFormGroupTouched(formGroup: FormGroup): void {

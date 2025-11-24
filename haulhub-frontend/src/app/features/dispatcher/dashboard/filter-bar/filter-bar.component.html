@@ -1,0 +1,90 @@
+<div class="compact-filter-bar" role="region" aria-label="Trip filters">
+  <h3 class="filter-title">Filters</h3>
+  
+  <form [formGroup]="filterForm" class="compact-filter-form" role="form" aria-label="Filter trips form">
+    <!-- Date Range - Compact -->
+    <div class="compact-date-section">
+      <mat-form-field appearance="outline" class="compact-date-field">
+        <mat-label>From</mat-label>
+        <input matInput [matDatepicker]="startPicker" formControlName="startDate"
+               [max]="maxDate" [min]="minDate">
+        <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-date-field">
+        <mat-label>To</mat-label>
+        <input matInput [matDatepicker]="endPicker" formControlName="endDate"
+               [max]="maxDate" [min]="minDate">
+        <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+    </div>
+
+    <!-- Quick Presets - Compact -->
+    <div class="compact-presets">
+      <button mat-button type="button" (click)="setDatePreset('month')" class="compact-preset-btn"
+              [class.active]="isPresetActive('month')">
+        Month
+      </button>
+      <button mat-button type="button" (click)="setDatePreset('year')" class="compact-preset-btn"
+              [class.active]="isPresetActive('year')">
+        Year
+      </button>
+    </div>
+
+    <!-- Main Filters - Compact -->
+    <div class="compact-filters">
+      <mat-form-field appearance="outline" class="compact-filter-field">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          <mat-option [value]="null">All</mat-option>
+          <mat-option *ngFor="let status of statusOptions" [value]="status">
+            {{ getStatusLabel(status) }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter-field">
+        <mat-label>Broker</mat-label>
+        <mat-select formControlName="brokerId">
+          <mat-option [value]="null">All</mat-option>
+          <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+            {{ broker.brokerName }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter-field">
+        <mat-label>Lorry ID</mat-label>
+        <input matInput formControlName="lorryId" placeholder="License plate">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter-field">
+        <mat-label>Driver</mat-label>
+        <input matInput formControlName="driverName" placeholder="Driver name">
+      </mat-form-field>
+    </div>
+
+    <!-- Compact Actions -->
+    <div class="compact-actions">
+      <button mat-stroked-button type="button" (click)="clearFilters()" class="compact-clear-btn"
+              [disabled]="activeFilterCount === 0">
+        <mat-icon>clear</mat-icon>
+        Clear
+      </button>
+
+      <div *ngIf="activeFilterCount > 0" class="compact-filter-count">
+        <mat-chip>{{ activeFilterCount }}</mat-chip>
+      </div>
+    </div>
+
+    <!-- Export PDF -->
+    <div class="compact-export">
+      <button mat-raised-button color="primary" type="button" (click)="exportPDF()" class="compact-export-btn">
+        <mat-icon>download</mat-icon>
+        Export PDF
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,109 +1,96 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TripService } from '../../../core/services';
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import { FilterBarComponent } from './filter-bar/filter-bar.component';
+import { TripSummaryCardsComponent } from './trip-summary-cards/trip-summary-cards.component';
+import { PaymentSummaryComponent } from './payment-summary/payment-summary.component';
+import { DashboardChartsComponent } from './dashboard-charts/dashboard-charts.component';
+import { TripTableComponent } from './trip-table/trip-table.component';
+import { DashboardStateService, LoadingState, ErrorState } from './dashboard-state.service';
+import { TripSummarySkeletonComponent } from '../../../shared/components/skeleton-loader/trip-summary-skeleton.component';
+import { PaymentSummarySkeletonComponent } from '../../../shared/components/skeleton-loader/payment-summary-skeleton.component';
+import { DashboardChartsSkeletonComponent } from '../../../shared/components/skeleton-loader/dashboard-charts-skeleton.component';
+import { TripTableSkeletonComponent } from '../../../shared/components/skeleton-loader/trip-table-skeleton.component';
+import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { ErrorStateComponent } from '../../../shared/components/error-state/error-state.component';
 
 @Component({
   selector: 'app-dispatcher-dashboard',
   standalone: true,
   imports: [
     CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    FilterBarComponent,
+    TripSummaryCardsComponent,
+    PaymentSummaryComponent,
+    DashboardChartsComponent,
+    TripTableComponent,
+    TripSummarySkeletonComponent,
+    PaymentSummarySkeletonComponent,
+    DashboardChartsSkeletonComponent,
+    TripTableSkeletonComponent,
+    LoadingOverlayComponent,
+    ErrorStateComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements OnInit {
-  loading = true;
-  recentTrips: Trip[] = [];
-  tripSummary = {
-    total: 0,
-    scheduled: 0,
-    inProgress: 0,
-    delivered: 0,
-    paid: 0
+export class DashboardComponent implements OnInit, OnDestroy {
+  loadingState: LoadingState = {
+    isLoading: false,
+    isInitialLoad: false,
+    isFilterUpdate: false,
+    loadingMessage: 'Loading...'
   };
+  errorState: ErrorState = {
+    hasError: false,
+    errorMessage: '',
+    canRetry: false,
+    retryCount: 0
+  };
+  
+  private destroy$ = new Subject<void>();
 
-  constructor(
-    private tripService: TripService,
-    private router: Router
-  ) {}
+  constructor(private dashboardState: DashboardStateService) {}
 
   ngOnInit(): void {
-    this.loadDashboardData();
+    // Start initial load
+    this.dashboardState.startInitialLoad();
+    
+    // Subscribe to loading state
+    this.dashboardState.loading$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(loadingState => {
+        this.loadingState = loadingState;
+      });
+    
+    // Subscribe to error state
+    this.dashboardState.error$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(errorState => {
+        this.errorState = errorState;
+      });
+    
+    // Simulate initial load completion after components are ready
+    setTimeout(() => {
+      this.dashboardState.completeLoad();
+    }, 1500);
   }
 
-  private loadDashboardData(): void {
-    this.loading = true;
-    this.tripService.getTrips({ limit: 10 }).subscribe({
-      next: (trips) => {
-        this.recentTrips = trips;
-        this.calculateSummary(trips);
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading dashboard data:', error);
-        this.loading = false;
-      }
-    });
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
-
-  private calculateSummary(trips: Trip[]): void {
-    this.tripSummary = {
-      total: trips.length,
-      scheduled: trips.filter(t => t.status === TripStatus.Scheduled).length,
-      inProgress: trips.filter(t => 
-        t.status === TripStatus.PickedUp || t.status === TripStatus.InTransit
-      ).length,
-      delivered: trips.filter(t => t.status === TripStatus.Delivered).length,
-      paid: trips.filter(t => t.status === TripStatus.Paid).length
-    };
-  }
-
-  onCreateTrip(): void {
-    this.router.navigate(['/dispatcher/trips/create']);
-  }
-
-  onViewAllTrips(): void {
-    this.router.navigate(['/dispatcher/trips']);
-  }
-
-  onViewReports(): void {
-    this.router.navigate(['/dispatcher/payment-reports']);
-  }
-
-  getStatusClass(status: TripStatus): string {
-    switch (status) {
-      case TripStatus.Scheduled:
-        return 'status-scheduled';
-      case TripStatus.PickedUp:
-      case TripStatus.InTransit:
-        return 'status-in-progress';
-      case TripStatus.Delivered:
-        return 'status-delivered';
-      case TripStatus.Paid:
-        return 'status-paid';
-      default:
-        return '';
-    }
-  }
-
-  formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  
+  onRetry(): void {
+    this.dashboardState.clearError();
+    this.dashboardState.startInitialLoad();
+    
+    // Simulate retry
+    setTimeout(() => {
+      this.dashboardState.completeLoad();
+    }, 1500);
   }
 }

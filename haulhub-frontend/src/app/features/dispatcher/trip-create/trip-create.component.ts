@@ -134,7 +134,7 @@ export class TripCreateComponent implements OnInit {
           duration: 3000,
           panelClass: ['success-snackbar']
         });
-        this.router.navigate(['/dispatcher/trips']);
+        this.router.navigate(['/dispatcher/dashboard']);
       },
       error: (error) => {
         console.error('Error creating trip:', error);

@@ -5,3 +5,5 @@ export * from './lorry.service';
 export * from './admin.service';
 export * from './error.service';
 export * from './loading.service';
+export * from './pdf-export.service';
+export * from './theme.service';

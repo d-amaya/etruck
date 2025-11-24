@@ -1,0 +1,395 @@
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import { Subject, combineLatest, Observable, of } from 'rxjs';
+import { switchMap, takeUntil, map, catchError, debounceTime } from 'rxjs/operators';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatChipsModule } from '@angular/material/chips';
+import { TripService } from '../../../../core/services';
+import { Trip, TripStatus, TripFilters } from '@haulhub/shared';
+import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { AccessibilityService } from '../../../../core/services/accessibility.service';
+
+@Component({
+  selector: 'app-trip-table',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatTableModule,
+    MatPaginatorModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+    MatDialogModule,
+    MatSnackBarModule,
+    MatChipsModule
+  ],
+  templateUrl: './trip-table.component.html',
+  styleUrls: ['./trip-table.component.scss']
+})
+export class TripTableComponent implements OnInit, OnDestroy {
+  displayedColumns = [
+    'scheduledPickupDatetime',
+    'pickupLocation',
+    'dropoffLocation',
+    'brokerName',
+    'lorryId',
+    'driverName',
+    'status',
+    'brokerPayment',
+    'profit',
+    'actions'
+  ];
+
+  trips: Trip[] = [];
+  totalTrips = 0;
+  pageSize = 25;
+  pageIndex = 0;
+  loading = false;
+  hasActiveFilters = false;
+
+  private destroy$ = new Subject<void>();
+  private deletedTrip: Trip | null = null;
+
+  constructor(
+    private tripService: TripService,
+    private dashboardState: DashboardStateService,
+    private router: Router,
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar,
+    private accessibilityService: AccessibilityService
+  ) {}
+
+  ngOnInit(): void {
+    // Subscribe to the combined filters and pagination observable
+    this.dashboardState.filtersAndPagination$.pipe(
+      switchMap(([filters, pagination]) => {
+        this.pageSize = pagination.pageSize;
+        this.pageIndex = pagination.page;
+        this.hasActiveFilters = this.dashboardState.getActiveFilterCount() > 0;
+        return this.loadTrips(filters, pagination);
+      }),
+      takeUntil(this.destroy$)
+    ).subscribe(result => {
+      this.trips = result.trips;
+      this.totalTrips = result.total;
+      // Update the dashboard state with the filtered trips for payment summary calculation
+      this.dashboardState.updateFilteredTrips(result.trips);
+    });
+  }
+
+  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number }> {
+    this.loading = true;
+    const apiFilters = this.buildApiFilters(filters, pagination);
+    
+    console.log('Loading trips with filters:', apiFilters);
+
+    return this.tripService.getTrips(apiFilters).pipe(
+      map(trips => {
+        this.loading = false;
+        console.log('Received trips from API:', trips.length, 'trips');
+        
+        // Apply client-side filtering as a fallback (in case backend filtering isn't working)
+        let filteredTrips = trips;
+        
+        // Filter by status if specified
+        if (filters.status) {
+          filteredTrips = filteredTrips.filter(trip => trip.status === filters.status);
+          console.log('After status filter:', filteredTrips.length, 'trips');
+        }
+        
+        // Filter by broker if specified
+        if (filters.brokerId) {
+          filteredTrips = filteredTrips.filter(trip => trip.brokerId === filters.brokerId);
+          console.log('After broker filter:', filteredTrips.length, 'trips');
+        }
+        
+        // Filter by lorry if specified
+        if (filters.lorryId) {
+          filteredTrips = filteredTrips.filter(trip => 
+            trip.lorryId.toLowerCase().includes(filters.lorryId!.toLowerCase())
+          );
+          console.log('After lorry filter:', filteredTrips.length, 'trips');
+        }
+        
+        // Filter by driver name if specified
+        if (filters.driverName) {
+          filteredTrips = filteredTrips.filter(trip => 
+            trip.driverName.toLowerCase().includes(filters.driverName!.toLowerCase())
+          );
+          console.log('After driver filter:', filteredTrips.length, 'trips');
+        }
+        
+        // Filter by date range if specified
+        if (filters.dateRange.startDate || filters.dateRange.endDate) {
+          filteredTrips = filteredTrips.filter(trip => {
+            const tripDate = new Date(trip.scheduledPickupDatetime);
+            let inRange = true;
+            
+            if (filters.dateRange.startDate) {
+              inRange = inRange && tripDate >= filters.dateRange.startDate;
+            }
+            
+            if (filters.dateRange.endDate) {
+              // Set end date to end of day
+              const endDate = new Date(filters.dateRange.endDate);
+              endDate.setHours(23, 59, 59, 999);
+              inRange = inRange && tripDate <= endDate;
+            }
+            
+            return inRange;
+          });
+          console.log('After date filter:', filteredTrips.length, 'trips');
+        }
+        
+        // Sort trips by scheduled pickup date in descending order (newest first)
+        const sortedTrips = filteredTrips.sort((a, b) => {
+          const dateA = new Date(a.scheduledPickupDatetime).getTime();
+          const dateB = new Date(b.scheduledPickupDatetime).getTime();
+          return dateB - dateA; // Descending order
+        });
+        
+        console.log('Final filtered and sorted trips:', sortedTrips.length, 'trips');
+        return { trips: sortedTrips, total: sortedTrips.length };
+      }),
+      catchError(error => {
+        this.loading = false;
+        
+        // Ignore cancellation errors (they're expected when filters change rapidly)
+        if (error.name === 'AbortError' || error.status === 0) {
+          console.log('Request cancelled (expected behavior)');
+          return of({ trips: [], total: 0 });
+        }
+        
+        console.error('Error loading trips:', error);
+        this.snackBar.open('Error loading trips. Please try again.', 'Close', {
+          duration: 5000
+        });
+        return of({ trips: [], total: 0 });
+      })
+    );
+  }
+
+  private buildApiFilters(filters: DashboardFilters, pagination: PaginationState): TripFilters {
+    const apiFilters: TripFilters = {
+      limit: pagination.pageSize
+    };
+
+    if (filters.dateRange.startDate) {
+      apiFilters.startDate = filters.dateRange.startDate.toISOString();
+    }
+    if (filters.dateRange.endDate) {
+      apiFilters.endDate = filters.dateRange.endDate.toISOString();
+    }
+    if (filters.status) {
+      apiFilters.status = filters.status;
+    }
+    if (filters.brokerId) {
+      apiFilters.brokerId = filters.brokerId;
+    }
+    if (filters.lorryId) {
+      apiFilters.lorryId = filters.lorryId;
+    }
+    if (filters.driverName) {
+      apiFilters.driverName = filters.driverName;
+    }
+
+    console.log('Dashboard filters:', filters);
+    console.log('Built API filters:', apiFilters);
+    return apiFilters;
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.dashboardState.updatePagination({
+      page: event.pageIndex,
+      pageSize: event.pageSize
+    });
+  }
+
+  viewTrip(trip: Trip): void {
+    this.router.navigate(['/dispatcher/trips', trip.tripId]);
+  }
+
+  editTrip(trip: Trip): void {
+    this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']);
+  }
+
+  deleteTrip(trip: Trip): void {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete Trip',
+        message: `Are you sure you want to delete this trip from ${trip.pickupLocation} to ${trip.dropoffLocation}?`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.performDelete(trip);
+      }
+    });
+  }
+
+  private performDelete(trip: Trip): void {
+    this.tripService.deleteTrip(trip.tripId).subscribe({
+      next: () => {
+        this.deletedTrip = trip;
+        this.trips = this.trips.filter(t => t.tripId !== trip.tripId);
+        this.totalTrips--;
+
+        const snackBarRef = this.snackBar.open(
+          'Trip deleted successfully',
+          'Undo',
+          { duration: 5000 }
+        );
+
+        snackBarRef.onAction().subscribe(() => {
+          this.undoDelete();
+        });
+
+        // Clear deleted trip after snackbar duration
+        setTimeout(() => {
+          this.deletedTrip = null;
+        }, 5000);
+      },
+      error: (error) => {
+        console.error('Error deleting trip:', error);
+        this.snackBar.open('Error deleting trip. Please try again.', 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  private undoDelete(): void {
+    if (this.deletedTrip) {
+      this.tripService.createTrip(this.deletedTrip).subscribe({
+        next: () => {
+          this.snackBar.open('Trip restored successfully', 'Close', {
+            duration: 3000
+          });
+          // Reload trips to show the restored trip
+          this.dashboardState.updateFilters({});
+        },
+        error: (error) => {
+          console.error('Error restoring trip:', error);
+          this.snackBar.open('Error restoring trip. Please try again.', 'Close', {
+            duration: 5000
+          });
+        }
+      });
+      this.deletedTrip = null;
+    }
+  }
+
+  createTrip(): void {
+    this.router.navigate(['/dispatcher/trips/create']);
+  }
+
+  getEmptyStateMessage(): string {
+    if (this.hasActiveFilters) {
+      return 'No trips found matching your filters. Try adjusting your filters or clear them to see all trips.';
+    }
+    return 'You haven\'t created any trips yet.';
+  }
+
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  }
+
+  calculateProfit(trip: Trip): number {
+    return trip.brokerPayment - trip.lorryOwnerPayment - trip.driverPayment;
+  }
+
+  getStatusClass(status: TripStatus): string {
+    switch (status) {
+      case TripStatus.Scheduled:
+        return 'status-scheduled';
+      case TripStatus.PickedUp:
+        return 'status-picked-up';
+      case TripStatus.InTransit:
+        return 'status-in-transit';
+      case TripStatus.Delivered:
+        return 'status-delivered';
+      case TripStatus.Paid:
+        return 'status-paid';
+      default:
+        return '';
+    }
+  }
+
+  getStatusLabel(status: TripStatus): string {
+    switch (status) {
+      case TripStatus.Scheduled:
+        return 'Scheduled';
+      case TripStatus.PickedUp:
+        return 'Picked Up';
+      case TripStatus.InTransit:
+        return 'In Transit';
+      case TripStatus.Delivered:
+        return 'Delivered';
+      case TripStatus.Paid:
+        return 'Paid';
+      default:
+        return status;
+    }
+  }
+
+  /**
+   * Get ARIA label for trip status
+   */
+  getStatusAriaLabel(status: TripStatus): string {
+    return this.accessibilityService.getStatusAriaLabel(status);
+  }
+
+  /**
+   * Get ARIA label for action buttons
+   */
+  getActionAriaLabel(action: string, tripId: string, destination?: string): string {
+    return this.accessibilityService.getActionAriaLabel(action, tripId, destination);
+  }
+
+  /**
+   * Get ARIA label for profit column
+   */
+  getProfitAriaLabel(trip: Trip): string {
+    const profit = this.calculateProfit(trip);
+    const profitText = this.formatCurrency(profit);
+    const profitType = profit >= 0 ? 'profit' : 'loss';
+    return `${profitType}: ${profitText}`;
+  }
+
+  /**
+   * Math utility for template
+   */
+  Math = Math;
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+}

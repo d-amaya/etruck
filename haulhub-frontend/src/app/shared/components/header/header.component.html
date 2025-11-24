@@ -4,6 +4,18 @@
     <span class="app-name">HaulHub</span>
   </button>
   
+  <!-- Navigation Items -->
+  <nav class="navigation" *ngIf="shouldShowNavigation()">
+    <button 
+      mat-button 
+      *ngFor="let item of getNavigationItems()" 
+      [class.active]="isActiveRoute(item.route)"
+      (click)="router.navigate([item.route])"
+      class="nav-item">
+      {{ item.label }}
+    </button>
+  </nav>
+  
   <span class="spacer"></span>
   
   <div class="user-info">

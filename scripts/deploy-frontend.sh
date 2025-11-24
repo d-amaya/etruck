@@ -69,7 +69,7 @@ fi
 
 # Install dependencies
 echo -e "${YELLOW}Installing frontend dependencies...${NC}"
-npm install
+npm install --legacy-peer-deps
 
 # Build frontend for production
 echo -e "${YELLOW}Building frontend for production...${NC}"

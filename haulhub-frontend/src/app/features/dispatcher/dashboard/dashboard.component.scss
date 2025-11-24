@@ -1,210 +1,155 @@
 .dashboard-container {
-  padding: 24px;
-  max-width: 1400px;
+  position: relative;
+  max-width: 1600px;
   margin: 0 auto;
+  padding: 24px;
+  background-color: #fafafa;
+  min-height: 100vh;
 }
 
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-
-  h1 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 500;
-  }
-
-  button mat-icon {
-    margin-right: 8px;
-  }
+.filter-section {
+  margin-bottom: 24px;
 }
 
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-}
-
-.summary-cards {
+.dashboard-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: 1fr;
+  gap: 24px;
 }
 
-.summary-card mat-card-content {
-  display: flex;
-  align-items: center;
-  padding: 20px;
+.content-wrapper {
+  display: contents;
 }
 
-.summary-icon {
-  margin-right: 16px;
-
-  mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    color: #1976d2;
-  }
+.skeleton-content,
+.loaded-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
 }
 
-.summary-card.scheduled .summary-icon mat-icon { color: #ff9800; }
-.summary-card.in-progress .summary-icon mat-icon { color: #2196f3; }
-.summary-card.delivered .summary-icon mat-icon { color: #4caf50; }
-.summary-card.paid .summary-icon mat-icon { color: #9c27b0; }
-
-.summary-value {
-  font-size: 32px;
-  font-weight: 600;
-  line-height: 1;
-  margin-bottom: 4px;
+// Compact Top Row Layout
+.compact-top-row {
+  display: grid;
+  grid-template-columns: 300px 1fr 280px; // Fixed width for filters and payment, flexible for charts
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 16px;
 }
 
-.summary-label {
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.quick-actions {
-  margin-bottom: 24px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-
-  button mat-icon {
-    margin-right: 8px;
-  }
-}
-
-.no-trips {
-  text-align: center;
-  padding: 40px 20px;
-  color: rgba(0, 0, 0, 0.6);
-
-  mat-icon {
-    font-size: 64px;
-    width: 64px;
-    height: 64px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-
-  p {
-    margin: 0;
-    font-size: 16px;
-  }
-}
-
-.trip-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.compact-filters-section {
+  background: white;
+  border-radius: 8px;
   padding: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 0;
+}
 
-  &:last-child {
-    border-bottom: none;
+.compact-charts-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 0;
+  min-height: 300px; // Ensure consistent height
+}
+
+.compact-payment-section {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 0;
+}
+
+.summary-cards-section {
+  grid-column: 1 / -1;
+}
+
+.table-section {
+  grid-column: 1 / -1;
+}
+
+// Responsive adjustments for large screens (1280px+)
+@media (min-width: 1280px) {
+  .dashboard-container {
+    padding: 32px;
+  }
+
+  .dashboard-content {
+    gap: 32px;
+  }
+
+  .compact-top-row {
+    gap: 24px;
+    grid-template-columns: 320px 1fr 300px; // Slightly larger on big screens
   }
 }
 
-.trip-info {
-  flex: 1;
-}
-
-.trip-route {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 16px;
-
-  mat-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
-    color: rgba(0, 0, 0, 0.54);
+// Responsive adjustments for tablets (768px - 1279px)
+@media (max-width: 1279px) {
+  .compact-top-row {
+    grid-template-columns: 1fr; // Stack vertically on smaller screens
+    gap: 16px;
+  }
+  
+  .compact-charts-section {
+    min-height: 250px; // Smaller height on tablets
   }
 }
 
-.trip-details {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
-}
+// Responsive adjustments for small tablets (768px - 1023px)
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-container {
+    padding: 20px;
+  }
 
-.trip-separator {
-  color: rgba(0, 0, 0, 0.3);
-}
+  .dashboard-content {
+    gap: 20px;
+  }
 
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  white-space: nowrap;
-
-  &.status-scheduled { background-color: #fff3e0; color: #e65100; }
-  &.status-in-progress { background-color: #e3f2fd; color: #0d47a1; }
-  &.status-delivered { background-color: #e8f5e9; color: #1b5e20; }
-  &.status-paid { background-color: #f3e5f5; color: #4a148c; }
-}
-
-.view-all-link {
-  text-align: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-
-  button mat-icon {
-    margin-left: 4px;
-    vertical-align: middle;
+  .compact-top-row {
+    gap: 16px;
   }
 }
 
-@media (max-width: 768px) {
+// Responsive adjustments for mobile (below 768px)
+@media (max-width: 767px) {
   .dashboard-container {
     padding: 16px;
+    background-color: #ffffff; // Use white background on mobile for better contrast
   }
 
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .dashboard-content {
     gap: 16px;
-
-    button {
-      width: 100%;
-    }
   }
 
-  .summary-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .action-buttons {
-    flex-direction: column;
-
-    button {
-      width: 100%;
-    }
-  }
-
-  .trip-item {
-    flex-direction: column;
-    align-items: flex-start;
+  .compact-top-row {
     gap: 12px;
+  }
+  
+  .compact-charts-section {
+    min-height: 200px; // Smaller height on mobile
+  }
+}
 
-    .trip-status {
-      align-self: flex-start;
-    }
+// Responsive adjustments for very small screens (below 480px)
+@media (max-width: 479px) {
+  .dashboard-container {
+    padding: 12px;
+  }
+
+  .dashboard-content {
+    gap: 12px;
+  }
+
+  .compact-top-row {
+    gap: 8px;
+  }
+  
+  .compact-filters-section,
+  .compact-charts-section,
+  .compact-payment-section {
+    padding: 12px;
   }
 }

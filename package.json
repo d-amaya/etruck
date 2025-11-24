@@ -9,6 +9,7 @@
     "haulhub-infrastructure",
     "haulhub-shared"
   ],
+
   "scripts": {
     "install:all": "npm install && npm install --workspace=haulhub-frontend && npm install --workspace=haulhub-backend && npm install --workspace=haulhub-infrastructure && npm install --workspace=haulhub-shared",
     "build:shared": "npm run build --workspace=haulhub-shared",

@@ -1,0 +1,56 @@
+<div class="compact-charts-container">
+  <!-- Chart Header with Type Selector -->
+  <div class="chart-header">
+    <h3 class="chart-title">{{ getChartTitle() }}</h3>
+    <mat-form-field appearance="outline" class="chart-type-selector">
+      <mat-label>Chart Type</mat-label>
+      <mat-select [(value)]="selectedChartType" (selectionChange)="onChartTypeChange()">
+        <mat-option value="status">Trips by Status</mat-option>
+        <mat-option value="payments">Payments Timeline</mat-option>
+        <mat-option value="profit">Profit Analysis</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="hasError" class="compact-error-state">
+    <div class="error-content">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <p class="error-message">Unable to load chart</p>
+      <button mat-button color="primary" (click)="retryLoad()" class="retry-btn">
+        <mat-icon>refresh</mat-icon>
+        Retry
+      </button>
+    </div>
+  </div>
+
+  <!-- Chart Content -->
+  <div *ngIf="!hasError" class="compact-chart-content">
+    <!-- Status Chart -->
+    <div *ngIf="selectedChartType === 'status'" class="chart-wrapper">
+      <canvas baseChart
+              [data]="tripsByStatusData"
+              [options]="compactBarChartOptions"
+              type="bar">
+      </canvas>
+    </div>
+
+    <!-- Payments Timeline Chart -->
+    <div *ngIf="selectedChartType === 'payments'" class="chart-wrapper">
+      <canvas baseChart
+              [data]="paymentsOverTimeData"
+              [options]="compactLineChartOptions"
+              type="line">
+      </canvas>
+    </div>
+
+    <!-- Profit Analysis Chart -->
+    <div *ngIf="selectedChartType === 'profit'" class="chart-wrapper">
+      <canvas baseChart
+              [data]="profitAnalysisData"
+              [options]="compactBarChartOptions"
+              type="bar">
+      </canvas>
+    </div>
+  </div>
+</div>

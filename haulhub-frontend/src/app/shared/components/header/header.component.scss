@@ -1,18 +1,67 @@
+// Ensure toolbar has proper styling
+mat-toolbar {
+  background-color: #1976D2 !important;
+  color: white !important;
+  min-height: 64px !important;
+}
+
 .logo-button {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 18px;
   font-weight: 500;
+  color: white !important;
 
   mat-icon {
     font-size: 28px;
     width: 28px;
     height: 28px;
+    color: white !important;
   }
 
   .app-name {
     margin-left: 4px;
+    color: white !important;
+  }
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  margin-left: 32px;
+
+  .nav-item {
+    margin: 0 8px;
+    font-size: 14px;
+    font-weight: 500;
+    position: relative;
+    color: rgba(255, 255, 255, 0.87) !important;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1) !important;
+      color: white !important;
+    }
+
+    &.active {
+      color: white !important;
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        height: 2px;
+        background-color: white;
+        border-radius: 1px;
+      }
+    }
   }
 }
 
@@ -30,6 +79,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 12px;
+  color: white !important;
 
   .user-details {
     display: flex;
@@ -41,11 +91,13 @@
     .user-name {
       font-size: 14px;
       font-weight: 500;
+      color: white !important;
     }
 
     .user-role {
       font-size: 12px;
       opacity: 0.8;
+      color: rgba(255, 255, 255, 0.8) !important;
     }
   }
 
@@ -53,19 +105,48 @@
     font-size: 32px;
     width: 32px;
     height: 32px;
+    color: white !important;
   }
 
   mat-icon:last-child {
     font-size: 24px;
     width: 24px;
     height: 24px;
+    color: white !important;
+  }
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
   }
 }
 
 // Responsive design for smaller screens
+@media (max-width: 768px) {
+  .navigation {
+    margin-left: 16px;
+    
+    .nav-item {
+      margin: 0 4px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.87) !important;
+    }
+  }
+}
+
 @media (max-width: 600px) {
   .app-name {
     display: none;
+  }
+
+  .navigation {
+    margin-left: 8px;
+    
+    .nav-item {
+      margin: 0 2px;
+      font-size: 12px;
+      padding: 0 8px;
+      color: rgba(255, 255, 255, 0.87) !important;
+    }
   }
 
   .user-details {

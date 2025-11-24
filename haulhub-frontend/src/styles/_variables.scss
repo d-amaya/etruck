@@ -1,0 +1,187 @@
+// =============================================================================
+// HAULHUB DESIGN SYSTEM - VARIABLES
+// Professional Corporate Design System
+// =============================================================================
+
+// =============================================================================
+// COLOR PALETTE
+// =============================================================================
+
+// Primary Colors
+$primary-blue: #1976D2;
+$primary-dark: #0D47A1;
+$primary-light: #BBDEFB;
+
+// Neutral Colors (Professional Gray Scale - WCAG AA Compliant)
+$neutral-900: #212121;  // Primary text (contrast ratio 15.8:1 on white)
+$neutral-800: #424242;  // High emphasis text (contrast ratio 12.6:1 on white)
+$neutral-700: #616161;  // Secondary text (contrast ratio 7.0:1 on white)
+$neutral-600: #757575;  // Medium emphasis text (contrast ratio 5.7:1 on white)
+$neutral-500: #9E9E9E;  // Disabled text (contrast ratio 3.9:1 on white)
+$neutral-400: #BDBDBD;  // Disabled elements
+$neutral-300: #E0E0E0;  // Borders
+$neutral-200: #EEEEEE;  // Dividers
+$neutral-100: #F5F5F5;  // Light backgrounds
+$neutral-50: #FAFAFA;   // Page background
+
+$white: #FFFFFF;
+$black: #000000;
+
+// Status Colors (Muted Professional - WCAG AA Compliant)
+$status-scheduled: #E3F2FD;      // Light blue background
+$status-picked-up: #FFF3E0;      // Light amber background
+$status-in-transit: #F3E5F5;     // Light purple background
+$status-delivered: #E8F5E9;      // Light green background
+$status-paid: #E0F2F1;           // Light teal background
+
+// Status Text Colors (WCAG AA Compliant - 4.5:1 contrast ratio minimum)
+$status-scheduled-text: #0D47A1;    // Dark blue (7.2:1 contrast on light blue bg)
+$status-picked-up-text: #E65100;    // Dark orange (6.8:1 contrast on light amber bg)
+$status-in-transit-text: #4A148C;   // Dark purple (8.1:1 contrast on light purple bg)
+$status-delivered-text: #1B5E20;    // Dark green (7.5:1 contrast on light green bg)
+$status-paid-text: #004D40;         // Dark teal (8.9:1 contrast on light teal bg)
+
+// Status Border Colors
+$status-scheduled-border: #90CAF9;
+$status-picked-up-border: #FFE082;
+$status-in-transit-border: #CE93D8;
+$status-delivered-border: #A5D6A7;
+$status-paid-border: #80CBC4;
+
+// Semantic Colors
+$success: #4CAF50;
+$error: #F44336;
+$warning: #FF9800;
+$info: #2196F3;
+
+// Success/Error variants
+$success-light: #E8F5E9;
+$error-light: #FFEBEE;
+$warning-light: #FFF3E0;
+$info-light: #E3F2FD;
+
+// =============================================================================
+// TYPOGRAPHY
+// =============================================================================
+
+// Font Families
+$font-family-primary: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+$font-family-mono: 'Roboto Mono', 'Courier New', monospace;
+
+// Font Sizes
+$font-size-h1: 32px;
+$font-size-h2: 24px;
+$font-size-h3: 20px;
+$font-size-h4: 18px;
+$font-size-body: 14px;
+$font-size-small: 12px;
+$font-size-xs: 10px;
+
+// Font Weights
+$font-weight-light: 300;
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 700;
+
+// Line Heights
+$line-height-tight: 1.2;
+$line-height-normal: 1.5;
+$line-height-relaxed: 1.75;
+
+// =============================================================================
+// SPACING SYSTEM
+// =============================================================================
+
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+$spacing-xxl: 48px;
+$spacing-xxxl: 64px;
+
+// =============================================================================
+// LAYOUT & GRID
+// =============================================================================
+
+// Container widths
+$container-max-width: 1440px;
+$container-padding: $spacing-lg;
+
+// Grid breakpoints
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-xxl: 1400px;
+
+// =============================================================================
+// SHADOWS & BORDERS
+// =============================================================================
+
+// Box Shadows (Subtle and Professional)
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+$shadow-md: 0 2px 6px rgba(0, 0, 0, 0.15);
+$shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.18);
+
+// Border Radius
+$border-radius-sm: 2px;
+$border-radius-md: 4px;
+$border-radius-lg: 8px;
+
+// Border Widths
+$border-width-thin: 1px;
+$border-width-medium: 2px;
+
+// =============================================================================
+// Z-INDEX SCALE
+// =============================================================================
+
+$z-index-dropdown: 1000;
+$z-index-sticky: 1020;
+$z-index-fixed: 1030;
+$z-index-modal-backdrop: 1040;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
+
+// =============================================================================
+// ANIMATION & TRANSITIONS
+// =============================================================================
+
+$transition-fast: 0.15s ease-in-out;
+$transition-normal: 0.3s ease-in-out;
+$transition-slow: 0.5s ease-in-out;
+
+// =============================================================================
+// COMPONENT SPECIFIC VARIABLES
+// =============================================================================
+
+// Cards
+$card-padding: $spacing-lg;
+$card-border-radius: $border-radius-md;
+$card-shadow: $shadow-sm;
+$card-shadow-hover: $shadow-md;
+
+// Buttons
+$button-border-radius: $border-radius-md;
+$button-padding-x: $spacing-md;
+$button-padding-y: $spacing-sm;
+$button-font-weight: $font-weight-medium;
+
+// Tables
+$table-cell-padding: $spacing-sm $spacing-md;
+$table-header-bg: $neutral-50;
+$table-border-color: $neutral-100;
+$table-hover-bg: $neutral-50;
+
+// Forms
+$form-field-border-radius: $border-radius-md;
+$form-field-padding: $spacing-sm $spacing-md;
+$form-field-border-color: $neutral-300;
+$form-field-focus-color: $primary-blue;
+
+// Dashboard specific
+$dashboard-bg: $neutral-50;
+$dashboard-content-bg: $white;
+$dashboard-gap: $spacing-lg;

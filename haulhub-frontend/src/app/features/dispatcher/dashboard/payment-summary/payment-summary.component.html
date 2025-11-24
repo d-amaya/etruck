@@ -1,0 +1,63 @@
+<div class="compact-payment-summary">
+  <h3 class="summary-title">
+    <mat-icon>account_balance_wallet</mat-icon>
+    Payment Summary
+  </h3>
+  
+  <div *ngIf="hasError" class="compact-error-state">
+    <div class="error-content">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <p class="error-message">Unable to load payments</p>
+      <button mat-button color="primary" (click)="retryLoad()" class="retry-btn">
+        <mat-icon>refresh</mat-icon>
+        Retry
+      </button>
+    </div>
+  </div>
+  
+  <div *ngIf="!hasError" class="compact-payment-metrics">
+    <div class="compact-metric">
+      <div class="metric-icon">
+        <mat-icon>trending_up</mat-icon>
+      </div>
+      <div class="metric-info">
+        <div class="metric-label">Broker</div>
+        <div class="metric-value">{{ paymentSummary.totalBrokerPayments | currency:'USD':'symbol':'1.0-0' }}</div>
+      </div>
+    </div>
+
+    <div class="compact-metric">
+      <div class="metric-icon">
+        <mat-icon>person</mat-icon>
+      </div>
+      <div class="metric-info">
+        <div class="metric-label">Driver</div>
+        <div class="metric-value">{{ paymentSummary.totalDriverPayments | currency:'USD':'symbol':'1.0-0' }}</div>
+      </div>
+    </div>
+
+    <div class="compact-metric">
+      <div class="metric-icon">
+        <mat-icon>local_shipping</mat-icon>
+      </div>
+      <div class="metric-info">
+        <div class="metric-label">Lorry Owner</div>
+        <div class="metric-value">{{ paymentSummary.totalLorryOwnerPayments | currency:'USD':'symbol':'1.0-0' }}</div>
+      </div>
+    </div>
+
+    <div class="compact-metric profit-metric">
+      <div class="metric-icon">
+        <mat-icon [class.profit-positive]="isProfitPositive" [class.profit-negative]="!isProfitPositive">
+          {{ isProfitPositive ? 'arrow_upward' : 'arrow_downward' }}
+        </mat-icon>
+      </div>
+      <div class="metric-info">
+        <div class="metric-label">Profit</div>
+        <div class="metric-value" [ngClass]="profitClass">
+          {{ paymentSummary.totalProfit | currency:'USD':'symbol':'1.0-0' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
