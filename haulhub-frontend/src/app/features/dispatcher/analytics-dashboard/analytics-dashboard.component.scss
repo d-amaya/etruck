@@ -1,0 +1,703 @@
+.analytics-dashboard {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 600;
+      color: #212121;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+
+      button {
+        mat-icon {
+          margin-right: 8px;
+        }
+      }
+    }
+  }
+
+  .loading-container,
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    text-align: center;
+
+    mat-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+    }
+
+    p {
+      font-size: 16px;
+      color: #757575;
+      margin-bottom: 24px;
+    }
+  }
+
+  .dashboard-content {
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+
+      .kpi-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+        &:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        &.kpi-success {
+          border-left: 4px solid #4caf50;
+        }
+
+        &.kpi-primary {
+          border-left: 4px solid #2196f3;
+        }
+
+        &.kpi-warn {
+          border-left: 4px solid #ff9800;
+        }
+
+        &.kpi-accent {
+          border-left: 4px solid #9c27b0;
+        }
+
+        mat-card-content {
+          padding: 20px;
+
+          .kpi-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+
+            mat-icon {
+              color: #757575;
+              font-size: 20px;
+              width: 20px;
+              height: 20px;
+            }
+
+            .kpi-title {
+              font-size: 14px;
+              color: #757575;
+              font-weight: 500;
+            }
+          }
+
+          .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #212121;
+            margin-bottom: 8px;
+            font-family: 'Roboto Mono', monospace;
+          }
+
+          .kpi-change {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 500;
+
+            &.positive {
+              color: #4caf50;
+            }
+
+            &.negative {
+              color: #f44336;
+            }
+
+            mat-icon {
+              font-size: 16px;
+              width: 16px;
+              height: 16px;
+            }
+          }
+        }
+      }
+    }
+
+    .charts-section {
+      margin-top: 32px;
+
+      .tab-content {
+        padding: 24px 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 24px;
+
+        .chart-card,
+        .report-card {
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+          mat-card-header {
+            padding: 20px 20px 0;
+
+            mat-card-title {
+              font-size: 18px;
+              font-weight: 600;
+              color: #212121;
+            }
+          }
+
+          mat-card-content {
+            padding: 20px;
+
+            .chart-placeholder {
+              min-height: 300px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background: #f5f5f5;
+              border-radius: 8px;
+              padding: 32px;
+              text-align: center;
+
+              p {
+                font-size: 16px;
+                color: #424242;
+                margin-bottom: 8px;
+
+                &.chart-note {
+                  font-size: 14px;
+                  color: #757575;
+                  font-style: italic;
+                }
+              }
+
+              .chart-data-preview {
+                margin-top: 16px;
+                padding: 16px;
+                background: white;
+                border-radius: 6px;
+                text-align: left;
+
+                p {
+                  margin: 4px 0;
+                  font-size: 14px;
+                  color: #616161;
+                }
+              }
+            }
+
+            .no-data {
+              min-height: 300px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              color: #9e9e9e;
+
+              mat-icon {
+                font-size: 64px;
+                width: 64px;
+                height: 64px;
+                margin-bottom: 16px;
+                opacity: 0.5;
+              }
+
+              p {
+                font-size: 16px;
+              }
+            }
+          }
+        }
+
+        .report-card {
+          mat-card-content {
+            p {
+              margin-bottom: 16px;
+              color: #616161;
+            }
+
+            button {
+              mat-icon {
+                margin-right: 8px;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Mobile responsive styles
+@media (max-width: 768px) {
+  .analytics-dashboard {
+    padding: 16px;
+
+    .dashboard-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .header-actions {
+        width: 100%;
+
+        button {
+          flex: 1;
+        }
+      }
+    }
+
+    .dashboard-content {
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .charts-section {
+        .tab-content {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
+  }
+}
+
+// Tablet responsive styles
+@media (min-width: 769px) and (max-width: 1024px) {
+  .analytics-dashboard {
+    .dashboard-content {
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .charts-section {
+        .tab-content {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
+  }
+}
+
+// Fuel Efficiency Specific Styles
+.fuel-price-management {
+  padding: 16px 0;
+
+  .current-price-display {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    margin-bottom: 24px;
+
+    mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+      color: #4caf50;
+    }
+
+    .price-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .label {
+        font-size: 14px;
+        color: #757575;
+        font-weight: 500;
+      }
+
+      .value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #212121;
+        font-family: 'Roboto Mono', monospace;
+      }
+    }
+  }
+
+  mat-divider {
+    margin: 24px 0;
+  }
+
+  .price-update-form {
+    padding: 16px 0;
+
+    h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #212121;
+    }
+
+    .hint {
+      font-size: 14px;
+      color: #757575;
+      margin-bottom: 16px;
+    }
+
+    .price-input {
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      mat-icon {
+        margin-right: 8px;
+      }
+    }
+  }
+
+  .price-history {
+    padding: 16px 0;
+
+    h4 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #212121;
+    }
+
+    .price-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      .price-history-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #f5f5f5;
+        border-radius: 6px;
+        transition: background 0.2s ease;
+
+        &:hover {
+          background: #eeeeee;
+        }
+
+        .date {
+          font-size: 14px;
+          color: #616161;
+          flex: 1;
+        }
+
+        .price {
+          font-size: 16px;
+          font-weight: 600;
+          color: #212121;
+          font-family: 'Roboto Mono', monospace;
+          flex: 1;
+          text-align: center;
+        }
+
+        .change {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 14px;
+          font-weight: 500;
+          flex: 1;
+          justify-content: flex-end;
+
+          &.positive {
+            color: #f44336;
+
+            mat-icon {
+              color: #f44336;
+            }
+          }
+
+          &.negative {
+            color: #4caf50;
+
+            mat-icon {
+              color: #4caf50;
+            }
+          }
+
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+          }
+        }
+      }
+    }
+
+    .no-history {
+      text-align: center;
+      color: #9e9e9e;
+      font-size: 14px;
+      padding: 32px;
+    }
+  }
+}
+
+// Fuel efficiency chart specific styles
+.chart-placeholder {
+  .hint {
+    font-size: 13px;
+    color: #9e9e9e;
+    margin-top: 8px;
+  }
+}
+
+// Additional Fees Specific Styles
+.fees-overview {
+  padding: 16px 0;
+
+  .fee-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+
+    .fee-summary-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      transition: background 0.2s ease, transform 0.2s ease;
+
+      &:hover {
+        background: #eeeeee;
+        transform: translateY(-2px);
+      }
+
+      .fee-icon {
+        font-size: 32px;
+        width: 32px;
+        height: 32px;
+        color: #ff9800;
+      }
+
+      .fee-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+
+        .fee-label {
+          font-size: 13px;
+          color: #757575;
+          font-weight: 500;
+        }
+
+        .fee-value {
+          font-size: 20px;
+          font-weight: 700;
+          color: #212121;
+          font-family: 'Roboto Mono', monospace;
+
+          &.total {
+            font-size: 24px;
+            color: #ff9800;
+          }
+
+          &.impact {
+            color: #f44336;
+          }
+        }
+
+        .fee-count {
+          font-size: 12px;
+          color: #9e9e9e;
+        }
+      }
+    }
+  }
+
+  mat-divider {
+    margin: 24px 0;
+  }
+
+  .fee-trends {
+    padding: 16px 0;
+
+    h4 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #212121;
+    }
+  }
+}
+
+.fee-breakdown-table {
+  overflow-x: auto;
+
+  .fees-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    thead {
+      background: #f5f5f5;
+
+      tr {
+        th {
+          padding: 12px 16px;
+          text-align: left;
+          font-weight: 600;
+          color: #424242;
+          border-bottom: 2px solid #e0e0e0;
+        }
+      }
+    }
+
+    tbody {
+      tr {
+        transition: background 0.2s ease;
+
+        &:hover {
+          background: #fafafa;
+        }
+
+        td {
+          padding: 12px 16px;
+          border-bottom: 1px solid #e0e0e0;
+          color: #616161;
+
+          strong {
+            color: #212121;
+          }
+
+          .percentage {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #e3f2fd;
+            color: #1976d2;
+            font-weight: 600;
+
+            &.high {
+              background: #ffebee;
+              color: #c62828;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+.fee-recovery-info {
+  padding: 16px 0;
+
+  .info-text {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: #e3f2fd;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: #1565c0;
+    line-height: 1.6;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      margin-top: 2px;
+    }
+  }
+
+  .recovery-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+      background: #f5f5f5;
+      border-radius: 8px;
+
+      .stat-label {
+        font-size: 13px;
+        color: #757575;
+        font-weight: 500;
+      }
+
+      .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #212121;
+        font-family: 'Roboto Mono', monospace;
+
+        &.success {
+          color: #4caf50;
+        }
+
+        &.warn {
+          color: #ff9800;
+        }
+      }
+    }
+  }
+
+  .action-button {
+    mat-icon {
+      margin-right: 8px;
+    }
+  }
+}
+
+// Mobile responsive styles for additional fees
+@media (max-width: 768px) {
+  .fees-overview {
+    .fee-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .fee-breakdown-table {
+    .fees-table {
+      font-size: 12px;
+
+      thead tr th,
+      tbody tr td {
+        padding: 8px 12px;
+      }
+    }
+  }
+
+  .fee-recovery-info {
+    .recovery-stats {
+      grid-template-columns: 1fr;
+    }
+  }
+}

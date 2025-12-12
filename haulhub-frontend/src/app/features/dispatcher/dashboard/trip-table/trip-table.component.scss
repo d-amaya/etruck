@@ -146,65 +146,26 @@
       justify-content: flex-start;
 
       .action-btn {
-        min-width: auto;
-        padding: 4px 12px;
-        font-size: 13px;
-        line-height: 24px;
-        height: 32px;
-        border-radius: 4px;
+        width: 36px;
+        height: 36px;
+        line-height: 36px;
         transition: all 0.2s ease;
+        color: #1976d2 !important;
 
         mat-icon {
-          font-size: 18px;
-          width: 18px;
-          height: 18px;
-          margin-right: 4px;
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
         }
 
-        span {
-          font-weight: 500;
+        &:hover {
+          background-color: #e3f2fd !important;
         }
 
-        &.view-btn {
-          color: #1976d2;
-
-          &:hover {
-            background-color: #e3f2fd;
-          }
-
-          &:focus {
-            outline: 2px solid #1976d2;
-            outline-offset: 2px;
-            background-color: #e3f2fd;
-          }
-        }
-
-        &.edit-btn {
-          color: #f57c00;
-
-          &:hover {
-            background-color: #fff3e0;
-          }
-
-          &:focus {
-            outline: 2px solid #f57c00;
-            outline-offset: 2px;
-            background-color: #fff3e0;
-          }
-        }
-
-        &.delete-btn {
-          color: #d32f2f;
-
-          &:hover {
-            background-color: #ffebee;
-          }
-
-          &:focus {
-            outline: 2px solid #d32f2f;
-            outline-offset: 2px;
-            background-color: #ffebee;
-          }
+        &:focus {
+          outline: 2px solid #1976d2;
+          outline-offset: 2px;
+          background-color: #e3f2fd !important;
         }
       }
     }

@@ -205,7 +205,8 @@ describe('FilterBarComponent', () => {
       TripStatus.PickedUp,
       TripStatus.InTransit,
       TripStatus.Delivered,
-      TripStatus.Paid
+      TripStatus.Paid,
+      TripStatus.Canceled
     ]);
   });
 

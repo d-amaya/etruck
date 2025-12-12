@@ -1,0 +1,87 @@
+.dashboard-container {
+  padding: 24px;
+  
+  h1 {
+    margin-bottom: 24px;
+  }
+}
+
+.stat-card {
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 24px;
+  }
+}
+
+.stat-icon {
+  margin-right: 24px;
+  
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: #3f51b5;
+  }
+}
+
+.stat-info {
+  flex: 1;
+  
+  h2 {
+    margin: 0 0 16px 0;
+    font-size: 24px;
+    font-weight: 500;
+  }
+}
+
+.stat-numbers {
+  display: flex;
+  gap: 32px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  
+  .stat-value {
+    font-size: 32px;
+    font-weight: 600;
+    color: #3f51b5;
+  }
+  
+  .stat-label {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.quick-actions {
+  margin-top: 32px;
+  
+  h2 {
+    margin-bottom: 16px;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 16px;
+    
+    button {
+      mat-icon {
+        margin-right: 8px;
+      }
+    }
+  }
+}

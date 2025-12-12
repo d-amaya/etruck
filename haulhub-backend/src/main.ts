@@ -14,8 +14,8 @@ async function bootstrap() {
   // Enable validation pipes globally
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: false, // Allow extra properties (less strict for development)
+      whitelist: false, // Keep false to allow query params through
+      forbidNonWhitelisted: false,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,

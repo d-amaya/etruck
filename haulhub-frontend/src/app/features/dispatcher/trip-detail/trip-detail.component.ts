@@ -133,6 +133,79 @@ export class TripDetailComponent implements OnInit {
 
   calculateProfit(): number {
     if (!this.trip) return 0;
-    return this.trip.brokerPayment - this.trip.lorryOwnerPayment - this.trip.driverPayment;
+    
+    let totalExpenses = this.trip.lorryOwnerPayment + this.trip.driverPayment;
+    
+    // Add fuel costs if available
+    if (this.hasFuelData()) {
+      totalExpenses += this.calculateFuelCost();
+    }
+    
+    // Add additional fees if available
+    if (this.trip.lumperFees) {
+      totalExpenses += this.trip.lumperFees;
+    }
+    if (this.trip.detentionFees) {
+      totalExpenses += this.trip.detentionFees;
+    }
+    
+    return this.trip.brokerPayment - totalExpenses;
   }
+
+  /**
+   * Calculate total miles from loaded and empty miles
+   */
+  calculateTotalMiles(): number {
+    if (!this.trip) return 0;
+    
+    const loadedMiles = this.trip.loadedMiles || this.trip.distance || 0;
+    const emptyMiles = this.trip.emptyMiles || 0;
+    
+    return loadedMiles + emptyMiles;
+  }
+
+  /**
+   * Check if trip has fuel cost data
+   */
+  hasFuelData(): boolean {
+    if (!this.trip) return false;
+    
+    return !!(
+      this.trip.fuelAvgCost && 
+      this.trip.fuelAvgCost > 0 && 
+      this.trip.fuelAvgGallonsPerMile && 
+      this.trip.fuelAvgGallonsPerMile > 0
+    );
+  }
+
+  /**
+   * Calculate estimated fuel consumption in gallons
+   * Formula: Total Miles × Gallons Per Mile
+   */
+  calculateFuelConsumption(): number {
+    if (!this.trip || !this.hasFuelData()) return 0;
+    
+    const totalMiles = this.calculateTotalMiles();
+    const gallonsPerMile = this.trip.fuelAvgGallonsPerMile || 0;
+    
+    return totalMiles * gallonsPerMile;
+  }
+
+  /**
+   * Calculate total fuel cost
+   * Formula: Total Miles × Gallons Per Mile × Cost Per Gallon
+   * Validates: Requirements 6.2
+   */
+  calculateFuelCost(): number {
+    if (!this.trip || !this.hasFuelData()) return 0;
+    
+    const totalMiles = this.calculateTotalMiles();
+    const gallonsPerMile = this.trip.fuelAvgGallonsPerMile || 0;
+    const costPerGallon = this.trip.fuelAvgCost || 0;
+    
+    return totalMiles * gallonsPerMile * costPerGallon;
+  }
+
+  // Expose Math to template
+  Math = Math;
 }

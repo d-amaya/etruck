@@ -356,13 +356,11 @@ describe('Dashboard Integration Tests', () => {
       fixture.detectChanges();
 
       const filterBar = fixture.debugElement.query(By.css('app-filter-bar'));
-      const summaryCards = fixture.debugElement.query(By.css('app-trip-summary-cards'));
       const paymentSummary = fixture.debugElement.query(By.css('app-payment-summary'));
       const charts = fixture.debugElement.query(By.css('app-dashboard-charts'));
       const tripTable = fixture.debugElement.query(By.css('app-trip-table'));
 
       expect(filterBar).toBeTruthy();
-      expect(summaryCards).toBeTruthy();
       expect(paymentSummary).toBeTruthy();
       expect(charts).toBeTruthy();
       expect(tripTable).toBeTruthy();
@@ -585,7 +583,6 @@ describe('Dashboard Integration Tests', () => {
       // Verify all expected UI components are integrated
       const expectedComponents = [
         'app-filter-bar',
-        'app-trip-summary-cards',
         'app-payment-summary',
         'app-dashboard-charts',
         'app-trip-table'

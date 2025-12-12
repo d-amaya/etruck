@@ -11,7 +11,7 @@
   ],
 
   "scripts": {
-    "install:all": "npm install && npm install --workspace=haulhub-frontend && npm install --workspace=haulhub-backend && npm install --workspace=haulhub-infrastructure && npm install --workspace=haulhub-shared",
+    "install:all": "npm install && npm install --workspace=haulhub-shared && npm install --workspace=haulhub-frontend && npm install --workspace=haulhub-backend && npm install --workspace=haulhub-infrastructure",
     "build:shared": "npm run build --workspace=haulhub-shared",
     "build:backend": "npm run build --workspace=haulhub-backend",
     "build:frontend": "npm run build --workspace=haulhub-frontend",

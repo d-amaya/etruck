@@ -1,65 +1,31 @@
-.trip-edit-container {
+:host {
+  display: block;
+  min-height: calc(100vh - 64px);
+  background-color: #f5f5f5;
+}
+
+.trip-create-container {
   padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-
-  .loading-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 400px;
-    gap: 16px;
-
-    p {
-      color: rgba(0, 0, 0, 0.6);
-      font-size: 16px;
-    }
-  }
-
-  .error-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 400px;
-
-    .error-card {
-      max-width: 500px;
-      text-align: center;
-
-      mat-card-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 16px;
-        padding: 32px;
-
-        mat-icon {
-          font-size: 64px;
-          width: 64px;
-          height: 64px;
-        }
-
-        h2 {
-          margin: 0;
-          font-size: 24px;
-        }
-
-        p {
-          color: rgba(0, 0, 0, 0.6);
-          margin: 0;
-        }
-      }
-    }
-  }
 
   mat-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+
     mat-card-header {
       margin-bottom: 24px;
 
       mat-card-title {
         font-size: 24px;
         font-weight: 500;
+        margin-bottom: 8px;
+        color: #1976d2;
+      }
+
+      mat-card-subtitle {
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.6);
       }
     }
 
@@ -67,18 +33,87 @@
       form {
         .form-section {
           margin-bottom: 32px;
+          padding-bottom: 24px;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+          &:last-of-type {
+            border-bottom: none;
+          }
 
           h3 {
             font-size: 18px;
             font-weight: 500;
+            margin: 0 0 16px 0;
+            color: #1976d2;
+          }
+
+          .current-vehicle-info {
             margin-bottom: 16px;
-            color: rgba(0, 0, 0, 0.87);
+
+            .info-card {
+              background-color: #f5f5f5;
+              box-shadow: none;
+
+              mat-card-content {
+                padding: 12px;
+
+                .info-row {
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 4px 0;
+
+                  .info-label {
+                    font-weight: 500;
+                    color: rgba(0, 0, 0, 0.6);
+                  }
+
+                  .info-value {
+                    font-weight: 500;
+                    color: rgba(0, 0, 0, 0.87);
+                  }
+                }
+              }
+            }
+          }
+
+          .profit-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            margin-top: 16px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+
+            .profit-label {
+              font-size: 18px;
+              font-weight: 600;
+              color: rgba(0, 0, 0, 0.87);
+            }
+
+            .profit-value {
+              font-size: 18px;
+              font-weight: 700;
+
+              &.profit-positive {
+                color: #2e7d32 !important;
+              }
+
+              &.profit-negative {
+                color: #d32f2f !important;
+              }
+            }
           }
 
           .form-row {
             display: flex;
             gap: 16px;
             margin-bottom: 16px;
+
+            &:last-child {
+              margin-bottom: 0;
+            }
 
             mat-form-field {
               &.full-width {
@@ -91,6 +126,11 @@
               }
 
               &.third-width {
+                flex: 1;
+                min-width: 0;
+              }
+
+              &.quarter-width {
                 flex: 1;
                 min-width: 0;
               }
@@ -125,25 +165,39 @@
 
 // Responsive design
 @media (max-width: 768px) {
-  .trip-edit-container {
+  .trip-create-container {
     padding: 16px;
 
-    mat-card-content {
-      form {
-        .form-section {
-          .form-row {
-            flex-direction: column;
-            gap: 0;
+    mat-card {
+      mat-card-content {
+        form {
+          .form-section {
+            .form-row {
+              flex-direction: column;
+              gap: 0;
 
-            mat-form-field {
-              &.half-width,
-              &.third-width {
+              mat-form-field {
                 width: 100%;
               }
+            }
+          }
+
+          .form-actions {
+            flex-direction: column-reverse;
+
+            button {
+              width: 100%;
             }
           }
         }
       }
     }
+  }
+}
+
+// Print styles
+@media print {
+  .form-actions {
+    display: none;
   }
 }

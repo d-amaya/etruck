@@ -5,6 +5,10 @@ export const DISPATCHER_ROUTES: Routes = [
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
+  {
+    path: 'analytics',
+    loadComponent: () => import('./analytics-dashboard/analytics-dashboard.component').then(m => m.AnalyticsDashboardComponent)
+  },
   // Keep trip management routes for direct access and trip operations
   {
     path: 'trips/create',
@@ -33,6 +37,15 @@ export const DISPATCHER_ROUTES: Routes = [
     path: 'payment-reports',
     redirectTo: 'dashboard',
     pathMatch: 'full'
+  },
+  // Invoice management routes
+  {
+    path: 'invoices',
+    loadComponent: () => import('./invoice-management/invoice-list.component').then(m => m.InvoiceListComponent)
+  },
+  {
+    path: 'invoices/:invoiceId',
+    loadComponent: () => import('./invoice-management/invoice-detail.component').then(m => m.InvoiceDetailComponent)
   },
   {
     path: '',

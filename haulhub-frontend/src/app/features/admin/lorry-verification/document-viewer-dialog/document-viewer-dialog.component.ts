@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { Lorry, DocumentMetadata } from '@haulhub/shared';
+import { Lorry, LorryDocumentMetadata } from '@haulhub/shared';
 import { AdminService } from '../../../../core/services/admin.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
@@ -30,7 +30,7 @@ export interface DocumentViewerDialogData {
   styleUrls: ['./document-viewer-dialog.component.scss']
 })
 export class DocumentViewerDialogComponent implements OnInit {
-  selectedDocument: DocumentMetadata | null = null;
+  selectedDocument: LorryDocumentMetadata | null = null;
   documentUrl: SafeResourceUrl | null = null;
   loading = false;
   error: string | null = null;
@@ -50,7 +50,7 @@ export class DocumentViewerDialogComponent implements OnInit {
     }
   }
 
-  selectDocument(document: DocumentMetadata): void {
+  selectDocument(document: LorryDocumentMetadata): void {
     this.selectedDocument = document;
     this.loading = true;
     this.error = null;

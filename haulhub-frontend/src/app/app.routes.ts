@@ -20,10 +20,10 @@ export const routes: Routes = [
     loadChildren: () => import('./features/dispatcher/dispatcher.routes').then(m => m.DISPATCHER_ROUTES)
   },
   {
-    path: 'lorry-owner',
+    path: 'truck-owner',
     canActivate: [authGuard],
     data: { roles: [UserRole.LorryOwner] },
-    loadChildren: () => import('./features/lorry-owner/lorry-owner.routes').then(m => m.LORRY_OWNER_ROUTES)
+    loadChildren: () => import('./features/truck-owner/truck-owner.routes').then(m => m.TRUCK_OWNER_ROUTES)
   },
   {
     path: 'driver',

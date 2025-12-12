@@ -34,7 +34,8 @@ describe('PdfExportService', () => {
     [TripStatus.PickedUp]: 3,
     [TripStatus.InTransit]: 7,
     [TripStatus.Delivered]: 10,
-    [TripStatus.Paid]: 15
+    [TripStatus.Paid]: 15,
+    [TripStatus.Canceled]: 0
   };
 
   const mockPaymentSummary = {

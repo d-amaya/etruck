@@ -1,0 +1,921 @@
+// =============================================================================
+// HAULHUB DESIGN SYSTEM - MOBILE-FIRST RESPONSIVE DESIGN
+// Touch-Optimized Mobile Components and Utilities
+// =============================================================================
+
+@import 'variables';
+
+// =============================================================================
+// MOBILE-SPECIFIC VARIABLES
+// =============================================================================
+
+// Touch target sizes (WCAG 2.1 Level AAA - 44x44px minimum)
+$touch-target-min: 44px;
+$touch-target-comfortable: 48px;
+$touch-target-large: 56px;
+
+// Mobile spacing (slightly reduced for smaller screens)
+$mobile-spacing-xs: 4px;
+$mobile-spacing-sm: 8px;
+$mobile-spacing-md: 12px;
+$mobile-spacing-lg: 16px;
+$mobile-spacing-xl: 24px;
+
+// Mobile typography
+$mobile-font-size-h1: 24px;
+$mobile-font-size-h2: 20px;
+$mobile-font-size-h3: 18px;
+$mobile-font-size-h4: 16px;
+$mobile-font-size-body: 14px;
+$mobile-font-size-small: 12px;
+
+// Mobile container padding
+$mobile-container-padding: $mobile-spacing-md;
+
+// Bottom sheet heights
+$bottom-sheet-peek-height: 80px;
+$bottom-sheet-half-height: 50vh;
+$bottom-sheet-full-height: 90vh;
+
+// =============================================================================
+// MOBILE-FIRST BASE STYLES
+// =============================================================================
+
+// Apply mobile-first approach - start with mobile styles, enhance for larger screens
+@media (max-width: $breakpoint-md) {
+  body {
+    font-size: $mobile-font-size-body;
+    -webkit-tap-highlight-color: transparent; // Remove tap highlight on iOS
+    -webkit-touch-callout: none; // Disable callout on long press
+  }
+
+  // Adjust container padding for mobile
+  .container,
+  .container-fluid {
+    padding: 0 $mobile-container-padding;
+  }
+
+  // Adjust dashboard container for mobile
+  .dashboard-container {
+    padding: $mobile-spacing-md;
+  }
+}
+
+// =============================================================================
+// TOUCH-FRIENDLY INTERACTIVE ELEMENTS
+// =============================================================================
+
+// Minimum touch target size for all interactive elements
+.touch-target {
+  min-width: $touch-target-min;
+  min-height: $touch-target-min;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  
+  &.comfortable {
+    min-width: $touch-target-comfortable;
+    min-height: $touch-target-comfortable;
+  }
+  
+  &.large {
+    min-width: $touch-target-large;
+    min-height: $touch-target-large;
+  }
+}
+
+// Touch-friendly buttons
+@media (max-width: $breakpoint-md) {
+  .mat-mdc-button,
+  .mat-mdc-raised-button,
+  .mat-mdc-outlined-button,
+  .mat-mdc-fab,
+  .mat-mdc-mini-fab {
+    min-height: $touch-target-min;
+    padding: $mobile-spacing-sm $mobile-spacing-md;
+    
+    .mat-icon {
+      margin-right: $mobile-spacing-xs;
+    }
+  }
+
+  // Icon buttons need larger touch targets
+  .mat-mdc-icon-button {
+    width: $touch-target-comfortable;
+    height: $touch-target-comfortable;
+    padding: $mobile-spacing-sm;
+  }
+
+  // Form fields with comfortable touch targets
+  .mat-mdc-form-field {
+    .mat-mdc-text-field-wrapper {
+      min-height: $touch-target-min;
+    }
+    
+    .mat-mdc-select,
+    .mat-mdc-input-element {
+      min-height: $touch-target-min;
+      padding: $mobile-spacing-sm $mobile-spacing-md;
+    }
+  }
+
+  // Checkbox and radio buttons
+  .mat-mdc-checkbox,
+  .mat-mdc-radio-button {
+    .mdc-checkbox,
+    .mdc-radio {
+      width: $touch-target-min;
+      height: $touch-target-min;
+    }
+  }
+
+  // Chips with touch-friendly sizing
+  .mat-mdc-chip {
+    min-height: $touch-target-min;
+    padding: $mobile-spacing-xs $mobile-spacing-md;
+  }
+}
+
+// =============================================================================
+// MOBILE CARD LAYOUTS
+// =============================================================================
+
+.mobile-card {
+  @media (max-width: $breakpoint-md) {
+    border-radius: $border-radius-lg;
+    padding: $mobile-spacing-md;
+    margin-bottom: $mobile-spacing-md;
+    box-shadow: $shadow-sm;
+    background: $white;
+    border: 1px solid $neutral-100;
+
+    // Card header with action
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: $mobile-spacing-md;
+      padding-bottom: $mobile-spacing-sm;
+      border-bottom: 1px solid $neutral-100;
+
+      .card-title {
+        font-size: $mobile-font-size-h4;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0;
+      }
+
+      .card-action {
+        min-width: $touch-target-min;
+        min-height: $touch-target-min;
+      }
+    }
+
+    // Card content with proper spacing
+    .card-content {
+      display: flex;
+      flex-direction: column;
+      gap: $mobile-spacing-sm;
+    }
+
+    // Card footer with actions
+    .card-footer {
+      display: flex;
+      gap: $mobile-spacing-sm;
+      margin-top: $mobile-spacing-md;
+      padding-top: $mobile-spacing-md;
+      border-top: 1px solid $neutral-100;
+
+      button {
+        flex: 1;
+        min-height: $touch-target-min;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// EXPANDABLE/COLLAPSIBLE SECTIONS (Progressive Disclosure)
+// =============================================================================
+
+.expandable-section {
+  @media (max-width: $breakpoint-md) {
+    border: 1px solid $neutral-100;
+    border-radius: $border-radius-md;
+    margin-bottom: $mobile-spacing-sm;
+    overflow: hidden;
+    background: $white;
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: $mobile-spacing-md;
+      cursor: pointer;
+      user-select: none;
+      min-height: $touch-target-comfortable;
+      transition: background-color $transition-fast;
+
+      &:active {
+        background-color: $neutral-50;
+      }
+
+      .section-title {
+        font-size: $mobile-font-size-body;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0;
+      }
+
+      .section-icon {
+        transition: transform $transition-fast;
+        color: $neutral-500;
+      }
+
+      &.expanded .section-icon {
+        transform: rotate(180deg);
+      }
+    }
+
+    .section-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height $transition-normal ease-in-out;
+
+      &.expanded {
+        max-height: 1000px; // Large enough for most content
+      }
+
+      .section-body {
+        padding: 0 $mobile-spacing-md $mobile-spacing-md;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// MOBILE LIST VIEWS (Alternative to Tables)
+// =============================================================================
+
+.mobile-list {
+  @media (max-width: $breakpoint-md) {
+    display: flex;
+    flex-direction: column;
+    gap: $mobile-spacing-sm;
+
+    .list-item {
+      background: $white;
+      border: 1px solid $neutral-100;
+      border-radius: $border-radius-md;
+      padding: $mobile-spacing-md;
+      cursor: pointer;
+      transition: all $transition-fast;
+
+      &:active {
+        background-color: $neutral-50;
+        transform: scale(0.98);
+      }
+
+      // Primary information (always visible)
+      .item-primary {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: $mobile-spacing-sm;
+
+        .item-title {
+          font-size: $mobile-font-size-body;
+          font-weight: $font-weight-medium;
+          color: $neutral-900;
+          margin: 0;
+        }
+
+        .item-badge {
+          padding: $mobile-spacing-xs $mobile-spacing-sm;
+          border-radius: $border-radius-sm;
+          font-size: $mobile-font-size-small;
+          font-weight: $font-weight-medium;
+          white-space: nowrap;
+        }
+      }
+
+      // Secondary information (key details)
+      .item-secondary {
+        display: flex;
+        flex-direction: column;
+        gap: $mobile-spacing-xs;
+        margin-bottom: $mobile-spacing-sm;
+
+        .item-detail {
+          display: flex;
+          align-items: center;
+          gap: $mobile-spacing-xs;
+          font-size: $mobile-font-size-small;
+          color: $neutral-700;
+
+          .mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            color: $neutral-500;
+          }
+        }
+      }
+
+      // Expandable details (progressive disclosure)
+      .item-details {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height $transition-normal ease-in-out;
+
+        &.expanded {
+          max-height: 500px;
+        }
+
+        .details-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: $mobile-spacing-sm;
+          padding-top: $mobile-spacing-sm;
+          border-top: 1px solid $neutral-100;
+
+          .detail-item {
+            .detail-label {
+              font-size: $mobile-font-size-small;
+              color: $neutral-500;
+              margin-bottom: $mobile-spacing-xs;
+            }
+
+            .detail-value {
+              font-size: $mobile-font-size-body;
+              color: $neutral-900;
+              font-weight: $font-weight-medium;
+            }
+          }
+        }
+      }
+
+      // Action buttons
+      .item-actions {
+        display: flex;
+        gap: $mobile-spacing-sm;
+        margin-top: $mobile-spacing-md;
+        padding-top: $mobile-spacing-md;
+        border-top: 1px solid $neutral-100;
+
+        button {
+          flex: 1;
+          min-height: $touch-target-min;
+        }
+      }
+    }
+  }
+}
+
+// =============================================================================
+// MOBILE NAVIGATION
+// =============================================================================
+
+// Bottom navigation bar
+.mobile-bottom-nav {
+  @media (max-width: $breakpoint-md) {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: $white;
+    border-top: 1px solid $neutral-100;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    z-index: $z-index-fixed;
+    padding: $mobile-spacing-xs 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: $touch-target-large;
+      min-height: $touch-target-large;
+      padding: $mobile-spacing-xs;
+      cursor: pointer;
+      transition: all $transition-fast;
+      text-decoration: none;
+      color: $neutral-600;
+
+      .mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+        margin-bottom: $mobile-spacing-xs;
+      }
+
+      .nav-label {
+        font-size: $mobile-font-size-small;
+        font-weight: $font-weight-regular;
+      }
+
+      &.active {
+        color: $primary-blue;
+
+        .nav-label {
+          font-weight: $font-weight-medium;
+        }
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
+    }
+  }
+}
+
+// Mobile header with hamburger menu
+.mobile-header {
+  @media (max-width: $breakpoint-md) {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: $white;
+    border-bottom: 1px solid $neutral-100;
+    box-shadow: $shadow-sm;
+    z-index: $z-index-sticky;
+    padding: $mobile-spacing-md;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: $touch-target-large;
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: $mobile-spacing-sm;
+
+      .menu-button {
+        min-width: $touch-target-min;
+        min-height: $touch-target-min;
+      }
+
+      .header-title {
+        font-size: $mobile-font-size-h3;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0;
+      }
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: $mobile-spacing-xs;
+
+      button {
+        min-width: $touch-target-min;
+        min-height: $touch-target-min;
+      }
+    }
+  }
+}
+
+// Slide-out drawer menu
+.mobile-drawer {
+  @media (max-width: $breakpoint-md) {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 80%;
+    max-width: 320px;
+    height: 100vh;
+    background: $white;
+    box-shadow: $shadow-lg;
+    z-index: $z-index-modal;
+    transition: left $transition-normal ease-in-out;
+    overflow-y: auto;
+
+    &.open {
+      left: 0;
+    }
+
+    .drawer-header {
+      padding: $mobile-spacing-lg $mobile-spacing-md;
+      border-bottom: 1px solid $neutral-100;
+      background: $neutral-50;
+
+      .drawer-title {
+        font-size: $mobile-font-size-h3;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0;
+      }
+
+      .drawer-subtitle {
+        font-size: $mobile-font-size-small;
+        color: $neutral-600;
+        margin-top: $mobile-spacing-xs;
+      }
+    }
+
+    .drawer-content {
+      padding: $mobile-spacing-md 0;
+
+      .drawer-section {
+        margin-bottom: $mobile-spacing-lg;
+
+        .section-title {
+          padding: 0 $mobile-spacing-md;
+          font-size: $mobile-font-size-small;
+          font-weight: $font-weight-medium;
+          color: $neutral-500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: $mobile-spacing-sm;
+        }
+
+        .drawer-item {
+          display: flex;
+          align-items: center;
+          gap: $mobile-spacing-md;
+          padding: $mobile-spacing-md;
+          min-height: $touch-target-comfortable;
+          cursor: pointer;
+          transition: background-color $transition-fast;
+          text-decoration: none;
+          color: $neutral-900;
+
+          .mat-icon {
+            color: $neutral-600;
+          }
+
+          .item-label {
+            font-size: $mobile-font-size-body;
+            font-weight: $font-weight-regular;
+          }
+
+          &.active {
+            background-color: $primary-light;
+            color: $primary-dark;
+
+            .mat-icon {
+              color: $primary-dark;
+            }
+
+            .item-label {
+              font-weight: $font-weight-medium;
+            }
+          }
+
+          &:active {
+            background-color: $neutral-100;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Drawer backdrop
+.mobile-drawer-backdrop {
+  @media (max-width: $breakpoint-md) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: $z-index-modal-backdrop;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity $transition-normal, visibility $transition-normal;
+
+    &.open {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+}
+
+// =============================================================================
+// BOTTOM SHEETS (Mobile Modals)
+// =============================================================================
+
+.mobile-bottom-sheet {
+  @media (max-width: $breakpoint-md) {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: $white;
+    border-radius: $border-radius-lg $border-radius-lg 0 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    z-index: $z-index-modal;
+    transform: translateY(100%);
+    transition: transform $transition-normal ease-in-out;
+    max-height: $bottom-sheet-full-height;
+    display: flex;
+    flex-direction: column;
+
+    &.open {
+      transform: translateY(0);
+    }
+
+    // Drag handle
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: $neutral-300;
+      border-radius: 2px;
+      margin: $mobile-spacing-sm auto;
+      cursor: grab;
+
+      &:active {
+        cursor: grabbing;
+      }
+    }
+
+    // Sheet header
+    .sheet-header {
+      padding: $mobile-spacing-md;
+      border-bottom: 1px solid $neutral-100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .sheet-title {
+        font-size: $mobile-font-size-h3;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0;
+      }
+
+      .close-button {
+        min-width: $touch-target-min;
+        min-height: $touch-target-min;
+      }
+    }
+
+    // Sheet content
+    .sheet-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: $mobile-spacing-md;
+    }
+
+    // Sheet footer with actions
+    .sheet-footer {
+      padding: $mobile-spacing-md;
+      border-top: 1px solid $neutral-100;
+      display: flex;
+      gap: $mobile-spacing-sm;
+
+      button {
+        flex: 1;
+        min-height: $touch-target-comfortable;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// MOBILE FORM LAYOUTS
+// =============================================================================
+
+.mobile-form {
+  @media (max-width: $breakpoint-md) {
+    display: flex;
+    flex-direction: column;
+    gap: $mobile-spacing-md;
+
+    .form-section {
+      background: $white;
+      border-radius: $border-radius-md;
+      padding: $mobile-spacing-md;
+      border: 1px solid $neutral-100;
+
+      .section-title {
+        font-size: $mobile-font-size-h4;
+        font-weight: $font-weight-medium;
+        color: $neutral-900;
+        margin: 0 0 $mobile-spacing-md 0;
+        padding-bottom: $mobile-spacing-sm;
+        border-bottom: 1px solid $neutral-100;
+      }
+
+      .form-fields {
+        display: flex;
+        flex-direction: column;
+        gap: $mobile-spacing-md;
+
+        .mat-mdc-form-field {
+          width: 100%;
+        }
+      }
+    }
+
+    .form-actions {
+      position: sticky;
+      bottom: 0;
+      background: $white;
+      padding: $mobile-spacing-md;
+      border-top: 1px solid $neutral-100;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+      display: flex;
+      gap: $mobile-spacing-sm;
+
+      button {
+        flex: 1;
+        min-height: $touch-target-comfortable;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// SWIPE GESTURES
+// =============================================================================
+
+.swipeable {
+  @media (max-width: $breakpoint-md) {
+    position: relative;
+    overflow: hidden;
+
+    .swipe-actions {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      transform: translateX(100%);
+      transition: transform $transition-fast;
+
+      .swipe-action {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 80px;
+        padding: 0 $mobile-spacing-md;
+        cursor: pointer;
+        transition: background-color $transition-fast;
+
+        &.delete {
+          background-color: $error;
+          color: $white;
+
+          &:active {
+            background-color: darken($error, 10%);
+          }
+        }
+
+        &.edit {
+          background-color: $primary-blue;
+          color: $white;
+
+          &:active {
+            background-color: $primary-dark;
+          }
+        }
+      }
+    }
+
+    &.swiped .swipe-actions {
+      transform: translateX(0);
+    }
+  }
+}
+
+// =============================================================================
+// PULL-TO-REFRESH
+// =============================================================================
+
+.pull-to-refresh {
+  @media (max-width: $breakpoint-md) {
+    position: relative;
+
+    .refresh-indicator {
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: top $transition-fast;
+
+      .mat-mdc-progress-spinner {
+        width: 32px !important;
+        height: 32px !important;
+      }
+
+      &.pulling {
+        top: 0;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// MOBILE UTILITY CLASSES
+// =============================================================================
+
+// Show/hide on mobile
+@media (max-width: $breakpoint-md) {
+  .mobile-only {
+    display: block !important;
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  // Full width on mobile
+  .mobile-full-width {
+    width: 100% !important;
+  }
+
+  // Stack on mobile
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  // Center on mobile
+  .mobile-center {
+    text-align: center !important;
+  }
+}
+
+// Hide on mobile (show on desktop)
+@media (min-width: $breakpoint-md + 1) {
+  .mobile-only {
+    display: none !important;
+  }
+
+  .desktop-hidden {
+    display: none !important;
+  }
+}
+
+// =============================================================================
+// MOBILE SPACING ADJUSTMENTS
+// =============================================================================
+
+@media (max-width: $breakpoint-md) {
+  // Reduce spacing on mobile
+  .mobile-compact {
+    .mat-mdc-card {
+      padding: $mobile-spacing-md !important;
+    }
+
+    .dashboard-content {
+      gap: $mobile-spacing-md !important;
+    }
+
+    .filter-bar {
+      padding: $mobile-spacing-md !important;
+    }
+  }
+
+  // Add bottom padding for bottom nav
+  .has-bottom-nav {
+    padding-bottom: calc(#{$touch-target-large} + #{$mobile-spacing-md}) !important;
+  }
+}
+
+// =============================================================================
+// MOBILE TYPOGRAPHY ADJUSTMENTS
+// =============================================================================
+
+@media (max-width: $breakpoint-md) {
+  h1, .h1 {
+    font-size: $mobile-font-size-h1 !important;
+  }
+
+  h2, .h2 {
+    font-size: $mobile-font-size-h2 !important;
+  }
+
+  h3, .h3 {
+    font-size: $mobile-font-size-h3 !important;
+  }
+
+  h4, .h4 {
+    font-size: $mobile-font-size-h4 !important;
+  }
+
+  // Truncate long text on mobile
+  .mobile-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

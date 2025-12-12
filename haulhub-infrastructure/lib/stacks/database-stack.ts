@@ -7,14 +7,21 @@ import { getResourceName, getEnvironmentConfig } from '../config';
 /**
  * DatabaseStack - DynamoDB Tables for HaulHub Data Storage
  * 
- * This stack creates:
- * - Main table (legacy, to be deprecated)
+ * ACTIVE TABLES (Multi-Table Architecture):
  * - Trips table with GSI1, GSI2, GSI3 for optimized trip queries
- * - Brokers table for broker reference data
  * - Lorries table with GSI1, GSI2 for lorry and document queries
  * - Users table for user profile data
+ * - Brokers table for broker reference data
+ * 
+ * LEGACY TABLE (Historical Data Only):
+ * - Main table (HaulHub-Table) - Single-table design from initial implementation
+ *   Used only by MigrationService for historical data migration
+ *   NOT used by active application services
+ * 
+ * All tables use:
  * - On-demand billing mode
  * - Encryption at rest
+ * - Point-in-time recovery (configurable)
  */
 export class DatabaseStack extends cdk.Stack {
   public readonly table: dynamodb.Table;
@@ -28,7 +35,13 @@ export class DatabaseStack extends cdk.Stack {
 
     const config = getEnvironmentConfig(props.environment);
 
-    // Create DynamoDB Table with single table design
+    // ========================================
+    // LEGACY TABLE - Historical Data Only
+    // ========================================
+    // This table uses the old single-table design and is NOT actively used by the application.
+    // It exists only for historical data migration purposes via MigrationService.
+    // Active services use the dedicated tables below (TripsTable, LorriesTable, etc.)
+    
     this.table = new dynamodb.Table(this, 'HaulHubTable', {
       tableName: getResourceName('Table', props.environment),
       
@@ -109,6 +122,10 @@ export class DatabaseStack extends cdk.Stack {
     // Access pattern 2: Admin views pending lorry verifications
     // GSI3PK = LORRY_STATUS#<Status>
     // GSI3SK = <CreatedAt>#<LorryId>
+    //
+    // Access pattern 3: Vehicle-specific trip queries
+    // GSI3PK = VEHICLE#<VehicleId>
+    // GSI3SK = TRIP#<ScheduledDate>#<TripId>
     this.table.addGlobalSecondaryIndex({
       indexName: 'GSI3',
       partitionKey: {
@@ -122,7 +139,45 @@ export class DatabaseStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // GSI4: Driver-Trip Index (Driver Performance)
+    // Access pattern: Driver views their trips with date ordering
+    // GSI4PK = DRIVER#<DriverId>
+    // GSI4SK = TRIP#<ScheduledDate>#<TripId>
+    // Performance: Natural distribution by driver, efficient for payment calculations
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'GSI4',
+      partitionKey: {
+        name: 'GSI4PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'GSI4SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
 
+    // GSI5: Financial-Date Index (Reporting Optimization)
+    // NOTE: This GSI was designed but never implemented in the application.
+    // The new TripsTable uses GSI1 + FilterExpression + application aggregation instead.
+    // DO NOT DEPLOY - This table is legacy and will be deprecated.
+    // 
+    // Original design:
+    // GSI5PK = FINANCIAL#<DispatcherId>#<YYYY-MM>
+    // GSI5SK = <TripStatus>#<CompletedDate>#<TripId>
+    // 
+    // this.table.addGlobalSecondaryIndex({
+    //   indexName: 'GSI5',
+    //   partitionKey: {
+    //     name: 'GSI5PK',
+    //     type: dynamodb.AttributeType.STRING,
+    //   },
+    //   sortKey: {
+    //     name: 'GSI5SK',
+    //     type: dynamodb.AttributeType.STRING,
+    //   },
+    //   projectionType: dynamodb.ProjectionType.ALL,
+    // });
 
     // Add tags to table
     cdk.Tags.of(this.table).add('Component', 'Database');
@@ -160,11 +215,24 @@ export class DatabaseStack extends cdk.Stack {
       description: 'GSI3 Index Name (Lorry Verification Status Queries)',
     });
 
+    new cdk.CfnOutput(this, 'GSI4IndexName', {
+      value: 'GSI4',
+      description: 'GSI4 Index Name (Driver-Trip Index for Driver Performance)',
+    });
+
+    // new cdk.CfnOutput(this, 'GSI5IndexName', {
+    //   value: 'GSI5',
+    //   description: 'GSI5 Index Name (Financial-Date Index for Reporting Optimization)',
+    // });
+
     // ========================================
-    // NEW DEDICATED TABLES
+    // ACTIVE DEDICATED TABLES
     // ========================================
+    // These tables are actively used by the application services.
+    // They replace the legacy single-table design with optimized multi-table architecture.
 
     // Trips Table - Optimized for trip operations with O(1) lookups by trip ID
+    // Used by: TripsService, AnalyticsService
     this.tripsTable = new dynamodb.Table(this, 'TripsTable', {
       tableName: getResourceName('TripsTable', props.environment),
       partitionKey: {
@@ -248,6 +316,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     // Brokers Table - Reference data for brokers
+    // Used by: BrokersService
     this.brokersTable = new dynamodb.Table(this, 'BrokersTable', {
       tableName: getResourceName('BrokersTable', props.environment),
       partitionKey: {
@@ -283,6 +352,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     // Lorries Table - Lorry registration and verification documents
+    // Used by: TripsService, TruckService, TrailerService
     this.lorriesTable = new dynamodb.Table(this, 'LorriesTable', {
       tableName: getResourceName('LorriesTable', props.environment),
       partitionKey: {
@@ -346,6 +416,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     // Users Table - User profile data
+    // Used by: User management services
     this.usersTable = new dynamodb.Table(this, 'UsersTable', {
       tableName: getResourceName('UsersTable', props.environment),
       partitionKey: {

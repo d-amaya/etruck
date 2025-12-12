@@ -39,6 +39,7 @@ export class TripStatusUpdateComponent implements OnInit {
   
   statusOptions = Object.values(TripStatus);
   TripStatus = TripStatus;
+  availableTransitions: any[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -70,12 +71,34 @@ export class TripStatusUpdateComponent implements OnInit {
         this.statusForm.patchValue({
           status: trip.status
         });
+        this.loadAvailableTransitions(tripId);
         this.loading = false;
       },
       error: (error) => {
         console.error('Error loading trip:', error);
         this.error = error.error?.message || 'Failed to load trip details';
         this.loading = false;
+      }
+    });
+  }
+
+  private loadAvailableTransitions(tripId: string): void {
+    // Load available status transitions from the workflow service
+    this.tripService.getAvailableTransitions(tripId).subscribe({
+      next: (response) => {
+        this.availableTransitions = response.availableTransitions || [];
+        // Update status options to only show available transitions
+        if (this.availableTransitions.length > 0) {
+          this.statusOptions = this.availableTransitions.map(t => t.status);
+        } else {
+          // Fall back to all statuses if no transitions available
+          this.statusOptions = Object.values(TripStatus);
+        }
+      },
+      error: (error) => {
+        console.error('Error loading available transitions:', error);
+        // Fall back to all statuses if workflow service fails
+        this.statusOptions = Object.values(TripStatus);
       }
     });
   }
@@ -130,6 +153,8 @@ export class TripStatusUpdateComponent implements OnInit {
         return 'Delivered';
       case TripStatus.Paid:
         return 'Paid';
+      case TripStatus.Canceled:
+        return 'Canceled';
       default:
         return status;
     }

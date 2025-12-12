@@ -50,20 +50,22 @@ describe('TripSummaryCardsComponent', () => {
       [TripStatus.PickedUp]: 3,
       [TripStatus.InTransit]: 7,
       [TripStatus.Delivered]: 10,
-      [TripStatus.Paid]: 15
+      [TripStatus.Paid]: 15,
+      [TripStatus.Canceled]: 0
     };
 
     tripServiceSpy.getTripSummaryByStatus.and.returnValue(of(mockSummary));
 
     fixture.detectChanges();
 
-    expect(component.summaryCards.length).toBe(5);
+    expect(component.summaryCards.length).toBe(6);
     expect(component.summaryCards[0].count).toBe(5);
     expect(component.summaryCards[0].label).toBe('Scheduled');
     expect(component.summaryCards[1].count).toBe(3);
     expect(component.summaryCards[2].count).toBe(7);
     expect(component.summaryCards[3].count).toBe(10);
     expect(component.summaryCards[4].count).toBe(15);
+    expect(component.summaryCards[5].count).toBe(0);
   });
 
   it('should display zero counts when no trips exist', () => {
@@ -72,14 +74,15 @@ describe('TripSummaryCardsComponent', () => {
       [TripStatus.PickedUp]: 0,
       [TripStatus.InTransit]: 0,
       [TripStatus.Delivered]: 0,
-      [TripStatus.Paid]: 0
+      [TripStatus.Paid]: 0,
+      [TripStatus.Canceled]: 0
     };
 
     tripServiceSpy.getTripSummaryByStatus.and.returnValue(of(mockSummary));
 
     fixture.detectChanges();
 
-    expect(component.summaryCards.length).toBe(5);
+    expect(component.summaryCards.length).toBe(6);
     component.summaryCards.forEach(card => {
       expect(card.count).toBe(0);
     });
@@ -91,7 +94,8 @@ describe('TripSummaryCardsComponent', () => {
       [TripStatus.PickedUp]: 3,
       [TripStatus.InTransit]: 7,
       [TripStatus.Delivered]: 10,
-      [TripStatus.Paid]: 15
+      [TripStatus.Paid]: 15,
+      [TripStatus.Canceled]: 0
     };
 
     tripServiceSpy.getTripSummaryByStatus.and.returnValue(of(mockSummary));
@@ -109,7 +113,8 @@ describe('TripSummaryCardsComponent', () => {
       [TripStatus.PickedUp]: 1,
       [TripStatus.InTransit]: 1,
       [TripStatus.Delivered]: 1,
-      [TripStatus.Paid]: 1
+      [TripStatus.Paid]: 1,
+      [TripStatus.Canceled]: 1
     };
 
     tripServiceSpy.getTripSummaryByStatus.and.returnValue(of(mockSummary));
@@ -130,6 +135,9 @@ describe('TripSummaryCardsComponent', () => {
     
     expect(component.summaryCards[4].icon).toBe('payments');
     expect(component.summaryCards[4].color).toBe('#E0F2F1');
+    
+    expect(component.summaryCards[5].icon).toBe('cancel');
+    expect(component.summaryCards[5].color).toBe('#FFEBEE');
   });
 
   xit('should build API filters correctly with date range', () => {
@@ -150,7 +158,8 @@ describe('TripSummaryCardsComponent', () => {
       [TripStatus.PickedUp]: 0,
       [TripStatus.InTransit]: 0,
       [TripStatus.Delivered]: 0,
-      [TripStatus.Paid]: 0
+      [TripStatus.Paid]: 0,
+      [TripStatus.Canceled]: 0
     }));
 
     fixture.detectChanges();

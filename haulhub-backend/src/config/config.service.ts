@@ -35,7 +35,7 @@ export class ConfigService {
   }
 
   get s3DocumentsBucketName(): string {
-    return process.env.S3_DOCUMENTS_BUCKET_NAME || '';
+    return process.env.S3_DOCUMENTS_BUCKET_NAME || 'haulhub-documents-dev';
   }
 
   get allowedOrigins(): string {
@@ -52,5 +52,9 @@ export class ConfigService {
 
   get isDevelopment(): boolean {
     return this.nodeEnv === 'development';
+  }
+
+  get kmsKeyId(): string {
+    return process.env.KMS_KEY_ID || '';
   }
 }

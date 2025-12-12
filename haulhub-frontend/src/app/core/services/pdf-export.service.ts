@@ -274,7 +274,8 @@ export class PdfExportService {
       [TripStatus.PickedUp]: 'Picked Up',
       [TripStatus.InTransit]: 'In Transit',
       [TripStatus.Delivered]: 'Delivered',
-      [TripStatus.Paid]: 'Paid'
+      [TripStatus.Paid]: 'Paid',
+      [TripStatus.Canceled]: 'Canceled'
     };
     return labels[status] || status;
   }

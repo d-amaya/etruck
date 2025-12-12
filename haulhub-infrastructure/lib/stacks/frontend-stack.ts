@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import { HaulHubStackProps } from '../types';
 import { getResourceName } from '../config';
@@ -20,6 +21,7 @@ import { getResourceName } from '../config';
 export class FrontendStack extends cdk.Stack {
   public readonly distribution: cloudfront.Distribution;
   public readonly frontendBucket: s3.Bucket;
+  public readonly certificate?: acm.Certificate;
 
   constructor(
     scope: Construct,
@@ -29,6 +31,23 @@ export class FrontendStack extends cdk.Stack {
     super(scope, id, props);
 
     const config = props.config;
+
+    // Create ACM Certificate for custom domain (dev and production)
+    // Note: Certificate must be in us-east-1 region for CloudFront
+    if (props.environment === 'prod' || props.environment === 'dev') {
+      this.certificate = new acm.Certificate(this, 'Certificate', {
+        domainName: 'etrucky.com',
+        subjectAlternativeNames: ['www.etrucky.com'],
+        validation: acm.CertificateValidation.fromDns(),
+      });
+
+      // Output certificate ARN for reference
+      new cdk.CfnOutput(this, 'CertificateArn', {
+        value: this.certificate.certificateArn,
+        description: 'ACM Certificate ARN - Add DNS validation records from ACM console',
+        exportName: `${getResourceName('CertificateArn', props.environment)}`,
+      });
+    }
 
     // Create frontend hosting bucket for Angular static files
     this.frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
@@ -99,11 +118,51 @@ export class FrontendStack extends cdk.Stack {
       }
     );
 
+    // Create security headers policy for HTTPS enforcement
+    const securityHeadersPolicy = new cloudfront.ResponseHeadersPolicy(
+      this,
+      'SecurityHeadersPolicy',
+      {
+        responseHeadersPolicyName: getResourceName('SecurityHeaders', props.environment),
+        comment: 'Security headers including HSTS for HTTPS enforcement',
+        securityHeadersBehavior: {
+          strictTransportSecurity: {
+            accessControlMaxAge: cdk.Duration.seconds(31536000), // 1 year
+            includeSubdomains: true,
+            preload: true,
+            override: true,
+          },
+          contentTypeOptions: {
+            override: true,
+          },
+          frameOptions: {
+            frameOption: cloudfront.HeadersFrameOption.DENY,
+            override: true,
+          },
+          referrerPolicy: {
+            referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+            override: true,
+          },
+          xssProtection: {
+            protection: true,
+            modeBlock: true,
+            override: true,
+          },
+        },
+      }
+    );
+
 
 
     // Create CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `HaulHub Frontend Distribution - ${props.environment}`,
+      
+      // Custom domain configuration (dev and production)
+      domainNames: (props.environment === 'prod' || props.environment === 'dev')
+        ? ['etrucky.com', 'www.etrucky.com']
+        : undefined,
+      certificate: this.certificate,
       
       // S3 origin configuration
       defaultBehavior: {
@@ -113,6 +172,7 @@ export class FrontendStack extends cdk.Stack {
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
         compress: true,
         cachePolicy: indexCachePolicy,
+        responseHeadersPolicy: securityHeadersPolicy,
       },
 
       // Additional behaviors for static assets with longer cache
@@ -250,8 +310,21 @@ export class FrontendStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'FrontendUrl', {
       value: `https://${this.distribution.distributionDomainName}`,
-      description: 'Frontend Application URL',
+      description: 'Frontend Application URL (CloudFront)',
     });
+
+    // Output custom domain URL for production
+    if (props.environment === 'prod') {
+      new cdk.CfnOutput(this, 'CustomDomainUrl', {
+        value: 'https://etrucky.com',
+        description: 'Custom Domain URL (after DNS configuration)',
+      });
+
+      new cdk.CfnOutput(this, 'CustomDomainAlternate', {
+        value: 'https://www.etrucky.com',
+        description: 'Custom Domain Alternate URL',
+      });
+    }
 
     // Output deployment commands for convenience
     new cdk.CfnOutput(this, 'DeployCommand', {

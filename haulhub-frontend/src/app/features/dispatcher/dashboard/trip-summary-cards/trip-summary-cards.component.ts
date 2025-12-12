@@ -87,7 +87,8 @@ export class TripSummaryCardsComponent implements OnInit, OnDestroy {
           [TripStatus.PickedUp]: 0,
           [TripStatus.InTransit]: 0,
           [TripStatus.Delivered]: 0,
-          [TripStatus.Paid]: 0
+          [TripStatus.Paid]: 0,
+          [TripStatus.Canceled]: 0
         } as Record<TripStatus, number>);
       })
     );
@@ -129,6 +130,13 @@ export class TripSummaryCardsComponent implements OnInit, OnDestroy {
         count: summary[TripStatus.Paid] || 0,
         color: '#E0F2F1',
         icon: 'payments'
+      },
+      {
+        status: TripStatus.Canceled,
+        label: 'Canceled',
+        count: summary[TripStatus.Canceled] || 0,
+        color: '#FFEBEE',
+        icon: 'cancel'
       }
     ];
   }
@@ -170,7 +178,8 @@ export class TripSummaryCardsComponent implements OnInit, OnDestroy {
       [TripStatus.PickedUp]: 'Picked Up',
       [TripStatus.InTransit]: 'In Transit',
       [TripStatus.Delivered]: 'Delivered',
-      [TripStatus.Paid]: 'Paid'
+      [TripStatus.Paid]: 'Paid',
+      [TripStatus.Canceled]: 'Canceled'
     };
     return labels[status] || status;
   }

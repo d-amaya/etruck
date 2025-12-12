@@ -287,7 +287,7 @@ describe('AuthService', () => {
 
       service.login(loginDto).subscribe(() => {
         service.navigateToDashboard();
-        expect(router.navigate).toHaveBeenCalledWith(['/lorry-owner/dashboard']);
+        expect(router.navigate).toHaveBeenCalledWith(['/truck-owner/dashboard']);
       });
 
       const req = httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`);

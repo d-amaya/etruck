@@ -15,6 +15,8 @@ import {
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { BrokersService } from '../admin/brokers.service';
+import { StatusWorkflowService } from './status-workflow.service';
+import { StatusAuditService } from './status-audit.service';
 import {
   Trip,
   TripStatus,
@@ -28,6 +30,8 @@ import {
   LorryOwnerPaymentReport,
   TripPaymentDetail,
   TripFilters,
+  StatusChangeRequest,
+  StatusAuditTrail,
 } from '@haulhub/shared';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -40,6 +44,8 @@ export class TripsService {
     private readonly awsService: AwsService,
     private readonly configService: ConfigService,
     private readonly brokersService: BrokersService,
+    private readonly statusWorkflowService: StatusWorkflowService,
+    private readonly statusAuditService: StatusAuditService,
   ) {
     this.tripsTableName = this.configService.tripsTableName;
     this.lorriesTableName = this.configService.lorriesTableName;
@@ -109,6 +115,13 @@ export class TripsService {
       driverPayment: dto.driverPayment,
       status: TripStatus.Scheduled,
       distance: dto.distance,
+      loadedMiles: dto.loadedMiles,
+      emptyMiles: dto.emptyMiles,
+      totalMiles: dto.totalMiles,
+      fuelAvgCost: dto.fuelAvgCost,
+      fuelAvgGallonsPerMile: dto.fuelAvgGallonsPerMile,
+      lumperFees: dto.lumperFees || 0,
+      detentionFees: dto.detentionFees || 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -299,6 +312,51 @@ export class TripsService {
       updateExpressions.push('#distance = :distance');
       expressionAttributeNames['#distance'] = 'distance';
       expressionAttributeValues[':distance'] = dto.distance;
+    }
+
+    // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
+    if (dto.loadedMiles !== undefined) {
+      updateExpressions.push('#loadedMiles = :loadedMiles');
+      expressionAttributeNames['#loadedMiles'] = 'loadedMiles';
+      expressionAttributeValues[':loadedMiles'] = dto.loadedMiles;
+    }
+
+    if (dto.emptyMiles !== undefined) {
+      updateExpressions.push('#emptyMiles = :emptyMiles');
+      expressionAttributeNames['#emptyMiles'] = 'emptyMiles';
+      expressionAttributeValues[':emptyMiles'] = dto.emptyMiles;
+    }
+
+    if (dto.totalMiles !== undefined) {
+      updateExpressions.push('#totalMiles = :totalMiles');
+      expressionAttributeNames['#totalMiles'] = 'totalMiles';
+      expressionAttributeValues[':totalMiles'] = dto.totalMiles;
+    }
+
+    // Fuel Management (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+    if (dto.fuelAvgCost !== undefined) {
+      updateExpressions.push('#fuelAvgCost = :fuelAvgCost');
+      expressionAttributeNames['#fuelAvgCost'] = 'fuelAvgCost';
+      expressionAttributeValues[':fuelAvgCost'] = dto.fuelAvgCost;
+    }
+
+    if (dto.fuelAvgGallonsPerMile !== undefined) {
+      updateExpressions.push('#fuelAvgGallonsPerMile = :fuelAvgGallonsPerMile');
+      expressionAttributeNames['#fuelAvgGallonsPerMile'] = 'fuelAvgGallonsPerMile';
+      expressionAttributeValues[':fuelAvgGallonsPerMile'] = dto.fuelAvgGallonsPerMile;
+    }
+
+    // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+    if (dto.lumperFees !== undefined) {
+      updateExpressions.push('#lumperFees = :lumperFees');
+      expressionAttributeNames['#lumperFees'] = 'lumperFees';
+      expressionAttributeValues[':lumperFees'] = dto.lumperFees;
+    }
+
+    if (dto.detentionFees !== undefined) {
+      updateExpressions.push('#detentionFees = :detentionFees');
+      expressionAttributeNames['#detentionFees'] = 'detentionFees';
+      expressionAttributeValues[':detentionFees'] = dto.detentionFees;
     }
 
     // Always update the updatedAt timestamp
@@ -598,6 +656,7 @@ export class TripsService {
       [TripStatus.InTransit]: [TripStatus.Delivered],
       [TripStatus.Delivered]: [], // Drivers cannot update from Delivered
       [TripStatus.Paid]: [], // No transitions from Paid
+      [TripStatus.Canceled]: [], // No transitions from Canceled
     };
 
     const allowedStatuses = validDriverTransitions[currentStatus];
@@ -692,7 +751,7 @@ export class TripsService {
         ...expressionAttributeValues,
         ...filterAttributeValues,
       },
-      Limit: filters.limit || 50,
+      Limit: filters.limit ? Number(filters.limit) : 50,
     };
 
     if (filterExpression) {
@@ -1004,6 +1063,13 @@ export class TripsService {
       driverPayment: item.driverPayment,
       status: item.status,
       distance: item.distance,
+      loadedMiles: item.loadedMiles,
+      emptyMiles: item.emptyMiles,
+      totalMiles: item.totalMiles,
+      fuelAvgCost: item.fuelAvgCost,
+      fuelAvgGallonsPerMile: item.fuelAvgGallonsPerMile,
+      lumperFees: item.lumperFees,
+      detentionFees: item.detentionFees,
       deliveredAt: item.deliveredAt,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
@@ -1046,6 +1112,8 @@ export class TripsService {
       lorryOwnerPayment: trip.lorryOwnerPayment,
       driverPayment: trip.driverPayment,
       distance: trip.distance,
+      lumperFees: trip.lumperFees,
+      detentionFees: trip.detentionFees,
       status: trip.status,
     }));
 
@@ -1064,7 +1132,7 @@ export class TripsService {
 
   /**
    * Generate dispatcher payment report
-   * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
+   * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2, 7.3, 7.4, 7.5
    */
   private generateDispatcherReport(
     trips: TripPaymentDetail[],
@@ -1073,12 +1141,22 @@ export class TripsService {
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
     const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
-    const profit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments;
+    
+    // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
+    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
+    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    
+    // Profit calculation includes additional fees as expenses (Requirement 7.2)
+    const profit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalAdditionalFees;
 
     const report: DispatcherPaymentReport = {
       totalBrokerPayments,
       totalDriverPayments,
       totalLorryOwnerPayments,
+      totalLumperFees,
+      totalDetentionFees,
+      totalAdditionalFees,
       profit,
       tripCount: trips.length,
       trips,
@@ -1306,12 +1384,13 @@ export class TripsService {
     const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
 
     // Initialize counts for all statuses
-    const summary: Record<TripStatus, number> = {
+    const summary: Partial<Record<TripStatus, number>> = {
       [TripStatus.Scheduled]: 0,
       [TripStatus.PickedUp]: 0,
       [TripStatus.InTransit]: 0,
       [TripStatus.Delivered]: 0,
       [TripStatus.Paid]: 0,
+      [TripStatus.Canceled]: 0,
     };
 
     // Count trips by status
@@ -1319,12 +1398,12 @@ export class TripsService {
       summary[trip.status] = (summary[trip.status] || 0) + 1;
     }
 
-    return summary;
+    return summary as Record<TripStatus, number>;
   }
 
   /**
    * Get payment summary for dashboard
-   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 7.1, 7.2, 7.3, 7.4, 7.5
    * 
    * Returns aggregated payment metrics for the dispatcher
    */
@@ -1335,6 +1414,9 @@ export class TripsService {
     totalBrokerPayments: number;
     totalDriverPayments: number;
     totalLorryOwnerPayments: number;
+    totalLumperFees: number;
+    totalDetentionFees: number;
+    totalAdditionalFees: number;
     totalProfit: number;
   }> {
     // Get all trips for the dispatcher with filters
@@ -1344,12 +1426,22 @@ export class TripsService {
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
     const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments;
+    
+    // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
+    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
+    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    
+    // Profit calculation includes additional fees as expenses (Requirement 7.2)
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalAdditionalFees;
 
     return {
       totalBrokerPayments,
       totalDriverPayments,
       totalLorryOwnerPayments,
+      totalLumperFees,
+      totalDetentionFees,
+      totalAdditionalFees,
       totalProfit,
     };
   }
@@ -1466,5 +1558,147 @@ export class TripsService {
       console.error('Error deleting trip:', error);
       throw new InternalServerErrorException('Failed to delete trip');
     }
+  }
+
+  /**
+   * Get status audit trail for a trip
+   * Requirements: 11.2 - Status change audit trails with timestamps and user information
+   */
+  async getStatusAuditTrail(
+    tripId: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<StatusAuditTrail> {
+    // Verify user has access to this trip
+    await this.getTripById(tripId, userId, userRole);
+    
+    // Get audit trail from DynamoDB
+    return this.statusAuditService.getAuditTrail(tripId);
+  }
+
+  /**
+   * Get available status transitions for a trip
+   * Requirements: 11.3 - Workflow automation rules and validations
+   */
+  async getAvailableStatusTransitions(
+    tripId: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<{
+    currentStatus: TripStatus;
+    availableTransitions: Array<{
+      status: TripStatus;
+      label: string;
+      color: string;
+      icon: string;
+      description: string;
+      requiresApproval: boolean;
+    }>;
+  }> {
+    // Get the trip
+    const trip = await this.getTripById(tripId, userId, userRole);
+    
+    // Get available transitions based on current status and user role
+    const availableStatuses = this.statusWorkflowService.getAvailableTransitions(
+      trip.status,
+      userRole
+    );
+    
+    // Enrich with display information
+    const availableTransitions = availableStatuses.map(status => {
+      const displayInfo = this.statusWorkflowService.getStatusDisplayInfo(status);
+      const validation = this.statusWorkflowService.validateStatusTransition(
+        trip.status,
+        status,
+        userRole
+      );
+      
+      return {
+        status,
+        ...displayInfo,
+        requiresApproval: validation.warnings?.includes('This status change requires approval') || false
+      };
+    });
+    
+    return {
+      currentStatus: trip.status,
+      availableTransitions
+    };
+  }
+
+  /**
+   * Change trip status with audit trail and workflow validation
+   * Requirements: 11.1, 11.2, 11.3 - Enhanced status tracking with audit and validation
+   */
+  async changeStatusWithAudit(
+    tripId: string,
+    userId: string,
+    userName: string,
+    userRole: UserRole,
+    request: StatusChangeRequest
+  ): Promise<Trip> {
+    // Get the trip
+    const trip = await this.getTripById(tripId, userId, userRole);
+    
+    // Validate the status transition
+    const validation = this.statusWorkflowService.validateStatusTransition(
+      trip.status,
+      request.newStatus,
+      userRole
+    );
+    
+    if (!validation.isValid) {
+      throw new BadRequestException(validation.errorMessage);
+    }
+    
+    // Create audit entry
+    const auditEntry = this.statusWorkflowService.createAuditEntry(
+      tripId,
+      trip.status,
+      request.newStatus,
+      userId,
+      userName,
+      request,
+      false // Not automatic
+    );
+    
+    // Save audit entry
+    await this.statusAuditService.saveAuditEntry(auditEntry);
+    
+    // Update trip status
+    const updatedTrip = await this.updateTripStatus(
+      tripId,
+      userId,
+      userRole,
+      request.newStatus
+    );
+    
+    return updatedTrip;
+  }
+
+  /**
+   * Get workflow statistics for reporting
+   * Requirements: 11.4 - Status-based filtering and reporting
+   */
+  async getWorkflowStatistics(
+    userId: string,
+    userRole: UserRole,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any> {
+    // For now, return basic statistics
+    // In production, this would aggregate data from multiple trips
+    
+    if (userRole !== UserRole.Dispatcher && userRole !== UserRole.Admin) {
+      throw new ForbiddenException('Only dispatchers and admins can view workflow statistics');
+    }
+    
+    // Get status change statistics
+    const stats = await this.statusAuditService.getStatusChangeStatistics(
+      startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate || new Date().toISOString()
+    );
+    
+    return stats;
   }
 }

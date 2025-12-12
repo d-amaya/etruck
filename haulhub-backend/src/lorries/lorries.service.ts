@@ -21,7 +21,7 @@ import {
   RegisterLorryDto,
   UploadDocumentDto,
   PresignedUrlResponse,
-  DocumentMetadata,
+  LorryDocumentMetadata,
   UserRole,
 } from '@haulhub/shared';
 import { v4 as uuidv4 } from 'uuid';
@@ -217,7 +217,7 @@ export class LorriesService {
 
     // Store document metadata in DynamoDB
     const now = new Date().toISOString();
-    const documentMetadata: DocumentMetadata = {
+    const documentMetadata: LorryDocumentMetadata = {
       documentId,
       fileName: dto.fileName,
       fileSize: dto.fileSize,
@@ -313,7 +313,7 @@ export class LorriesService {
     lorryId: string,
     userId: string,
     userRole: UserRole,
-  ): Promise<DocumentMetadata[]> {
+  ): Promise<LorryDocumentMetadata[]> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
     // Get document metadata
@@ -355,7 +355,7 @@ export class LorriesService {
   private async addDocumentToLorry(
     lorryId: string,
     ownerId: string,
-    documentMetadata: DocumentMetadata,
+    documentMetadata: LorryDocumentMetadata,
   ): Promise<void> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 

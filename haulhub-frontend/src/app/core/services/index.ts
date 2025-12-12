@@ -7,3 +7,5 @@ export * from './error.service';
 export * from './loading.service';
 export * from './pdf-export.service';
 export * from './theme.service';
+export * from './document.service';
+export * from './analytics.service';

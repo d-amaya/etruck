@@ -79,8 +79,8 @@ npm install --omit=dev --ignore-scripts --silent
 
 # Copy @haulhub/shared as a proper npm package into node_modules
 mkdir -p node_modules/@haulhub/shared
-cp -r ../../haulhub-shared/dist/* node_modules/@haulhub/shared/
 cp ../../haulhub-shared/package.json node_modules/@haulhub/shared/
+cp -r ../../haulhub-shared/dist node_modules/@haulhub/shared/
 
 cd ..
 

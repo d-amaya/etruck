@@ -11,7 +11,10 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      handleError(error, snackBar, router);
+      // Skip 401 errors - they're handled by authInterceptor
+      if (error.status !== 401) {
+        handleError(error, snackBar, router);
+      }
       return throwError(() => error);
     })
   );
@@ -19,15 +22,10 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
 function handleError(error: HttpErrorResponse, snackBar: MatSnackBar, router: Router): void {
     let errorMessage = 'An unexpected error occurred';
-    let shouldShowSnackbar = true;
 
     if (error.status === 0) {
       // Network error
       errorMessage = 'Network connection error. Please check your internet connection.';
-    } else if (error.status === 401) {
-      // Unauthorized - redirect to login
-      errorMessage = 'Your session has expired. Please log in again.';
-      router.navigate(['/auth/login']);
     } else if (error.status === 403) {
       // Forbidden
       errorMessage = 'You do not have permission to perform this action.';
@@ -54,11 +52,9 @@ function handleError(error: HttpErrorResponse, snackBar: MatSnackBar, router: Ro
     error: error.error
   });
 
-  // Show snackbar for non-401 errors (401 redirects to login)
-  if (shouldShowSnackbar && error.status !== 401) {
-    snackBar.open(errorMessage, 'Dismiss', {
-      duration: 5000,
-      panelClass: ['error-snackbar']
-    });
-  }
+  // Show snackbar notification
+  snackBar.open(errorMessage, 'Dismiss', {
+    duration: 5000,
+    panelClass: ['error-snackbar']
+  });
 }

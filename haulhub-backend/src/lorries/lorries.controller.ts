@@ -21,7 +21,7 @@ import {
   Lorry,
   UploadDocumentDto,
   PresignedUrlResponse,
-  DocumentMetadata,
+  LorryDocumentMetadata,
 } from '@haulhub/shared';
 
 @Controller('lorries')
@@ -119,7 +119,7 @@ export class LorriesController {
   async getDocuments(
     @CurrentUser() user: CurrentUserData,
     @Param('id') lorryId: string,
-  ): Promise<DocumentMetadata[]> {
+  ): Promise<LorryDocumentMetadata[]> {
     return this.lorriesService.getDocuments(
       lorryId,
       user.userId,

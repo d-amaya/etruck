@@ -1,6 +1,6 @@
 import { LorryVerificationStatus } from '../enums/lorry-verification-status.enum';
 
-export interface DocumentMetadata {
+export interface LorryDocumentMetadata {
   documentId: string;
   fileName: string;
   fileSize: number;
@@ -15,7 +15,7 @@ export interface Lorry {
   model: string;
   year: number;
   verificationStatus: LorryVerificationStatus;
-  verificationDocuments: DocumentMetadata[];
+  verificationDocuments: LorryDocumentMetadata[];
   rejectionReason?: string;
   createdAt: string;
   updatedAt: string;

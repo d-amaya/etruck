@@ -1,0 +1,273 @@
+<div class="driver-profile-container">
+  <mat-card class="profile-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>person</mat-icon>
+        Driver Profile
+      </mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner></mat-spinner>
+        <p>Loading profile...</p>
+      </div>
+
+      <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" *ngIf="!loading">
+        <!-- Basic Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>info</mat-icon>
+            Basic Information
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Full Name</mat-label>
+              <input matInput formControlName="name" required>
+              <mat-icon matPrefix>person</mat-icon>
+              <mat-error *ngIf="profileForm.get('name')?.hasError('required')">
+                Name is required
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Email</mat-label>
+              <input matInput type="email" formControlName="email" required>
+              <mat-icon matPrefix>email</mat-icon>
+              <mat-error *ngIf="profileForm.get('email')?.hasError('required')">
+                Email is required
+              </mat-error>
+              <mat-error *ngIf="profileForm.get('email')?.hasError('email')">
+                Invalid email format
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Phone</mat-label>
+              <input matInput type="tel" formControlName="phone" required>
+              <mat-icon matPrefix>phone</mat-icon>
+              <mat-error *ngIf="profileForm.get('phone')?.hasError('required')">
+                Phone is required
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Address</mat-label>
+              <input matInput formControlName="address">
+              <mat-icon matPrefix>home</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>City</mat-label>
+              <input matInput formControlName="city">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>State</mat-label>
+              <mat-select formControlName="state">
+                <mat-option *ngFor="let state of usStates" [value]="state">
+                  {{ state }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>ZIP Code</mat-label>
+              <input matInput formControlName="zip">
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- CDL Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>badge</mat-icon>
+            CDL Information
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>CDL Class</mat-label>
+              <mat-select formControlName="cdlClass">
+                <mat-option *ngFor="let cdlClass of cdlClasses" [value]="cdlClass">
+                  Class {{ cdlClass }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>card_membership</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>CDL State</mat-label>
+              <mat-select formControlName="cdlState">
+                <mat-option *ngFor="let state of usStates" [value]="state">
+                  {{ state }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>CDL Issued Date</mat-label>
+              <input matInput [matDatepicker]="issuedPicker" formControlName="cdlIssued">
+              <mat-datepicker-toggle matSuffix [for]="issuedPicker"></mat-datepicker-toggle>
+              <mat-datepicker #issuedPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>CDL Expiration Date</mat-label>
+              <input matInput [matDatepicker]="expiresPicker" formControlName="cdlExpires">
+              <mat-datepicker-toggle matSuffix [for]="expiresPicker"></mat-datepicker-toggle>
+              <mat-datepicker #expiresPicker></mat-datepicker>
+              <mat-hint *ngIf="isCDLExpired()" class="error-hint">
+                <mat-icon>warning</mat-icon>
+                CDL has expired
+              </mat-hint>
+              <mat-hint *ngIf="isCDLExpiringSoon()" class="warning-hint">
+                <mat-icon>info</mat-icon>
+                CDL expires within 30 days
+              </mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Corporate Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>business</mat-icon>
+            Corporate Information
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Corporation Name</mat-label>
+              <input matInput formControlName="corpName">
+              <mat-icon matPrefix>business</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>EIN (XX-XXXXXXX)</mat-label>
+              <input matInput formControlName="ein" placeholder="12-3456789">
+              <mat-icon matPrefix>fingerprint</mat-icon>
+              <mat-error *ngIf="profileForm.get('ein')?.hasError('pattern')">
+                Invalid EIN format (XX-XXXXXXX)
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Personal Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>lock</mat-icon>
+            Personal Information (Secure)
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="security-notice">
+            <mat-icon>info</mat-icon>
+            <p>This information is stored securely and only visible to you and administrators.</p>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Date of Birth</mat-label>
+              <input matInput [matDatepicker]="dobPicker" formControlName="dob">
+              <mat-datepicker-toggle matSuffix [for]="dobPicker"></mat-datepicker-toggle>
+              <mat-datepicker #dobPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>SSN (XXX-XX-XXXX)</mat-label>
+              <input matInput type="password" formControlName="ssn" placeholder="123-45-6789">
+              <mat-icon matPrefix>security</mat-icon>
+              <mat-error *ngIf="profileForm.get('ssn')?.hasError('pattern')">
+                Invalid SSN format (XXX-XX-XXXX)
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Banking Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>account_balance</mat-icon>
+            Banking Information (Secure)
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="security-notice">
+            <mat-icon>info</mat-icon>
+            <p>Banking information is encrypted and used only for payment processing.</p>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Bank Name</mat-label>
+              <input matInput formControlName="bankName">
+              <mat-icon matPrefix>account_balance</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Account Number</mat-label>
+              <input matInput type="password" formControlName="bankAccountNumber">
+              <mat-icon matPrefix>credit_card</mat-icon>
+              <mat-error *ngIf="profileForm.get('bankAccountNumber')?.hasError('pattern')">
+                Account number must be 8-17 digits
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Rate Information Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>attach_money</mat-icon>
+            Rate Information
+          </h3>
+          <mat-divider></mat-divider>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Per Mile Rate ($)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="perMileRate">
+              <mat-icon matPrefix>attach_money</mat-icon>
+              <mat-error *ngIf="profileForm.get('perMileRate')?.hasError('min')">
+                Rate must be positive
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <mat-icon>notes</mat-icon>
+            Additional Notes
+          </h3>
+          <mat-divider></mat-divider>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Notes</mat-label>
+            <textarea matInput formControlName="notes" rows="4"></textarea>
+          </mat-form-field>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button mat-raised-button type="button" (click)="loadDriverProfile()">
+            <mat-icon>refresh</mat-icon>
+            Reset
+          </button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="saving || profileForm.invalid">
+            <mat-spinner *ngIf="saving" diameter="20"></mat-spinner>
+            <mat-icon *ngIf="!saving">save</mat-icon>
+            {{ saving ? 'Saving...' : 'Save Profile' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

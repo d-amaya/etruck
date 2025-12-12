@@ -1,7 +1,16 @@
+:host {
+  display: block;
+  min-height: calc(100vh - 64px);
+  background-color: #f5f5f5;
+}
+
 .trip-detail-container {
   padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+
+  .trip-content {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
 }
 
 .loading-container {
@@ -27,6 +36,8 @@
   .error-card {
     max-width: 500px;
     text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
 
     mat-card-content {
       display: flex;
@@ -56,24 +67,80 @@
 
 .header-card {
   margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
 
   mat-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 16px;
+    align-items: flex-start;
+    padding: 24px;
 
-    mat-card-title {
-      h1 {
+    // Override Material's default centering
+    ::ng-deep .mat-mdc-card-header-text {
+      display: contents;
+    }
+
+    .header-title-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+
+      mat-card-title {
         margin: 0;
-        font-size: 28px;
-        font-weight: 500;
+        
+        h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: 500;
+          color: #1976d2;
+        }
+      }
+
+      .status-and-timestamps {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+
+        mat-chip {
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          min-height: 24px;
+          padding: 4px 12px;
+          border-radius: 12px;
+          border: 1px solid transparent;
+        }
+
+        .timestamp-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: rgba(0, 0, 0, 0.6);
+
+          .timestamp-label {
+            font-weight: 500;
+          }
+
+          .timestamp-value {
+            color: rgba(0, 0, 0, 0.87);
+          }
+
+          .timestamp-separator {
+            color: rgba(0, 0, 0, 0.4);
+          }
+        }
       }
     }
 
     .header-actions {
       display: flex;
       gap: 12px;
+      margin-top: 4px;
     }
   }
 }
@@ -85,13 +152,18 @@
 }
 
 .detail-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+
   mat-card-header {
     padding: 16px 16px 8px 16px;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #1976d2;
 
     mat-card-title {
-      font-size: 18px;
-      font-weight: 500;
-      color: rgba(0, 0, 0, 0.87);
+      font-size: 18px !important;
+      font-weight: 600 !important;
+      color: #1976d2 !important;
     }
   }
 
@@ -141,12 +213,12 @@
 
   &.payment-card {
     .payment-positive {
-      color: #2e7d32;
+      color: #2e7d32 !important;
       font-weight: 500;
     }
 
     .payment-negative {
-      color: #d32f2f;
+      color: #d32f2f !important;
       font-weight: 500;
     }
 
@@ -172,30 +244,35 @@
   }
 }
 
-// Status chip colors
+// Status chip colors - matching dashboard
 .status-scheduled {
-  background-color: #2196f3 !important;
-  color: white !important;
+  background-color: #e3f2fd !important;
+  color: #0d47a1 !important;
+  border-color: #90caf9 !important;
 }
 
 .status-picked-up {
-  background-color: #ff9800 !important;
-  color: white !important;
+  background-color: #fff3e0 !important;
+  color: #e65100 !important;
+  border-color: #ffe082 !important;
 }
 
 .status-in-transit {
-  background-color: #9c27b0 !important;
-  color: white !important;
+  background-color: #f3e5f5 !important;
+  color: #4a148c !important;
+  border-color: #ce93d8 !important;
 }
 
 .status-delivered {
-  background-color: #4caf50 !important;
-  color: white !important;
+  background-color: #e8f5e9 !important;
+  color: #1b5e20 !important;
+  border-color: #a5d6a7 !important;
 }
 
 .status-paid {
-  background-color: #00bcd4 !important;
-  color: white !important;
+  background-color: #e0f2f1 !important;
+  color: #004d40 !important;
+  border-color: #80cbc4 !important;
 }
 
 @media (max-width: 768px) {
@@ -212,6 +289,10 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 16px;
+
+      .header-title-section {
+        gap: 12px;
+      }
 
       .header-actions {
         width: 100%;

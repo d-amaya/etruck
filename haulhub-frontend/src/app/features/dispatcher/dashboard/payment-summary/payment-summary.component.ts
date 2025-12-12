@@ -58,7 +58,23 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
     const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments;
+    
+    // Calculate total fuel costs
+    const totalFuelCosts = trips.reduce((sum, trip) => {
+      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
+      }
+      return sum;
+    }, 0);
+    
+    // Calculate total additional fees
+    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
+    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
+    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    
+    // Profit includes all expenses: driver, lorry owner, fuel, and additional fees
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalFuelCosts - totalAdditionalFees;
 
     this.paymentSummary = {
       totalBrokerPayments,

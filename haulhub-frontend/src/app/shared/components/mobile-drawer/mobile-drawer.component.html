@@ -1,0 +1,32 @@
+<!-- Backdrop -->
+<div 
+  class="mobile-drawer-backdrop" 
+  [class.open]="open"
+  (click)="onBackdropClick()"
+></div>
+
+<!-- Drawer -->
+<aside class="mobile-drawer" [class.open]="open">
+  <!-- Header -->
+  <div class="drawer-header">
+    <h2 class="drawer-title">{{ title }}</h2>
+    <p *ngIf="subtitle" class="drawer-subtitle">{{ subtitle }}</p>
+  </div>
+
+  <!-- Content -->
+  <div class="drawer-content">
+    <div *ngFor="let section of sections" class="drawer-section">
+      <h3 class="section-title">{{ section.title }}</h3>
+      <a
+        *ngFor="let item of section.items"
+        [routerLink]="item.route"
+        class="drawer-item"
+        [class.active]="item.active"
+        (click)="onItemClick(item)"
+      >
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span class="item-label">{{ item.label }}</span>
+      </a>
+    </div>
+  </div>
+</aside>

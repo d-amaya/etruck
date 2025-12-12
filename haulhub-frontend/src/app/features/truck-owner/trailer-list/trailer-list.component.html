@@ -1,0 +1,88 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>
+      <div class="header-container">
+        <h2>My Trailers</h2>
+        <button mat-raised-button color="primary" (click)="onRegisterTrailer()">
+          <mat-icon>add</mat-icon>
+          Register Trailer
+        </button>
+      </div>
+    </mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div *ngIf="loading" class="loading-container">
+      <mat-spinner></mat-spinner>
+    </div>
+
+    <div *ngIf="!loading && trailers.length === 0" class="empty-state">
+      <mat-icon>rv_hookup</mat-icon>
+      <p>No trailers registered yet</p>
+      <button mat-raised-button color="primary" (click)="onRegisterTrailer()">
+        Register Your First Trailer
+      </button>
+    </div>
+
+    <table mat-table [dataSource]="trailers" *ngIf="!loading && trailers.length > 0" class="trailers-table">
+      <!-- Name Column -->
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let trailer">{{ trailer.name }}</td>
+      </ng-container>
+
+      <!-- License Plate Column -->
+      <ng-container matColumnDef="licensePlate">
+        <th mat-header-cell *matHeaderCellDef>License Plate</th>
+        <td mat-cell *matCellDef="let trailer">{{ trailer.licensePlate }}</td>
+      </ng-container>
+
+      <!-- Brand Column -->
+      <ng-container matColumnDef="brand">
+        <th mat-header-cell *matHeaderCellDef>Brand</th>
+        <td mat-cell *matCellDef="let trailer">{{ trailer.brand }}</td>
+      </ng-container>
+
+      <!-- Year Column -->
+      <ng-container matColumnDef="year">
+        <th mat-header-cell *matHeaderCellDef>Year</th>
+        <td mat-cell *matCellDef="let trailer">{{ trailer.year }}</td>
+      </ng-container>
+
+      <!-- Verification Status Column -->
+      <ng-container matColumnDef="verificationStatus">
+        <th mat-header-cell *matHeaderCellDef>Verification</th>
+        <td mat-cell *matCellDef="let trailer">
+          <mat-chip [color]="getVerificationStatusColor(trailer.verificationStatus)">
+            {{ getVerificationStatusLabel(trailer.verificationStatus) }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Active Status Column -->
+      <ng-container matColumnDef="isActive">
+        <th mat-header-cell *matHeaderCellDef>Active</th>
+        <td mat-cell *matCellDef="let trailer">
+          <mat-slide-toggle
+            [checked]="trailer.isActive"
+            (change)="onToggleActive(trailer, $event)"
+            [matTooltip]="trailer.isActive ? 'Deactivate trailer' : 'Activate trailer'">
+          </mat-slide-toggle>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let trailer">
+          <button mat-icon-button (click)="onViewTrailer(trailer)" matTooltip="View Details">
+            <mat-icon>visibility</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="trailer-row"></tr>
+    </table>
+  </mat-card-content>
+</mat-card>

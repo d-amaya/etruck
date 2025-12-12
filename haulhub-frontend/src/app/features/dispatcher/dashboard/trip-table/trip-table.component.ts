@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subject, combineLatest, Observable, of } from 'rxjs';
-import { switchMap, takeUntil, map, catchError, debounceTime } from 'rxjs/operators';
+import { switchMap, takeUntil, map, catchError, debounceTime, tap, finalize } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -88,75 +88,18 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number }> {
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
-    
-    console.log('Loading trips with filters:', apiFilters);
 
     return this.tripService.getTrips(apiFilters).pipe(
       map(trips => {
         this.loading = false;
-        console.log('Received trips from API:', trips.length, 'trips');
         
-        // Apply client-side filtering as a fallback (in case backend filtering isn't working)
-        let filteredTrips = trips;
-        
-        // Filter by status if specified
-        if (filters.status) {
-          filteredTrips = filteredTrips.filter(trip => trip.status === filters.status);
-          console.log('After status filter:', filteredTrips.length, 'trips');
-        }
-        
-        // Filter by broker if specified
-        if (filters.brokerId) {
-          filteredTrips = filteredTrips.filter(trip => trip.brokerId === filters.brokerId);
-          console.log('After broker filter:', filteredTrips.length, 'trips');
-        }
-        
-        // Filter by lorry if specified
-        if (filters.lorryId) {
-          filteredTrips = filteredTrips.filter(trip => 
-            trip.lorryId.toLowerCase().includes(filters.lorryId!.toLowerCase())
-          );
-          console.log('After lorry filter:', filteredTrips.length, 'trips');
-        }
-        
-        // Filter by driver name if specified
-        if (filters.driverName) {
-          filteredTrips = filteredTrips.filter(trip => 
-            trip.driverName.toLowerCase().includes(filters.driverName!.toLowerCase())
-          );
-          console.log('After driver filter:', filteredTrips.length, 'trips');
-        }
-        
-        // Filter by date range if specified
-        if (filters.dateRange.startDate || filters.dateRange.endDate) {
-          filteredTrips = filteredTrips.filter(trip => {
-            const tripDate = new Date(trip.scheduledPickupDatetime);
-            let inRange = true;
-            
-            if (filters.dateRange.startDate) {
-              inRange = inRange && tripDate >= filters.dateRange.startDate;
-            }
-            
-            if (filters.dateRange.endDate) {
-              // Set end date to end of day
-              const endDate = new Date(filters.dateRange.endDate);
-              endDate.setHours(23, 59, 59, 999);
-              inRange = inRange && tripDate <= endDate;
-            }
-            
-            return inRange;
-          });
-          console.log('After date filter:', filteredTrips.length, 'trips');
-        }
-        
-        // Sort trips by scheduled pickup date in descending order (newest first)
-        const sortedTrips = filteredTrips.sort((a, b) => {
+        // Backend handles all filtering - just sort the results
+        const sortedTrips = trips.sort((a, b) => {
           const dateA = new Date(a.scheduledPickupDatetime).getTime();
           const dateB = new Date(b.scheduledPickupDatetime).getTime();
           return dateB - dateA; // Descending order
         });
         
-        console.log('Final filtered and sorted trips:', sortedTrips.length, 'trips');
         return { trips: sortedTrips, total: sortedTrips.length };
       }),
       catchError(error => {
@@ -164,7 +107,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
         
         // Ignore cancellation errors (they're expected when filters change rapidly)
         if (error.name === 'AbortError' || error.status === 0) {
-          console.log('Request cancelled (expected behavior)');
           return of({ trips: [], total: 0 });
         }
         
@@ -173,6 +115,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
           duration: 5000
         });
         return of({ trips: [], total: 0 });
+      }),
+      finalize(() => {
+        this.dashboardState.completeLoad();
       })
     );
   }
@@ -201,8 +146,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
       apiFilters.driverName = filters.driverName;
     }
 
-    console.log('Dashboard filters:', filters);
-    console.log('Built API filters:', apiFilters);
     return apiFilters;
   }
 
@@ -322,7 +265,24 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   calculateProfit(trip: Trip): number {
-    return trip.brokerPayment - trip.lorryOwnerPayment - trip.driverPayment;
+    let totalExpenses = trip.lorryOwnerPayment + trip.driverPayment;
+    
+    // Add fuel costs if available
+    if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
+      const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+      const fuelCost = totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
+      totalExpenses += fuelCost;
+    }
+    
+    // Add additional fees
+    if (trip.lumperFees) {
+      totalExpenses += trip.lumperFees;
+    }
+    if (trip.detentionFees) {
+      totalExpenses += trip.detentionFees;
+    }
+    
+    return trip.brokerPayment - totalExpenses;
   }
 
   getStatusClass(status: TripStatus): string {

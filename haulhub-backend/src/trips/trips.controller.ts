@@ -191,9 +191,9 @@ export class TripsController {
   /**
    * GET /trips/dashboard/payment-summary
    * Get aggregated payment metrics for dashboard
-   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 7.1, 7.2, 7.3, 7.4, 7.5
    * 
-   * Dispatcher only - returns total payments and profit
+   * Dispatcher only - returns total payments and profit including additional fees
    */
   @Get('dashboard/payment-summary')
   @Roles(UserRole.Dispatcher)
@@ -204,6 +204,9 @@ export class TripsController {
     totalBrokerPayments: number;
     totalDriverPayments: number;
     totalLorryOwnerPayments: number;
+    totalLumperFees: number;
+    totalDetentionFees: number;
+    totalAdditionalFees: number;
     totalProfit: number;
   }> {
     return this.tripsService.getPaymentSummary(user.userId, filters);
@@ -246,5 +249,69 @@ export class TripsController {
   ): Promise<{ message: string }> {
     await this.tripsService.deleteTrip(tripId, user.userId);
     return { message: 'Trip deleted successfully' };
+  }
+
+  /**
+   * GET /trips/:id/audit-trail
+   * Get complete status audit trail for a trip
+   * Requirements: 11.2 - Status change audit trails with timestamps and user information
+   */
+  @Get(':id/audit-trail')
+  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  async getAuditTrail(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') tripId: string,
+  ) {
+    return this.tripsService.getStatusAuditTrail(tripId, user.userId, user.role as UserRole);
+  }
+
+  /**
+   * GET /trips/:id/available-transitions
+   * Get available status transitions for a trip based on current status and user role
+   * Requirements: 11.3 - Workflow automation rules and validations
+   */
+  @Get(':id/available-transitions')
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.Admin)
+  async getAvailableTransitions(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') tripId: string,
+  ) {
+    return this.tripsService.getAvailableStatusTransitions(tripId, user.userId, user.role as UserRole);
+  }
+
+  /**
+   * POST /trips/:id/status-change
+   * Change trip status with audit trail and workflow validation
+   * Requirements: 11.1, 11.2, 11.3 - Enhanced status tracking with audit and validation
+   */
+  @Post(':id/status-change')
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.Admin)
+  async changeStatus(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') tripId: string,
+    @Body() request: any, // StatusChangeRequest from shared package
+  ) {
+    return this.tripsService.changeStatusWithAudit(
+      tripId,
+      user.userId,
+      user.email,
+      user.role as UserRole,
+      request
+    );
+  }
+
+  /**
+   * GET /trips/workflow/statistics
+   * Get workflow statistics for reporting
+   * Requirements: 11.4 - Status-based filtering and reporting
+   */
+  @Get('workflow/statistics')
+  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  async getWorkflowStatistics(
+    @CurrentUser() user: CurrentUserData,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.tripsService.getWorkflowStatistics(user.userId, user.role as UserRole, startDate, endDate);
   }
 }

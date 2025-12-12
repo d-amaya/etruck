@@ -1,0 +1,197 @@
+<div class="payment-tracking-container">
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <mat-card class="summary-card earnings">
+      <mat-card-content>
+        <div class="card-header">
+          <mat-icon>attach_money</mat-icon>
+          <span class="card-label">Total Earnings</span>
+        </div>
+        <div class="card-value">{{ formatCurrency(summary.totalEarnings) }}</div>
+        <div class="card-subtitle">{{ summary.tripCount }} trips</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card advances">
+      <mat-card-content>
+        <div class="card-header">
+          <mat-icon>payment</mat-icon>
+          <span class="card-label">Total Advances</span>
+        </div>
+        <div class="card-value">{{ formatCurrency(summary.totalAdvances) }}</div>
+        <div class="card-subtitle">Received upfront</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card net-payment">
+      <mat-card-content>
+        <div class="card-header">
+          <mat-icon>account_balance_wallet</mat-icon>
+          <span class="card-label">Net Payment</span>
+        </div>
+        <div class="card-value">{{ formatCurrency(summary.netPayment) }}</div>
+        <div class="card-subtitle">After advances</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card mileage">
+      <mat-card-content>
+        <div class="card-header">
+          <mat-icon>speed</mat-icon>
+          <span class="card-label">Total Miles</span>
+        </div>
+        <div class="card-value">{{ summary.totalMiles.toLocaleString() }}</div>
+        <div class="card-subtitle">{{ formatCurrency(summary.averagePerMile) }}/mile</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Filters -->
+  <mat-card class="filters-card">
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filters-form">
+        <mat-form-field appearance="outline">
+          <mat-label>Start Date</mat-label>
+          <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+          <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+          <mat-datepicker #startPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>End Date</mat-label>
+          <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+          <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+          <mat-datepicker #endPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status">
+            <mat-option *ngFor="let status of statusOptions" [value]="status">
+              {{ status }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="filter-actions">
+          <button mat-raised-button color="primary" (click)="applyFilters()">
+            <mat-icon>search</mat-icon>
+            Apply
+          </button>
+          <button mat-button (click)="resetFilters()">
+            <mat-icon>refresh</mat-icon>
+            Reset
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Payments Table -->
+  <mat-card class="table-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>receipt_long</mat-icon>
+        Payment History
+      </mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner></mat-spinner>
+        <p>Loading payment data...</p>
+      </div>
+
+      <div *ngIf="!loading && payments.length === 0" class="no-data">
+        <mat-icon>inbox</mat-icon>
+        <p>No payment records found for the selected period</p>
+      </div>
+
+      <div *ngIf="!loading && payments.length > 0" class="table-container">
+        <table mat-table [dataSource]="payments" class="payments-table">
+          <!-- Date Column -->
+          <ng-container matColumnDef="orderDate">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let payment">
+              {{ payment.orderDate | date:'MMM d, y' }}
+            </td>
+          </ng-container>
+
+          <!-- Order Confirmation Column -->
+          <ng-container matColumnDef="orderConfirmation">
+            <th mat-header-cell *matHeaderCellDef>Order #</th>
+            <td mat-cell *matCellDef="let payment">
+              <span class="order-number">{{ payment.orderConfirmation }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Route Column -->
+          <ng-container matColumnDef="route">
+            <th mat-header-cell *matHeaderCellDef>Route</th>
+            <td mat-cell *matCellDef="let payment">
+              <div class="route-cell">
+                <mat-icon>arrow_forward</mat-icon>
+                <span>{{ formatRoute(payment) }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Truck Column -->
+          <ng-container matColumnDef="truck">
+            <th mat-header-cell *matHeaderCellDef>Truck</th>
+            <td mat-cell *matCellDef="let payment">
+              {{ payment.truckName }}
+            </td>
+          </ng-container>
+
+          <!-- Miles Column -->
+          <ng-container matColumnDef="miles">
+            <th mat-header-cell *matHeaderCellDef>Miles</th>
+            <td mat-cell *matCellDef="let payment" class="numeric">
+              {{ payment.loadedMiles.toLocaleString() }}
+            </td>
+          </ng-container>
+
+          <!-- Rate Column -->
+          <ng-container matColumnDef="rate">
+            <th mat-header-cell *matHeaderCellDef>Rate</th>
+            <td mat-cell *matCellDef="let payment" class="numeric">
+              {{ formatCurrency(payment.driverRate) }}/mi
+            </td>
+          </ng-container>
+
+          <!-- Advance Column -->
+          <ng-container matColumnDef="advance">
+            <th mat-header-cell *matHeaderCellDef>Advance</th>
+            <td mat-cell *matCellDef="let payment" class="numeric">
+              <span [class.has-advance]="payment.driverAdvance > 0">
+                {{ formatCurrency(payment.driverAdvance) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Payment Column -->
+          <ng-container matColumnDef="payment">
+            <th mat-header-cell *matHeaderCellDef>Payment</th>
+            <td mat-cell *matCellDef="let payment" class="numeric payment-amount">
+              {{ formatCurrency(payment.driverPayment) }}
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let payment">
+              <mat-chip [color]="getStatusColor(payment.orderStatus)">
+                {{ payment.orderStatus }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

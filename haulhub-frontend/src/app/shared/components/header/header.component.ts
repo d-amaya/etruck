@@ -111,9 +111,11 @@ export class HeaderComponent implements OnInit {
     switch (user.role) {
       case UserRole.Dispatcher:
         items.push({ label: 'Dashboard', route: '/dispatcher/dashboard' });
+        items.push({ label: 'Invoices', route: '/dispatcher/invoices' });
+        items.push({ label: 'Analytics', route: '/dispatcher/analytics' });
         break;
       case UserRole.LorryOwner:
-        items.push({ label: 'Dashboard', route: '/lorry-owner/dashboard' });
+        items.push({ label: 'Dashboard', route: '/truck-owner/dashboard' });
         break;
       case UserRole.Driver:
         items.push({ label: 'Dashboard', route: '/driver/dashboard' });

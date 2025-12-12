@@ -51,6 +51,44 @@ export class CreateTripDto {
   @IsNumber()
   @IsPositive()
   distance?: number;
+
+  // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  loadedMiles?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  emptyMiles?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  totalMiles?: number;
+
+  // Fuel Management (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  fuelAvgCost?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  fuelAvgGallonsPerMile?: number;
+
+  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lumperFees?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  detentionFees?: number;
 }
 
 export class UpdateTripDto {
@@ -105,6 +143,44 @@ export class UpdateTripDto {
   @IsNumber()
   @IsPositive()
   distance?: number;
+
+  // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  loadedMiles?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  emptyMiles?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  totalMiles?: number;
+
+  // Fuel Management (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  fuelAvgCost?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  fuelAvgGallonsPerMile?: number;
+
+  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lumperFees?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  detentionFees?: number;
 }
 
 export class UpdateTripStatusDto {

@@ -36,8 +36,11 @@ import { Broker, CreateTripDto } from '@haulhub/shared';
 export class TripCreateComponent implements OnInit {
   tripForm!: FormGroup;
   brokers: Broker[] = [];
+  trucks: any[] = []; // TODO: Replace with Truck interface from shared
+  trailers: any[] = []; // TODO: Replace with Trailer interface from shared
   loading = false;
   loadingBrokers = true;
+  loadingVehicles = true;
   minDate = new Date();
 
   constructor(
@@ -50,23 +53,100 @@ export class TripCreateComponent implements OnInit {
   ngOnInit(): void {
     this.initializeForm();
     this.loadBrokers();
+    this.loadVehicles();
+  }
+  
+  private loadVehicles(): void {
+    this.loadingVehicles = true;
+    // TODO: Implement actual API calls when truck/trailer endpoints are ready
+    // For now, using placeholder data
+    this.trucks = [
+      { truckId: 'truck-1', name: 'Freigh101', licensePlate: 'F0077X', isActive: true },
+      { truckId: 'truck-2', name: 'Freigh102', licensePlate: 'F0076X', isActive: true },
+      { truckId: 'truck-3', name: 'Freigh103', licensePlate: 'F9251X', isActive: true }
+    ];
+    this.trailers = [
+      { trailerId: 'trailer-1', name: 'Trailer101', licensePlate: 'T0077X', isActive: true },
+      { trailerId: 'trailer-2', name: 'Trailer102', licensePlate: 'T0076X', isActive: true }
+    ];
+    this.loadingVehicles = false;
   }
 
   private initializeForm(): void {
     this.tripForm = this.fb.group({
+      // Location Information
       pickupLocation: ['', [Validators.required, Validators.minLength(3)]],
       dropoffLocation: ['', [Validators.required, Validators.minLength(3)]],
+      
+      // Schedule Information
       scheduledPickupDatetime: ['', Validators.required],
       scheduledPickupTime: ['', Validators.required],
+      
+      // Broker Information
       brokerId: ['', Validators.required],
-      lorryId: ['', [Validators.required, Validators.minLength(2)]],
+      orderConfirmation: [''],
+      
+      // Vehicle Assignment (Enhanced - separate truck and trailer)
+      truckId: ['', [Validators.required, Validators.minLength(2)]],
+      trailerId: [''],
+      
+      // Driver Assignment
       driverId: ['', [Validators.required, Validators.minLength(2)]],
       driverName: ['', [Validators.required, Validators.minLength(2)]],
+      
+      // Mileage Tracking (Enhanced)
+      loadedMiles: ['', [Validators.required, Validators.min(0)]],
+      emptyMiles: ['', [Validators.required, Validators.min(0)]],
+      totalMiles: [{ value: '', disabled: true }], // Auto-calculated
+      
+      // Financial Details (Enhanced)
+      orderRate: ['', [Validators.required, Validators.min(0.01)]],
       brokerPayment: ['', [Validators.required, Validators.min(0.01)]],
-      lorryOwnerPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverPayment: ['', [Validators.required, Validators.min(0.01)]],
-      distance: ['', Validators.min(0)]
+      driverRate: ['', Validators.min(0)],
+      
+      // Enhanced Pickup Details
+      pickupCompany: [''],
+      pickupPhone: [''],
+      pickupAddress: [''],
+      pickupCity: [''],
+      pickupState: [''],
+      pickupZip: [''],
+      pickupNotes: [''],
+      
+      // Enhanced Delivery Details
+      deliveryCompany: [''],
+      deliveryPhone: [''],
+      deliveryAddress: [''],
+      deliveryCity: [''],
+      deliveryState: [''],
+      deliveryZip: [''],
+      deliveryDate: [''],
+      deliveryTime: [''],
+      deliveryNotes: [''],
+      
+      // Additional Fees
+      lumperFees: [0, Validators.min(0)],
+      detentionFees: [0, Validators.min(0)],
+      
+      // Fuel Management
+      fuelAvgCost: ['', Validators.min(0)],
+      fuelAvgGallonsPerMile: ['', Validators.min(0)],
+      
+      // Notes
+      notes: ['']
     });
+    
+    // Auto-calculate total miles when loaded or empty miles change
+    this.tripForm.get('loadedMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    this.tripForm.get('emptyMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+  }
+  
+  private calculateTotalMiles(): void {
+    const loadedMiles = parseFloat(this.tripForm.get('loadedMiles')?.value) || 0;
+    const emptyMiles = parseFloat(this.tripForm.get('emptyMiles')?.value) || 0;
+    const totalMiles = loadedMiles + emptyMiles;
+    this.tripForm.get('totalMiles')?.setValue(totalMiles, { emitEvent: false });
   }
 
   private loadBrokers(): void {
@@ -97,7 +177,7 @@ export class TripCreateComponent implements OnInit {
       return;
     }
 
-    const formValue = this.tripForm.value;
+    const formValue = this.tripForm.getRawValue(); // Get all values including disabled fields
     
     // Combine date and time into ISO string
     const date = new Date(formValue.scheduledPickupDatetime);
@@ -112,19 +192,72 @@ export class TripCreateComponent implements OnInit {
       });
       return;
     }
+    
+    // Combine delivery date and time if provided
+    let deliveryDatetime: string | undefined;
+    if (formValue.deliveryDate && formValue.deliveryTime) {
+      const deliveryDate = new Date(formValue.deliveryDate);
+      const [deliveryHours, deliveryMinutes] = formValue.deliveryTime.split(':');
+      deliveryDate.setHours(parseInt(deliveryHours, 10), parseInt(deliveryMinutes, 10), 0, 0);
+      deliveryDatetime = deliveryDate.toISOString();
+    }
 
-    const tripData: CreateTripDto = {
+    const tripData: any = { // TODO: Update CreateTripDto interface in shared package
+      // Basic trip info
       pickupLocation: formValue.pickupLocation.trim(),
       dropoffLocation: formValue.dropoffLocation.trim(),
       scheduledPickupDatetime: date.toISOString(),
       brokerId: formValue.brokerId,
-      lorryId: formValue.lorryId.trim(),
+      orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
+      
+      // Vehicle assignment (enhanced)
+      truckId: formValue.truckId.trim(),
+      trailerId: formValue.trailerId?.trim() || undefined,
+      
+      // Driver assignment
       driverId: formValue.driverId.trim(),
       driverName: formValue.driverName.trim(),
+      
+      // Mileage tracking (enhanced)
+      loadedMiles: parseFloat(formValue.loadedMiles),
+      emptyMiles: parseFloat(formValue.emptyMiles),
+      totalMiles: parseFloat(formValue.totalMiles),
+      
+      // Financial details (enhanced)
+      orderRate: parseFloat(formValue.orderRate),
       brokerPayment: parseFloat(formValue.brokerPayment),
-      lorryOwnerPayment: parseFloat(formValue.lorryOwnerPayment),
       driverPayment: parseFloat(formValue.driverPayment),
-      distance: formValue.distance ? parseFloat(formValue.distance) : undefined
+      driverRate: formValue.driverRate ? parseFloat(formValue.driverRate) : undefined,
+      
+      // Enhanced pickup details
+      pickupCompany: formValue.pickupCompany?.trim() || undefined,
+      pickupPhone: formValue.pickupPhone?.trim() || undefined,
+      pickupAddress: formValue.pickupAddress?.trim() || undefined,
+      pickupCity: formValue.pickupCity?.trim() || undefined,
+      pickupState: formValue.pickupState?.trim() || undefined,
+      pickupZip: formValue.pickupZip?.trim() || undefined,
+      pickupNotes: formValue.pickupNotes?.trim() || undefined,
+      
+      // Enhanced delivery details
+      deliveryCompany: formValue.deliveryCompany?.trim() || undefined,
+      deliveryPhone: formValue.deliveryPhone?.trim() || undefined,
+      deliveryAddress: formValue.deliveryAddress?.trim() || undefined,
+      deliveryCity: formValue.deliveryCity?.trim() || undefined,
+      deliveryState: formValue.deliveryState?.trim() || undefined,
+      deliveryZip: formValue.deliveryZip?.trim() || undefined,
+      deliveryDate: deliveryDatetime,
+      deliveryNotes: formValue.deliveryNotes?.trim() || undefined,
+      
+      // Additional fees
+      lumperFees: parseFloat(formValue.lumperFees) || 0,
+      detentionFees: parseFloat(formValue.detentionFees) || 0,
+      
+      // Fuel management
+      fuelAvgCost: formValue.fuelAvgCost ? parseFloat(formValue.fuelAvgCost) : undefined,
+      fuelAvgGallonsPerMile: formValue.fuelAvgGallonsPerMile ? parseFloat(formValue.fuelAvgGallonsPerMile) : undefined,
+      
+      // Notes
+      notes: formValue.notes?.trim() || undefined
     };
 
     this.loading = true;

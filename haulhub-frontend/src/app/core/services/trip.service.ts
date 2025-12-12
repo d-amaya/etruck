@@ -79,4 +79,24 @@ export class TripService {
   deleteTrip(tripId: string): Observable<{ message: string }> {
     return this.apiService.delete<{ message: string }>(`/trips/${tripId}`);
   }
+
+  // Enhanced status workflow methods
+  getStatusAuditTrail(tripId: string): Observable<any> {
+    return this.apiService.get<any>(`/trips/${tripId}/audit-trail`);
+  }
+
+  getAvailableTransitions(tripId: string): Observable<any> {
+    return this.apiService.get<any>(`/trips/${tripId}/available-transitions`);
+  }
+
+  changeStatusWithAudit(tripId: string, request: any): Observable<Trip> {
+    return this.apiService.post<Trip>(`/trips/${tripId}/status-change`, request);
+  }
+
+  getWorkflowStatistics(startDate?: string, endDate?: string): Observable<any> {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return this.apiService.get<any>('/trips/workflow/statistics', params);
+  }
 }

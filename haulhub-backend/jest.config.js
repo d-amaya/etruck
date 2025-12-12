@@ -16,7 +16,7 @@ module.exports = {
   coverageDirectory: './coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@haulhub/shared$': '<rootDir>/../haulhub-shared/src',
+    '^@haulhub/shared$': '<rootDir>/../haulhub-shared/dist',
     '^uuid$': require.resolve('uuid'),
   },
   roots: ['<rootDir>/test', '<rootDir>/src'],

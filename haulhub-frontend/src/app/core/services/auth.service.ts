@@ -305,7 +305,7 @@ export class AuthService {
         this.router.navigate(['/dispatcher/dashboard']);
         break;
       case UserRole.LorryOwner:
-        this.router.navigate(['/lorry-owner/dashboard']);
+        this.router.navigate(['/truck-owner/dashboard']);
         break;
       case UserRole.Driver:
         this.router.navigate(['/driver/dashboard']);

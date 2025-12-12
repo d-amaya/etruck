@@ -47,7 +47,7 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="filter-field">
-            <mat-label>Lorry ID</mat-label>
+            <mat-label>Truck ID</mat-label>
             <input matInput formControlName="lorryId" placeholder="License plate">
           </mat-form-field>
         </div>
@@ -98,7 +98,7 @@
             Broker: {{ getBrokerName(filterForm.value.brokerId) }}
           </mat-chip>
           <mat-chip *ngIf="filterForm.value.lorryId">
-            Lorry: {{ filterForm.value.lorryId }}
+            Truck: {{ filterForm.value.lorryId }}
           </mat-chip>
           <mat-chip *ngIf="filterForm.value.driverId">
             Driver ID: {{ filterForm.value.driverId }}
@@ -161,9 +161,9 @@
             <td mat-cell *matCellDef="let trip">{{ trip.brokerName }}</td>
           </ng-container>
 
-          <!-- Lorry Column -->
+          <!-- Truck Column -->
           <ng-container matColumnDef="lorryId">
-            <th mat-header-cell *matHeaderCellDef>Lorry</th>
+            <th mat-header-cell *matHeaderCellDef>Truck</th>
             <td mat-cell *matCellDef="let trip">{{ trip.lorryId }}</td>
           </ng-container>
 
@@ -191,9 +191,9 @@
             </td>
           </ng-container>
 
-          <!-- Lorry Owner Payment Column -->
+          <!-- Truck Owner Payment Column -->
           <ng-container matColumnDef="lorryOwnerPayment">
-            <th mat-header-cell *matHeaderCellDef>Lorry Payment</th>
+            <th mat-header-cell *matHeaderCellDef>Truck Payment</th>
             <td mat-cell *matCellDef="let trip" class="payment-cell">
               {{ formatCurrency(trip.lorryOwnerPayment) }}
             </td>

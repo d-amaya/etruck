@@ -1,0 +1,111 @@
+<div class="advanced-filter-container" role="region" aria-label="Advanced filtering options">
+  <!-- Full-Text Search -->
+  <div *ngIf="showFullTextSearch" class="search-section">
+    <form [formGroup]="searchForm">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search</mat-label>
+        <input 
+          matInput 
+          formControlName="searchQuery"
+          [placeholder]="getSearchPlaceholder()"
+          aria-label="Full text search">
+        <mat-icon matPrefix>search</mat-icon>
+        <button 
+          mat-icon-button 
+          matSuffix 
+          *ngIf="searchForm.get('searchQuery')?.value"
+          (click)="searchForm.patchValue({ searchQuery: '' })"
+          aria-label="Clear search">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </mat-form-field>
+    </form>
+  </div>
+
+  <!-- Quick Filters -->
+  <div *ngIf="showQuickFilters && quickFilters.length > 0" class="quick-filters-section">
+    <h4 class="section-title">Quick Filters</h4>
+    <div class="quick-filters-grid">
+      <button
+        *ngFor="let filter of quickFilters"
+        mat-stroked-button
+        class="quick-filter-btn"
+        [class.active]="isQuickFilterActive(filter.id)"
+        (click)="applyQuickFilter(filter)"
+        [matTooltip]="filter.description"
+        [attr.aria-label]="'Apply quick filter: ' + filter.name"
+        [attr.aria-pressed]="isQuickFilterActive(filter.id)">
+        <mat-icon>{{ filter.icon }}</mat-icon>
+        <span>{{ filter.name }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Saved Searches -->
+  <div *ngIf="showSavedSearches" class="saved-searches-section">
+    <div class="section-header">
+      <h4 class="section-title">Saved Searches</h4>
+      <button
+        mat-icon-button
+        (click)="openSaveSearchDialog()"
+        matTooltip="Save current search"
+        aria-label="Save current search">
+        <mat-icon>bookmark_add</mat-icon>
+      </button>
+    </div>
+
+    <div *ngIf="savedSearches.length === 0" class="empty-state">
+      <mat-icon>bookmark_border</mat-icon>
+      <p>No saved searches yet</p>
+      <p class="hint">Apply filters and save them for quick access</p>
+    </div>
+
+    <div *ngIf="savedSearches.length > 0" class="saved-searches-list">
+      <mat-chip-listbox aria-label="Saved searches">
+        <mat-chip-option
+          *ngFor="let search of savedSearches"
+          [selected]="isSavedSearchActive(search.id)"
+          (click)="applySavedSearch(search)"
+          [attr.aria-label]="'Apply saved search: ' + search.name">
+          <mat-icon *ngIf="search.isDefault" matChipAvatar>star</mat-icon>
+          <span class="search-name">{{ search.name }}</span>
+          <span class="search-meta">
+            <span *ngIf="search.useCount > 0" class="use-count">
+              {{ search.useCount }} uses
+            </span>
+          </span>
+          <button
+            matChipRemove
+            [matMenuTriggerFor]="searchMenu"
+            (click)="$event.stopPropagation()"
+            aria-label="Search options">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          
+          <mat-menu #searchMenu="matMenu">
+            <button mat-menu-item (click)="setAsDefault(search, $event)">
+              <mat-icon>star</mat-icon>
+              <span>Set as default</span>
+            </button>
+            <button mat-menu-item (click)="deleteSavedSearch(search, $event)">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
+        </mat-chip-option>
+      </mat-chip-listbox>
+    </div>
+  </div>
+
+  <!-- Clear All Button -->
+  <div class="actions-section">
+    <button
+      mat-stroked-button
+      (click)="clearAllFilters()"
+      [disabled]="!activeQuickFilter && !activeSavedSearch && !searchForm.get('searchQuery')?.value"
+      aria-label="Clear all filters">
+      <mat-icon>clear_all</mat-icon>
+      Clear All Filters
+    </button>
+  </div>
+</div>

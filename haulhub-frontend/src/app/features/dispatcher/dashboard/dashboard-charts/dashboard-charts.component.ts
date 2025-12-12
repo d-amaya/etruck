@@ -199,25 +199,35 @@ export class DashboardChartsComponent implements OnInit, OnDestroy {
     );
     const statusCounts = Object.values(data.statusSummary);
 
+    // Map each status to its color
+    const statusColorMap: Record<string, { bg: string; border: string }> = {
+      'New': { bg: '#B0BEC5', border: '#78909C' },           // Grey
+      'Pending': { bg: '#FFCC80', border: '#FF9800' },       // Orange
+      'Scheduled': { bg: '#90CAF9', border: '#42A5F5' },     // Blue
+      'PickedUp': { bg: '#FFE082', border: '#FFA726' },      // Amber
+      'InTransit': { bg: '#CE93D8', border: '#AB47BC' },     // Purple
+      'Delivered': { bg: '#A5D6A7', border: '#66BB6A' },     // Green
+      'Paid': { bg: '#80CBC4', border: '#26A69A' },          // Teal
+      'Canceled': { bg: '#FFAB91', border: '#FF7043' }       // Red
+    };
+
+    const backgroundColors = statusLabels.map(label => {
+      const status = label.replace(/\s/g, '');
+      return statusColorMap[status]?.bg || '#E0E0E0';
+    });
+
+    const borderColors = statusLabels.map(label => {
+      const status = label.replace(/\s/g, '');
+      return statusColorMap[status]?.border || '#9E9E9E';
+    });
+
     this.tripsByStatusData = {
       labels: statusLabels,
       datasets: [{
         label: 'Trips',
         data: statusCounts,
-        backgroundColor: [
-          '#90CAF9', // Scheduled - light blue
-          '#FFE082', // Picked Up - light amber
-          '#CE93D8', // In Transit - light purple
-          '#A5D6A7', // Delivered - light green
-          '#80CBC4'  // Paid - light teal
-        ],
-        borderColor: [
-          '#42A5F5',
-          '#FFA726',
-          '#AB47BC',
-          '#66BB6A',
-          '#26A69A'
-        ],
+        backgroundColor: backgroundColors,
+        borderColor: borderColors,
         borderWidth: 1
       }]
     };

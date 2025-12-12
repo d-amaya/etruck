@@ -26,6 +26,7 @@ build/
 .env
 .env.local
 .env.*.local
+scripts/.env
 
 # Production environment files
 haulhub-frontend/src/environments/environment.prod.ts
@@ -33,6 +34,8 @@ haulhub-frontend/src/environments/environment.prod.ts
 # Scripts with sensitive data (production URLs, credentials, test data)
 scripts/create-cognito-users.sh
 scripts/seed-all-tables.sh
+scripts/seed-brokers.sh
+scripts/seed-complete-database.sh
 scripts/test-api.sh
 scripts/fix-broker-names.sh
 scripts/fix-broker-names.py

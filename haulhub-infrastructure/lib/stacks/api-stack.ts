@@ -159,7 +159,7 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         DOCUMENTS_BUCKET_NAME: props.documentsBucketName,
-        ALLOWED_ORIGINS: props.allowedOrigins || '*',
+        ALLOWED_ORIGINS: this.getAllowedOrigins(props).join(','),
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1', // Improve performance
       },
       description: 'HaulHub Backend API (NestJS)',
@@ -188,9 +188,7 @@ export class ApiStack extends cdk.Stack {
       
       // CORS configuration
       defaultCorsPreflightOptions: {
-        allowOrigins: props.allowedOrigins 
-          ? props.allowedOrigins.split(',') 
-          : apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: this.getAllowedOrigins(props),
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',
@@ -252,5 +250,29 @@ export class ApiStack extends cdk.Stack {
       description: 'Lambda Function Name',
       exportName: `${getResourceName('LambdaFunctionName', props.environment)}`,
     });
+  }
+
+  /**
+   * Get allowed origins based on environment
+   * Production includes custom domain, all environments include localhost for development
+   */
+  private getAllowedOrigins(props: ApiStackProps): string[] {
+    const origins = [
+      'http://localhost:4200',
+      'https://localhost:4200',
+    ];
+
+    // Add custom domain origins for production
+    if (props.environment === 'prod') {
+      origins.push('https://etrucky.com', 'https://www.etrucky.com');
+    }
+
+    // Add any additional origins from context/props
+    if (props.allowedOrigins && props.allowedOrigins !== '*') {
+      const additionalOrigins = props.allowedOrigins.split(',').map(o => o.trim());
+      origins.push(...additionalOrigins);
+    }
+
+    return origins;
   }
 }

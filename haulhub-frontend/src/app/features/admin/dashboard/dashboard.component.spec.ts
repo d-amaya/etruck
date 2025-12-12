@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
@@ -61,29 +61,31 @@ describe('DashboardComponent', () => {
   });
 
   describe('ngOnInit', () => {
-    it('should load dashboard data on init', () => {
+    it('should load dashboard data on init', fakeAsync(() => {
       adminServiceSpy.getDashboardSummary.and.returnValue(of(mockSummary));
 
       fixture.detectChanges(); // triggers ngOnInit
+      tick(); // Process all pending async operations
 
       expect(adminServiceSpy.getDashboardSummary).toHaveBeenCalled();
       expect(component.loading).toBe(false);
       expect(component.summary).toEqual(mockSummary);
       expect(component.error).toBeNull();
-    });
+    }));
 
-    it('should handle error when loading dashboard data', () => {
+    it('should handle error when loading dashboard data', fakeAsync(() => {
       const errorMessage = 'Failed to load';
       adminServiceSpy.getDashboardSummary.and.returnValue(
         throwError(() => new Error(errorMessage))
       );
 
       fixture.detectChanges(); // triggers ngOnInit
+      tick(); // Process all pending async operations
 
       expect(component.loading).toBe(false);
       expect(component.error).toBe('Failed to load dashboard data. Please try again.');
       expect(component.summary).toBeNull();
-    });
+    }));
   });
 
   describe('loadDashboardData', () => {

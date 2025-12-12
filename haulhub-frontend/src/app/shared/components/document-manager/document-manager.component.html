@@ -1,0 +1,256 @@
+<div class="document-manager">
+  <!-- Header with controls -->
+  <div class="document-manager-header">
+    <div class="header-left">
+      <h3>Documents</h3>
+      <span class="document-count">{{ filteredDocuments.length }} of {{ documents.length }}</span>
+    </div>
+    
+    <div class="header-right">
+      <!-- View mode toggle -->
+      <div class="view-toggle">
+        <button 
+          [class.active]="viewMode === 'list'" 
+          (click)="viewMode = 'list'"
+          aria-label="List view">
+          ☰
+        </button>
+        <button 
+          [class.active]="viewMode === 'grid'" 
+          (click)="viewMode = 'grid'"
+          aria-label="Grid view">
+          ⊞
+        </button>
+      </div>
+      
+      <!-- Upload button -->
+      <button 
+        *ngIf="allowUpload" 
+        class="btn-primary upload-btn"
+        (click)="fileInput.click()"
+        [disabled]="isUploading">
+        <span *ngIf="!isUploading">📤 Upload</span>
+        <span *ngIf="isUploading">Uploading... {{ uploadProgress }}%</span>
+      </button>
+      <input 
+        #fileInput 
+        type="file" 
+        multiple 
+        hidden 
+        (change)="onFileSelected($event)">
+    </div>
+  </div>
+
+  <!-- Search and filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <input 
+        type="text" 
+        [(ngModel)]="searchQuery" 
+        (ngModelChange)="applyFilters()"
+        placeholder="Search documents..."
+        class="search-input">
+      <span class="search-icon">🔍</span>
+    </div>
+    
+    <select 
+      [(ngModel)]="selectedCategory" 
+      (ngModelChange)="applyFilters()"
+      class="category-filter">
+      <option value="all">All Categories</option>
+      <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+    </select>
+    
+    <button 
+      *ngIf="allowFolderManagement" 
+      class="btn-secondary"
+      (click)="createFolder()">
+      📁 New Folder
+    </button>
+  </div>
+
+  <!-- Main content area -->
+  <div class="document-content">
+    <!-- Folder tree sidebar -->
+    <div class="folder-sidebar" *ngIf="folderTree.length > 0">
+      <div class="folder-tree">
+        <div 
+          class="folder-item root" 
+          [class.selected]="selectedFolder === null"
+          (click)="selectFolder(null)">
+          <span class="folder-icon">📂</span>
+          <span class="folder-name">All Documents</span>
+        </div>
+        
+        <ng-container *ngFor="let node of folderTree">
+          <ng-container *ngTemplateOutlet="folderNode; context: { $implicit: node, level: 0 }"></ng-container>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Document list/grid -->
+    <div class="document-area">
+      <!-- Drop zone -->
+      <div 
+        class="drop-zone"
+        [class.dragging]="isDragging"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)">
+        
+        <div *ngIf="isDragging" class="drop-overlay">
+          <div class="drop-message">
+            <span class="drop-icon">📥</span>
+            <p>Drop files here to upload</p>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="filteredDocuments.length === 0 && !isUploading" class="empty-state">
+          <span class="empty-icon">📄</span>
+          <p>No documents found</p>
+          <p class="empty-hint" *ngIf="allowUpload">
+            Drag and drop files here or click the Upload button
+          </p>
+        </div>
+
+        <!-- List view -->
+        <div *ngIf="viewMode === 'list' && filteredDocuments.length > 0" class="document-list">
+          <div *ngFor="let doc of filteredDocuments" class="document-item">
+            <div class="document-icon">{{ getFileIcon(doc.contentType) }}</div>
+            
+            <div class="document-info">
+              <div class="document-name">{{ doc.fileName }}</div>
+              <div class="document-meta">
+                <span class="document-size">{{ formatFileSize(doc.fileSize) }}</span>
+                <span class="document-category">{{ doc.category }}</span>
+                <span class="document-date">{{ doc.uploadedAt | date:'short' }}</span>
+              </div>
+            </div>
+            
+            <div class="document-actions">
+              <button 
+                *ngIf="canPreview(doc.contentType)"
+                class="btn-icon" 
+                (click)="previewDocumentAction(doc)"
+                title="Preview">
+                👁️
+              </button>
+              <button 
+                class="btn-icon" 
+                (click)="downloadDocument(doc)"
+                title="Download">
+                ⬇️
+              </button>
+              <button 
+                *ngIf="allowDelete"
+                class="btn-icon btn-danger" 
+                (click)="deleteDocument(doc)"
+                title="Delete">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid view -->
+        <div *ngIf="viewMode === 'grid' && filteredDocuments.length > 0" class="document-grid">
+          <div *ngFor="let doc of filteredDocuments" class="document-card">
+            <div class="card-preview">
+              <span class="card-icon">{{ getFileIcon(doc.contentType) }}</span>
+            </div>
+            
+            <div class="card-content">
+              <div class="card-title" [title]="doc.fileName">{{ doc.fileName }}</div>
+              <div class="card-meta">
+                <span class="card-size">{{ formatFileSize(doc.fileSize) }}</span>
+                <span class="card-category">{{ doc.category }}</span>
+              </div>
+            </div>
+            
+            <div class="card-actions">
+              <button 
+                *ngIf="canPreview(doc.contentType)"
+                class="btn-icon" 
+                (click)="previewDocumentAction(doc)"
+                title="Preview">
+                👁️
+              </button>
+              <button 
+                class="btn-icon" 
+                (click)="downloadDocument(doc)"
+                title="Download">
+                ⬇️
+              </button>
+              <button 
+                *ngIf="allowDelete"
+                class="btn-icon btn-danger" 
+                (click)="deleteDocument(doc)"
+                title="Delete">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview modal -->
+<div *ngIf="previewDocument" class="preview-modal" (click)="closePreview()">
+  <div class="preview-content" (click)="$event.stopPropagation()">
+    <div class="preview-header">
+      <h3>{{ previewDocument.fileName }}</h3>
+      <button class="btn-close" (click)="closePreview()">✕</button>
+    </div>
+    
+    <div class="preview-body">
+      <iframe 
+        *ngIf="previewUrl && previewDocument.contentType.includes('pdf')"
+        [src]="previewUrl" 
+        class="preview-iframe">
+      </iframe>
+      
+      <img 
+        *ngIf="previewUrl && previewDocument.contentType.startsWith('image/')"
+        [src]="previewUrl" 
+        [alt]="previewDocument.fileName"
+        class="preview-image">
+    </div>
+    
+    <div class="preview-footer">
+      <button class="btn-secondary" (click)="downloadDocument(previewDocument)">
+        ⬇️ Download
+      </button>
+      <button class="btn-secondary" (click)="closePreview()">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Folder tree template -->
+<ng-template #folderNode let-node let-level="level">
+  <div 
+    class="folder-item" 
+    [class.selected]="selectedFolder === node.folder.name"
+    [style.padding-left.px]="level * 20 + 10"
+    (click)="selectFolder(node.folder.name)">
+    <span 
+      class="folder-toggle" 
+      *ngIf="node.children.length > 0"
+      (click)="toggleFolder(node); $event.stopPropagation()">
+      {{ node.expanded ? '▼' : '▶' }}
+    </span>
+    <span class="folder-icon">📁</span>
+    <span class="folder-name">{{ node.folder.name }}</span>
+    <span class="folder-count">({{ node.documents.length }})</span>
+  </div>
+  
+  <ng-container *ngIf="node.expanded">
+    <ng-container *ngFor="let child of node.children">
+      <ng-container *ngTemplateOutlet="folderNode; context: { $implicit: child, level: level + 1 }"></ng-container>
+    </ng-container>
+  </ng-container>
+</ng-template>

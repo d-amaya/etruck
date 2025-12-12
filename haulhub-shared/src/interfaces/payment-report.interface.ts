@@ -23,6 +23,9 @@ export interface TripPaymentDetail {
   lorryOwnerPayment: number;
   driverPayment: number;
   distance?: number;
+  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+  lumperFees?: number;
+  detentionFees?: number;
   status: string;
 }
 
@@ -30,6 +33,10 @@ export interface DispatcherPaymentReport {
   totalBrokerPayments: number;
   totalDriverPayments: number;
   totalLorryOwnerPayments: number;
+  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+  totalLumperFees?: number;
+  totalDetentionFees?: number;
+  totalAdditionalFees?: number;
   profit: number;
   tripCount: number;
   trips: TripPaymentDetail[];

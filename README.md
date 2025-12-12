@@ -1,6 +1,6 @@
-# HaulHub Transportation Management System
+# eTrucky Transportation Management System
 
-A serverless web application for managing transportation logistics between Dispatchers, Lorry Owners, and Drivers.
+A serverless web application for managing transportation logistics between Dispatchers, Truck Owners, and Drivers.
 
 ## Table of Contents
 
@@ -21,10 +21,10 @@ A serverless web application for managing transportation logistics between Dispa
 
 ## Overview
 
-HaulHub is a transportation management system designed for the US logistics industry. The system facilitates coordination between:
+eTrucky is a transportation management system designed for the US logistics industry. The system facilitates coordination between:
 
-- **Dispatchers**: Manage transportation deals from brokers, assign drivers and lorries
-- **Lorry Owners**: Register vehicles, track trips involving their lorries
+- **Dispatchers**: Manage transportation deals from brokers, assign drivers and trucks
+- **Truck Owners**: Register vehicles, track trips involving their trucks
 - **Drivers**: View assigned trips and track earnings
 - **Admins**: Verify users, approve lorry registrations, manage broker lists
 
@@ -37,11 +37,11 @@ The application is built using AWS serverless architecture to minimize operation
 This is a monorepo containing four main packages:
 
 ```
-haulhub/
-├── haulhub-shared/           # Shared TypeScript types, interfaces, and DTOs
-├── haulhub-backend/          # NestJS backend API (AWS Lambda)
-├── haulhub-frontend/         # Angular frontend application
-├── haulhub-infrastructure/   # AWS CDK infrastructure code
+etrucky/
+├── etrucky-shared/           # Shared TypeScript types, interfaces, and DTOs
+├── etrucky-backend/          # NestJS backend API (AWS Lambda)
+├── etrucky-frontend/         # Angular frontend application
+├── etrucky-infrastructure/   # AWS CDK infrastructure code
 ├── scripts/                  # Deployment and development scripts
 ├── package.json              # Root workspace configuration
 └── README.md                 # This file
@@ -57,7 +57,7 @@ The `shared` package contains TypeScript definitions used across all packages:
 
 Import shared types:
 ```typescript
-import { UserRole, Trip, CreateTripDto } from '@haulhub/shared';
+import { UserRole, Trip, CreateTripDto } from '@etrucky/shared';
 ```
 
 ---
@@ -80,11 +80,11 @@ import { UserRole, Trip, CreateTripDto } from '@haulhub/shared';
 
 ## Configuration Files
 
-HaulHub uses environment-specific configuration files that are excluded from git. These files contain your unique AWS resource URLs.
+eTrucky uses environment-specific configuration files that are excluded from git. These files contain your unique AWS resource URLs.
 
 ### `cdk.context.json` - Infrastructure Configuration
 
-**Location**: `haulhub-infrastructure/cdk.context.json`
+**Location**: `etrucky-infrastructure/cdk.context.json`
 
 **Purpose**: Provides runtime configuration to CDK when deploying infrastructure.
 
@@ -92,7 +92,7 @@ HaulHub uses environment-specific configuration files that are excluded from git
 ```json
 {
   "environment": "dev",
-  "awsProfile": "haul-hub",
+  "awsProfile": "etrucky",
   "allowedOrigins": "https://YOUR_CLOUDFRONT_URL.cloudfront.net"
 }
 ```
@@ -103,7 +103,7 @@ HaulHub uses environment-specific configuration files that are excluded from git
 
 ### `environment.prod.ts` - Frontend Configuration
 
-**Location**: `haulhub-frontend/src/environments/environment.prod.ts`
+**Location**: `etrucky-frontend/src/environments/environment.prod.ts`
 
 **Purpose**: Tells your Angular frontend where to find your backend API in production.
 
@@ -148,12 +148,12 @@ For a brand new setup from scratch, follow these steps in order:
 - [ ] Install prerequisites (Node.js 18+, AWS CLI, AWS CDK CLI)
 - [ ] Create AWS account (if you don't have one)
 - [ ] Create AWS access keys (see [AWS Profile Configuration](#aws-profile-configuration))
-- [ ] Configure AWS CLI profile (`aws configure --profile haul-hub`)
+- [ ] Configure AWS CLI profile (`aws configure --profile etrucky`)
 - [ ] Clone repository
 - [ ] Run `npm install` from root
 - [ ] Create config files from templates
 - [ ] Build shared package (`npm run build:shared`)
-- [ ] Deploy infrastructure (`cd haulhub-infrastructure && npx cdk bootstrap && npx cdk deploy --all`)
+- [ ] Deploy infrastructure (`cd etrucky-infrastructure && npx cdk bootstrap && npx cdk deploy --all`)
 - [ ] Save CDK outputs (User Pool ID, API URL, CloudFront URL, etc.)
 - [ ] Update configuration files with actual values
 - [ ] Build backend and frontend
@@ -183,7 +183,7 @@ cdk --version     # Should be 2.x
 
 ### AWS Profile Configuration
 
-This project uses the `haul-hub` AWS profile to manage AWS credentials locally.
+This project uses the `etrucky` AWS profile to manage AWS credentials locally.
 
 #### Step 1: Create AWS Access Keys
 
@@ -197,7 +197,7 @@ If you have a brand new AWS account, you need to create access keys first:
 4. Click **Create access key**
 5. Choose **Command Line Interface (CLI)**
 6. Check "I understand..." and click **Next**
-7. (Optional) Add description tag: "HaulHub Development"
+7. (Optional) Add description tag: "eTrucky Development"
 8. Click **Create access key**
 9. **Important**: Download the `.csv` file or copy both keys immediately (you won't see the secret key again!)
 
@@ -206,7 +206,7 @@ If you have a brand new AWS account, you need to create access keys first:
 1. Sign in to [AWS Console](https://console.aws.amazon.com/)
 2. Go to **IAM** service
 3. Click **Users** → **Create user**
-4. Username: `haulhub-developer` (or your name)
+4. Username: `etrucky-developer` (or your name)
 5. Click **Next**
 6. Select **Attach policies directly**
 7. Add these policies:
@@ -226,7 +226,7 @@ If you have a brand new AWS account, you need to create access keys first:
 Now configure the AWS CLI with your access keys:
 
 ```bash
-aws configure --profile haul-hub
+aws configure --profile etrucky
 ```
 
 You'll be prompted for:
@@ -240,7 +240,7 @@ You'll be prompted for:
 Test that your credentials work:
 
 ```bash
-aws sts get-caller-identity --profile haul-hub
+aws sts get-caller-identity --profile etrucky
 ```
 
 Expected output:
@@ -262,14 +262,14 @@ Your credentials are stored locally in:
 
 **Example `~/.aws/credentials`**:
 ```ini
-[haul-hub]
+[etrucky]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ```
 
 **Example `~/.aws/config`**:
 ```ini
-[profile haul-hub]
+[profile etrucky]
 region = us-east-1
 output = json
 ```
@@ -304,10 +304,10 @@ This uses npm workspaces to:
 
 ```bash
 # From root
-npm install <package> --workspace=haulhub-backend
+npm install <package> --workspace=etrucky-backend
 
 # Or from within the workspace directory
-cd haulhub-backend
+cd etrucky-backend
 npm install <package>
 ```
 
@@ -333,10 +333,10 @@ npm run build:infrastructure  # Build infrastructure
 ### Build Order
 
 Always build in this order:
-1. **haulhub-shared** - Must be built first as other packages depend on it
-2. **haulhub-backend** - Backend API
-3. **haulhub-frontend** - Angular application
-4. **haulhub-infrastructure** - AWS CDK stacks
+1. **etrucky-shared** - Must be built first as other packages depend on it
+2. **etrucky-backend** - Backend API
+3. **etrucky-frontend** - Angular application
+4. **etrucky-infrastructure** - AWS CDK stacks
 
 ### Cleaning and Rebuilding
 
@@ -369,7 +369,7 @@ Before running the application locally for the first time, you need to configure
 Create your `.env` file in the backend directory:
 
 ```bash
-cd haulhub-backend
+cd etrucky-backend
 
 # Copy the example file
 cp .env.example .env
@@ -381,20 +381,20 @@ cp .env.example .env
 **Quick way to get values**:
 ```bash
 # Get Cognito User Pool ID
-aws cognito-idp list-user-pools --max-results 10 --profile haul-hub --region us-east-1 --query 'UserPools[?Name==`HaulHub-UserPool-dev`].Id' --output text
+aws cognito-idp list-user-pools --max-results 10 --profile etrucky --region us-east-1 --query 'UserPools[?Name==`eTrucky-UserPool-dev`].Id' --output text
 
 # Get Cognito Client ID
-aws cognito-idp list-user-pool-clients --user-pool-id YOUR_POOL_ID --profile haul-hub --region us-east-1 --query 'UserPoolClients[0].ClientId' --output text
+aws cognito-idp list-user-pool-clients --user-pool-id YOUR_POOL_ID --profile etrucky --region us-east-1 --query 'UserPoolClients[0].ClientId' --output text
 
 # Get S3 Bucket Name
-aws s3 ls --profile haul-hub | grep haulhub-documents-dev
+aws s3 ls --profile etrucky | grep etrucky-documents-dev
 
-# Table names are standard: HaulHub-TripsTable-dev, HaulHub-BrokersTable-dev, etc.
+# Table names are standard: eTrucky-TripsTable-dev, eTrucky-BrokersTable-dev, etc.
 ```
 
 #### Frontend Environment Setup
 
-Update `haulhub-frontend/src/environments/environment.ts` for local development:
+Update `etrucky-frontend/src/environments/environment.ts` for local development:
 
 ```typescript
 export const environment = {
@@ -429,14 +429,14 @@ Once environment variables are configured, start both servers:
 **Backend:**
 
 ```bash
-cd haulhub-backend
+cd etrucky-backend
 npm run start:dev
 # Runs on http://localhost:3000
 ```
 
 **Frontend:**
 ```bash
-cd haulhub-frontend
+cd etrucky-frontend
 npm start
 # Runs on http://localhost:4200
 ```
@@ -451,7 +451,7 @@ Once both servers are running:
 
 ### Working with the Shared Package
 
-The `haulhub-shared` package contains TypeScript types, interfaces, and DTOs used by both backend and frontend. When you modify files in `haulhub-shared/src/`:
+The `etrucky-shared` package contains TypeScript types, interfaces, and DTOs used by both backend and frontend. When you modify files in `etrucky-shared/src/`:
 
 1. **Rebuild the shared package and update dependencies**:
    ```bash
@@ -460,7 +460,7 @@ The `haulhub-shared` package contains TypeScript types, interfaces, and DTOs use
 
 2. **Restart your dev servers** (Ctrl+C and run the dev scripts again)
 
-**Why is this needed?** The shared package is compiled and cached in `node_modules/@haulhub`. Changes require rebuilding and clearing the cache.
+**Why is this needed?** The shared package is compiled and cached in `node_modules/@etrucky`. Changes require rebuilding and clearing the cache.
 
 **Common issue**: If you see validation errors like `"property X should not exist"`, it means the backend/frontend is using an old cached version of the shared package. Run `./scripts/rebuild-shared.sh` to fix it.
 
@@ -482,19 +482,19 @@ The `haulhub-shared` package contains TypeScript types, interfaces, and DTOs use
 
 #### Making Changes to Backend
 
-1. Edit files in `haulhub-backend/src/`
+1. Edit files in `etrucky-backend/src/`
 2. The dev server will auto-reload (hot reload enabled)
 3. No need to restart unless you modify `package.json` or `.env`
 
 #### Making Changes to Frontend
 
-1. Edit files in `haulhub-frontend/src/`
+1. Edit files in `etrucky-frontend/src/`
 2. The dev server will auto-reload (hot reload enabled)
 3. No need to restart unless you modify `package.json`
 
 #### Making Changes to Shared Package
 
-When you modify files in `haulhub-shared/src/` (DTOs, interfaces, enums):
+When you modify files in `etrucky-shared/src/` (DTOs, interfaces, enums):
 
 1. **Rebuild and update dependencies**:
    ```bash
@@ -503,8 +503,8 @@ When you modify files in `haulhub-shared/src/` (DTOs, interfaces, enums):
 
 2. **Restart both dev servers** (Ctrl+C and run the dev scripts again)
 
-**Why?** The shared package is compiled and cached in `node_modules/@haulhub`. Changes require:
-- Recompiling TypeScript (`npm run build` in haulhub-shared)
+**Why?** The shared package is compiled and cached in `node_modules/@etrucky`. Changes require:
+- Recompiling TypeScript (`npm run build` in etrucky-shared)
 - Clearing cached versions in backend and frontend
 - Restarting dev servers to pick up changes
 
@@ -540,11 +540,11 @@ For production deployment, you need to configure environment files with your act
 
 #### Frontend Production Environment
 
-Create `haulhub-frontend/src/environments/environment.prod.ts`:
+Create `etrucky-frontend/src/environments/environment.prod.ts`:
 
 ```bash
-cp haulhub-frontend/src/environments/environment.prod.ts.template \
-   haulhub-frontend/src/environments/environment.prod.ts
+cp etrucky-frontend/src/environments/environment.prod.ts.template \
+   etrucky-frontend/src/environments/environment.prod.ts
 ```
 
 Then update with your API Gateway URL (from CDK outputs):
@@ -571,15 +571,15 @@ For Lambda deployment, environment variables are set automatically by CDK. No `.
 
 ```bash
 # Backend tests
-cd haulhub-backend
+cd etrucky-backend
 npm test
 
 # Frontend tests
-cd haulhub-frontend
+cd etrucky-frontend
 npm test
 
 # Infrastructure tests
-cd haulhub-infrastructure
+cd etrucky-infrastructure
 npm test
 ```
 
@@ -587,11 +587,11 @@ npm test
 
 ```bash
 # Backend coverage
-cd haulhub-backend
+cd etrucky-backend
 npm run test:cov
 
 # Frontend coverage
-cd haulhub-frontend
+cd etrucky-frontend
 npm run test:coverage
 ```
 
@@ -599,7 +599,7 @@ npm run test:coverage
 
 ## Deployment
 
-HaulHub provides automated deployment scripts for easy deployment to AWS.
+eTrucky provides automated deployment scripts for easy deployment to AWS.
 
 ### Quick Start Deployment
 
@@ -621,7 +621,7 @@ HaulHub provides automated deployment scripts for easy deployment to AWS.
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd HaulHub
+cd eTrucky
 
 # Install all dependencies
 npm install
@@ -631,11 +631,11 @@ npm install
 
 ```bash
 # Create CDK context file (leave placeholder values for now)
-cp haulhub-infrastructure/cdk.context.json.template haulhub-infrastructure/cdk.context.json
+cp etrucky-infrastructure/cdk.context.json.template etrucky-infrastructure/cdk.context.json
 
 # Create production environment file (leave placeholder values for now)
-cp haulhub-frontend/src/environments/environment.prod.ts.template \
-   haulhub-frontend/src/environments/environment.prod.ts
+cp etrucky-frontend/src/environments/environment.prod.ts.template \
+   etrucky-frontend/src/environments/environment.prod.ts
 ```
 
 **Important Notes**:
@@ -655,10 +655,10 @@ npm run build:shared
 #### Step 4: Deploy Infrastructure
 
 ```bash
-cd haulhub-infrastructure
+cd etrucky-infrastructure
 npm run build
-npx cdk bootstrap --profile haul-hub
-npx cdk deploy --all --profile haul-hub --require-approval never
+npx cdk bootstrap --profile etrucky
+npx cdk deploy --all --profile etrucky --require-approval never
 ```
 
 **Expected Duration**: 10-15 minutes
@@ -667,16 +667,16 @@ npx cdk deploy --all --profile haul-hub --require-approval never
 
 ```
 Outputs:
-HaulHub-Auth-dev.UserPoolId = us-east-1_XXXXXXXXX
-HaulHub-Auth-dev.UserPoolClientId = XXXXXXXXXXXXXXXXXXXXXXXXXX
-HaulHub-Api-dev.ApiEndpoint = https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev
-HaulHub-Storage-dev.DocumentsBucketName = haulhub-documents-dev-XXXXXXXXXX
-HaulHub-Frontend-dev.CloudFrontURL = https://XXXXXXXXXXXXXX.cloudfront.net
-HaulHub-Frontend-dev.FrontendBucketName = haulhub-frontend-dev-XXXXXXXXXX
-HaulHub-Database-dev.TripsTableName = HaulHub-TripsTable-dev
-HaulHub-Database-dev.BrokersTableName = HaulHub-BrokersTable-dev
-HaulHub-Database-dev.LorriesTableName = HaulHub-LorriesTable-dev
-HaulHub-Database-dev.UsersTableName = HaulHub-UsersTable-dev
+eTrucky-Auth-dev.UserPoolId = us-east-1_XXXXXXXXX
+eTrucky-Auth-dev.UserPoolClientId = XXXXXXXXXXXXXXXXXXXXXXXXXX
+eTrucky-Api-dev.ApiEndpoint = https://XXXXXXXXXX.execute-api.us-east-1.amazonaws.com/dev
+eTrucky-Storage-dev.DocumentsBucketName = etrucky-documents-dev-XXXXXXXXXX
+eTrucky-Frontend-dev.CloudFrontURL = https://XXXXXXXXXXXXXX.cloudfront.net
+eTrucky-Frontend-dev.FrontendBucketName = etrucky-frontend-dev-XXXXXXXXXX
+eTrucky-Database-dev.TripsTableName = eTrucky-TripsTable-dev
+eTrucky-Database-dev.BrokersTableName = eTrucky-BrokersTable-dev
+eTrucky-Database-dev.LorriesTableName = eTrucky-LorriesTable-dev
+eTrucky-Database-dev.UsersTableName = eTrucky-UsersTable-dev
 ```
 
 #### Step 5: Update Configuration Files and Secure CORS
@@ -685,30 +685,30 @@ HaulHub-Database-dev.UsersTableName = HaulHub-UsersTable-dev
 
 Using the outputs from Step 4, update your configuration files:
 
-**A. Update `haulhub-infrastructure/cdk.context.json`:**
+**A. Update `etrucky-infrastructure/cdk.context.json`:**
 ```json
 {
   "environment": "dev",
-  "awsProfile": "haul-hub",
+  "awsProfile": "etrucky",
   "allowedOrigins": "https://XXXXXXXXXXXXXX.cloudfront.net"
 }
 ```
 
-**B. Create `haulhub-backend/.env`:**
+**B. Create `etrucky-backend/.env`:**
 ```bash
 AWS_REGION=us-east-1
 COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
 COGNITO_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
-TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
-BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
-LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
-USERS_TABLE_NAME=HaulHub-UsersTable-dev
-S3_DOCUMENTS_BUCKET_NAME=haulhub-documents-dev-XXXXXXXXXX
+TRIPS_TABLE_NAME=eTrucky-TripsTable-dev
+BROKERS_TABLE_NAME=eTrucky-BrokersTable-dev
+LORRIES_TABLE_NAME=eTrucky-LorriesTable-dev
+USERS_TABLE_NAME=eTrucky-UsersTable-dev
+S3_DOCUMENTS_BUCKET_NAME=etrucky-documents-dev-XXXXXXXXXX
 ALLOWED_ORIGINS=https://XXXXXXXXXXXXXX.cloudfront.net
 NODE_ENV=production
 ```
 
-**C. Update `haulhub-frontend/src/environments/environment.prod.ts`:**
+**C. Update `etrucky-frontend/src/environments/environment.prod.ts`:**
 ```typescript
 export const environment = {
   production: true,
@@ -717,7 +717,7 @@ export const environment = {
 };
 ```
 
-**D. Update `haulhub-frontend/src/environments/environment.ts` (for local development):**
+**D. Update `etrucky-frontend/src/environments/environment.ts` (for local development):**
 ```typescript
 export const environment = {
   production: false,
@@ -731,8 +731,8 @@ export const environment = {
 Now that you've updated `cdk.context.json` with your actual CloudFront URL, redeploy the API stack to secure CORS:
 
 ```bash
-cd haulhub-infrastructure
-npx cdk deploy HaulHub-Api-dev --profile haul-hub
+cd etrucky-infrastructure
+npx cdk deploy eTrucky-Api-dev --profile etrucky
 ```
 
 **What this does**:
@@ -746,11 +746,11 @@ npx cdk deploy HaulHub-Api-dev --profile haul-hub
 
 ```bash
 # Build backend
-cd ../haulhub-backend
+cd ../etrucky-backend
 npm run build
 
 # Build frontend
-cd ../haulhub-frontend
+cd ../etrucky-frontend
 npm run build
 ```
 
@@ -759,8 +759,8 @@ npm run build
 The Lambda function already exists from Step 4, but now we need to update it with the built backend code:
 
 ```bash
-cd ../haulhub-infrastructure
-npx cdk deploy HaulHub-Api-dev --profile haul-hub
+cd ../etrucky-infrastructure
+npx cdk deploy eTrucky-Api-dev --profile etrucky
 ```
 
 **Expected Duration**: 2-3 minutes
@@ -776,7 +776,7 @@ cd scripts
 ./seed-brokers.sh
 ```
 
-This will populate the `HaulHub-BrokersTable-dev` with 20 brokers including:
+This will populate the `eTrucky-BrokersTable-dev` with 20 brokers including:
 - C.H. Robinson
 - XPO Logistics
 - TQL (Total Quality Logistics)
@@ -791,23 +791,23 @@ This will populate the `HaulHub-BrokersTable-dev` with 20 brokers including:
 - Adds 20 major US freight brokers
 - Verifies seeded data
 
-**Note**: You can also seed all tables at once with `./seed-all-tables.sh` which includes brokers, test users, lorries, and trips.
+**Note**: You can also seed all tables at once with `./seed-all-tables.sh` which includes brokers, test users, trucks, and trips.
 
 #### Step 10: Deploy Frontend to S3 and CloudFront
 
 ```bash
-cd ../haulhub-frontend
+cd ../etrucky-frontend
 
 # Sync built files to S3
-aws s3 sync dist/haulhub-frontend/ s3://haulhub-frontend-dev-XXXXXXXXXX/ \
-  --profile haul-hub \
+aws s3 sync dist/etrucky-frontend/ s3://etrucky-frontend-dev-XXXXXXXXXX/ \
+  --profile etrucky \
   --delete
 
 # Invalidate CloudFront cache
 aws cloudfront create-invalidation \
   --distribution-id XXXXXXXXXXXXXX \
   --paths "/*" \
-  --profile haul-hub
+  --profile etrucky
 ```
 
 **Expected Duration**: 5-10 minutes (including CloudFront invalidation)
@@ -853,8 +853,8 @@ aws cloudfront create-invalidation \
 ./scripts/deploy-frontend.sh
 
 # Update infrastructure
-cd haulhub-infrastructure
-npx cdk deploy --all --profile haul-hub
+cd etrucky-infrastructure
+npx cdk deploy --all --profile etrucky
 ```
 
 ### Deployment Scripts
@@ -866,12 +866,12 @@ npx cdk deploy --all --profile haul-hub
 ```
 
 **Environment Variables**:
-- `AWS_PROFILE`: AWS profile to use (default: `haul-hub`)
+- `AWS_PROFILE`: AWS profile to use (default: `etrucky`)
 - `ENVIRONMENT`: Deployment environment (default: `dev`)
 
 **Example**:
 ```bash
-AWS_PROFILE=haul-hub ENVIRONMENT=staging ./scripts/deploy-infrastructure.sh
+AWS_PROFILE=etrucky ENVIRONMENT=staging ./scripts/deploy-infrastructure.sh
 ```
 
 #### Backend Deployment
@@ -906,15 +906,15 @@ AWS_PROFILE=haul-hub ENVIRONMENT=staging ./scripts/deploy-infrastructure.sh
 ```bash
 # Find previous version
 aws lambda list-versions-by-function \
-  --function-name HaulHub-Lambda-dev \
-  --profile haul-hub
+  --function-name eTrucky-Lambda-dev \
+  --profile etrucky
 
 # Update alias to previous version
 aws lambda update-alias \
-  --function-name HaulHub-Lambda-dev \
+  --function-name eTrucky-Lambda-dev \
   --name live \
   --function-version <previous-version> \
-  --profile haul-hub
+  --profile etrucky
 ```
 
 #### Rollback Frontend (S3)
@@ -924,20 +924,20 @@ aws lambda update-alias \
 aws s3api list-object-versions \
   --bucket your-bucket-name \
   --prefix index.html \
-  --profile haul-hub
+  --profile etrucky
 
 # Restore previous version
 aws s3api copy-object \
   --bucket your-bucket-name \
   --copy-source your-bucket-name/index.html?versionId=<version-id> \
   --key index.html \
-  --profile haul-hub
+  --profile etrucky
 
 # Invalidate CloudFront
 aws cloudfront create-invalidation \
   --distribution-id YOUR_DIST_ID \
   --paths "/*" \
-  --profile haul-hub
+  --profile etrucky
 ```
 
 ### Monitoring and Logs
@@ -946,14 +946,14 @@ aws cloudfront create-invalidation \
 
 ```bash
 # Backend logs
-aws logs tail /aws/lambda/HaulHub-Lambda-dev \
+aws logs tail /aws/lambda/eTrucky-Lambda-dev \
   --follow \
-  --profile haul-hub
+  --profile etrucky
 
 # API Gateway logs
-aws logs tail /aws/apigateway/HaulHub-Api-dev \
+aws logs tail /aws/apigateway/eTrucky-Api-dev \
   --follow \
-  --profile haul-hub
+  --profile etrucky
 ```
 
 ---
@@ -962,7 +962,7 @@ aws logs tail /aws/apigateway/HaulHub-Api-dev \
 
 ### Authentication
 
-HaulHub uses JWT (JSON Web Token) authentication via AWS Cognito.
+eTrucky uses JWT (JSON Web Token) authentication via AWS Cognito.
 
 **Token Types**:
 1. **Access Token**: Short-lived (1 hour), used for API requests
@@ -1058,10 +1058,10 @@ All errors follow a consistent format:
 
 #### Lorries Endpoints
 
-**POST /lorries** - Register lorry (Lorry Owner only)
-**GET /lorries** - Get lorries
-**POST /lorries/:id/documents** - Upload document
-**GET /lorries/:id/documents/:docId** - View document
+**POST /trucks** - Register lorry (Lorry Owner only)
+**GET /trucks** - Get trucks
+**POST /trucks/:id/documents** - Upload document
+**GET /trucks/:id/documents/:docId** - View document
 
 #### Users Endpoints
 
@@ -1070,8 +1070,8 @@ All errors follow a consistent format:
 
 #### Admin Endpoints
 
-**GET /admin/lorries/pending** - Get pending lorries
-**PATCH /admin/lorries/:id/verify** - Verify lorry
+**GET /admin/trucks/pending** - Get pending trucks
+**PATCH /admin/trucks/:id/verify** - Verify lorry
 **GET /admin/users/pending** - Get pending users
 **PATCH /admin/users/:id/verify** - Verify user
 
@@ -1082,7 +1082,7 @@ All errors follow a consistent format:
 **PATCH /brokers/:id** - Update broker (Admin only)
 **DELETE /brokers/:id** - Delete broker (Admin only)
 
-For complete API documentation with request/response examples, see [haulhub-backend/README.md](./haulhub-backend/README.md).
+For complete API documentation with request/response examples, see [etrucky-backend/README.md](./etrucky-backend/README.md).
 
 ### Testing the API
 
@@ -1112,8 +1112,8 @@ curl -X GET http://localhost:3000/trips \
 
 **Solution**:
 ```bash
-cd haulhub-infrastructure
-npx cdk bootstrap --profile haul-hub
+cd etrucky-infrastructure
+npx cdk bootstrap --profile etrucky
 ```
 
 ### Lambda Deployment Failed
@@ -1122,7 +1122,7 @@ npx cdk bootstrap --profile haul-hub
 
 **Solution**: Optimize dependencies
 ```bash
-cd haulhub-backend
+cd etrucky-backend
 npm prune --production
 npm run build
 ```
@@ -1134,7 +1134,7 @@ Invalidation can take 10-15 minutes. Check status:
 aws cloudfront get-invalidation \
   --distribution-id YOUR_DIST_ID \
   --id INVALIDATION_ID \
-  --profile haul-hub
+  --profile etrucky
 ```
 
 ### CORS Errors
@@ -1143,9 +1143,9 @@ aws cloudfront get-invalidation \
 
 **Solution**: Update API Gateway CORS configuration:
 ```bash
-cd haulhub-infrastructure
+cd etrucky-infrastructure
 # Update CORS settings in api-stack.ts
-npx cdk deploy HaulHub-Api-dev --profile haul-hub
+npx cdk deploy eTrucky-Api-dev --profile etrucky
 ```
 
 ### Duplicate Dependencies
@@ -1196,14 +1196,14 @@ npm run fresh
 
 **Solution**: Create configuration files from templates:
 ```bash
-cp haulhub-infrastructure/cdk.context.json.template haulhub-infrastructure/cdk.context.json
-cp haulhub-frontend/src/environments/environment.prod.ts.template \
-   haulhub-frontend/src/environments/environment.prod.ts
+cp etrucky-infrastructure/cdk.context.json.template etrucky-infrastructure/cdk.context.json
+cp etrucky-frontend/src/environments/environment.prod.ts.template \
+   etrucky-frontend/src/environments/environment.prod.ts
 ```
 
 #### Shared Package Not Built
 
-**Error**: `Cannot find module '@haulhub/shared'`
+**Error**: `Cannot find module '@etrucky/shared'`
 
 **Solution**: Build shared package first:
 ```bash
@@ -1214,7 +1214,7 @@ npm run build:shared
 
 **Error**: `"property X should not exist"` or validation errors in API requests
 
-**Cause**: The backend/frontend is using a cached version of the shared package from `node_modules/@haulhub`.
+**Cause**: The backend/frontend is using a cached version of the shared package from `node_modules/@etrucky`.
 
 **Solution**: Rebuild shared package and clear cache:
 ```bash
@@ -1227,11 +1227,11 @@ Then restart your dev servers (Ctrl+C and run `./scripts/dev-backend.sh` and `./
 
 #### AWS Profile Not Configured
 
-**Error**: `Unable to locate credentials` or `The config profile (haul-hub) could not be found`
+**Error**: `Unable to locate credentials` or `The config profile (etrucky) could not be found`
 
 **Solution**: Configure AWS profile:
 ```bash
-aws configure --profile haul-hub
+aws configure --profile etrucky
 ```
 
 If you don't have AWS access keys yet, see [AWS Profile Configuration](#aws-profile-configuration) section for detailed instructions on creating them.
@@ -1249,7 +1249,7 @@ If you don't have AWS access keys yet, see [AWS Profile Configuration](#aws-prof
 1. Verify your access keys in AWS Console (IAM → Users → Security credentials)
 2. If keys are invalid, create new ones and reconfigure:
    ```bash
-   aws configure --profile haul-hub
+   aws configure --profile etrucky
    ```
 
 #### Insufficient Permissions
@@ -1267,11 +1267,11 @@ If you don't have AWS access keys yet, see [AWS Profile Configuration](#aws-prof
 **Solution**: Verify you're using the correct profile:
 ```bash
 # Check current profile
-aws sts get-caller-identity --profile haul-hub
+aws sts get-caller-identity --profile etrucky
 
 # Ensure CDK uses correct profile
-export AWS_PROFILE=haul-hub
-cdk deploy --profile haul-hub
+export AWS_PROFILE=etrucky
+cdk deploy --profile etrucky
 ```
 
 #### CDK Not Bootstrapped
@@ -1280,8 +1280,8 @@ cdk deploy --profile haul-hub
 
 **Solution**: Bootstrap CDK:
 ```bash
-cd haulhub-infrastructure
-npx cdk bootstrap --profile haul-hub
+cd etrucky-infrastructure
+npx cdk bootstrap --profile etrucky
 ```
 
 #### Table Names Not Found
@@ -1290,13 +1290,13 @@ npx cdk bootstrap --profile haul-hub
 
 **Solution**: Ensure you're using the new table names in your `.env`:
 ```bash
-TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
-BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
-LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
-USERS_TABLE_NAME=HaulHub-UsersTable-dev
+TRIPS_TABLE_NAME=eTrucky-TripsTable-dev
+BROKERS_TABLE_NAME=eTrucky-BrokersTable-dev
+LORRIES_TABLE_NAME=eTrucky-LorriesTable-dev
+USERS_TABLE_NAME=eTrucky-UsersTable-dev
 ```
 
-Not the old single table name: ~~`DYNAMODB_TABLE_NAME=HaulHub`~~
+Not the old single table name: ~~`DYNAMODB_TABLE_NAME=eTrucky`~~
 
 #### Missing .env File
 
@@ -1304,7 +1304,7 @@ Not the old single table name: ~~`DYNAMODB_TABLE_NAME=HaulHub`~~
 
 **Solution**: Create `.env` file from example:
 ```bash
-cd haulhub-backend
+cd etrucky-backend
 cp .env.example .env
 # Then edit .env with your actual values
 ```
@@ -1321,13 +1321,13 @@ cp .env.example .env
 **Solution**:
 ```bash
 # Verify AWS credentials work
-aws sts get-caller-identity --profile haul-hub
+aws sts get-caller-identity --profile etrucky
 
 # Ensure .env file exists
-ls -la haulhub-backend/.env
+ls -la etrucky-backend/.env
 
 # Check .env has correct values
-cat haulhub-backend/.env
+cat etrucky-backend/.env
 ```
 
 #### CORS Errors in Local Development
@@ -1366,7 +1366,7 @@ apiUrl: 'http://localhost:3000'
 - [AWS CloudFront Documentation](https://docs.aws.amazon.com/cloudfront/)
 - [NestJS Documentation](https://docs.nestjs.com/)
 - [Angular Documentation](https://angular.io/docs)
-- [HaulHub Design Document](.kiro/specs/haulhub-transportation-management/design.md)
+- [eTrucky Design Document](.kiro/specs/etrucky-transportation-management/design.md)
 
 ---
 

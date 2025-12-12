@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "clean:src": "find src -name '*.js' -o -name '*.d.ts' -o -name '*.js.map' -o -name '*.d.ts.map' | xargs rm -f",
+    "prebuild": "npm run clean:src"
   },
   "keywords": [
     "haulhub",

@@ -1,0 +1,11 @@
+@import '../../../../styles/variables';
+
+.section-title-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .section-icon-left {
+    color: $neutral-600;
+  }
+}

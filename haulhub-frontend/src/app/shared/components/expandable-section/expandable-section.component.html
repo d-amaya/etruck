@@ -1,0 +1,21 @@
+<div class="expandable-section">
+  <!-- Header -->
+  <div 
+    class="section-header" 
+    [class.expanded]="expanded"
+    (click)="toggleExpanded()"
+  >
+    <div class="section-title-container">
+      <mat-icon *ngIf="icon" class="section-icon-left">{{ icon }}</mat-icon>
+      <h3 class="section-title">{{ title }}</h3>
+    </div>
+    <mat-icon class="section-icon">expand_more</mat-icon>
+  </div>
+
+  <!-- Content -->
+  <div class="section-content" [class.expanded]="expanded">
+    <div class="section-body">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</div>

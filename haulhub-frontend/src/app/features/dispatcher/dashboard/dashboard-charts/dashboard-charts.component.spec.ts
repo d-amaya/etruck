@@ -17,7 +17,8 @@ describe('DashboardChartsComponent', () => {
     [TripStatus.PickedUp]: 3,
     [TripStatus.InTransit]: 7,
     [TripStatus.Delivered]: 10,
-    [TripStatus.Paid]: 15
+    [TripStatus.Paid]: 15,
+    [TripStatus.Canceled]: 0
   };
 
   const mockPaymentsTimeline = {
@@ -75,8 +76,8 @@ describe('DashboardChartsComponent', () => {
   it('should update trips by status chart with correct data', () => {
     fixture.detectChanges();
 
-    expect(component.tripsByStatusData.labels?.length).toBe(5);
-    expect(component.tripsByStatusData.datasets[0].data).toEqual([5, 3, 7, 10, 15]);
+    expect(component.tripsByStatusData.labels?.length).toBe(6);
+    expect(component.tripsByStatusData.datasets[0].data).toEqual([5, 3, 7, 10, 15, 0]);
   });
 
   it('should update payments over time chart with correct data', () => {
