@@ -260,12 +260,10 @@ export class ApiStack extends cdk.Stack {
     const origins = [
       'http://localhost:4200',
       'https://localhost:4200',
+      // Always include production domains for all environments
+      'https://etrucky.com',
+      'https://www.etrucky.com',
     ];
-
-    // Add custom domain origins for production
-    if (props.environment === 'prod') {
-      origins.push('https://etrucky.com', 'https://www.etrucky.com');
-    }
 
     // Add any additional origins from context/props
     if (props.allowedOrigins && props.allowedOrigins !== '*') {

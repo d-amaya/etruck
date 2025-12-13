@@ -37,10 +37,8 @@ export class TripService {
     return this.apiService.post<Trip>('/trips', tripData);
   }
 
-  getTrips(filters?: TripFilters): Observable<Trip[]> {
-    return this.apiService.get<TripsResponse>('/trips', filters).pipe(
-      map(response => response.trips)
-    );
+  getTrips(filters?: TripFilters): Observable<TripsResponse> {
+    return this.apiService.get<TripsResponse>('/trips', filters);
   }
 
   getTripById(tripId: string): Observable<Trip> {

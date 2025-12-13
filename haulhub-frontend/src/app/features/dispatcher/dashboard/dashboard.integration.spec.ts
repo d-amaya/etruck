@@ -166,7 +166,7 @@ describe('Dashboard Integration Tests', () => {
     dashboardStateService.getBrokers.and.returnValue(mockBrokers);
     dashboardStateService.getActiveFilterCount.and.returnValue(0);
     dashboardStateService.getCurrentFilters.and.returnValue(defaultFilters);
-    tripService.getTrips.and.returnValue(of(mockTrips));
+    tripService.getTrips.and.returnValue(of({ trips: mockTrips, lastEvaluatedKey: undefined }));
     tripService.getBrokers.and.returnValue(of(mockBrokers));
     tripService.deleteTrip.and.returnValue(of({ message: 'Trip deleted successfully' }));
     tripService.createTrip.and.returnValue(of(mockTrips[0]));

@@ -62,10 +62,11 @@ export class TripListComponent implements OnInit {
   filterForm: FormGroup;
   
   // Pagination
-  pageSize = 50;
+  pageSize = 10;
   pageIndex = 0;
   totalTrips = 0;
   lastEvaluatedKey?: string;
+  paginationKeys: Map<number, string> = new Map(); // Track keys for each page
 
   // Status options
   statusOptions = Object.values(TripStatus);
@@ -76,9 +77,14 @@ export class TripListComponent implements OnInit {
     private router: Router,
     private fb: FormBuilder
   ) {
+    // Set default date range to last 30 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
     this.filterForm = this.fb.group({
-      startDate: [null],
-      endDate: [null],
+      startDate: [startDate],
+      endDate: [endDate],
       brokerId: [''],
       lorryId: [''],
       driverId: [''],
@@ -107,10 +113,47 @@ export class TripListComponent implements OnInit {
     this.loading = true;
     const filters = this.buildFilters();
     
+    console.log('Loading trips with filters:', filters);
+    console.log('Current pageIndex:', this.pageIndex);
+    
     this.tripService.getTrips(filters).subscribe({
-      next: (trips) => {
-        this.trips = trips;
-        this.totalTrips = trips.length;
+      next: (response) => {
+        console.log('Received response:', {
+          tripCount: response.trips.length,
+          hasMorePages: !!response.lastEvaluatedKey,
+          lastEvaluatedKey: response.lastEvaluatedKey ? response.lastEvaluatedKey.substring(0, 50) + '...' : 'none'
+        });
+        
+        this.trips = response.trips;
+        
+        // Store the key for navigating to the NEXT page
+        if (response.lastEvaluatedKey) {
+          this.paginationKeys.set(this.pageIndex + 1, response.lastEvaluatedKey);
+          console.log('Stored key for next page:', this.pageIndex + 1);
+        }
+        
+        // Update lastEvaluatedKey for display purposes
+        this.lastEvaluatedKey = response.lastEvaluatedKey;
+        
+        // Calculate totalTrips to control paginator behavior
+        // If there's a lastEvaluatedKey, we know there are more pages
+        if (response.lastEvaluatedKey) {
+          // Set total to at least one more page than current
+          // This ensures the "next" button stays enabled
+          this.totalTrips = (this.pageIndex + 2) * this.pageSize;
+          console.log('Has more pages - set totalTrips to:', this.totalTrips);
+        } else {
+          // No more pages - set exact total
+          this.totalTrips = (this.pageIndex * this.pageSize) + response.trips.length;
+          console.log('Last page - set totalTrips to:', this.totalTrips);
+        }
+        
+        // Safety check: ensure totalTrips is at least the number of trips we have
+        if (this.totalTrips < response.trips.length) {
+          console.warn('totalTrips was less than trips received, adjusting');
+          this.totalTrips = response.trips.length;
+        }
+        
         this.loading = false;
       },
       error: (error) => {
@@ -154,8 +197,10 @@ export class TripListComponent implements OnInit {
       filters.status = formValue.status;
     }
 
+    // Include lastEvaluatedKey if available (for pagination)
     if (this.lastEvaluatedKey) {
       filters.lastEvaluatedKey = this.lastEvaluatedKey;
+      console.log('Including lastEvaluatedKey in filters:', this.lastEvaluatedKey.substring(0, 50) + '...');
     }
 
     return filters;
@@ -164,6 +209,7 @@ export class TripListComponent implements OnInit {
   onApplyFilters(): void {
     this.pageIndex = 0;
     this.lastEvaluatedKey = undefined;
+    this.paginationKeys.clear();
     this.loadTrips();
   }
 
@@ -179,14 +225,33 @@ export class TripListComponent implements OnInit {
     });
     this.pageIndex = 0;
     this.lastEvaluatedKey = undefined;
+    this.paginationKeys.clear();
     this.loadTrips();
   }
 
   onPageChange(event: PageEvent): void {
+    console.log('Page change event:', event);
+    
+    const oldPageSize = this.pageSize;
     this.pageSize = event.pageSize;
+    
+    // If page size changed, reset pagination
+    if (oldPageSize !== event.pageSize) {
+      this.pageIndex = 0;
+      this.lastEvaluatedKey = undefined;
+      this.paginationKeys.clear();
+      this.loadTrips();
+      return;
+    }
+    
+    // Update page index
     this.pageIndex = event.pageIndex;
-    // Note: For proper pagination with DynamoDB, we'd need to track lastEvaluatedKey
-    // For now, we'll reload with the same filters
+    
+    // Get the pagination key for this page (undefined for page 0)
+    this.lastEvaluatedKey = this.paginationKeys.get(event.pageIndex);
+    
+    console.log('Navigating to page', event.pageIndex, 'with key:', this.lastEvaluatedKey ? 'present' : 'none');
+    
     this.loadTrips();
   }
 

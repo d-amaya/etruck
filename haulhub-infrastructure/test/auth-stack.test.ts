@@ -120,20 +120,20 @@ describe('AuthStack', () => {
       });
     });
 
-    test('should configure token validity - access token 5 minutes (for testing)', () => {
+    test('should configure token validity - access token 1 hour', () => {
       template.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-        AccessTokenValidity: 5, // 5 minutes (minimum allowed by Cognito, for testing token refresh)
+        AccessTokenValidity: 1,
         TokenValidityUnits: Match.objectLike({
-          AccessToken: 'minutes',
+          AccessToken: 'hours',
         }),
       });
     });
 
-    test('should configure token validity - refresh token 1 year', () => {
+    test('should configure token validity - refresh token 24 hours', () => {
       template.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-        RefreshTokenValidity: 525600, // 1 year in minutes (365 * 24 * 60)
+        RefreshTokenValidity: 24,
         TokenValidityUnits: Match.objectLike({
-          RefreshToken: 'minutes',
+          RefreshToken: 'hours',
         }),
       });
     });

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { tap, catchError } from 'rxjs/operators';
+import { tap, catchError, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { LoginDto, RegisterDto, AuthResponse } from '@haulhub/shared';
@@ -30,27 +30,52 @@ export class AuthService {
     private http: HttpClient,
     private router: Router
   ) {
+    console.log('AuthService initializing...');
     // Initialize the subject with stored user data
     let storedUser: UserData | null = null;
     try {
       storedUser = this.getStoredUserData();
       
-      // Validate that if we have user data, we also have tokens
+      // Validate that if we have user data, we also have tokens and valid role
       if (storedUser) {
         const hasAccessToken = !!this.getAccessToken();
         const hasRefreshToken = !!localStorage.getItem(this.REFRESH_TOKEN_KEY);
+        const hasValidRole = !!storedUser.role;
         
-        // If user data exists but tokens are missing, clear everything
-        if (!hasAccessToken || !hasRefreshToken) {
-          console.warn('User data exists but tokens are missing, clearing auth data');
-          this.clearUserData();
+        console.log('Auth state on init:', {
+          hasUser: true,
+          hasAccessToken,
+          hasRefreshToken,
+          hasValidRole,
+          role: storedUser.role
+        });
+        
+        // If user data exists but tokens/role are missing, clear everything
+        if (!hasAccessToken || !hasRefreshToken || !hasValidRole) {
+          console.warn('User data is corrupted (missing tokens or role), clearing localStorage');
+          // Clear localStorage directly without calling clearUserData() since subject isn't initialized yet
+          try {
+            localStorage.removeItem(this.USER_DATA_KEY);
+            localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+            localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+          } catch (e) {
+            console.error('Error clearing localStorage:', e);
+          }
           storedUser = null;
         }
+      } else {
+        console.log('No stored user data found');
       }
     } catch (error) {
       console.error('Error loading stored user data:', error);
-      // Clear corrupted data
-      this.clearUserData();
+      // Clear corrupted data directly
+      try {
+        localStorage.removeItem(this.USER_DATA_KEY);
+        localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+        localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+      } catch (e) {
+        console.error('Error clearing localStorage:', e);
+      }
       storedUser = null;
     }
     
@@ -117,23 +142,41 @@ export class AuthService {
   /**
    * Refresh the access token
    * Note: Refresh response doesn't include a new refresh token (it stays the same)
+   * Note: Refresh response may not include full user data, only the new access token
    */
   refreshToken(): Observable<Omit<AuthResponse, 'refreshToken'>> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
+      console.error('No refresh token available');
       this.clearUserData();
       this.router.navigate(['/auth/login']);
       return throwError(() => new Error('No refresh token available'));
     }
 
+    console.log('Attempting token refresh...');
     return this.http.post<Omit<AuthResponse, 'refreshToken'>>(
       `${this.baseUrl}/auth/refresh`,
       { refreshToken }
     ).pipe(
-      tap(response => this.handleAuthResponse(response as AuthResponse)),
+      tap(response => {
+        console.log('Token refresh successful, updating access token...');
+        // Only update the access token, don't touch user data
+        if (response.accessToken) {
+          this.storeAccessToken(response.accessToken);
+        }
+      }),
       catchError(error => {
         console.error('Token refresh error:', error);
-        // If refresh fails, logout user
+        
+        // If the request was aborted, reload the page to get a clean state
+        // The user data and tokens are still valid, so they'll stay logged in
+        if (error.name === 'AbortError' || error.status === 0) {
+          console.warn('Token refresh was aborted, reloading page...');
+          window.location.reload();
+          return throwError(() => error);
+        }
+        
+        // For other errors, logout
         this.clearUserData();
         this.router.navigate(['/auth/login']);
         return throwError(() => error);
@@ -174,12 +217,20 @@ export class AuthService {
    * Store user data and tokens in localStorage
    */
   private handleAuthResponse(response: AuthResponse): void {
+    // Validate response has required fields
+    if (!response.userId || !response.role || !response.email || !response.fullName) {
+      console.error('Invalid auth response - missing required fields:', response);
+      throw new Error('Invalid authentication response');
+    }
+
     const userData: UserData = {
       userId: response.userId,
       role: response.role,
       email: response.email,
       fullName: response.fullName
     };
+
+    console.log('Storing auth data:', { userId: userData.userId, role: userData.role });
 
     // Store user data and tokens in localStorage
     this.storeUserData(userData);
@@ -291,30 +342,33 @@ export class AuthService {
   }
 
   /**
-   * Navigate to role-specific dashboard
+   * Get the dashboard route for the current user's role
    */
-  navigateToDashboard(): void {
+  getDashboardRoute(): string {
     const role = this.userRole;
     if (!role) {
-      this.router.navigate(['/auth/login']);
-      return;
+      return '/auth/login';
     }
 
     switch (role) {
       case UserRole.Dispatcher:
-        this.router.navigate(['/dispatcher/dashboard']);
-        break;
+        return '/dispatcher/dashboard';
       case UserRole.LorryOwner:
-        this.router.navigate(['/truck-owner/dashboard']);
-        break;
+        return '/truck-owner/dashboard';
       case UserRole.Driver:
-        this.router.navigate(['/driver/dashboard']);
-        break;
+        return '/driver/dashboard';
       case UserRole.Admin:
-        this.router.navigate(['/admin/dashboard']);
-        break;
+        return '/admin/dashboard';
       default:
-        this.router.navigate(['/auth/login']);
+        return '/auth/login';
     }
+  }
+
+  /**
+   * Navigate to role-specific dashboard
+   */
+  navigateToDashboard(): void {
+    const dashboardRoute = this.getDashboardRoute();
+    this.router.navigate([dashboardRoute]);
   }
 }

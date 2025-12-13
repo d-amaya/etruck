@@ -14,6 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { Trip, TripStatus, TripFilters, Truck, Trailer, VehicleVerificationStatus, Broker } from '@haulhub/shared';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-vehicle-trip-list',
@@ -58,10 +59,11 @@ export class VehicleTripListComponent implements OnInit {
   loading = false;
   filterForm: FormGroup;
   
-  pageSize = 50;
+  pageSize = 10;
   pageIndex = 0;
   totalTrips = 0;
   lastEvaluatedKey?: string;
+  paginationKeys: Map<number, string> = new Map();
 
   statusOptions = Object.values(TripStatus);
   TripStatus = TripStatus;
@@ -135,12 +137,8 @@ export class VehicleTripListComponent implements OnInit {
     };
 
     if (formValue.vehicleId) {
-      // Filter by specific vehicle (truck or trailer)
-      if (formValue.vehicleType === 'truck') {
-        filters.truckId = formValue.vehicleId;
-      } else if (formValue.vehicleType === 'trailer') {
-        filters.trailerId = formValue.vehicleId;
-      }
+      // Filter by specific vehicle (using lorryId for both trucks and trailers)
+      filters.lorryId = formValue.vehicleId;
     }
 
     if (formValue.startDate) {
@@ -192,8 +190,24 @@ export class VehicleTripListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
+    const oldPageSize = this.pageSize;
     this.pageSize = event.pageSize;
+    
+    // If page size changed, reset pagination
+    if (oldPageSize !== event.pageSize) {
+      this.pageIndex = 0;
+      this.lastEvaluatedKey = undefined;
+      this.paginationKeys.clear();
+      this.loadTrips();
+      return;
+    }
+    
+    // Update page index
     this.pageIndex = event.pageIndex;
+    
+    // Get the pagination key for this page (undefined for page 0)
+    this.lastEvaluatedKey = this.paginationKeys.get(event.pageIndex);
+    
     this.loadTrips();
   }
 

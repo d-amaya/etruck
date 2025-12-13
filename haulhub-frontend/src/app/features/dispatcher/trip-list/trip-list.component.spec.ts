@@ -16,7 +16,7 @@ describe('TripListComponent', () => {
     mockTripService = jasmine.createSpyObj('TripService', ['getTrips', 'getBrokers']);
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
 
-    mockTripService.getTrips.and.returnValue(of([]));
+    mockTripService.getTrips.and.returnValue(of({ trips: [], lastEvaluatedKey: undefined }));
     mockTripService.getBrokers.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({

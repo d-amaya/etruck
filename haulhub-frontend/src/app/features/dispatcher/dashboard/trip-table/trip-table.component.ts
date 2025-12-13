@@ -90,8 +90,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
     const apiFilters = this.buildApiFilters(filters, pagination);
 
     return this.tripService.getTrips(apiFilters).pipe(
-      map(trips => {
+      map(response => {
         this.loading = false;
+        const trips = response.trips;
         
         // Backend handles all filtering - just sort the results
         const sortedTrips = trips.sort((a, b) => {
@@ -100,7 +101,18 @@ export class TripTableComponent implements OnInit, OnDestroy {
           return dateB - dateA; // Descending order
         });
         
-        return { trips: sortedTrips, total: sortedTrips.length };
+        // Calculate total for pagination
+        // If there's a lastEvaluatedKey, we know there are more pages
+        let total: number;
+        if (response.lastEvaluatedKey) {
+          // Set total to at least one more page than current
+          total = (pagination.page + 2) * pagination.pageSize;
+        } else {
+          // No more pages - set exact total
+          total = (pagination.page * pagination.pageSize) + sortedTrips.length;
+        }
+        
+        return { trips: sortedTrips, total };
       }),
       catchError(error => {
         this.loading = false;

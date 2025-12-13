@@ -119,10 +119,9 @@ export class AuthStack extends cdk.Stack {
       },
       
       // Token validity
-      // NOTE: Access token set to 5 minutes (minimum allowed) for testing token refresh mechanism
-      accessTokenValidity: cdk.Duration.minutes(5),
-      idTokenValidity: cdk.Duration.minutes(5),
-      refreshTokenValidity: cdk.Duration.days(365), // 1 year
+      accessTokenValidity: cdk.Duration.hours(1), // 1 hour
+      idTokenValidity: cdk.Duration.hours(1), // 1 hour
+      refreshTokenValidity: cdk.Duration.hours(24), // 24 hours
       
       // Token revocation
       enableTokenRevocation: true,

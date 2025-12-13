@@ -11,10 +11,11 @@ describe('Auth Guards', () => {
   let mockState: RouterStateSnapshot;
 
   beforeEach(() => {
-    const authServiceSpy = jasmine.createSpyObj('AuthService', ['navigateToDashboard'], {
+    const authServiceSpy = jasmine.createSpyObj('AuthService', ['navigateToDashboard', 'getDashboardRoute'], {
       isAuthenticated: false,
       userRole: null
     });
+    authServiceSpy.getDashboardRoute.and.returnValue('/dashboard');
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     TestBed.configureTestingModule({

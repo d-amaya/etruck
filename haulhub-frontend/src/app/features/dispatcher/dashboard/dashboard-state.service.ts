@@ -122,7 +122,7 @@ export class DashboardStateService {
 
   clearFilters(): void {
     const defaultFilters = this.getDefaultFilters();
-    const defaultPagination = { page: 0, pageSize: 25 };
+    const defaultPagination = { page: 0, pageSize: 10 };
     
     this.filtersSubject.next(defaultFilters);
     this.paginationSubject.next(defaultPagination);
@@ -155,8 +155,13 @@ export class DashboardStateService {
   }
 
   private getDefaultFilters(): DashboardFilters {
+    // Set default date range to last 30 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
     return {
-      dateRange: { startDate: null, endDate: null },
+      dateRange: { startDate, endDate },
       status: null,
       brokerId: null,
       lorryId: null,
@@ -273,12 +278,12 @@ export class DashboardStateService {
       const stored = sessionStorage.getItem(this.PAGINATION_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return { page: 0, pageSize: 25, ...parsed };
+        return { page: 0, pageSize: 10, ...parsed };
       }
     } catch (error) {
       console.warn('Failed to load pagination from session storage:', error);
     }
-    return { page: 0, pageSize: 25 };
+    return { page: 0, pageSize: 10 };
   }
 
   private savePaginationToStorage(pagination: PaginationState): void {

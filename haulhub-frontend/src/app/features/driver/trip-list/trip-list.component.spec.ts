@@ -44,7 +44,7 @@ describe('TripListComponent', () => {
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
     mockSnackBar = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    mockTripService.getTrips.and.returnValue(of([]));
+    mockTripService.getTrips.and.returnValue(of({ trips: [], lastEvaluatedKey: undefined }));
 
     await TestBed.configureTestingModule({
       imports: [TripListComponent, NoopAnimationsModule],

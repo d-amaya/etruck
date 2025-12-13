@@ -47,7 +47,8 @@ export class DashboardComponent implements OnInit {
     this.loading = true;
     // Get upcoming trips (scheduled and in progress)
     this.tripService.getTrips({ limit: 10 }).subscribe({
-      next: (trips) => {
+      next: (response) => {
+        const trips = response.trips;
         // Filter for upcoming trips (not delivered or paid)
         this.upcomingTrips = trips
           .filter(t => 

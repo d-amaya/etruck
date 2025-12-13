@@ -119,8 +119,8 @@ describe('TripService', () => {
       }
     ];
 
-    service.getTrips().subscribe(trips => {
-      expect(trips).toEqual(mockTrips);
+    service.getTrips().subscribe(response => {
+      expect(response.trips).toEqual(mockTrips);
     });
 
     const req = httpMock.expectOne(`${environment.apiUrl}/trips`);

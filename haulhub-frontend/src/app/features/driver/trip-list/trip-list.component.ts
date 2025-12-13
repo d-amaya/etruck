@@ -67,10 +67,11 @@ export class TripListComponent implements OnInit {
   filterForm: FormGroup;
   
   // Pagination
-  pageSize = 50;
+  pageSize = 10;
   pageIndex = 0;
   totalTrips = 0;
   lastEvaluatedKey?: string;
+  paginationKeys: Map<number, string> = new Map();
 
   // Status options
   statusOptions = Object.values(TripStatus);
@@ -101,9 +102,22 @@ export class TripListComponent implements OnInit {
     const filters = this.buildFilters();
     
     this.tripService.getTrips(filters).subscribe({
-      next: (trips) => {
-        this.trips = trips;
-        this.totalTrips = trips.length;
+      next: (response) => {
+        this.trips = response.trips;
+        this.lastEvaluatedKey = response.lastEvaluatedKey;
+        
+        // Store the key for navigating to the NEXT page
+        if (response.lastEvaluatedKey) {
+          this.paginationKeys.set(this.pageIndex + 1, response.lastEvaluatedKey);
+        }
+        
+        // Calculate totalTrips to control paginator behavior
+        if (response.lastEvaluatedKey) {
+          this.totalTrips = (this.pageIndex + 2) * this.pageSize;
+        } else {
+          this.totalTrips = (this.pageIndex * this.pageSize) + response.trips.length;
+        }
+        
         this.loading = false;
       },
       error: (error) => {
@@ -149,6 +163,7 @@ export class TripListComponent implements OnInit {
   onApplyFilters(): void {
     this.pageIndex = 0;
     this.lastEvaluatedKey = undefined;
+    this.paginationKeys.clear();
     this.loadTrips();
   }
 
@@ -162,12 +177,29 @@ export class TripListComponent implements OnInit {
     });
     this.pageIndex = 0;
     this.lastEvaluatedKey = undefined;
+    this.paginationKeys.clear();
     this.loadTrips();
   }
 
   onPageChange(event: PageEvent): void {
+    const oldPageSize = this.pageSize;
     this.pageSize = event.pageSize;
+    
+    // If page size changed, reset pagination
+    if (oldPageSize !== event.pageSize) {
+      this.pageIndex = 0;
+      this.lastEvaluatedKey = undefined;
+      this.paginationKeys.clear();
+      this.loadTrips();
+      return;
+    }
+    
+    // Update page index
     this.pageIndex = event.pageIndex;
+    
+    // Get the pagination key for this page (undefined for page 0)
+    this.lastEvaluatedKey = this.paginationKeys.get(event.pageIndex);
+    
     this.loadTrips();
   }
 

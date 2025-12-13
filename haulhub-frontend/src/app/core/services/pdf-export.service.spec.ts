@@ -65,7 +65,7 @@ describe('PdfExportService', () => {
     // Mock the private filtersSubject property
     (dashboardSpy as any)['filtersSubject'] = { value: mockFilters };
 
-    tripSpy.getTrips.and.returnValue(of([mockTrip]));
+    tripSpy.getTrips.and.returnValue(of({ trips: [mockTrip], lastEvaluatedKey: undefined }));
     tripSpy.getTripSummaryByStatus.and.returnValue(of(mockSummaryByStatus));
     tripSpy.getPaymentSummary.and.returnValue(of(mockPaymentSummary));
     dashboardSpy.getBrokers.and.returnValue([

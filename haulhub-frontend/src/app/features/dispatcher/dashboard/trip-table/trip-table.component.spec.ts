@@ -76,7 +76,7 @@ describe('TripTableComponent', () => {
     
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    tripServiceSpy.getTrips.and.returnValue(of([mockTrip]));
+    tripServiceSpy.getTrips.and.returnValue(of({ trips: [mockTrip], total: 1 }));
     dashboardStateSpy.getActiveFilterCount.and.returnValue(0);
 
     await TestBed.configureTestingModule({

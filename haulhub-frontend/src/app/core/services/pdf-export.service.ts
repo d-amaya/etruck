@@ -20,12 +20,12 @@ export class PdfExportService {
 
     // Load all required data
     forkJoin({
-      trips: this.tripService.getTrips(this.buildApiFilters(filters)),
+      tripsResponse: this.tripService.getTrips(this.buildApiFilters(filters)),
       summaryByStatus: this.tripService.getTripSummaryByStatus(this.buildApiFilters(filters)),
       paymentSummary: this.tripService.getPaymentSummary(this.buildApiFilters(filters))
     }).subscribe({
       next: (data) => {
-        this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, filters);
+        this.generatePdf(data.tripsResponse.trips, data.summaryByStatus, data.paymentSummary, filters);
       },
       error: (error) => {
         console.error('Error loading dashboard data for PDF export:', error);
