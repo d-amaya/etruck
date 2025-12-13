@@ -120,26 +120,33 @@ export class FilterBarComponent implements OnInit, OnDestroy {
 
   setDatePreset(preset: string): void {
     const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
     let startDate: Date;
     let endDate = today;
 
     switch (preset) {
       case 'today':
-        startDate = today;
+        startDate = new Date(today);
+        startDate.setHours(0, 0, 0, 0); // Start of today
         break;
       case 'week':
         startDate = new Date(today);
         startDate.setDate(today.getDate() - today.getDay());
+        startDate.setHours(0, 0, 0, 0); // Start of week
         break;
       case 'month':
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0); // Start of month
         break;
       case 'lastMonth':
         startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        startDate.setHours(0, 0, 0, 0); // Start of last month
         endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        endDate.setHours(23, 59, 59, 999); // End of last month
         break;
       case 'year':
         startDate = new Date(today.getFullYear(), 0, 1);
+        startDate.setHours(0, 0, 0, 0); // Start of year
         break;
       default:
         return;
@@ -149,15 +156,19 @@ export class FilterBarComponent implements OnInit, OnDestroy {
   }
 
   clearFilters(): void {
+    // Get default filters from dashboard state (last 30 days)
+    this.dashboardState.clearFilters();
+    const defaultFilters = this.dashboardState.getCurrentFilters();
+    
+    // Apply default filters to form
     this.filterForm.reset({
-      startDate: null,
-      endDate: null,
+      startDate: defaultFilters.dateRange.startDate,
+      endDate: defaultFilters.dateRange.endDate,
       status: null,
       brokerId: null,
       lorryId: '',
       driverName: ''
     });
-    this.dashboardState.clearFilters();
   }
 
   exportPDF(): void {

@@ -27,6 +27,8 @@ export interface PaymentSummary {
 export interface PaginationState {
   page: number;
   pageSize: number;
+  lastEvaluatedKey?: string;
+  pageTokens?: string[]; // Store tokens for each page to enable back navigation
 }
 
 export interface LoadingState {
@@ -103,8 +105,8 @@ export class DashboardStateService {
     this.filtersSubject.next(newFilters);
     this.saveFiltersToStorage(newFilters);
     
-    // Reset to page 0 when filters change
-    const newPagination = { ...this.paginationSubject.value, page: 0 };
+    // Reset to page 0 and clear pagination tokens when filters change
+    const newPagination = { page: 0, pageSize: this.paginationSubject.value.pageSize, pageTokens: [] };
     this.paginationSubject.next(newPagination);
     this.savePaginationToStorage(newPagination);
     
@@ -122,7 +124,7 @@ export class DashboardStateService {
 
   clearFilters(): void {
     const defaultFilters = this.getDefaultFilters();
-    const defaultPagination = { page: 0, pageSize: 10 };
+    const defaultPagination = { page: 0, pageSize: 10, pageTokens: [] };
     
     this.filtersSubject.next(defaultFilters);
     this.paginationSubject.next(defaultPagination);
@@ -157,8 +159,10 @@ export class DashboardStateService {
   private getDefaultFilters(): DashboardFilters {
     // Set default date range to last 30 days
     const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999); // End of today
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0); // Start of day 30 days ago
     
     return {
       dateRange: { startDate, endDate },
@@ -278,12 +282,13 @@ export class DashboardStateService {
       const stored = sessionStorage.getItem(this.PAGINATION_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return { page: 0, pageSize: 10, ...parsed };
+        // Always reset to page 0 on load to avoid showing stale page numbers
+        return { page: 0, pageSize: parsed.pageSize || 10, pageTokens: [] };
       }
     } catch (error) {
       console.warn('Failed to load pagination from session storage:', error);
     }
-    return { page: 0, pageSize: 10 };
+    return { page: 0, pageSize: 10, pageTokens: [] };
   }
 
   private savePaginationToStorage(pagination: PaginationState): void {

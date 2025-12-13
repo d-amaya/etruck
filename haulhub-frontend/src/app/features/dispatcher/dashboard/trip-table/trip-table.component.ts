@@ -101,15 +101,31 @@ export class TripTableComponent implements OnInit, OnDestroy {
           return dateB - dateA; // Descending order
         });
         
-        // Calculate total for pagination
-        // If there's a lastEvaluatedKey, we know there are more pages
-        let total: number;
+        // Update pagination state with new lastEvaluatedKey
         if (response.lastEvaluatedKey) {
-          // Set total to at least one more page than current
-          total = (pagination.page + 2) * pagination.pageSize;
+          // Store the token for the next page
+          const pageTokens = pagination.pageTokens || [];
+          if (!pageTokens[pagination.page]) {
+            pageTokens[pagination.page] = response.lastEvaluatedKey;
+            this.dashboardState.updatePagination({ 
+              lastEvaluatedKey: response.lastEvaluatedKey,
+              pageTokens 
+            });
+          }
+        }
+        
+        // Calculate total for pagination
+        // DynamoDB doesn't give us exact totals, so we estimate based on what we know
+        let total: number;
+        const currentPageItems = sortedTrips.length;
+        const itemsBeforeCurrentPage = pagination.page * pagination.pageSize;
+        
+        if (response.lastEvaluatedKey) {
+          // There are more items - show at least current items + 1 more to enable next button
+          total = itemsBeforeCurrentPage + currentPageItems + 1;
         } else {
-          // No more pages - set exact total
-          total = (pagination.page * pagination.pageSize) + sortedTrips.length;
+          // This is the last page - we now know the exact total
+          total = itemsBeforeCurrentPage + currentPageItems;
         }
         
         return { trips: sortedTrips, total };
@@ -138,6 +154,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
     const apiFilters: TripFilters = {
       limit: pagination.pageSize
     };
+
+    // Add pagination token for pages after the first
+    if (pagination.page > 0 && pagination.pageTokens && pagination.pageTokens[pagination.page - 1]) {
+      apiFilters.lastEvaluatedKey = pagination.pageTokens[pagination.page - 1];
+    }
 
     if (filters.dateRange.startDate) {
       apiFilters.startDate = filters.dateRange.startDate.toISOString();
