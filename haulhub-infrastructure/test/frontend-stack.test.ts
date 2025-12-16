@@ -346,7 +346,7 @@ describe('FrontendStack', () => {
 
     test('should output Frontend URL', () => {
       template.hasOutput('FrontendUrl', {
-        Description: 'Frontend Application URL',
+        Description: 'Frontend Application URL (CloudFront)',
       });
     });
 
@@ -481,7 +481,7 @@ describe('FrontendStack', () => {
       });
     });
 
-    test('should not configure custom domain when not provided', () => {
+    test('should not configure custom domain in dev environment', () => {
       const distributions = template.findResources('AWS::CloudFront::Distribution');
       const distributionKeys = Object.keys(distributions);
       

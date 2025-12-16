@@ -183,10 +183,10 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should create exactly three GSIs', () => {
+    test('should create exactly four GSIs', () => {
       const table = template.findResources('AWS::DynamoDB::Table');
       const tableResource = Object.values(table)[0] as any;
-      expect(tableResource.Properties.GlobalSecondaryIndexes.length).toBe(3);
+      expect(tableResource.Properties.GlobalSecondaryIndexes.length).toBe(4);
     });
   });
 

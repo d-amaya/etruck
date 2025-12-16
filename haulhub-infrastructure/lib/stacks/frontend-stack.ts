@@ -32,9 +32,9 @@ export class FrontendStack extends cdk.Stack {
 
     const config = props.config;
 
-    // Create ACM Certificate for custom domain (dev and production)
+    // Create ACM Certificate for custom domain (production only)
     // Note: Certificate must be in us-east-1 region for CloudFront
-    if (props.environment === 'prod' || props.environment === 'dev') {
+    if (props.environment === 'prod') {
       this.certificate = new acm.Certificate(this, 'Certificate', {
         domainName: 'etrucky.com',
         subjectAlternativeNames: ['www.etrucky.com'],
@@ -158,8 +158,8 @@ export class FrontendStack extends cdk.Stack {
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `HaulHub Frontend Distribution - ${props.environment}`,
       
-      // Custom domain configuration (dev and production)
-      domainNames: (props.environment === 'prod' || props.environment === 'dev')
+      // Custom domain configuration (production only)
+      domainNames: props.environment === 'prod'
         ? ['etrucky.com', 'www.etrucky.com']
         : undefined,
       certificate: this.certificate,
