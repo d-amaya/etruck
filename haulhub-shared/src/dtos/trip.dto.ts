@@ -110,7 +110,19 @@ export class UpdateTripDto {
 
   @IsOptional()
   @IsString()
+  orderConfirmation?: string;
+
+  @IsOptional()
+  @IsEnum(TripStatus)
+  status?: TripStatus;
+
+  @IsOptional()
+  @IsString()
   lorryId?: string;
+
+  @IsOptional()
+  @IsString()
+  truckId?: string; // Alias for lorryId
 
   @IsOptional()
   @IsString()
@@ -130,6 +142,12 @@ export class UpdateTripDto {
   @Type(() => Number)
   @IsNumber()
   @IsPositive()
+  orderRate?: number; // Alias for brokerPayment
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
   lorryOwnerPayment?: number;
 
   @IsOptional()
@@ -137,6 +155,11 @@ export class UpdateTripDto {
   @IsNumber()
   @IsPositive()
   driverPayment?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  driverRate?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -181,6 +204,73 @@ export class UpdateTripDto {
   @Type(() => Number)
   @IsNumber()
   detentionFees?: number;
+
+  // Enhanced Pickup Details
+  @IsOptional()
+  @IsString()
+  pickupCompany?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupCity?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupState?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupZip?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupNotes?: string;
+
+  // Enhanced Delivery Details
+  @IsOptional()
+  @IsString()
+  deliveryCompany?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryCity?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryState?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryZip?: string;
+
+  @IsOptional()
+  @IsDateString()
+  deliveryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryNotes?: string;
+
+  // Notes
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class UpdateTripStatusDto {
