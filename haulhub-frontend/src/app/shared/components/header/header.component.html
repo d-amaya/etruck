@@ -10,7 +10,7 @@
       mat-button 
       *ngFor="let item of getNavigationItems()" 
       [class.active]="isActiveRoute(item.route)"
-      (click)="router.navigate([item.route])"
+      (click)="navigateTo(item.route)"
       class="nav-item">
       {{ item.label }}
     </button>

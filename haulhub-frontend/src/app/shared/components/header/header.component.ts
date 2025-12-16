@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -20,7 +20,8 @@ import { filter } from 'rxjs/operators';
     MatMenuModule
   ],
   templateUrl: './header.component.html',
-  styleUrls: ['./header.component.scss']
+  styleUrls: ['./header.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HeaderComponent implements OnInit {
   userName: string = '';
@@ -30,20 +31,27 @@ export class HeaderComponent implements OnInit {
 
   constructor(
     private authService: AuthService,
-    public router: Router
+    public router: Router,
+    private ngZone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    console.log('HeaderComponent ngOnInit called');
+    
     this.authService.currentUser$.subscribe(user => {
+      console.log('HeaderComponent user subscription:', user);
       if (user) {
         this.isAuthenticated = true;
         this.userName = user.fullName;
         this.userRole = this.formatRole(user.role);
+        console.log('HeaderComponent authenticated, navigation items:', this.getNavigationItems());
       } else {
         this.isAuthenticated = false;
         this.userName = '';
         this.userRole = '';
       }
+      this.cdr.markForCheck();
     });
 
     // Track current route for active navigation highlighting
@@ -51,9 +59,15 @@ export class HeaderComponent implements OnInit {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event) => {
         if (event instanceof NavigationEnd) {
+          console.log('HeaderComponent route changed:', event.url);
           this.currentRoute = event.url;
+          this.cdr.markForCheck();
         }
       });
+    
+    // Set initial route
+    this.currentRoute = this.router.url;
+    console.log('HeaderComponent initial route:', this.currentRoute);
   }
 
   private formatRole(role: UserRole): string {
@@ -92,7 +106,7 @@ export class HeaderComponent implements OnInit {
   }
 
   isActiveRoute(route: string): boolean {
-    return this.currentRoute.includes(route);
+    return this.currentRoute?.includes(route) || false;
   }
 
   shouldShowNavigation(): boolean {
@@ -126,5 +140,16 @@ export class HeaderComponent implements OnInit {
     }
 
     return items;
+  }
+
+  navigateTo(route: string): void {
+    console.log('navigateTo called with route:', route);
+    console.log('Current route:', this.currentRoute);
+    this.ngZone.run(() => {
+      this.router.navigate([route]).then(
+        success => console.log('Navigation success:', success),
+        error => console.error('Navigation error:', error)
+      );
+    });
   }
 }
