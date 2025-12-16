@@ -5,6 +5,13 @@ mat-toolbar {
   min-height: 64px !important;
 }
 
+@media (max-width: 1023px) {
+  mat-toolbar {
+    min-height: 48px !important;
+    padding: 0 8px !important;
+  }
+}
+
 .logo-button {
   display: flex;
   align-items: center;
@@ -138,18 +145,31 @@ mat-toolbar {
 }
 
 @media (max-width: 600px) {
+  .logo-button {
+    gap: 4px;
+    font-size: 14px;
+    padding: 0 4px;
+
+    mat-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+    }
+  }
+
   .app-name {
     display: none;
   }
 
   .navigation {
-    margin-left: 8px;
+    margin-left: 4px;
     
     .nav-item {
-      margin: 0 2px;
-      font-size: 12px;
-      padding: 0 8px;
+      margin: 0 1px;
+      font-size: 11px;
+      padding: 0 6px;
       color: rgba(255, 255, 255, 0.87) !important;
+      min-height: 40px;
     }
   }
 
@@ -158,6 +178,18 @@ mat-toolbar {
   }
 
   .user-button {
-    padding: 0 8px;
+    padding: 0 4px;
+    
+    mat-icon:first-child {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+    
+    mat-icon:last-child {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
   }
 }

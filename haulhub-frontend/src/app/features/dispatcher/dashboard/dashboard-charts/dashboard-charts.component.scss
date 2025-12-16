@@ -113,3 +113,35 @@
     }
   }
 }
+
+@media (max-width: 1023px) {
+  .compact-charts-container {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  
+  .chart-wrapper {
+    height: 180px;
+    max-width: 100%;
+    
+    canvas {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+  }
+  
+  .chart-header {
+    .chart-title {
+      font-size: 14px;
+    }
+    
+    .chart-type-selector {
+      width: 100%;
+      max-width: 100%;
+      
+      ::ng-deep .mat-mdc-form-field {
+        width: 100%;
+      }
+    }
+  }
+}

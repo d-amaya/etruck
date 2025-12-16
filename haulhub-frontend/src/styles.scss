@@ -122,13 +122,19 @@ $haulhub-theme: mat.define-light-theme((
 // BASE STYLES
 // =============================================================================
 
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
   font-family: $font-family-primary;
   font-size: $font-size-body;
   line-height: $line-height-normal;
@@ -136,6 +142,33 @@ body {
   background-color: $neutral-50;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Prevent any element from causing horizontal scroll on mobile (portrait and landscape)
+@media (max-width: 1023px) {
+  * {
+    max-width: 100vw;
+  }
+  
+  // Material form fields specific fix
+  .mat-mdc-form-field {
+    max-width: 100% !important;
+  }
+  
+  .mat-mdc-text-field-wrapper {
+    max-width: 100% !important;
+  }
+  
+  // Prevent charts from overflowing
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
 }
 
 // =============================================================================

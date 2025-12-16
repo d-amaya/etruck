@@ -5,6 +5,9 @@
   padding: 24px;
   background-color: #fafafa;
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .filter-section {
@@ -113,23 +116,36 @@
   }
 }
 
-// Responsive adjustments for mobile (below 768px)
-@media (max-width: 767px) {
+// Responsive adjustments for mobile (portrait and landscape)
+@media (max-width: 1023px) {
   .dashboard-container {
-    padding: 16px;
-    background-color: #ffffff; // Use white background on mobile for better contrast
+    padding: 10px;
+    background-color: #fafafa;
+    width: 100%;
+    max-width: 100vw;
   }
 
   .dashboard-content {
-    gap: 16px;
+    gap: 10px;
+    width: 100%;
   }
 
   .compact-top-row {
-    gap: 12px;
+    gap: 10px;
+    width: 100%;
+  }
+  
+  .compact-filters-section,
+  .compact-charts-section,
+  .compact-payment-section {
+    padding: 10px;
+    border-radius: 4px;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .compact-charts-section {
-    min-height: 200px; // Smaller height on mobile
+    min-height: 200px;
   }
 }
 
