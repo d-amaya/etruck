@@ -481,14 +481,14 @@ describe('FrontendStack', () => {
       });
     });
 
-    test('should not configure custom domain in dev environment', () => {
+    test('should configure custom domain in dev environment', () => {
       const distributions = template.findResources('AWS::CloudFront::Distribution');
       const distributionKeys = Object.keys(distributions);
       
       expect(distributionKeys.length).toBe(1);
       distributionKeys.forEach(key => {
         const aliases = distributions[key].Properties?.DistributionConfig?.Aliases;
-        expect(aliases).toBeUndefined();
+        expect(aliases).toEqual(['etrucky.com', 'www.etrucky.com']);
       });
     });
   });
