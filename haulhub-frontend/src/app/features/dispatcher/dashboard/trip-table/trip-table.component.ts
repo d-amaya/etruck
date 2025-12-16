@@ -190,29 +190,53 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   viewTrip(trip: Trip): void {
-    this.router.navigate(['/dispatcher/trips', trip.tripId]);
+    console.log('View trip clicked:', trip.tripId);
+    try {
+      this.router.navigate(['/dispatcher/trips', trip.tripId]).catch(err => {
+        console.error('Navigation error:', err);
+        this.snackBar.open('Error navigating to trip details', 'Close', { duration: 3000 });
+      });
+    } catch (error) {
+      console.error('Error in viewTrip:', error);
+      this.snackBar.open('Error viewing trip', 'Close', { duration: 3000 });
+    }
   }
 
   editTrip(trip: Trip): void {
-    this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']);
+    console.log('Edit trip clicked:', trip.tripId);
+    try {
+      this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']).catch(err => {
+        console.error('Navigation error:', err);
+        this.snackBar.open('Error navigating to edit trip', 'Close', { duration: 3000 });
+      });
+    } catch (error) {
+      console.error('Error in editTrip:', error);
+      this.snackBar.open('Error editing trip', 'Close', { duration: 3000 });
+    }
   }
 
   deleteTrip(trip: Trip): void {
-    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: '400px',
-      data: {
-        title: 'Delete Trip',
-        message: `Are you sure you want to delete this trip from ${trip.pickupLocation} to ${trip.dropoffLocation}?`,
-        confirmText: 'Delete',
-        cancelText: 'Cancel'
-      }
-    });
+    console.log('Delete trip clicked:', trip.tripId);
+    try {
+      const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+        width: '400px',
+        data: {
+          title: 'Delete Trip',
+          message: `Are you sure you want to delete this trip from ${trip.pickupLocation} to ${trip.dropoffLocation}?`,
+          confirmText: 'Delete',
+          cancelText: 'Cancel'
+        }
+      });
 
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.performDelete(trip);
-      }
-    });
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.performDelete(trip);
+        }
+      });
+    } catch (error) {
+      console.error('Error in deleteTrip:', error);
+      this.snackBar.open('Error opening delete dialog', 'Close', { duration: 3000 });
+    }
   }
 
   private performDelete(trip: Trip): void {

@@ -344,14 +344,29 @@
       }
 
       .action-buttons {
+        gap: 8px;
+        
         .action-btn {
-          padding: 4px 8px;
-          height: 28px;
+          width: 44px !important;  // WCAG minimum touch target
+          height: 44px !important;
+          padding: 10px !important;
+          cursor: pointer;
+          -webkit-tap-highlight-color: rgba(25, 118, 210, 0.2);
+          touch-action: manipulation; // Prevents double-tap zoom on iOS
+          
+          // Ensure button is clickable on iOS
+          position: relative;
+          z-index: 1;
 
           mat-icon {
-            font-size: 16px;
-            width: 16px;
-            height: 16px;
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+          }
+          
+          // iOS Safari specific fix
+          &:active {
+            background-color: #e3f2fd !important;
           }
         }
       }

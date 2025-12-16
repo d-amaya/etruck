@@ -100,18 +100,21 @@
           <div class="action-buttons" role="group" [attr.aria-label]="'Actions for trip to ' + trip.dropoffLocation">
             <button mat-icon-button class="action-btn view-btn" 
                     (click)="viewTrip(trip)"
+                    (touchend)="viewTrip(trip); $event.preventDefault()"
                     [matTooltip]="'View trip details'"
                     [attr.aria-label]="getActionAriaLabel('view', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">visibility</mat-icon>
             </button>
             <button mat-icon-button class="action-btn edit-btn" 
                     (click)="editTrip(trip)"
+                    (touchend)="editTrip(trip); $event.preventDefault()"
                     [matTooltip]="'Edit trip'"
                     [attr.aria-label]="getActionAriaLabel('edit', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">edit</mat-icon>
             </button>
             <button mat-icon-button class="action-btn delete-btn" 
                     (click)="deleteTrip(trip)"
+                    (touchend)="deleteTrip(trip); $event.preventDefault()"
                     [matTooltip]="'Delete trip'"
                     [attr.aria-label]="getActionAriaLabel('delete', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">delete</mat-icon>
