@@ -1623,7 +1623,9 @@ export class TripsService {
       profit.push(
         monthlyData[month].brokerPayments -
         monthlyData[month].driverPayments -
-        monthlyData[month].lorryOwnerPayments
+        monthlyData[month].lorryOwnerPayments -
+        monthlyData[month].fuelCosts -
+        monthlyData[month].additionalFees
       );
     }
 
