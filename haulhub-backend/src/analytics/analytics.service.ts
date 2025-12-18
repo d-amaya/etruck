@@ -204,9 +204,22 @@ export class AnalyticsService {
       const completedTrips = trips.filter(t => t.status === TripStatus.Delivered || t.status === TripStatus.Paid).length;
       
       const totalRevenue = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
+      
+      // Calculate fuel costs from trip data
+      const totalFuelCost = trips.reduce((sum, trip) => {
+        if (trip.fuelTotalCost) {
+          return sum + trip.fuelTotalCost;
+        } else if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
+          const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+          return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
+        }
+        return sum;
+      }, 0);
+      
       const totalExpenses = trips.reduce((sum, trip) => 
         sum + trip.driverPayment + trip.lorryOwnerPayment + (trip.lumperFees || 0) + (trip.detentionFees || 0), 0
-      );
+      ) + totalFuelCost;
+      
       const totalProfit = totalRevenue - totalExpenses;
       
       const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
@@ -217,8 +230,11 @@ export class AnalyticsService {
       // For now, we'll consider all delivered trips as on-time since we don't track actual vs scheduled delivery
       const onTimeDeliveryRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
       
-      // Fuel efficiency placeholder (miles per gallon) - not tracked yet
-      const fuelEfficiency = 0;
+      // Calculate average fuel efficiency (gallons per mile)
+      const tripsWithFuelData = trips.filter(t => t.fuelAvgGallonsPerMile);
+      const avgFuelEfficiency = tripsWithFuelData.length > 0
+        ? tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgGallonsPerMile || 0), 0) / tripsWithFuelData.length
+        : 0;
       
       return {
         totalTrips,
@@ -229,7 +245,7 @@ export class AnalyticsService {
         averageDistance,
         averageRevenue,
         onTimeDeliveryRate,
-        fuelEfficiency,
+        fuelEfficiency: avgFuelEfficiency,
       };
     } catch (error) {
       console.error('Error getting trip analytics:', error);
@@ -651,6 +667,287 @@ export class AnalyticsService {
       return {
         vehicleAlerts: [],
         driverAlerts: [],
+      };
+    }
+  }
+
+  async getFuelAnalytics(startDate?: Date, endDate?: Date) {
+    try {
+      // Get all trips within date range
+      const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
+      const tripsTableName = this.tripsService['tripsTableName'];
+      
+      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      // Build filter expression
+      let filterExpression = 'SK = :metadata';
+      const expressionAttributeValues: any = {
+        ':metadata': 'METADATA',
+      };
+      
+      if (startDate && endDate) {
+        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        expressionAttributeValues[':endDate'] = endDate.toISOString();
+      } else if (startDate) {
+        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString();
+      } else if (endDate) {
+        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString();
+      }
+      
+      const scanCommand = new ScanCommand({
+        TableName: tripsTableName,
+        FilterExpression: filterExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+      });
+      
+      const result = await dynamodbClient.send(scanCommand);
+      const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
+      
+      // Filter trips with fuel data
+      const tripsWithFuelData = trips.filter(t => t.fuelAvgCost && t.fuelAvgGallonsPerMile);
+      
+      if (tripsWithFuelData.length === 0) {
+        return {
+          totalTripsWithFuelData: 0,
+          totalFuelCost: 0,
+          averageFuelCost: 0,
+          averageFuelPrice: 0,
+          averageGallonsPerMile: 0,
+          totalGallonsUsed: 0,
+          vehicleFuelEfficiency: [],
+        };
+      }
+      
+      // Calculate total fuel costs
+      const totalFuelCost = tripsWithFuelData.reduce((sum, trip) => {
+        if (trip.fuelTotalCost) {
+          return sum + trip.fuelTotalCost;
+        }
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        return sum + (totalMiles * trip.fuelAvgGallonsPerMile! * trip.fuelAvgCost!);
+      }, 0);
+      
+      // Calculate average fuel price
+      const avgFuelPrice = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgCost || 0), 0) / tripsWithFuelData.length;
+      
+      // Calculate average gallons per mile
+      const avgGallonsPerMile = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgGallonsPerMile || 0), 0) / tripsWithFuelData.length;
+      
+      // Calculate total gallons used
+      const totalGallonsUsed = tripsWithFuelData.reduce((sum, trip) => {
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        return sum + (totalMiles * (trip.fuelAvgGallonsPerMile || 0));
+      }, 0);
+      
+      // Group by vehicle for efficiency comparison
+      const vehicleMap = new Map<string, {
+        tripCount: number;
+        totalMiles: number;
+        totalGallons: number;
+        totalCost: number;
+      }>();
+      
+      for (const trip of tripsWithFuelData) {
+        if (!vehicleMap.has(trip.lorryId)) {
+          vehicleMap.set(trip.lorryId, {
+            tripCount: 0,
+            totalMiles: 0,
+            totalGallons: 0,
+            totalCost: 0,
+          });
+        }
+        
+        const vehicleData = vehicleMap.get(trip.lorryId)!;
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        const gallons = totalMiles * (trip.fuelAvgGallonsPerMile || 0);
+        const cost = trip.fuelTotalCost || (gallons * (trip.fuelAvgCost || 0));
+        
+        vehicleData.tripCount += 1;
+        vehicleData.totalMiles += totalMiles;
+        vehicleData.totalGallons += gallons;
+        vehicleData.totalCost += cost;
+      }
+      
+      // Build vehicle efficiency array
+      const vehicleFuelEfficiency = Array.from(vehicleMap.entries()).map(([vehicleId, data]) => ({
+        vehicleId,
+        tripCount: data.tripCount,
+        totalMiles: data.totalMiles,
+        totalGallons: data.totalGallons,
+        totalCost: data.totalCost,
+        averageGallonsPerMile: data.totalMiles > 0 ? data.totalGallons / data.totalMiles : 0,
+        averageMPG: data.totalGallons > 0 ? data.totalMiles / data.totalGallons : 0,
+      }));
+      
+      // Sort by efficiency (MPG descending)
+      vehicleFuelEfficiency.sort((a, b) => b.averageMPG - a.averageMPG);
+      
+      // Group fuel costs by month for trend chart
+      const monthlyFuelMap = new Map<string, {
+        fuelCost: number;
+        gallonsUsed: number;
+        tripCount: number;
+      }>();
+      
+      for (const trip of tripsWithFuelData) {
+        const date = new Date(trip.scheduledPickupDatetime);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!monthlyFuelMap.has(monthKey)) {
+          monthlyFuelMap.set(monthKey, {
+            fuelCost: 0,
+            gallonsUsed: 0,
+            tripCount: 0,
+          });
+        }
+        
+        const monthData = monthlyFuelMap.get(monthKey)!;
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        const gallons = totalMiles * (trip.fuelAvgGallonsPerMile || 0);
+        const cost = trip.fuelTotalCost || (gallons * (trip.fuelAvgCost || 0));
+        
+        monthData.fuelCost += cost;
+        monthData.gallonsUsed += gallons;
+        monthData.tripCount += 1;
+      }
+      
+      // Sort months chronologically
+      const sortedMonths = Array.from(monthlyFuelMap.keys()).sort();
+      
+      // Build monthly data array
+      const monthlyFuelData = sortedMonths.map(monthKey => {
+        const [year, month] = monthKey.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        
+        const data = monthlyFuelMap.get(monthKey)!;
+        return {
+          month: monthName,
+          fuelCost: data.fuelCost,
+          gallonsUsed: data.gallonsUsed,
+          tripCount: data.tripCount,
+          avgCostPerTrip: data.tripCount > 0 ? data.fuelCost / data.tripCount : 0,
+        };
+      });
+      
+      return {
+        totalTripsWithFuelData: tripsWithFuelData.length,
+        totalFuelCost,
+        averageFuelCost: tripsWithFuelData.length > 0 ? totalFuelCost / tripsWithFuelData.length : 0,
+        averageFuelPrice: avgFuelPrice,
+        averageGallonsPerMile: avgGallonsPerMile,
+        totalGallonsUsed,
+        vehicleFuelEfficiency,
+        monthlyFuelData,
+      };
+    } catch (error) {
+      console.error('Error getting fuel analytics:', error);
+      return {
+        totalTripsWithFuelData: 0,
+        totalFuelCost: 0,
+        averageFuelCost: 0,
+        averageFuelPrice: 0,
+        averageGallonsPerMile: 0,
+        totalGallonsUsed: 0,
+        vehicleFuelEfficiency: [],
+      };
+    }
+  }
+
+  async getBrokerAnalytics(startDate?: Date, endDate?: Date) {
+    try {
+      // Get all trips within date range
+      const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
+      const tripsTableName = this.tripsService['tripsTableName'];
+      
+      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      // Build filter expression
+      let filterExpression = 'SK = :metadata';
+      const expressionAttributeValues: any = {
+        ':metadata': 'METADATA',
+      };
+      
+      if (startDate && endDate) {
+        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        expressionAttributeValues[':endDate'] = endDate.toISOString();
+      } else if (startDate) {
+        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString();
+      } else if (endDate) {
+        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString();
+      }
+      
+      const scanCommand = new ScanCommand({
+        TableName: tripsTableName,
+        FilterExpression: filterExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+      });
+      
+      const result = await dynamodbClient.send(scanCommand);
+      const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
+      
+      // Group trips by broker
+      const brokerMap = new Map<string, {
+        tripCount: number;
+        totalRevenue: number;
+        totalDistance: number;
+        completedTrips: number;
+      }>();
+      
+      for (const trip of trips) {
+        if (!brokerMap.has(trip.brokerName)) {
+          brokerMap.set(trip.brokerName, {
+            tripCount: 0,
+            totalRevenue: 0,
+            totalDistance: 0,
+            completedTrips: 0,
+          });
+        }
+        
+        const brokerData = brokerMap.get(trip.brokerName)!;
+        brokerData.tripCount += 1;
+        brokerData.totalRevenue += trip.brokerPayment;
+        brokerData.totalDistance += trip.distance || 0;
+        
+        if (trip.status === TripStatus.Delivered || trip.status === TripStatus.Paid) {
+          brokerData.completedTrips += 1;
+        }
+      }
+      
+      // Build broker analytics array
+      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerName, data]) => ({
+        brokerName,
+        tripCount: data.tripCount,
+        totalRevenue: data.totalRevenue,
+        averageRevenue: data.tripCount > 0 ? data.totalRevenue / data.tripCount : 0,
+        totalDistance: data.totalDistance,
+        averageDistance: data.tripCount > 0 ? data.totalDistance / data.tripCount : 0,
+        completedTrips: data.completedTrips,
+        completionRate: data.tripCount > 0 ? (data.completedTrips / data.tripCount) * 100 : 0,
+      }));
+      
+      // Sort by total revenue descending
+      brokerAnalytics.sort((a, b) => b.totalRevenue - a.totalRevenue);
+      
+      return {
+        brokers: brokerAnalytics,
+        totalBrokers: brokerAnalytics.length,
+        totalRevenue: brokerAnalytics.reduce((sum, b) => sum + b.totalRevenue, 0),
+        totalTrips: brokerAnalytics.reduce((sum, b) => sum + b.tripCount, 0),
+      };
+    } catch (error) {
+      console.error('Error getting broker analytics:', error);
+      return {
+        brokers: [],
+        totalBrokers: 0,
+        totalRevenue: 0,
+        totalTrips: 0,
       };
     }
   }

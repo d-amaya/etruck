@@ -1,8 +1,24 @@
 <div class="analytics-dashboard">
-  <!-- Header -->
-  <div class="dashboard-header">
-    <h1>Analytics Dashboard</h1>
+  <!-- Header with Date Filter -->
+  <div class="page-header">
+    <h1 class="page-title">Analytics</h1>
     <div class="header-actions">
+      <mat-form-field appearance="outline" class="date-filter">
+        <mat-label>Start Date</mat-label>
+        <input matInput [matDatepicker]="startPicker" [(ngModel)]="startDate" 
+               [max]="endDate || maxDate" (dateChange)="onDateRangeChange()">
+        <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+      
+      <mat-form-field appearance="outline" class="date-filter">
+        <mat-label>End Date</mat-label>
+        <input matInput [matDatepicker]="endPicker" [(ngModel)]="endDate" 
+               [min]="startDate" [max]="maxDate" (dateChange)="onDateRangeChange()">
+        <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+      
       <button mat-raised-button color="primary" (click)="onRefresh()">
         <mat-icon>refresh</mat-icon>
         Refresh
@@ -29,94 +45,115 @@
     </button>
   </div>
 
-  <!-- Dashboard Content -->
-  <div *ngIf="!isLoading && !error" class="dashboard-content">
-    <!-- KPI Cards -->
-    <div class="kpi-grid">
-      <mat-card *ngFor="let kpi of kpiCards" class="kpi-card" [class]="'kpi-' + kpi.color">
-        <mat-card-content>
-          <div class="kpi-header">
-            <mat-icon>{{ kpi.icon }}</mat-icon>
-            <span class="kpi-title">{{ kpi.title }}</span>
-          </div>
-          <div class="kpi-value">{{ kpi.value }}</div>
-          <div class="kpi-change" [class.positive]="kpi.change > 0" [class.negative]="kpi.change < 0">
-            <mat-icon>{{ kpi.change > 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-            <span>{{ kpi.change > 0 ? '+' : '' }}{{ kpi.change }}% {{ kpi.changeLabel }}</span>
-          </div>
-        </mat-card-content>
-      </mat-card>
+  <!-- Summary Cards (Always Visible) -->
+  <div *ngIf="!error" class="summary-cards">
+    <div *ngFor="let kpi of kpiCards" class="summary-card" [class]="'card-' + kpi.color">
+      <div class="card-icon">
+        <mat-icon>{{ kpi.icon }}</mat-icon>
+      </div>
+      <div class="card-content">
+        <span class="card-label">{{ kpi.title }}</span>
+        <span class="card-value">{{ kpi.value }}</span>
+      </div>
     </div>
+  </div>
 
-    <!-- Charts Section -->
-    <mat-tab-group class="charts-section">
-      <!-- Financial Trends Tab -->
-      <mat-tab label="Financial Trends">
+  <!-- Charts Section -->
+  <mat-tab-group *ngIf="!isLoading && !error" class="charts-section" (selectedIndexChange)="onTabChange($event)" [selectedIndex]="selectedTabIndex">
+      <!-- Vehicle Performance Tab -->
+      <mat-tab label="Vehicle Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-header>
-              <mat-card-title>Revenue & Expenses</mat-card-title>
+              <mat-card-title>Vehicle Utilization</mat-card-title>
+              <mat-card-subtitle>Utilization rates and revenue by vehicle</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="chart-placeholder" *ngIf="revenueChartData">
-                <p>Revenue & Expenses Chart</p>
-                <p class="chart-note">Chart visualization will be implemented with Chart.js or similar library</p>
-                <div class="chart-data-preview">
-                  <p><strong>Data Points:</strong> {{ revenueChartData.labels.length }}</p>
-                  <p><strong>Datasets:</strong> {{ revenueChartData.datasets.length }}</p>
-                </div>
+              <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
+                <table class="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Vehicle ID</th>
+                      <th>Total Trips</th>
+                      <th>Total Distance</th>
+                      <th>Total Revenue</th>
+                      <th>Utilization Rate</th>
+                      <th>Avg Revenue/Trip</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let vehicle of vehicleUtilizationData">
+                      <td>{{ vehicle.vehicleId }}</td>
+                      <td>{{ vehicle.totalTrips }}</td>
+                      <td>{{ vehicle.totalDistance | number:'1.0-0' }} mi</td>
+                      <td>{{ formatCurrency(vehicle.totalRevenue) }}</td>
+                      <td>
+                        <span class="utilization-badge" [class.high]="vehicle.utilizationRate >= 70" 
+                              [class.medium]="vehicle.utilizationRate >= 40 && vehicle.utilizationRate < 70"
+                              [class.low]="vehicle.utilizationRate < 40">
+                          {{ vehicle.utilizationRate | number:'1.1-1' }}%
+                        </span>
+                      </td>
+                      <td>{{ formatCurrency(vehicle.averageRevenuePerTrip) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div class="no-data" *ngIf="!revenueChartData">
-                <mat-icon>bar_chart</mat-icon>
-                <p>No data available</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Profit Trends</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="chart-placeholder" *ngIf="profitChartData">
-                <p>Profit Trends Chart</p>
-                <p class="chart-note">Chart visualization will be implemented with Chart.js or similar library</p>
-                <div class="chart-data-preview">
-                  <p><strong>Data Points:</strong> {{ profitChartData.labels.length }}</p>
-                </div>
-              </div>
-              <div class="no-data" *ngIf="!profitChartData">
-                <mat-icon>show_chart</mat-icon>
-                <p>No data available</p>
+              <div class="no-data" *ngIf="!vehicleUtilizationData || vehicleUtilizationData.length === 0">
+                <mat-icon>local_shipping</mat-icon>
+                <p>No vehicle utilization data available</p>
+                <p class="hint">Create trips to see vehicle utilization metrics</p>
               </div>
             </mat-card-content>
           </mat-card>
         </div>
       </mat-tab>
 
-      <!-- Fleet Utilization Tab -->
-      <mat-tab label="Fleet Utilization">
+      <!-- Driver Performance Tab -->
+      <mat-tab label="Driver Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-header>
-              <mat-card-title>Vehicle Utilization</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="chart-placeholder">
-                <p>Vehicle Utilization Chart</p>
-                <p class="chart-note">Shows utilization rates for trucks and trailers</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-header>
               <mat-card-title>Driver Performance</mat-card-title>
+              <mat-card-subtitle>Performance metrics and earnings by driver</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="chart-placeholder">
-                <p>Driver Performance Chart</p>
-                <p class="chart-note">Shows driver efficiency and earnings metrics</p>
+              <div *ngIf="driverPerformanceData && driverPerformanceData.length > 0" class="data-table">
+                <table class="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Driver Name</th>
+                      <th>Total Trips</th>
+                      <th>Completed</th>
+                      <th>Total Distance</th>
+                      <th>Total Earnings</th>
+                      <th>Avg Earnings/Trip</th>
+                      <th>Completion Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let driver of driverPerformanceData">
+                      <td>{{ driver.driverName }}</td>
+                      <td>{{ driver.totalTrips }}</td>
+                      <td>{{ driver.completedTrips }}</td>
+                      <td>{{ driver.totalDistance | number:'1.0-0' }} mi</td>
+                      <td>{{ formatCurrency(driver.totalRevenue) }}</td>
+                      <td>{{ formatCurrency(driver.averageRevenue) }}</td>
+                      <td>
+                        <span class="completion-badge" [class.high]="driver.onTimeDeliveryRate >= 90"
+                              [class.medium]="driver.onTimeDeliveryRate >= 70 && driver.onTimeDeliveryRate < 90"
+                              [class.low]="driver.onTimeDeliveryRate < 70">
+                          {{ driver.onTimeDeliveryRate | number:'1.0-0' }}%
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="no-data" *ngIf="!driverPerformanceData || driverPerformanceData.length === 0">
+                <mat-icon>person</mat-icon>
+                <p>No driver performance data available</p>
+                <p class="hint">Assign drivers to trips to see performance metrics</p>
               </div>
             </mat-card-content>
           </mat-card>
@@ -126,182 +163,80 @@
       <!-- Broker Performance Tab -->
       <mat-tab label="Broker Performance">
         <div class="tab-content">
-          <mat-card class="chart-card">
+          <mat-card class="chart-card" *ngIf="brokerAnalyticsData">
             <mat-card-header>
-              <mat-card-title>Broker Rates Analysis</mat-card-title>
+              <mat-card-title>Broker Performance Summary</mat-card-title>
+              <mat-card-subtitle>Overview of all broker relationships</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="chart-placeholder">
-                <p>Broker Rates Chart</p>
-                <p class="chart-note">Shows total rates and trip counts by broker</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Average Rates by Broker</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="chart-placeholder">
-                <p>Average Rates Chart</p>
-                <p class="chart-note">Shows average payment rates per broker</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-      </mat-tab>
-
-      <!-- Additional Fees Tab -->
-      <mat-tab label="Additional Fees">
-        <div class="tab-content">
-          <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Additional Fees Overview</mat-card-title>
-              <mat-card-subtitle>Track lumper fees and detention charges</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="fees-overview" *ngIf="additionalFeesData">
-                <div class="fee-summary-grid">
-                  <div class="fee-summary-card">
-                    <mat-icon class="fee-icon">local_shipping</mat-icon>
-                    <div class="fee-details">
-                      <span class="fee-label">Total Lumper Fees</span>
-                      <span class="fee-value">{{ formatCurrency(additionalFeesData.totalLumperFees) }}</span>
-                      <span class="fee-count">{{ additionalFeesData.lumperFeeCount }} trips</span>
-                    </div>
-                  </div>
-                  
-                  <div class="fee-summary-card">
-                    <mat-icon class="fee-icon">schedule</mat-icon>
-                    <div class="fee-details">
-                      <span class="fee-label">Total Detention Fees</span>
-                      <span class="fee-value">{{ formatCurrency(additionalFeesData.totalDetentionFees) }}</span>
-                      <span class="fee-count">{{ additionalFeesData.detentionFeeCount }} trips</span>
-                    </div>
-                  </div>
-                  
-                  <div class="fee-summary-card">
-                    <mat-icon class="fee-icon">attach_money</mat-icon>
-                    <div class="fee-details">
-                      <span class="fee-label">Total Additional Fees</span>
-                      <span class="fee-value total">{{ formatCurrency(additionalFeesData.totalFees) }}</span>
-                      <span class="fee-count">{{ additionalFeesData.totalFeeCount }} trips</span>
-                    </div>
-                  </div>
-                  
-                  <div class="fee-summary-card">
-                    <mat-icon class="fee-icon">trending_down</mat-icon>
-                    <div class="fee-details">
-                      <span class="fee-label">Impact on Profit Margin</span>
-                      <span class="fee-value impact">-{{ additionalFeesData.profitImpactPercent | number:'1.1-1' }}%</span>
-                      <span class="fee-count">{{ formatCurrency(additionalFeesData.profitImpactAmount) }} reduction</span>
-                    </div>
+              <div class="broker-summary-grid">
+                <div class="summary-stat">
+                  <mat-icon>business</mat-icon>
+                  <div class="stat-content">
+                    <span class="stat-label">Total Brokers</span>
+                    <span class="stat-value">{{ brokerAnalyticsData.totalBrokers }}</span>
                   </div>
                 </div>
-                
-                <mat-divider></mat-divider>
-                
-                <div class="fee-trends">
-                  <h4>Fee Trends</h4>
-                  <div class="chart-placeholder">
-                    <p>Additional Fees Trend Chart</p>
-                    <p class="chart-note">Shows lumper fees and detention charges over time</p>
-                    <div class="chart-data-preview">
-                      <p><strong>Average Lumper Fee:</strong> {{ formatCurrency(additionalFeesData.avgLumperFee) }}</p>
-                      <p><strong>Average Detention Fee:</strong> {{ formatCurrency(additionalFeesData.avgDetentionFee) }}</p>
-                      <p><strong>Highest Single Fee:</strong> {{ formatCurrency(additionalFeesData.highestFee) }}</p>
-                    </div>
+                <div class="summary-stat">
+                  <mat-icon>local_shipping</mat-icon>
+                  <div class="stat-content">
+                    <span class="stat-label">Total Trips</span>
+                    <span class="stat-value">{{ brokerAnalyticsData.totalTrips }}</span>
+                  </div>
+                </div>
+                <div class="summary-stat">
+                  <mat-icon>attach_money</mat-icon>
+                  <div class="stat-content">
+                    <span class="stat-label">Total Revenue</span>
+                    <span class="stat-value">{{ formatCurrency(brokerAnalyticsData.totalRevenue) }}</span>
                   </div>
                 </div>
               </div>
-              <div class="no-data" *ngIf="!additionalFeesData">
-                <mat-icon>money_off</mat-icon>
-                <p>No additional fees data available</p>
-                <p class="hint">Add lumper fees or detention charges to trips to see analytics</p>
-              </div>
             </mat-card-content>
           </mat-card>
 
           <mat-card class="chart-card">
             <mat-card-header>
-              <mat-card-title>Fee Breakdown by Trip</mat-card-title>
-              <mat-card-subtitle>Detailed view of trips with additional fees</mat-card-subtitle>
+              <mat-card-title>Broker Performance Details</mat-card-title>
+              <mat-card-subtitle>Revenue, trips, and completion rates by broker</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="fee-breakdown-table" *ngIf="tripFeesBreakdown && tripFeesBreakdown.length > 0">
-                <table class="fees-table">
+              <div *ngIf="brokerAnalyticsData && brokerAnalyticsData.brokers && brokerAnalyticsData.brokers.length > 0" class="data-table">
+                <table class="analytics-table">
                   <thead>
                     <tr>
-                      <th>Trip ID</th>
-                      <th>Date</th>
-                      <th>Broker</th>
-                      <th>Lumper Fees</th>
-                      <th>Detention Fees</th>
-                      <th>Total Fees</th>
-                      <th>% of Revenue</th>
+                      <th>Broker Name</th>
+                      <th>Total Trips</th>
+                      <th>Completed</th>
+                      <th>Total Revenue</th>
+                      <th>Avg Revenue/Trip</th>
+                      <th>Total Distance</th>
+                      <th>Completion Rate</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let trip of tripFeesBreakdown">
-                      <td>{{ trip.tripId }}</td>
-                      <td>{{ formatDate(trip.date) }}</td>
-                      <td>{{ trip.brokerName }}</td>
-                      <td>{{ formatCurrency(trip.lumperFees) }}</td>
-                      <td>{{ formatCurrency(trip.detentionFees) }}</td>
-                      <td><strong>{{ formatCurrency(trip.totalFees) }}</strong></td>
+                    <tr *ngFor="let broker of brokerAnalyticsData.brokers">
+                      <td><strong>{{ broker.brokerName }}</strong></td>
+                      <td>{{ broker.tripCount }}</td>
+                      <td>{{ broker.completedTrips }}</td>
+                      <td>{{ formatCurrency(broker.totalRevenue) }}</td>
+                      <td>{{ formatCurrency(broker.averageRevenue) }}</td>
+                      <td>{{ broker.totalDistance | number:'1.0-0' }} mi</td>
                       <td>
-                        <span class="percentage" [class.high]="trip.feePercentage > 10">
-                          {{ trip.feePercentage | number:'1.1-1' }}%
+                        <span class="completion-badge" [class.high]="broker.completionRate >= 90"
+                              [class.medium]="broker.completionRate >= 70 && broker.completionRate < 90"
+                              [class.low]="broker.completionRate < 70">
+                          {{ broker.completionRate | number:'1.0-0' }}%
                         </span>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div class="no-data" *ngIf="!tripFeesBreakdown || tripFeesBreakdown.length === 0">
-                <mat-icon>list_alt</mat-icon>
-                <p>No trips with additional fees found</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Fee Recovery Analysis</mat-card-title>
-              <mat-card-subtitle>Track fee recovery from brokers</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="fee-recovery-info">
-                <p class="info-text">
-                  <mat-icon>info</mat-icon>
-                  Additional fees like lumper fees and detention charges should be recovered from brokers.
-                  Use this section to track which fees have been invoiced and paid.
-                </p>
-                
-                <div class="recovery-stats" *ngIf="feeRecoveryData">
-                  <div class="stat-item">
-                    <span class="stat-label">Fees Invoiced:</span>
-                    <span class="stat-value">{{ formatCurrency(feeRecoveryData.invoiced) }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Fees Recovered:</span>
-                    <span class="stat-value success">{{ formatCurrency(feeRecoveryData.recovered) }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Outstanding:</span>
-                    <span class="stat-value warn">{{ formatCurrency(feeRecoveryData.outstanding) }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Recovery Rate:</span>
-                    <span class="stat-value">{{ feeRecoveryData.recoveryRate | number:'1.0-0' }}%</span>
-                  </div>
-                </div>
-                
-                <button mat-raised-button color="primary" class="action-button">
-                  <mat-icon>receipt</mat-icon>
-                  Generate Fee Invoice Report
-                </button>
+              <div class="no-data" *ngIf="!brokerAnalyticsData || !brokerAnalyticsData.brokers || brokerAnalyticsData.brokers.length === 0">
+                <mat-icon>business</mat-icon>
+                <p>No broker performance data available</p>
+                <p class="hint">Create trips with broker information to see analytics</p>
               </div>
             </mat-card-content>
           </mat-card>
@@ -317,13 +252,14 @@
               <mat-card-subtitle>Track fuel expenses over time</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="chart-placeholder" *ngIf="fuelCostChartData">
-                <p>Fuel Cost Trends Chart</p>
-                <p class="chart-note">Shows fuel costs per trip and monthly averages</p>
-                <div class="chart-data-preview">
+              <div *ngIf="fuelCostChartData">
+                <div class="chart-data-preview" style="margin-bottom: 16px;">
                   <p><strong>Average Fuel Cost:</strong> {{ formatCurrency(fuelCostChartData.avgCost) }}</p>
                   <p><strong>Total Fuel Expenses:</strong> {{ formatCurrency(fuelCostChartData.totalCost) }}</p>
                   <p><strong>Trips with Fuel Data:</strong> {{ fuelCostChartData.tripCount }}</p>
+                </div>
+                <div class="chart-container" *ngIf="fuelCostTrendData">
+                  <canvas #fuelCostChart></canvas>
                 </div>
               </div>
               <div class="no-data" *ngIf="!fuelCostChartData">
@@ -340,13 +276,42 @@
               <mat-card-subtitle>Compare fuel consumption across fleet</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="chart-placeholder" *ngIf="fuelEfficiencyChartData">
-                <p>Fuel Efficiency Chart</p>
-                <p class="chart-note">Shows gallons per mile for each vehicle</p>
-                <div class="chart-data-preview">
-                  <p><strong>Fleet Average:</strong> {{ fuelEfficiencyChartData.fleetAvg | number:'1.3-3' }} gal/mi</p>
-                  <p><strong>Best Performer:</strong> {{ fuelEfficiencyChartData.bestVehicle }} ({{ fuelEfficiencyChartData.bestEfficiency | number:'1.3-3' }} gal/mi)</p>
+              <div *ngIf="fuelEfficiencyChartData">
+                <div class="chart-data-preview" style="margin-bottom: 16px;">
+                  <p><strong>Fleet Average MPG:</strong> {{ fuelEfficiencyChartData.fleetAvgMPG | number:'1.2-2' }} mpg</p>
+                  <p><strong>Best Performer:</strong> {{ fuelEfficiencyChartData.bestVehicle }} ({{ fuelEfficiencyChartData.bestMPG | number:'1.2-2' }} mpg)</p>
                   <p><strong>Vehicles Tracked:</strong> {{ fuelEfficiencyChartData.vehicleCount }}</p>
+                </div>
+                
+                <div class="data-table" *ngIf="fuelEfficiencyChartData.vehicles && fuelEfficiencyChartData.vehicles.length > 0">
+                  <table class="analytics-table">
+                    <thead>
+                      <tr>
+                        <th>Vehicle ID</th>
+                        <th>Trips</th>
+                        <th>Total Miles</th>
+                        <th>Total Gallons</th>
+                        <th>Avg MPG</th>
+                        <th>Total Fuel Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let vehicle of fuelEfficiencyChartData.vehicles">
+                        <td><strong>{{ vehicle.vehicleId }}</strong></td>
+                        <td>{{ vehicle.tripCount }}</td>
+                        <td>{{ vehicle.totalMiles | number:'1.0-0' }} mi</td>
+                        <td>{{ vehicle.totalGallons | number:'1.1-1' }} gal</td>
+                        <td>
+                          <span class="utilization-badge" [class.high]="vehicle.averageMPG >= 6.5"
+                                [class.medium]="vehicle.averageMPG >= 5.5 && vehicle.averageMPG < 6.5"
+                                [class.low]="vehicle.averageMPG < 5.5">
+                            {{ vehicle.averageMPG | number:'1.2-2' }} mpg
+                          </span>
+                        </td>
+                        <td>{{ formatCurrency(vehicle.totalCost) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
               <div class="no-data" *ngIf="!fuelEfficiencyChartData">
@@ -356,125 +321,7 @@
               </div>
             </mat-card-content>
           </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Fuel Price Management</mat-card-title>
-              <mat-card-subtitle>Track and update fuel prices</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="fuel-price-management">
-                <div class="current-price-display">
-                  <mat-icon>attach_money</mat-icon>
-                  <div class="price-info">
-                    <span class="label">Current Default Fuel Price:</span>
-                    <span class="value">{{ formatCurrency(defaultFuelPrice) }}/gal</span>
-                  </div>
-                </div>
-                
-                <mat-divider></mat-divider>
-                
-                <div class="price-update-form">
-                  <h4>Update Default Fuel Price</h4>
-                  <p class="hint">This will be used as the default for new trips</p>
-                  
-                  <mat-form-field appearance="outline" class="price-input">
-                    <mat-label>Fuel Price ($/gallon)</mat-label>
-                    <input matInput type="number" step="0.01" min="0" 
-                           [(ngModel)]="newFuelPrice" 
-                           placeholder="0.00">
-                    <span matPrefix>$&nbsp;</span>
-                    <mat-hint>Enter current fuel price per gallon</mat-hint>
-                  </mat-form-field>
-                  
-                  <button mat-raised-button color="primary" 
-                          (click)="onUpdateFuelPrice()"
-                          [disabled]="!newFuelPrice || newFuelPrice <= 0">
-                    <mat-icon>update</mat-icon>
-                    Update Price
-                  </button>
-                </div>
-                
-                <mat-divider></mat-divider>
-                
-                <div class="price-history">
-                  <h4>Recent Price Changes</h4>
-                  <div class="price-history-list" *ngIf="fuelPriceHistory && fuelPriceHistory.length > 0">
-                    <div class="price-history-item" *ngFor="let entry of fuelPriceHistory">
-                      <span class="date">{{ formatDate(entry.date) }}</span>
-                      <span class="price">{{ formatCurrency(entry.price) }}/gal</span>
-                      <span class="change" [class.positive]="entry.change > 0" [class.negative]="entry.change < 0">
-                        <mat-icon>{{ entry.change > 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-                        {{ entry.change > 0 ? '+' : '' }}{{ formatCurrency(Math.abs(entry.change)) }}
-                      </span>
-                    </div>
-                  </div>
-                  <p class="no-history" *ngIf="!fuelPriceHistory || fuelPriceHistory.length === 0">
-                    No price history available
-                  </p>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-      </mat-tab>
-
-      <!-- Reports Tab -->
-      <mat-tab label="Reports">
-        <div class="tab-content">
-          <mat-card class="report-card">
-            <mat-card-header>
-              <mat-card-title>Outstanding Payments Report</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <p>Detailed report of unpaid invoices with aging information</p>
-              <button mat-raised-button color="primary">
-                <mat-icon>description</mat-icon>
-                Generate Report
-              </button>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="report-card">
-            <mat-card-header>
-              <mat-card-title>Monthly Performance Summary</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <p>Comparative analytics showing current month vs previous months</p>
-              <button mat-raised-button color="primary">
-                <mat-icon>description</mat-icon>
-                Generate Report
-              </button>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="report-card">
-            <mat-card-header>
-              <mat-card-title>Entity Performance Report</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <p>Performance metrics for trucks, trailers, and drivers</p>
-              <button mat-raised-button color="primary">
-                <mat-icon>description</mat-icon>
-                Generate Report
-              </button>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="report-card">
-            <mat-card-header>
-              <mat-card-title>Fuel Cost Analysis Report</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <p>Comprehensive fuel cost and efficiency analysis</p>
-              <button mat-raised-button color="primary">
-                <mat-icon>description</mat-icon>
-                Generate Report
-              </button>
-            </mat-card-content>
-          </mat-card>
         </div>
       </mat-tab>
     </mat-tab-group>
-  </div>
 </div>

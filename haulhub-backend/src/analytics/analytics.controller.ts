@@ -70,4 +70,26 @@ export class AnalyticsController {
   async getMaintenanceAlerts() {
     return await this.analyticsService.getMaintenanceAlerts();
   }
+
+  @Get('broker-analytics')
+  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  async getBrokerAnalytics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return await this.analyticsService.getBrokerAnalytics(start, end);
+  }
+
+  @Get('fuel-analytics')
+  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  async getFuelAnalytics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return await this.analyticsService.getFuelAnalytics(start, end);
+  }
 }

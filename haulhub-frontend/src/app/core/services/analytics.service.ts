@@ -146,4 +146,26 @@ export class AnalyticsService {
   getMaintenanceAlerts(): Observable<MaintenanceAlerts> {
     return this.http.get<MaintenanceAlerts>(`${this.apiUrl}/maintenance-alerts`);
   }
+
+  getBrokerAnalytics(startDate?: Date, endDate?: Date): Observable<any> {
+    let params = new HttpParams();
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<any>(`${this.apiUrl}/broker-analytics`, { params });
+  }
+
+  getFuelAnalytics(startDate?: Date, endDate?: Date): Observable<any> {
+    let params = new HttpParams();
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
+  }
 }
