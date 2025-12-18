@@ -752,6 +752,7 @@ export class TripsService {
         ...filterAttributeValues,
       },
       Limit: filters.limit ? Number(filters.limit) : 50,
+      ScanIndexForward: false, // Return results in descending order (newest first)
     };
 
     if (filterExpression) {
@@ -849,6 +850,7 @@ export class TripsService {
         ...filterAttributeValues,
       },
       Limit: filters.limit || 50,
+      ScanIndexForward: false, // Return results in descending order (newest first)
     };
 
     if (filterExpression) {
@@ -961,6 +963,7 @@ export class TripsService {
           ...expressionAttributeValues,
           ...filterAttributeValues,
         },
+        ScanIndexForward: false, // Return results in descending order (newest first)
       };
 
       if (filterExpression) {
@@ -1371,6 +1374,39 @@ export class TripsService {
   }
 
   /**
+   * Helper method to get ALL trips for aggregation purposes (no pagination)
+   * This fetches all trips matching the filters by paginating through all results
+   */
+  private async getAllTripsForAggregation(
+    userId: string,
+    userRole: UserRole,
+    filters: TripFilters,
+  ): Promise<Trip[]> {
+    const allTrips: Trip[] = [];
+    let lastEvaluatedKey: string | undefined = undefined;
+    const pageSize = 100; // Fetch in batches of 100
+
+    do {
+      const { trips, lastEvaluatedKey: nextKey } = await this.getTrips(
+        userId,
+        userRole,
+        { ...filters, limit: pageSize, lastEvaluatedKey }
+      );
+      
+      allTrips.push(...trips);
+      lastEvaluatedKey = nextKey;
+      
+      // Safety check to prevent infinite loops (max 10,000 trips)
+      if (allTrips.length >= 10000) {
+        console.warn('Reached maximum trip limit (10,000) for aggregation');
+        break;
+      }
+    } while (lastEvaluatedKey);
+
+    return allTrips;
+  }
+
+  /**
    * Get trip summary by status for dashboard
    * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
    * 
@@ -1380,8 +1416,8 @@ export class TripsService {
     dispatcherId: string,
     filters: TripFilters,
   ): Promise<Record<TripStatus, number>> {
-    // Get all trips for the dispatcher with filters
-    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+    // Get ALL trips for the dispatcher with filters (no pagination limit for aggregation)
+    const trips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
 
     // Initialize counts for all statuses
     const summary: Partial<Record<TripStatus, number>> = {
@@ -1419,21 +1455,31 @@ export class TripsService {
     totalAdditionalFees: number;
     totalProfit: number;
   }> {
-    // Get all trips for the dispatcher with filters
-    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+    // Get ALL trips for the dispatcher with filters (no pagination limit for aggregation)
+    const allTrips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+    const trips = allTrips;
 
     // Calculate totals
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
     const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
     
+    // Calculate fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+    const totalFuelCosts = trips.reduce((sum, trip) => {
+      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
+      }
+      return sum;
+    }, 0);
+    
     // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
     const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
     const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
     const totalAdditionalFees = totalLumperFees + totalDetentionFees;
     
-    // Profit calculation includes additional fees as expenses (Requirement 7.2)
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalAdditionalFees;
+    // Profit calculation includes fuel costs and additional fees as expenses (Requirements 6.2, 7.2)
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalFuelCosts - totalAdditionalFees;
 
     return {
       totalBrokerPayments,
@@ -1462,14 +1508,16 @@ export class TripsService {
     lorryOwnerPayments: number[];
     profit: number[];
   }> {
-    // Get all trips for the dispatcher with filters
-    const { trips } = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+    // Get ALL trips for the dispatcher with filters (no pagination limit for aggregation)
+    const trips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
 
     // Group trips by month
     const monthlyData: Record<string, {
       brokerPayments: number;
       driverPayments: number;
       lorryOwnerPayments: number;
+      fuelCosts: number;
+      additionalFees: number;
     }> = {};
 
     for (const trip of trips) {
@@ -1482,12 +1530,23 @@ export class TripsService {
           brokerPayments: 0,
           driverPayments: 0,
           lorryOwnerPayments: 0,
+          fuelCosts: 0,
+          additionalFees: 0,
         };
       }
 
       monthlyData[monthKey].brokerPayments += trip.brokerPayment;
       monthlyData[monthKey].driverPayments += trip.driverPayment;
       monthlyData[monthKey].lorryOwnerPayments += trip.lorryOwnerPayment;
+      
+      // Add fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
+        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        monthlyData[monthKey].fuelCosts += totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
+      }
+      
+      // Add additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
+      monthlyData[monthKey].additionalFees += (trip.lumperFees || 0) + (trip.detentionFees || 0);
     }
 
     // Sort months chronologically

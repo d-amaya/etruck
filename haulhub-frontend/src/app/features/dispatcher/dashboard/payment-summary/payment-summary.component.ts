@@ -8,7 +8,6 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TripService, PaymentSummary } from '../../../../core/services/trip.service';
 import { DashboardStateService } from '../dashboard-state.service';
-import { Trip } from '@haulhub/shared';
 
 @Component({
   selector: 'app-payment-summary',
@@ -35,55 +34,63 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Subscribe to filtered trips from dashboard state
-    this.dashboardState.filteredTrips$
+    // Subscribe to filter changes
+    this.dashboardState.filters$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(trips => {
-        this.calculatePaymentSummary(trips);
+      .subscribe(filters => {
+        this.loadPaymentSummary(filters);
+      });
+
+    // Subscribe to refresh triggers (after deletions, etc.)
+    this.dashboardState.refreshPaymentSummary$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        const filters = this.dashboardState.getCurrentFilters();
+        this.loadPaymentSummary(filters);
       });
   }
 
-  private calculatePaymentSummary(trips: Trip[]): void {
-    if (!trips || trips.length === 0) {
-      this.paymentSummary = {
-        totalBrokerPayments: 0,
-        totalDriverPayments: 0,
-        totalLorryOwnerPayments: 0,
-        totalProfit: 0
-      };
-      return;
+  private loadPaymentSummary(filters: any): void {
+    const apiFilters = this.buildApiFilters(filters);
+    
+    this.tripService.getPaymentSummary(apiFilters).subscribe({
+      next: (summary) => {
+        this.paymentSummary = summary;
+        this.hasError = false;
+      },
+      error: (error) => {
+        // Ignore cancellation errors (they're expected when filters change rapidly)
+        if (error.name === 'AbortError' || error.status === 0) {
+          return;
+        }
+        this.handleError(error);
+      }
+    });
+  }
+
+  private buildApiFilters(filters: any): any {
+    const apiFilters: any = {};
+
+    if (filters.dateRange?.startDate) {
+      apiFilters.startDate = filters.dateRange.startDate.toISOString();
+    }
+    if (filters.dateRange?.endDate) {
+      apiFilters.endDate = filters.dateRange.endDate.toISOString();
+    }
+    if (filters.status) {
+      apiFilters.status = filters.status;
+    }
+    if (filters.brokerId) {
+      apiFilters.brokerId = filters.brokerId;
+    }
+    if (filters.lorryId) {
+      apiFilters.lorryId = filters.lorryId;
+    }
+    if (filters.driverName) {
+      apiFilters.driverName = filters.driverName;
     }
 
-    // Calculate totals from the filtered trips array
-    const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
-    const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
-    const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
-    
-    // Calculate total fuel costs
-    const totalFuelCosts = trips.reduce((sum, trip) => {
-      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
-      }
-      return sum;
-    }, 0);
-    
-    // Calculate total additional fees
-    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
-    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
-    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
-    
-    // Profit includes all expenses: driver, lorry owner, fuel, and additional fees
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalFuelCosts - totalAdditionalFees;
-
-    this.paymentSummary = {
-      totalBrokerPayments,
-      totalDriverPayments,
-      totalLorryOwnerPayments,
-      totalProfit
-    };
-
-    this.hasError = false;
+    return apiFilters;
   }
 
   ngOnDestroy(): void {

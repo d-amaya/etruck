@@ -9,15 +9,12 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatExpansionModule } from '@angular/material/expansion';
 import { Subject } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
 import { TripStatus, Broker } from '@haulhub/shared';
 import { DashboardStateService } from '../dashboard-state.service';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
 import { PdfExportService } from '../../../../core/services/pdf-export.service';
-import { AdvancedFilterComponent } from '../../../../shared/components/advanced-filter/advanced-filter.component';
-import { SavedSearch, QuickFilterPreset } from '../../../../shared/services/saved-search.service';
 
 @Component({
   selector: 'app-filter-bar',
@@ -32,9 +29,7 @@ import { SavedSearch, QuickFilterPreset } from '../../../../shared/services/save
     MatNativeDateModule,
     MatButtonModule,
     MatIconModule,
-    MatChipsModule,
-    MatExpansionModule,
-    AdvancedFilterComponent
+    MatChipsModule
   ],
   templateUrl: './filter-bar.component.html',
   styleUrls: ['./filter-bar.component.scss']
@@ -44,7 +39,6 @@ export class FilterBarComponent implements OnInit, OnDestroy {
   statusOptions = Object.values(TripStatus);
   brokers: Broker[] = [];
   activeFilterCount = 0;
-  showAdvancedFilters = false;
 
   maxDate = new Date();
   minDate = new Date();
@@ -234,63 +228,6 @@ export class FilterBarComponent implements OnInit, OnDestroy {
 
     return startDate.toDateString() === expectedStart.toDateString() &&
            endDate.toDateString() === expectedEnd.toDateString();
-  }
-
-  /**
-   * Toggle advanced filters panel
-   */
-  toggleAdvancedFilters(): void {
-    this.showAdvancedFilters = !this.showAdvancedFilters;
-  }
-
-  /**
-   * Handle search query changes from advanced filter
-   */
-  onSearchQueryChanged(query: string): void {
-    // Search query will be handled by the dashboard component
-    // which will use the FullTextSearchService to filter trips
-    console.log('Search query changed:', query);
-  }
-
-  /**
-   * Handle quick filter application
-   */
-  onQuickFilterApplied(preset: QuickFilterPreset): void {
-    console.log('Quick filter applied:', preset);
-    
-    // Apply the preset filters to the form
-    if (preset.filters.status) {
-      this.filterForm.patchValue({ status: preset.filters.status[0] });
-    }
-    
-    if (preset.filters.dateRange?.preset) {
-      this.setDatePreset(preset.filters.dateRange.preset);
-    }
-  }
-
-  /**
-   * Handle saved search application
-   */
-  onSavedSearchApplied(search: SavedSearch): void {
-    console.log('Saved search applied:', search);
-    
-    // Apply the saved search filters to the form
-    const filters = search.filters;
-    this.filterForm.patchValue({
-      startDate: filters.dateRange?.startDate || null,
-      endDate: filters.dateRange?.endDate || null,
-      status: filters.status || null,
-      brokerId: filters.brokerId || null,
-      lorryId: filters.lorryId || '',
-      driverName: filters.driverName || ''
-    });
-  }
-
-  /**
-   * Get current filters for advanced filter component
-   */
-  getCurrentFilters(): any {
-    return this.dashboardState.getCurrentFilters();
   }
 
   ngOnDestroy(): void {

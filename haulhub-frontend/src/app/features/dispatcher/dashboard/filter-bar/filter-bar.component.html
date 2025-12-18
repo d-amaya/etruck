@@ -87,32 +87,4 @@
       </button>
     </div>
   </form>
-
-  <!-- Advanced Filters Toggle -->
-  <div class="advanced-filters-toggle">
-    <button 
-      mat-stroked-button 
-      type="button" 
-      (click)="toggleAdvancedFilters()"
-      class="toggle-btn">
-      <mat-icon>{{ showAdvancedFilters ? 'expand_less' : 'expand_more' }}</mat-icon>
-      {{ showAdvancedFilters ? 'Hide' : 'Show' }} Advanced Filters
-    </button>
-  </div>
-
-  <!-- Advanced Filters Panel -->
-  <mat-expansion-panel 
-    [expanded]="showAdvancedFilters"
-    class="advanced-filters-panel">
-    <app-advanced-filter
-      entityType="trip"
-      [currentFilters]="getCurrentFilters()"
-      [showFullTextSearch]="true"
-      [showQuickFilters]="true"
-      [showSavedSearches]="true"
-      (searchQueryChanged)="onSearchQueryChanged($event)"
-      (quickFilterApplied)="onQuickFilterApplied($event)"
-      (savedSearchApplied)="onSavedSearchApplied($event)">
-    </app-advanced-filter>
-  </mat-expansion-panel>
 </div>

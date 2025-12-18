@@ -246,6 +246,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
         this.trips = this.trips.filter(t => t.tripId !== trip.tripId);
         this.totalTrips--;
 
+        // Trigger payment summary refresh after deletion
+        this.dashboardState.triggerPaymentSummaryRefresh();
+
         const snackBarRef = this.snackBar.open(
           'Trip deleted successfully',
           'Undo',

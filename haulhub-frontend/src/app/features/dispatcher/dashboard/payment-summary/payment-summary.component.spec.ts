@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { PaymentSummaryComponent } from './payment-summary.component';
 import { TripService, PaymentSummary } from '../../../../core/services/trip.service';
 import { DashboardStateService } from '../dashboard-state.service';
@@ -12,11 +12,38 @@ describe('PaymentSummaryComponent', () => {
   let tripServiceSpy: jasmine.SpyObj<TripService>;
   let dashboardStateSpy: jasmine.SpyObj<DashboardStateService>;
 
+  const mockPaymentSummary: PaymentSummary = {
+    totalBrokerPayments: 50000,
+    totalDriverPayments: 20000,
+    totalLorryOwnerPayments: 15000,
+    totalProfit: 15000
+  };
+
   beforeEach(async () => {
     const tripSpy = jasmine.createSpyObj('TripService', ['getPaymentSummary']);
-    const dashboardSpy = jasmine.createSpyObj('DashboardStateService', ['updateFilters'], {
-      filteredTrips$: of([])
+    const refreshSubject = new Subject<void>();
+    const dashboardSpy = jasmine.createSpyObj('DashboardStateService', ['getCurrentFilters'], {
+      filters$: of({
+        dateRange: { startDate: new Date('2024-01-01'), endDate: new Date('2024-12-31') },
+        status: null,
+        brokerId: null,
+        lorryId: null,
+        driverId: null,
+        driverName: null
+      }),
+      refreshPaymentSummary$: refreshSubject.asObservable()
     });
+
+    dashboardSpy.getCurrentFilters.and.returnValue({
+      dateRange: { startDate: new Date('2024-01-01'), endDate: new Date('2024-12-31') },
+      status: null,
+      brokerId: null,
+      lorryId: null,
+      driverId: null,
+      driverName: null
+    });
+
+    tripSpy.getPaymentSummary.and.returnValue(of(mockPaymentSummary));
 
     await TestBed.configureTestingModule({
       imports: [PaymentSummaryComponent, NoopAnimationsModule],
@@ -37,62 +64,24 @@ describe('PaymentSummaryComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should calculate and display payment summary from filtered trips', () => {
-    const mockTrips: Trip[] = [
-      {
-        tripId: 'trip-1',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'Location A',
-        dropoffLocation: 'Location B',
-        brokerId: 'broker-1',
-        brokerName: 'Test Broker',
-        brokerPayment: 30000,
-        lorryId: 'lorry-1',
-        lorryOwnerPayment: 10000,
-        driverId: 'driver-1',
-        driverName: 'John Doe',
-        driverPayment: 8000,
-        status: TripStatus.Scheduled,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      },
-      {
-        tripId: 'trip-2',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-16T10:00:00Z',
-        pickupLocation: 'Location C',
-        dropoffLocation: 'Location D',
-        brokerId: 'broker-2',
-        brokerName: 'Another Broker',
-        brokerPayment: 20000,
-        lorryId: 'lorry-2',
-        lorryOwnerPayment: 5000,
-        driverId: 'driver-2',
-        driverName: 'Jane Smith',
-        driverPayment: 12000,
-        status: TripStatus.Delivered,
-        createdAt: '2024-01-16T09:00:00Z',
-        updatedAt: '2024-01-16T09:00:00Z'
-      }
-    ];
-
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(mockTrips)
-    });
-
+  it('should load and display payment summary from API', () => {
     fixture.detectChanges();
 
+    expect(tripServiceSpy.getPaymentSummary).toHaveBeenCalled();
     expect(component.paymentSummary.totalBrokerPayments).toBe(50000);
     expect(component.paymentSummary.totalDriverPayments).toBe(20000);
     expect(component.paymentSummary.totalLorryOwnerPayments).toBe(15000);
     expect(component.paymentSummary.totalProfit).toBe(15000);
   });
 
-  it('should display zero values when no trips exist', () => {
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of([])
-    });
+  it('should display zero values when API returns empty summary', () => {
+    const emptyPaymentSummary: PaymentSummary = {
+      totalBrokerPayments: 0,
+      totalDriverPayments: 0,
+      totalLorryOwnerPayments: 0,
+      totalProfit: 0
+    };
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(emptyPaymentSummary));
 
     fixture.detectChanges();
 
@@ -103,30 +92,13 @@ describe('PaymentSummaryComponent', () => {
   });
 
   it('should identify positive profit correctly', () => {
-    const mockTrips: Trip[] = [
-      {
-        tripId: 'trip-1',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'Location A',
-        dropoffLocation: 'Location B',
-        brokerId: 'broker-1',
-        brokerName: 'Test Broker',
-        brokerPayment: 50000,
-        lorryId: 'lorry-1',
-        lorryOwnerPayment: 15000,
-        driverId: 'driver-1',
-        driverName: 'John Doe',
-        driverPayment: 20000,
-        status: TripStatus.Scheduled,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      }
-    ];
-
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(mockTrips)
-    });
+    const positiveProfitSummary: PaymentSummary = {
+      totalBrokerPayments: 50000,
+      totalDriverPayments: 20000,
+      totalLorryOwnerPayments: 15000,
+      totalProfit: 15000
+    };
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(positiveProfitSummary));
 
     fixture.detectChanges();
 
@@ -135,30 +107,13 @@ describe('PaymentSummaryComponent', () => {
   });
 
   it('should identify negative profit correctly', () => {
-    const mockTrips: Trip[] = [
-      {
-        tripId: 'trip-1',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'Location A',
-        dropoffLocation: 'Location B',
-        brokerId: 'broker-1',
-        brokerName: 'Test Broker',
-        brokerPayment: 30000,
-        lorryId: 'lorry-1',
-        lorryOwnerPayment: 15000,
-        driverId: 'driver-1',
-        driverName: 'John Doe',
-        driverPayment: 20000,
-        status: TripStatus.Scheduled,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      }
-    ];
-
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(mockTrips)
-    });
+    const negativeProfitSummary: PaymentSummary = {
+      totalBrokerPayments: 30000,
+      totalDriverPayments: 20000,
+      totalLorryOwnerPayments: 15000,
+      totalProfit: -5000
+    };
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(negativeProfitSummary));
 
     fixture.detectChanges();
 
@@ -167,30 +122,13 @@ describe('PaymentSummaryComponent', () => {
   });
 
   it('should treat zero profit as positive', () => {
-    const mockTrips: Trip[] = [
-      {
-        tripId: 'trip-1',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'Location A',
-        dropoffLocation: 'Location B',
-        brokerId: 'broker-1',
-        brokerName: 'Test Broker',
-        brokerPayment: 35000,
-        lorryId: 'lorry-1',
-        lorryOwnerPayment: 15000,
-        driverId: 'driver-1',
-        driverName: 'John Doe',
-        driverPayment: 20000,
-        status: TripStatus.Scheduled,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      }
-    ];
-
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(mockTrips)
-    });
+    const zeroProfitSummary: PaymentSummary = {
+      totalBrokerPayments: 35000,
+      totalDriverPayments: 20000,
+      totalLorryOwnerPayments: 15000,
+      totalProfit: 0
+    };
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(zeroProfitSummary));
 
     fixture.detectChanges();
 
@@ -198,64 +136,40 @@ describe('PaymentSummaryComponent', () => {
     expect(component.profitClass).toBe('profit-positive');
   });
 
-  it('should update payment summary when filtered trips change', () => {
-    const initialTrips: Trip[] = [
-      {
-        tripId: 'trip-1',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'Location A',
-        dropoffLocation: 'Location B',
-        brokerId: 'broker-1',
-        brokerName: 'Test Broker',
-        brokerPayment: 30000,
-        lorryId: 'lorry-1',
-        lorryOwnerPayment: 10000,
-        driverId: 'driver-1',
-        driverName: 'John Doe',
-        driverPayment: 8000,
-        status: TripStatus.Scheduled,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      }
-    ];
+  it('should update payment summary when filters change', () => {
+    const initialSummary: PaymentSummary = {
+      totalBrokerPayments: 30000,
+      totalDriverPayments: 8000,
+      totalLorryOwnerPayments: 10000,
+      totalProfit: 12000
+    };
+    
+    const updatedSummary: PaymentSummary = {
+      totalBrokerPayments: 20000,
+      totalDriverPayments: 12000,
+      totalLorryOwnerPayments: 5000,
+      totalProfit: 3000
+    };
 
-    const updatedTrips: Trip[] = [
-      {
-        tripId: 'trip-2',
-        dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-16T10:00:00Z',
-        pickupLocation: 'Location C',
-        dropoffLocation: 'Location D',
-        brokerId: 'broker-2',
-        brokerName: 'Another Broker',
-        brokerPayment: 20000,
-        lorryId: 'lorry-2',
-        lorryOwnerPayment: 5000,
-        driverId: 'driver-2',
-        driverName: 'Jane Smith',
-        driverPayment: 12000,
-        status: TripStatus.Delivered,
-        createdAt: '2024-01-16T09:00:00Z',
-        updatedAt: '2024-01-16T09:00:00Z'
-      }
-    ];
-
-    // Set initial trips
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(initialTrips)
-    });
-
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(initialSummary));
     fixture.detectChanges();
 
     expect(component.paymentSummary.totalBrokerPayments).toBe(30000);
     expect(component.paymentSummary.totalProfit).toBe(12000);
 
-    // Update trips
-    Object.defineProperty(dashboardStateSpy, 'filteredTrips$', {
-      get: () => of(updatedTrips)
+    // Simulate filter change
+    tripServiceSpy.getPaymentSummary.and.returnValue(of(updatedSummary));
+    Object.defineProperty(dashboardStateSpy, 'filters$', {
+      get: () => of({
+        dateRange: { startDate: new Date('2024-06-01'), endDate: new Date('2024-06-30') },
+        status: null,
+        brokerId: null,
+        lorryId: null,
+        driverId: null,
+        driverName: null
+      })
     });
-
+    
     component.ngOnInit();
 
     expect(component.paymentSummary.totalBrokerPayments).toBe(20000);

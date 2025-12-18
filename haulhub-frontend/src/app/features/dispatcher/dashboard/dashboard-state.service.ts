@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
+import { BehaviorSubject, Observable, combineLatest, Subject } from 'rxjs';
 import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
 import { TripStatus, Broker, Trip } from '@haulhub/shared';
 import { TripService } from '../../../core/services/trip.service';
@@ -91,6 +91,10 @@ export class DashboardStateService {
   private filteredTripsSubject = new BehaviorSubject<Trip[]>([]);
   public filteredTrips$: Observable<Trip[]> = this.filteredTripsSubject.asObservable();
 
+  // Trigger for refreshing payment summary after data mutations (delete, create, update)
+  private refreshPaymentSummarySubject = new Subject<void>();
+  public refreshPaymentSummary$: Observable<void> = this.refreshPaymentSummarySubject.asObservable();
+
   constructor(
     private tripService: TripService,
     private authService: AuthService
@@ -154,6 +158,13 @@ export class DashboardStateService {
 
   updateFilteredTrips(trips: Trip[]): void {
     this.filteredTripsSubject.next(trips);
+  }
+
+  /**
+   * Trigger payment summary refresh after data mutations (delete, create, update)
+   */
+  triggerPaymentSummaryRefresh(): void {
+    this.refreshPaymentSummarySubject.next();
   }
 
   private getDefaultFilters(): DashboardFilters {

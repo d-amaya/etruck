@@ -3,7 +3,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of, BehaviorSubject } from 'rxjs';
+import { of, BehaviorSubject, Subject } from 'rxjs';
 import { DebugElement } from '@angular/core';
 import { By } from '@angular/platform-browser';
 
@@ -101,6 +101,7 @@ describe('Dashboard Integration Tests', () => {
   let paginationSubject: BehaviorSubject<PaginationState>;
   let loadingSubject: BehaviorSubject<any>;
   let errorSubject: BehaviorSubject<any>;
+  let refreshPaymentSummarySubject: BehaviorSubject<void>;
 
   beforeEach(async () => {
     // Initialize subjects
@@ -118,6 +119,7 @@ describe('Dashboard Integration Tests', () => {
       canRetry: false,
       retryCount: 0
     });
+    refreshPaymentSummarySubject = new BehaviorSubject<void>(undefined);
 
     // Create spies
     dashboardStateService = jasmine.createSpyObj('DashboardStateService', [
@@ -131,21 +133,26 @@ describe('Dashboard Integration Tests', () => {
       'completeLoad',
       'clearError',
       'setError',
-      'updateFilteredTrips'
+      'updateFilteredTrips',
+      'triggerPaymentSummaryRefresh'
     ], {
       filters$: filtersSubject.asObservable(),
       pagination$: paginationSubject.asObservable(),
       loading$: loadingSubject.asObservable(),
       error$: errorSubject.asObservable(),
       filteredTrips$: of([]),
-      filtersAndPagination$: of([defaultFilters, defaultPagination])
+      filtersAndPagination$: of([defaultFilters, defaultPagination]),
+      refreshPaymentSummary$: refreshPaymentSummarySubject.asObservable()
     });
 
     tripService = jasmine.createSpyObj('TripService', [
       'getTrips',
       'deleteTrip',
       'createTrip',
-      'getBrokers'
+      'getBrokers',
+      'getTripSummaryByStatus',
+      'getPaymentSummary',
+      'getPaymentsTimeline'
     ]);
 
     authService = jasmine.createSpyObj('AuthService', [], {
@@ -170,6 +177,27 @@ describe('Dashboard Integration Tests', () => {
     tripService.getBrokers.and.returnValue(of(mockBrokers));
     tripService.deleteTrip.and.returnValue(of({ message: 'Trip deleted successfully' }));
     tripService.createTrip.and.returnValue(of(mockTrips[0]));
+    tripService.getTripSummaryByStatus.and.returnValue(of({
+      [TripStatus.Scheduled]: 1,
+      [TripStatus.PickedUp]: 0,
+      [TripStatus.InTransit]: 1,
+      [TripStatus.Delivered]: 0,
+      [TripStatus.Paid]: 0,
+      [TripStatus.Canceled]: 0
+    }));
+    tripService.getPaymentSummary.and.returnValue(of({
+      totalBrokerPayments: 2700,
+      totalDriverPayments: 1400,
+      totalLorryOwnerPayments: 900,
+      totalProfit: 400
+    }));
+    tripService.getPaymentsTimeline.and.returnValue(of({
+      labels: ['Jan 2024'],
+      brokerPayments: [2700],
+      driverPayments: [1400],
+      lorryOwnerPayments: [900],
+      profit: [400]
+    }));
 
     await TestBed.configureTestingModule({
       imports: [
