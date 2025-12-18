@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TripService } from './trip.service';
 import { DashboardStateService, DashboardFilters } from '../../features/dispatcher/dashboard/dashboard-state.service';
-import { Trip, TripStatus, TripFilters } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, calculateTripProfit } from '@haulhub/shared';
 import { forkJoin } from 'rxjs';
 
 @Injectable({
@@ -281,6 +281,6 @@ export class PdfExportService {
   }
 
   private calculateProfit(trip: Trip): number {
-    return trip.brokerPayment - trip.driverPayment - trip.lorryOwnerPayment;
+    return calculateTripProfit(trip);
   }
 }

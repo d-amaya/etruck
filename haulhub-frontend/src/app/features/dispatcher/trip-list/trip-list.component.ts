@@ -16,7 +16,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatMenuModule } from '@angular/material/menu';
 import { TripService } from '../../../core/services';
-import { Trip, TripStatus, TripFilters, Broker } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-list',
@@ -328,7 +328,7 @@ export class TripListComponent implements OnInit {
   }
 
   calculateProfit(trip: Trip): number {
-    return trip.brokerPayment - trip.lorryOwnerPayment - trip.driverPayment;
+    return calculateTripProfit(trip);
   }
 
   hasActiveFilters(): boolean {

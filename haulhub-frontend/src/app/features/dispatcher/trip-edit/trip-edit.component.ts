@@ -13,7 +13,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TripService } from '../../../core/services';
-import { Broker, CreateTripDto, Trip, TripStatus } from '@haulhub/shared';
+import { Broker, CreateTripDto, Trip, TripStatus, calculateTripProfit } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-edit',
@@ -410,24 +410,20 @@ export class TripEditComponent implements OnInit {
   }
 
   calculateProfit(): number {
-    const brokerPayment = parseFloat(this.tripForm.get('brokerPayment')?.value) || 0;
-    const lorryOwnerPayment = parseFloat(this.tripForm.get('lorryOwnerPayment')?.value) || 0;
-    const driverPayment = parseFloat(this.tripForm.get('driverPayment')?.value) || 0;
-    const lumperFees = parseFloat(this.tripForm.get('lumperFees')?.value) || 0;
-    const detentionFees = parseFloat(this.tripForm.get('detentionFees')?.value) || 0;
+    // Create a temporary trip object from form values
+    const tempTrip: Partial<Trip> = {
+      brokerPayment: parseFloat(this.tripForm.get('brokerPayment')?.value) || 0,
+      lorryOwnerPayment: parseFloat(this.tripForm.get('lorryOwnerPayment')?.value) || 0,
+      driverPayment: parseFloat(this.tripForm.get('driverPayment')?.value) || 0,
+      lumperFees: parseFloat(this.tripForm.get('lumperFees')?.value) || 0,
+      detentionFees: parseFloat(this.tripForm.get('detentionFees')?.value) || 0,
+      fuelAvgCost: parseFloat(this.tripForm.get('fuelAvgCost')?.value) || 0,
+      fuelAvgGallonsPerMile: parseFloat(this.tripForm.get('fuelAvgGallonsPerMile')?.value) || 0,
+      loadedMiles: parseFloat(this.tripForm.get('loadedMiles')?.value) || 0,
+      emptyMiles: parseFloat(this.tripForm.get('emptyMiles')?.value) || 0
+    };
     
-    // Calculate fuel costs if available
-    const fuelAvgCost = parseFloat(this.tripForm.get('fuelAvgCost')?.value) || 0;
-    const fuelAvgGallonsPerMile = parseFloat(this.tripForm.get('fuelAvgGallonsPerMile')?.value) || 0;
-    const loadedMiles = parseFloat(this.tripForm.get('loadedMiles')?.value) || 0;
-    const emptyMiles = parseFloat(this.tripForm.get('emptyMiles')?.value) || 0;
-    const totalMiles = loadedMiles + emptyMiles;
-    const fuelCost = (fuelAvgCost > 0 && fuelAvgGallonsPerMile > 0) 
-      ? totalMiles * fuelAvgGallonsPerMile * fuelAvgCost 
-      : 0;
-    
-    const totalExpenses = lorryOwnerPayment + driverPayment + lumperFees + detentionFees + fuelCost;
-    return brokerPayment - totalExpenses;
+    return calculateTripProfit(tempTrip as Trip);
   }
 
   formatCurrency(amount: number): string {

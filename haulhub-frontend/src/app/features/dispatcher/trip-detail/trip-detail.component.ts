@@ -8,7 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { TripService } from '../../../core/services';
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-detail',
@@ -133,23 +133,7 @@ export class TripDetailComponent implements OnInit {
 
   calculateProfit(): number {
     if (!this.trip) return 0;
-    
-    let totalExpenses = this.trip.lorryOwnerPayment + this.trip.driverPayment;
-    
-    // Add fuel costs if available
-    if (this.hasFuelData()) {
-      totalExpenses += this.calculateFuelCost();
-    }
-    
-    // Add additional fees if available
-    if (this.trip.lumperFees) {
-      totalExpenses += this.trip.lumperFees;
-    }
-    if (this.trip.detentionFees) {
-      totalExpenses += this.trip.detentionFees;
-    }
-    
-    return this.trip.brokerPayment - totalExpenses;
+    return calculateTripProfit(this.trip);
   }
 
   /**
@@ -169,13 +153,7 @@ export class TripDetailComponent implements OnInit {
    */
   hasFuelData(): boolean {
     if (!this.trip) return false;
-    
-    return !!(
-      this.trip.fuelAvgCost && 
-      this.trip.fuelAvgCost > 0 && 
-      this.trip.fuelAvgGallonsPerMile && 
-      this.trip.fuelAvgGallonsPerMile > 0
-    );
+    return hasFuelData(this.trip);
   }
 
   /**
@@ -197,13 +175,8 @@ export class TripDetailComponent implements OnInit {
    * Validates: Requirements 6.2
    */
   calculateFuelCost(): number {
-    if (!this.trip || !this.hasFuelData()) return 0;
-    
-    const totalMiles = this.calculateTotalMiles();
-    const gallonsPerMile = this.trip.fuelAvgGallonsPerMile || 0;
-    const costPerGallon = this.trip.fuelAvgCost || 0;
-    
-    return totalMiles * gallonsPerMile * costPerGallon;
+    if (!this.trip) return 0;
+    return calculateFuelCost(this.trip);
   }
 
   // Expose Math to template

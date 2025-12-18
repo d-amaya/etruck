@@ -12,7 +12,7 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { TripService } from '../../../../core/services';
-import { Trip, TripStatus, TripFilters } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
@@ -325,24 +325,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   calculateProfit(trip: Trip): number {
-    let totalExpenses = trip.lorryOwnerPayment + trip.driverPayment;
-    
-    // Add fuel costs if available
-    if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-      const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-      const fuelCost = totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
-      totalExpenses += fuelCost;
-    }
-    
-    // Add additional fees
-    if (trip.lumperFees) {
-      totalExpenses += trip.lumperFees;
-    }
-    if (trip.detentionFees) {
-      totalExpenses += trip.detentionFees;
-    }
-    
-    return trip.brokerPayment - totalExpenses;
+    return calculateTripProfit(trip);
   }
 
   getStatusClass(status: TripStatus): string {
