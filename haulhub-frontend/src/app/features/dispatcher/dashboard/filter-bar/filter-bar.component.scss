@@ -39,6 +39,31 @@
   }
 }
 
+.date-range-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 4px;
+  
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: #dc2626;
+  }
+  
+  span {
+    flex: 1;
+    line-height: 1.4;
+  }
+}
+
 .compact-presets {
   display: flex;
   gap: 4px;
@@ -235,6 +260,17 @@
 
   .compact-date-section {
     gap: 10px;
+  }
+
+  .date-range-error {
+    padding: 10px;
+    font-size: 12px;
+    
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
   }
 
   .compact-presets {

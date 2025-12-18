@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -39,6 +39,7 @@ export class FilterBarComponent implements OnInit, OnDestroy {
   statusOptions = Object.values(TripStatus);
   brokers: Broker[] = [];
   activeFilterCount = 0;
+  dateRangeError: string | null = null;
 
   maxDate = new Date();
   minDate = new Date();
@@ -61,7 +62,39 @@ export class FilterBarComponent implements OnInit, OnDestroy {
       brokerId: [null],
       lorryId: [''],
       driverName: ['']
-    });
+    }, { validators: this.dateRangeValidator.bind(this) });
+  }
+
+  /**
+   * Custom validator to ensure date range does not exceed 1 year
+   */
+  private dateRangeValidator(control: AbstractControl): ValidationErrors | null {
+    const startDate = control.get('startDate')?.value;
+    const endDate = control.get('endDate')?.value;
+
+    if (!startDate || !endDate) {
+      this.dateRangeError = null;
+      return null;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Calculate the difference in milliseconds
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    console.log('Date range validation:', { start, end, diffDays });
+
+    // Check if range exceeds 365 days (1 year)
+    if (diffDays > 365) {
+      this.dateRangeError = 'Date range cannot exceed 1 year. Please select a shorter time period.';
+      console.log('Date range exceeded!');
+      return { dateRangeExceeded: true };
+    }
+
+    this.dateRangeError = null;
+    return null;
   }
 
   ngOnInit(): void {
@@ -86,22 +119,26 @@ export class FilterBarComponent implements OnInit, OnDestroy {
       )
       .subscribe(formValue => {
         console.log('Filter form changed:', formValue);
-        this.dashboardState.updateFilters({
-          dateRange: {
-            startDate: formValue.startDate,
-            endDate: formValue.endDate
-          },
-          status: formValue.status,
-          brokerId: formValue.brokerId,
-          lorryId: formValue.lorryId?.trim() || null,
-          driverName: formValue.driverName?.trim() || null,
-          driverId: null // Not used in filter bar
-        });
         
-        // Complete filter update loading after a short delay
-        setTimeout(() => {
-          this.dashboardState.completeLoad();
-        }, 500);
+        // Only update filters if form is valid
+        if (this.filterForm.valid) {
+          this.dashboardState.updateFilters({
+            dateRange: {
+              startDate: formValue.startDate,
+              endDate: formValue.endDate
+            },
+            status: formValue.status,
+            brokerId: formValue.brokerId,
+            lorryId: formValue.lorryId?.trim() || null,
+            driverName: formValue.driverName?.trim() || null,
+            driverId: null // Not used in filter bar
+          });
+          
+          // Complete filter update loading after a short delay
+          setTimeout(() => {
+            this.dashboardState.completeLoad();
+          }, 500);
+        }
       });
 
     // Track active filter count
