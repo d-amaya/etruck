@@ -121,9 +121,23 @@ export class DashboardStateService {
 
   updatePagination(pagination: Partial<PaginationState>): void {
     const currentPagination = this.paginationSubject.value;
-    const newPagination = { ...currentPagination, ...pagination };
-    this.paginationSubject.next(newPagination);
-    this.savePaginationToStorage(newPagination);
+    
+    // If page size changed, reset to page 0 and clear pagination tokens
+    if (pagination.pageSize !== undefined && pagination.pageSize !== currentPagination.pageSize) {
+      const newPagination = {
+        ...currentPagination,
+        ...pagination,
+        page: 0,
+        pageTokens: [],
+        lastEvaluatedKey: undefined
+      };
+      this.paginationSubject.next(newPagination);
+      this.savePaginationToStorage(newPagination);
+    } else {
+      const newPagination = { ...currentPagination, ...pagination };
+      this.paginationSubject.next(newPagination);
+      this.savePaginationToStorage(newPagination);
+    }
   }
 
   clearFilters(): void {

@@ -886,13 +886,18 @@ describe('TripsService', () => {
           JSON.stringify({ PK: 'DISPATCHER#dispatcher-123', SK: 'TRIP#2024-02-15#trip-1' }),
         ).toString('base64');
 
-        mockDynamoDBClient.send.mockResolvedValueOnce({
-          Items: [{ tripId: 'trip-2', dispatcherId, scheduledPickupDatetime: '2024-02-16T08:00:00.000Z' }],
-          LastEvaluatedKey: { PK: 'DISPATCHER#dispatcher-123', SK: 'TRIP#2024-02-16#trip-2' },
+        // Mock returns 2 items (limit+1) to indicate there are more pages
+        mockDynamoDBClient.send.mockResolvedValue({
+          Items: [
+            { tripId: 'trip-2', dispatcherId, scheduledPickupDatetime: '2024-02-16T08:00:00.000Z' },
+            { tripId: 'trip-3', dispatcherId, scheduledPickupDatetime: '2024-02-17T08:00:00.000Z' },
+          ],
+          LastEvaluatedKey: { PK: 'DISPATCHER#dispatcher-123', SK: 'TRIP#2024-02-17#trip-3' },
         });
 
         const result = await service.getTrips(dispatcherId, UserRole.Dispatcher, {
           lastEvaluatedKey,
+          limit: 1,
         });
 
         expect(result.trips).toHaveLength(1);

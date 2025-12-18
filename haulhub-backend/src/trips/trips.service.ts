@@ -742,44 +742,95 @@ export class TripsService {
     const { filterExpression, filterAttributeNames, filterAttributeValues } =
       this.buildSecondaryFilters(filters);
 
-    // Build query command for GSI1 on new trips table
-    const queryParams: any = {
-      TableName: this.tripsTableName,
-      IndexName: 'GSI1',
-      KeyConditionExpression: keyConditionExpression,
-      ExpressionAttributeValues: {
-        ...expressionAttributeValues,
-        ...filterAttributeValues,
-      },
-      Limit: filters.limit ? Number(filters.limit) : 50,
-      ScanIndexForward: false, // Return results in descending order (newest first)
-    };
+    const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+    const trips: Trip[] = [];
+    let lastEvaluatedKey = filters.lastEvaluatedKey;
+    
+    // When using FilterExpression, DynamoDB applies the filter AFTER limiting results
+    // So we need to keep fetching until we have enough items or run out of data
+    // Fetch one extra item to determine if there are more pages
+    const fetchLimit = requestedLimit + 1;
+    const maxIterations = 10; // Prevent infinite loops
+    let iterations = 0;
+    
+    while (trips.length < fetchLimit && iterations < maxIterations) {
+      iterations++;
+      
+      // Build query command for GSI1 on new trips table
+      const queryParams: any = {
+        TableName: this.tripsTableName,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: {
+          ...expressionAttributeValues,
+          ...filterAttributeValues,
+        },
+        // Fetch more items than needed to account for filtering
+        Limit: filterExpression ? fetchLimit * 3 : fetchLimit,
+        ScanIndexForward: false, // Return results in descending order (newest first)
+      };
 
-    if (filterExpression) {
-      queryParams.FilterExpression = filterExpression;
-      queryParams.ExpressionAttributeNames = filterAttributeNames;
-    }
+      if (filterExpression) {
+        queryParams.FilterExpression = filterExpression;
+        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      }
 
-    if (filters.lastEvaluatedKey) {
-      try {
-        queryParams.ExclusiveStartKey = JSON.parse(
-          Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
-        );
-      } catch (error) {
-        throw new BadRequestException('Invalid lastEvaluatedKey format');
+      if (lastEvaluatedKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(lastEvaluatedKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
+      }
+
+      const queryCommand = new QueryCommand(queryParams);
+      const result = await dynamodbClient.send(queryCommand);
+
+      const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+      trips.push(...batchTrips);
+
+      // Update lastEvaluatedKey for next iteration or response
+      if (result.LastEvaluatedKey) {
+        lastEvaluatedKey = Buffer.from(
+          JSON.stringify(result.LastEvaluatedKey),
+        ).toString('base64');
+      } else {
+        // No more items available
+        lastEvaluatedKey = undefined;
+        break;
+      }
+      
+      // If we got fewer items than requested, there might not be more data
+      if (batchTrips.length === 0) {
+        break;
       }
     }
 
-    const queryCommand = new QueryCommand(queryParams);
-    const result = await dynamodbClient.send(queryCommand);
+    // Check if there are more items beyond the requested limit
+    const hasMoreItems = trips.length > requestedLimit;
+    
+    // Trim to requested limit
+    const trimmedTrips = trips.slice(0, requestedLimit);
+    
+    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
+      trips: trimmedTrips 
+    };
 
-    const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
-
-    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips };
-
-    if (result.LastEvaluatedKey) {
+    // Include lastEvaluatedKey if there are more items
+    // We need to get the key from the last item we're returning
+    if (hasMoreItems && trimmedTrips.length > 0) {
+      const lastTrip = trimmedTrips[trimmedTrips.length - 1];
+      // Create a lastEvaluatedKey from the last returned trip
+      const lastKey = {
+        PK: `TRIP#${lastTrip.tripId}`,
+        SK: 'METADATA',
+        GSI1PK: `DISPATCHER#${dispatcherId}`,
+        GSI1SK: `${lastTrip.scheduledPickupDatetime}#${lastTrip.tripId}`,
+      };
       response.lastEvaluatedKey = Buffer.from(
-        JSON.stringify(result.LastEvaluatedKey),
+        JSON.stringify(lastKey),
       ).toString('base64');
     }
 

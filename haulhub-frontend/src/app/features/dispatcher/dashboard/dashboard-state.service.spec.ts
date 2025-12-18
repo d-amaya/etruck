@@ -183,22 +183,24 @@ describe('DashboardStateService', () => {
       });
     });
 
-    it('should update page size', (done) => {
+    it('should update page size and reset page to 0', (done) => {
       service.updatePagination({ pageSize: 50 });
 
       service.pagination$.subscribe(pagination => {
-        expect(pagination.page).toBe(0); // page remains unchanged
+        expect(pagination.page).toBe(0); // page resets to 0 when pageSize changes
         expect(pagination.pageSize).toBe(50);
+        expect(pagination.pageTokens).toEqual([]); // tokens cleared
         done();
       });
     });
 
-    it('should update both page and pageSize', (done) => {
+    it('should reset page to 0 when pageSize changes even if page is also provided', (done) => {
       service.updatePagination({ page: 2, pageSize: 100 });
 
       service.pagination$.subscribe(pagination => {
-        expect(pagination.page).toBe(2);
+        expect(pagination.page).toBe(0); // page resets to 0 when pageSize changes
         expect(pagination.pageSize).toBe(100);
+        expect(pagination.pageTokens).toEqual([]); // tokens cleared
         done();
       });
     });
