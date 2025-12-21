@@ -157,10 +157,11 @@ mat-toolbar {
       width: 22px;
       height: 22px;
     }
-  }
 
-  .app-name {
-    display: none;
+    .app-name {
+      font-size: 16px;
+      margin-left: 2px;
+    }
   }
 
   .navigation {
