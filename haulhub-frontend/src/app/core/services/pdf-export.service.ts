@@ -4,7 +4,8 @@ import autoTable from 'jspdf-autotable';
 import { TripService } from './trip.service';
 import { DashboardStateService, DashboardFilters } from '../../features/dispatcher/dashboard/dashboard-state.service';
 import { Trip, TripStatus, TripFilters, calculateTripProfit } from '@haulhub/shared';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -18,20 +19,44 @@ export class PdfExportService {
   exportDashboard(): void {
     const filters = this.dashboardState['filtersSubject'].value;
 
-    // Load all required data
+    // Load all required data - fetch ALL trips by following pagination
     forkJoin({
-      tripsResponse: this.tripService.getTrips(this.buildApiFilters(filters)),
+      trips: this.fetchAllTrips(this.buildApiFilters(filters)),
       summaryByStatus: this.tripService.getTripSummaryByStatus(this.buildApiFilters(filters)),
       paymentSummary: this.tripService.getPaymentSummary(this.buildApiFilters(filters))
     }).subscribe({
       next: (data) => {
-        this.generatePdf(data.tripsResponse.trips, data.summaryByStatus, data.paymentSummary, filters);
+        this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, filters);
       },
       error: (error) => {
         console.error('Error loading dashboard data for PDF export:', error);
         alert('Failed to export PDF. Please try again.');
       }
     });
+  }
+
+  private fetchAllTrips(filters: TripFilters): Observable<Trip[]> {
+    const allTrips: Trip[] = [];
+    
+    const fetchPage = (lastKey?: string): Observable<Trip[]> => {
+      const pageFilters = lastKey ? { ...filters, lastEvaluatedKey: lastKey } : filters;
+      
+      return this.tripService.getTrips(pageFilters).pipe(
+        switchMap(response => {
+          allTrips.push(...response.trips);
+          
+          // If there's more data, fetch the next page
+          if (response.lastEvaluatedKey) {
+            return fetchPage(response.lastEvaluatedKey);
+          }
+          
+          // No more pages, return all trips
+          return of(allTrips);
+        })
+      );
+    };
+    
+    return fetchPage();
   }
 
   private generatePdf(
@@ -147,26 +172,30 @@ export class PdfExportService {
         trip.driverName,
         this.getStatusLabel(trip.status),
         this.formatCurrency(trip.brokerPayment),
+        this.formatCurrency(trip.driverPayment),
+        this.formatCurrency(trip.lorryOwnerPayment),
         this.formatCurrency(this.calculateProfit(trip))
       ]);
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Date', 'Pickup', 'Dropoff', 'Broker', 'Lorry', 'Driver', 'Status', 'Broker Pay', 'Profit']],
+        head: [['Date', 'Pickup', 'Dropoff', 'Broker', 'Lorry', 'Driver', 'Status', 'Broker Pay', 'Driver Pay', 'Owner Pay', 'Profit']],
         body: tripTableData,
         theme: 'striped',
-        headStyles: { fillColor: [66, 66, 66], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [66, 66, 66], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 7, cellPadding: 2 },
         columnStyles: {
-          0: { cellWidth: 22 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 25 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 22, halign: 'right' },
-          8: { cellWidth: 22, halign: 'right' }
+          0: { cellWidth: 20 },
+          1: { cellWidth: 28 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 20, halign: 'right' },
+          8: { cellWidth: 20, halign: 'right' },
+          9: { cellWidth: 20, halign: 'right' },
+          10: { cellWidth: 20, halign: 'right' }
         },
         margin: { left: 14, right: 14 }
       });

@@ -1,170 +1,130 @@
 .dashboard-container {
+  padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
   background-color: #fafafa;
   min-height: calc(100vh - 64px);
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
 }
 
-.filter-section {
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 24px;
+  background: white;
+  padding: 20px 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  .page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    font-size: 28px;
+    font-weight: 500;
+    color: #333;
+
+    mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+      color: #1976d2;
+    }
+  }
+
+  .create-trip-btn {
+    mat-icon {
+      margin-right: 8px;
+    }
+  }
 }
 
 .dashboard-content {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
 
 .content-wrapper {
-  display: contents;
+  position: relative;
 }
 
-.skeleton-content,
-.loaded-content {
-  display: grid;
-  grid-template-columns: 1fr;
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
 
-// Compact Top Row Layout
-.compact-top-row {
-  display: grid;
-  grid-template-columns: 300px 1fr 280px; // Fixed width for filters and payment, flexible for charts
-  gap: 20px;
-  align-items: start;
-  margin-bottom: 16px;
+.loaded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.compact-filters-section {
-  background: white;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  min-width: 0;
+// Table View Layout
+.table-view {
+  width: 100%;
+
+  .table-section {
+    width: 100%;
+  }
 }
 
-.compact-charts-section {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  min-width: 0;
-  min-height: 300px; // Ensure consistent height
+// Analytics View Layout
+.analytics-view {
+  width: 100%;
 }
 
-.compact-payment-section {
-  background: white;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  min-width: 0;
+// Payments View Layout
+.payments-view {
+  width: 100%;
 }
 
-.summary-cards-section {
-  grid-column: 1 / -1;
-}
-
-.table-section {
-  grid-column: 1 / -1;
-}
-
-// Responsive adjustments for large screens (1280px+)
-@media (min-width: 1280px) {
+// Responsive design
+@media (max-width: 1200px) {
   .dashboard-container {
-    padding: 32px;
-  }
-
-  .dashboard-content {
-    gap: 32px;
-  }
-
-  .compact-top-row {
-    gap: 24px;
-    grid-template-columns: 320px 1fr 300px; // Slightly larger on big screens
+    padding: 16px;
   }
 }
 
-// Responsive adjustments for tablets (768px - 1279px)
-@media (max-width: 1279px) {
-  .compact-top-row {
-    grid-template-columns: 1fr; // Stack vertically on smaller screens
-    gap: 16px;
-  }
-  
-  .compact-charts-section {
-    min-height: 250px; // Smaller height on tablets
-  }
-}
-
-// Responsive adjustments for small tablets (768px - 1023px)
-@media (min-width: 768px) and (max-width: 1023px) {
-  .dashboard-container {
-    padding: 20px;
-  }
-
-  .dashboard-content {
-    gap: 20px;
-  }
-
-  .compact-top-row {
-    gap: 16px;
-  }
-}
-
-// Responsive adjustments for mobile (portrait and landscape)
-@media (max-width: 1023px) {
-  .dashboard-container {
-    padding: 10px;
-    background-color: #fafafa;
-    width: 100%;
-    max-width: 100vw;
-  }
-
-  .dashboard-content {
-    gap: 10px;
-    width: 100%;
-  }
-
-  .compact-top-row {
-    gap: 10px;
-    width: 100%;
-  }
-  
-  .compact-filters-section,
-  .compact-charts-section,
-  .compact-payment-section {
-    padding: 10px;
-    border-radius: 4px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  
-  .compact-charts-section {
-    min-height: 200px;
-  }
-}
-
-// Responsive adjustments for very small screens (below 480px)
-@media (max-width: 479px) {
+@media (max-width: 768px) {
   .dashboard-container {
     padding: 12px;
   }
 
-  .dashboard-content {
-    gap: 12px;
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+
+    .page-title {
+      font-size: 24px;
+
+      mat-icon {
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    .create-trip-btn {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 8px;
   }
 
-  .compact-top-row {
-    gap: 8px;
-  }
-  
-  .compact-filters-section,
-  .compact-charts-section,
-  .compact-payment-section {
+  .page-header {
     padding: 12px;
+
+    .page-title {
+      font-size: 20px;
+    }
   }
 }

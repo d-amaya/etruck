@@ -1,4 +1,73 @@
 <div class="trip-table-container" role="region" aria-label="Trip list">
+  <!-- Table Filters -->
+  <div class="table-filters" *ngIf="!loading">
+    <form [formGroup]="filterForm" class="filter-row">
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Statuses</mat-option>
+          <mat-option *ngFor="let status of statusOptions" [value]="status">
+            {{ getStatusLabel(status) }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Broker</mat-label>
+        <mat-select formControlName="brokerId" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Brokers</mat-option>
+          <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+            {{ broker.brokerName }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Truck ID</mat-label>
+        <input matInput formControlName="lorryId" placeholder="License plate" 
+               (blur)="onTextInputBlur()" 
+               (keydown)="onTextInputKeydown($event)">
+        <button mat-icon-button matSuffix *ngIf="filterForm.get('lorryId')?.value" 
+                (click)="clearField('lorryId')" type="button" tabindex="-1">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Driver Name</mat-label>
+        <input matInput formControlName="driverName" placeholder="Driver name" 
+               (blur)="onTextInputBlur()" 
+               (keydown)="onTextInputKeydown($event)">
+        <button mat-icon-button matSuffix *ngIf="filterForm.get('driverName')?.value" 
+                (click)="clearField('driverName')" type="button" tabindex="-1">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <div class="spacer"></div>
+
+      <div class="action-buttons-group">
+        <button mat-icon-button (click)="clearAllFilters()" type="button"
+                [matTooltip]="'Clear all filters'"
+                class="action-btn clear-btn">
+          <mat-icon>filter_alt_off</mat-icon>
+        </button>
+
+        <button mat-icon-button (click)="exportPDF()" type="button"
+                [matTooltip]="'Export to PDF'"
+                class="action-btn export-btn">
+          <mat-icon>download</mat-icon>
+        </button>
+
+        <button mat-icon-button (click)="createTrip()" type="button"
+                [matTooltip]="'Create new trip'"
+                class="action-btn create-btn">
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
+    </form>
+  </div>
+
   <div class="table-wrapper" *ngIf="!loading && trips.length > 0">
     <table mat-table [dataSource]="trips" class="trip-table" 
            role="table" [attr.aria-label]="'Trip list with ' + totalTrips + ' total trips'">
@@ -78,6 +147,24 @@
         <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
             [attr.aria-label]="'Broker payment: ' + formatCurrency(trip.brokerPayment)">
           {{ formatCurrency(trip.brokerPayment) }}
+        </td>
+      </ng-container>
+
+      <!-- Driver Payment Column -->
+      <ng-container matColumnDef="driverPayment">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Driver Pay</th>
+        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
+            [attr.aria-label]="'Driver payment: ' + formatCurrency(trip.driverPayment)">
+          {{ formatCurrency(trip.driverPayment) }}
+        </td>
+      </ng-container>
+
+      <!-- Lorry Owner Payment Column -->
+      <ng-container matColumnDef="lorryOwnerPayment">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Owner Pay</th>
+        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
+            [attr.aria-label]="'Lorry owner payment: ' + formatCurrency(trip.lorryOwnerPayment)">
+          {{ formatCurrency(trip.lorryOwnerPayment) }}
         </td>
       </ng-container>
 

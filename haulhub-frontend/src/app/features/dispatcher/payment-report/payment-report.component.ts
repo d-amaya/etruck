@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -13,8 +13,12 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule, MatTabChangeEvent } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { TripService } from '../../../core/services/trip.service';
 import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
+import { SharedFilterService } from '../dashboard/shared-filter.service';
+import { DashboardStateService } from '../dashboard/dashboard-state.service';
 
 @Component({
   selector: 'app-payment-report',
@@ -37,26 +41,14 @@ import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
   templateUrl: './payment-report.component.html',
   styleUrls: ['./payment-report.component.scss']
 })
-export class PaymentReportComponent implements OnInit {
+export class PaymentReportComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   filterForm: FormGroup;
   report: DispatcherPaymentReport | null = null;
   loading = false;
   activeTabIndex = 0; // Initialize to 0 for "By Broker" tab (first tab)
 
   // Table columns
-  tripColumns: string[] = [
-    'scheduledPickupDatetime',
-    'pickupLocation',
-    'dropoffLocation',
-    'brokerName',
-    'lorryId',
-    'driverName',
-    'brokerPayment',
-    'lorryOwnerPayment',
-    'driverPayment',
-    'status'
-  ];
-
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
   lorryColumns: string[] = ['lorryId', 'totalPayment', 'tripCount'];
@@ -65,7 +57,9 @@ export class PaymentReportComponent implements OnInit {
     private fb: FormBuilder,
     private tripService: TripService,
     private snackBar: MatSnackBar,
-    private router: Router
+    private router: Router,
+    private sharedFilterService: SharedFilterService,
+    private dashboardStateService: DashboardStateService
   ) {
     this.filterForm = this.fb.group({
       startDate: [null],
@@ -74,17 +68,24 @@ export class PaymentReportComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Set default date range to current month
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    this.filterForm.patchValue({
-      startDate: firstDay,
-      endDate: lastDay
-    });
+    // Subscribe to shared filter changes
+    this.sharedFilterService.filters$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(filters => {
+        // Update form with shared filter values
+        this.filterForm.patchValue({
+          startDate: filters.dateRange.startDate,
+          endDate: filters.dateRange.endDate
+        }, { emitEvent: false });
+        
+        // Load report with new filters
+        this.loadReport();
+      });
+  }
 
-    this.loadReport();
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadReport(): void {
@@ -93,6 +94,8 @@ export class PaymentReportComponent implements OnInit {
     }
 
     this.loading = true;
+    this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
+    
     const formValue = this.filterForm.value;
     
     const filters: PaymentReportFilters = {};
@@ -113,12 +116,13 @@ export class PaymentReportComponent implements OnInit {
     } else if (this.activeTabIndex === 2) {
       filters.groupBy = 'lorry';
     }
-    // activeTabIndex === 3 is "Trip Details" tab, no groupBy needed
 
     this.tripService.getPaymentReport(filters).subscribe({
       next: (report) => {
         this.report = report as DispatcherPaymentReport;
         this.loading = false;
+        this.dashboardStateService.setLoadingState(false);
+        this.dashboardStateService.clearError();
       },
       error: (error) => {
         console.error('Error loading payment report:', error);
@@ -126,6 +130,8 @@ export class PaymentReportComponent implements OnInit {
           duration: 3000
         });
         this.loading = false;
+        this.dashboardStateService.setLoadingState(false);
+        this.dashboardStateService.setError('Failed to load payment report. Please try again.');
       }
     });
   }
@@ -205,6 +211,20 @@ export class PaymentReportComponent implements OnInit {
       totalPayment: data.totalPayment,
       tripCount: data.tripCount
     }));
+  }
+
+  getTotalExpenses(): number {
+    if (!this.report) {
+      return 0;
+    }
+    
+    // The backend should already calculate these totals using calculateTripExpenses
+    // from @haulhub/shared, which includes:
+    // - Fuel costs (calculated from fuelAvgCost * fuelAvgGallonsPerMile * totalMiles)
+    // - Lumper fees
+    // - Detention fees
+    // These are returned as totalAdditionalFees in the report
+    return this.report.totalAdditionalFees || 0;
   }
 
   goBack(): void {

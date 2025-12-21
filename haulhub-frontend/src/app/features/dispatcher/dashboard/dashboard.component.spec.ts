@@ -2,10 +2,14 @@ import { fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { DashboardStateService } from './dashboard-state.service';
+import { SharedFilterService } from './shared-filter.service';
+import { Router } from '@angular/router';
 
 describe('DashboardComponent', () => {
   let component: DashboardComponent;
   let dashboardStateServiceSpy: jasmine.SpyObj<DashboardStateService>;
+  let sharedFilterServiceSpy: jasmine.SpyObj<SharedFilterService>;
+  let routerSpy: jasmine.SpyObj<Router>;
 
   const mockLoadingState = {
     isLoading: false,
@@ -31,7 +35,19 @@ describe('DashboardComponent', () => {
       error$: of(mockErrorState)
     });
 
-    component = new DashboardComponent(dashboardStateServiceSpy);
+    sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [], {
+      viewMode$: of('table')
+    });
+
+    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const cdrSpy = jasmine.createSpyObj('ChangeDetectorRef', ['detectChanges']);
+
+    component = new DashboardComponent(
+      dashboardStateServiceSpy,
+      sharedFilterServiceSpy,
+      routerSpy,
+      cdrSpy
+    );
   });
 
   it('should create', () => {

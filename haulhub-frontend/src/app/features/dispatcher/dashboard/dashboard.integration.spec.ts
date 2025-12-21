@@ -142,7 +142,8 @@ describe('Dashboard Integration Tests', () => {
       error$: errorSubject.asObservable(),
       filteredTrips$: of([]),
       filtersAndPagination$: of([defaultFilters, defaultPagination]),
-      refreshPaymentSummary$: refreshPaymentSummarySubject.asObservable()
+      refreshPaymentSummary$: refreshPaymentSummarySubject.asObservable(),
+      brokers$: of(mockBrokers)
     });
 
     tripService = jasmine.createSpyObj('TripService', [
@@ -383,14 +384,10 @@ describe('Dashboard Integration Tests', () => {
 
       fixture.detectChanges();
 
-      const filterBar = fixture.debugElement.query(By.css('app-filter-bar'));
-      const paymentSummary = fixture.debugElement.query(By.css('app-payment-summary'));
-      const charts = fixture.debugElement.query(By.css('app-dashboard-charts'));
+      const filterCard = fixture.debugElement.query(By.css('app-unified-filter-card'));
       const tripTable = fixture.debugElement.query(By.css('app-trip-table'));
 
-      expect(filterBar).toBeTruthy();
-      expect(paymentSummary).toBeTruthy();
-      expect(charts).toBeTruthy();
+      expect(filterCard).toBeTruthy();
       expect(tripTable).toBeTruthy();
     });
 
@@ -398,8 +395,8 @@ describe('Dashboard Integration Tests', () => {
       // Requirement 6.2: Filter bar should always be visible
       fixture.detectChanges();
 
-      const filterBar = fixture.debugElement.query(By.css('app-filter-bar'));
-      expect(filterBar).toBeTruthy();
+      const filterCard = fixture.debugElement.query(By.css('app-unified-filter-card'));
+      expect(filterCard).toBeTruthy();
 
       // During initial loading, skeleton content should be shown
       loadingSubject.next({
@@ -528,7 +525,7 @@ describe('Dashboard Integration Tests', () => {
       expect(dashboardContainer).toBeTruthy();
 
       // Verify main sections are present
-      const filterSection = fixture.debugElement.query(By.css('.compact-filters-section'));
+      const filterSection = fixture.debugElement.query(By.css('app-unified-filter-card'));
       expect(filterSection).toBeTruthy();
     });
 
@@ -610,9 +607,7 @@ describe('Dashboard Integration Tests', () => {
 
       // Verify all expected UI components are integrated
       const expectedComponents = [
-        'app-filter-bar',
-        'app-payment-summary',
-        'app-dashboard-charts',
+        'app-unified-filter-card',
         'app-trip-table'
       ];
 

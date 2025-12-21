@@ -119,27 +119,8 @@ export class HeaderComponent implements OnInit {
     const user = this.authService.currentUserValue;
     if (!user) return [];
 
-    const items = [];
-
-    // Add Dashboard for all roles
-    switch (user.role) {
-      case UserRole.Dispatcher:
-        items.push({ label: 'Dashboard', route: '/dispatcher/dashboard' });
-        items.push({ label: 'Invoices', route: '/dispatcher/invoices' });
-        items.push({ label: 'Analytics', route: '/dispatcher/analytics' });
-        break;
-      case UserRole.LorryOwner:
-        items.push({ label: 'Dashboard', route: '/truck-owner/dashboard' });
-        break;
-      case UserRole.Driver:
-        items.push({ label: 'Dashboard', route: '/driver/dashboard' });
-        break;
-      case UserRole.Admin:
-        items.push({ label: 'Dashboard', route: '/admin/dashboard' });
-        break;
-    }
-
-    return items;
+    // No navigation items needed - role-based title shown in dashboard
+    return [];
   }
 
   navigateTo(route: string): void {

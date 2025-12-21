@@ -1,0 +1,69 @@
+<mat-card class="unified-filter-card">
+  <mat-card-content>
+    <div class="card-header">
+      <div class="title-row">
+        <h1 class="page-title">
+          <mat-icon>dashboard</mat-icon>
+          Dispatcher Dashboard
+        </h1>
+        <div class="view-section-header">
+          <span class="view-label">View:</span>
+          <app-view-mode-selector class="view-mode-inline"></app-view-mode-selector>
+        </div>
+      </div>
+      <h2 class="filter-title">
+        <mat-icon>date_range</mat-icon>
+        Date Range
+      </h2>
+    </div>
+
+    <form [formGroup]="filterForm" class="filter-form">
+      <!-- Date Range Section -->
+      <div class="filter-section date-section">
+        <div class="date-row">
+          <div class="date-inputs">
+            <mat-form-field appearance="outline" class="date-field">
+              <mat-label>From</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="startDate"
+                     [max]="maxDate" [min]="minDate">
+              <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="date-field">
+              <mat-label>To</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="endDate"
+                     [max]="maxDate" [min]="minDate">
+              <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+            </mat-form-field>
+
+            <div class="date-presets">
+              <button mat-button type="button" (click)="setDatePreset('30days')"
+                      [class.active]="isPresetActive('30days')">
+                Last 30 Days
+              </button>
+              <button mat-button type="button" (click)="setDatePreset('month')"
+                      [class.active]="isPresetActive('month')">
+                This Month
+              </button>
+              <button mat-button type="button" (click)="setDatePreset('year')"
+                      [class.active]="isPresetActive('year')">
+                This Year
+              </button>
+              <button mat-button type="button" (click)="setDatePreset('365days')"
+                      [class.active]="isPresetActive('365days')">
+                Last 365 Days
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="dateRangeError" class="date-range-error">
+          <mat-icon>error</mat-icon>
+          <span>{{ dateRangeError }}</span>
+        </div>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

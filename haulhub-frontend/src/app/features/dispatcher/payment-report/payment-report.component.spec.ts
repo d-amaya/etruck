@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { PaymentReportComponent } from './payment-report.component';
 import { TripService } from '../../../core/services/trip.service';
@@ -60,8 +62,11 @@ describe('PaymentReportComponent', () => {
   };
 
   beforeEach(async () => {
-    const tripServiceSpy = jasmine.createSpyObj('TripService', ['getPaymentReport']);
+    const tripServiceSpy = jasmine.createSpyObj('TripService', ['getPaymentReport', 'getBrokers']);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+
+    // Mock getBrokers to return empty array (needed by DashboardStateService)
+    tripServiceSpy.getBrokers.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [
@@ -70,6 +75,8 @@ describe('PaymentReportComponent', () => {
         NoopAnimationsModule
       ],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: TripService, useValue: tripServiceSpy },
         { provide: MatSnackBar, useValue: snackBarSpy }
       ]

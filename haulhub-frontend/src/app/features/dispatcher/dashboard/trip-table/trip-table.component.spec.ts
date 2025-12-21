@@ -7,6 +7,9 @@ import { of, throwError, Subject, EMPTY } from 'rxjs';
 import { TripTableComponent } from './trip-table.component';
 import { TripService } from '../../../../core/services';
 import { DashboardStateService } from '../dashboard-state.service';
+import { SharedFilterService } from '../shared-filter.service';
+import { PdfExportService } from '../../../../core/services/pdf-export.service';
+import { AccessibilityService } from '../../../../core/services/accessibility.service';
 import { Trip, TripStatus } from '@haulhub/shared';
 
 describe('TripTableComponent', () => {
@@ -14,6 +17,9 @@ describe('TripTableComponent', () => {
   let fixture: ComponentFixture<TripTableComponent>;
   let tripServiceSpy: jasmine.SpyObj<TripService>;
   let dashboardStateSpy: jasmine.SpyObj<DashboardStateService>;
+  let sharedFilterServiceSpy: jasmine.SpyObj<SharedFilterService>;
+  let pdfExportServiceSpy: jasmine.SpyObj<PdfExportService>;
+  let accessibilityServiceSpy: jasmine.SpyObj<AccessibilityService>;
   let routerSpy: jasmine.SpyObj<Router>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
@@ -66,9 +72,33 @@ describe('TripTableComponent', () => {
           driverName: null
         },
         { page: 0, pageSize: 25 }
-      ])
+      ]),
+      brokers$: of([])
     });
+    
+    sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [
+      'getCurrentFilters',
+      'updateFilters'
+    ]);
+    sharedFilterServiceSpy.getCurrentFilters.and.returnValue({
+      dateRange: { startDate: null, endDate: null },
+      status: null,
+      brokerId: null,
+      lorryId: null,
+      driverId: null,
+      driverName: null
+    });
+    
+    pdfExportServiceSpy = jasmine.createSpyObj('PdfExportService', ['exportDashboard']);
+    accessibilityServiceSpy = jasmine.createSpyObj('AccessibilityService', [
+      'announceMessage',
+      'getStatusAriaLabel',
+      'getActionAriaLabel'
+    ]);
+    accessibilityServiceSpy.getStatusAriaLabel.and.returnValue('Trip status');
+    accessibilityServiceSpy.getActionAriaLabel.and.returnValue('Action label');
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    routerSpy.navigate.and.returnValue(Promise.resolve(true));
     
     // Create dialog ref spy
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
@@ -76,7 +106,7 @@ describe('TripTableComponent', () => {
     
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    tripServiceSpy.getTrips.and.returnValue(of({ trips: [mockTrip], total: 1 }));
+    tripServiceSpy.getTrips.and.returnValue(of({ trips: [mockTrip], lastEvaluatedKey: undefined }));
     dashboardStateSpy.getActiveFilterCount.and.returnValue(0);
 
     await TestBed.configureTestingModule({
@@ -84,6 +114,9 @@ describe('TripTableComponent', () => {
       providers: [
         { provide: TripService, useValue: tripServiceSpy },
         { provide: DashboardStateService, useValue: dashboardStateSpy },
+        { provide: SharedFilterService, useValue: sharedFilterServiceSpy },
+        { provide: PdfExportService, useValue: pdfExportServiceSpy },
+        { provide: AccessibilityService, useValue: accessibilityServiceSpy },
         { provide: Router, useValue: routerSpy },
         MatDialog,
         { provide: MatSnackBar, useValue: snackBarSpy }

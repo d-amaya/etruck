@@ -4,6 +4,7 @@ import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
 import { TripStatus, Broker, Trip } from '@haulhub/shared';
 import { TripService } from '../../../core/services/trip.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SharedFilterService } from './shared-filter.service';
 
 export interface DashboardFilters {
   dateRange: {
@@ -85,6 +86,8 @@ export class DashboardStateService {
 
   // Cached data
   private brokersCache: Broker[] = [];
+  private brokersSubject = new BehaviorSubject<Broker[]>([]);
+  public brokers$: Observable<Broker[]> = this.brokersSubject.asObservable();
   private loadingTimeout: any;
   
   // Filtered trips for payment summary calculation
@@ -97,8 +100,11 @@ export class DashboardStateService {
 
   constructor(
     private tripService: TripService,
-    private authService: AuthService
+    private authService: AuthService,
+    private sharedFilterService: SharedFilterService
   ) {
+    // Register this service with SharedFilterService so it can notify us of filter changes
+    this.sharedFilterService.setDashboardStateService(this);
     this.loadBrokers();
     this.setupLogoutListener();
   }
@@ -214,7 +220,7 @@ export class DashboardStateService {
           this.setError('Loading is taking longer than expected. Please check your connection and try again.', true);
           this.setLoadingState(false);
         }
-      }, 10000); // 10 second timeout
+      }, 30000); // 30 second timeout for large datasets
     } else {
       if (this.loadingTimeout) {
         clearTimeout(this.loadingTimeout);
@@ -252,13 +258,18 @@ export class DashboardStateService {
   }
 
   private loadBrokers(): void {
+    console.log('Loading brokers from API...');
     this.tripService.getBrokers().subscribe({
       next: (brokers) => {
+        console.log('Brokers loaded from API:', brokers);
         this.brokersCache = brokers.filter(b => b.isActive);
+        this.brokersSubject.next(this.brokersCache);
+        console.log('Active brokers cached:', this.brokersCache);
       },
       error: (error) => {
         console.error('Failed to load brokers:', error);
-        // Don't show error for broker loading as it's not critical
+        // Emit empty array on error so subscribers still get notified
+        this.brokersSubject.next([]);
       }
     });
   }
@@ -273,6 +284,11 @@ export class DashboardStateService {
   }
 
   private loadFiltersFromStorage(): DashboardFilters {
+    // Always start fresh - don't load from storage
+    // This ensures hard refresh clears all filters
+    return this.getDefaultFilters();
+    
+    /* Original code that persisted filters:
     try {
       const stored = sessionStorage.getItem(this.FILTERS_STORAGE_KEY);
       if (stored) {
@@ -292,6 +308,7 @@ export class DashboardStateService {
       console.warn('Failed to load filters from session storage:', error);
     }
     return this.getDefaultFilters();
+    */
   }
 
   private saveFiltersToStorage(filters: DashboardFilters): void {
@@ -303,6 +320,11 @@ export class DashboardStateService {
   }
 
   private loadPaginationFromStorage(): PaginationState {
+    // Always start fresh - don't load from storage
+    // This ensures hard refresh resets pagination
+    return { page: 0, pageSize: 10, pageTokens: [] };
+    
+    /* Original code that persisted pagination:
     try {
       const stored = sessionStorage.getItem(this.PAGINATION_STORAGE_KEY);
       if (stored) {
@@ -314,6 +336,7 @@ export class DashboardStateService {
       console.warn('Failed to load pagination from session storage:', error);
     }
     return { page: 0, pageSize: 10, pageTokens: [] };
+    */
   }
 
   private savePaginationToStorage(pagination: PaginationState): void {

@@ -15,6 +15,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AnalyticsService } from '../../../core/services/analytics.service';
+import { SharedFilterService } from '../dashboard/shared-filter.service';
+import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 
 Chart.register(...registerables);
@@ -106,14 +108,20 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
   constructor(
     private analyticsService: AnalyticsService,
+    private sharedFilterService: SharedFilterService,
+    private dashboardStateService: DashboardStateService,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    // Set default date range to last 30 days
-    this.endDate = new Date();
-    this.startDate = new Date();
-    this.startDate.setDate(this.startDate.getDate() - 30);
+    // Subscribe to shared filter changes
+    this.sharedFilterService.filters$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(filters => {
+        this.startDate = filters.dateRange.startDate;
+        this.endDate = filters.dateRange.endDate;
+        this.loadAllAnalytics();
+      });
     
     // Initialize empty KPI cards to show structure while loading
     this.kpiCards = [
@@ -150,8 +158,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
         color: 'primary'
       }
     ];
-    
-    this.loadAllAnalytics();
   }
 
   ngAfterViewInit(): void {
@@ -173,15 +179,24 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   private loadAllAnalytics(): void {
     this.isLoading = true;
     this.error = null;
+    
+    // Notify dashboard state service that we're loading
+    this.dashboardStateService.setLoadingState(true, false, true, 'Loading analytics...');
+    this.dashboardStateService.clearError();
 
-    // Validate date range (max 1 year)
+    // Validate date range (max 365 days)
     if (this.startDate && this.endDate) {
-      const oneYearAgo = new Date(this.endDate);
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const diffTime = this.endDate.getTime() - this.startDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       
-      if (this.startDate < oneYearAgo) {
-        this.startDate = oneYearAgo;
-        this.snackBar.open('Date range limited to 1 year maximum', 'Close', {
+      if (diffDays > 365) {
+        // Adjust start date to be exactly 365 days before end date
+        const adjustedStart = new Date(this.endDate);
+        adjustedStart.setDate(adjustedStart.getDate() - 365);
+        adjustedStart.setHours(0, 0, 0, 0);
+        this.startDate = adjustedStart;
+        
+        this.snackBar.open('Date range limited to 365 days maximum', 'Close', {
           duration: 3000
         });
       }
@@ -205,10 +220,22 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
           this.loadBrokerAnalyticsData();
           this.loadFuelEfficiencyData();
           this.isLoading = false;
+          
+          // Notify dashboard state service that loading is complete
+          this.dashboardStateService.completeLoad();
         },
         error: (error) => {
           console.error('[Analytics] Error loading trip analytics:', error);
+          this.error = 'Failed to load analytics data. Please try again.';
           this.isLoading = false;
+          
+          // Notify dashboard state service of error
+          this.dashboardStateService.setError('Failed to load analytics data. Please try again.', true);
+          this.dashboardStateService.completeLoad();
+          
+          this.snackBar.open('Error loading analytics data', 'Close', {
+            duration: 5000
+          });
         }
       });
   }

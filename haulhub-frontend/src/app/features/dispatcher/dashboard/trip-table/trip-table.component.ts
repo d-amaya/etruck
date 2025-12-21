@@ -1,19 +1,25 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, combineLatest, Observable, of } from 'rxjs';
-import { switchMap, takeUntil, map, catchError, debounceTime, tap, finalize } from 'rxjs/operators';
+import { switchMap, takeUntil, map, catchError, tap, finalize } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent, MatPaginator } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { TripService } from '../../../../core/services';
-import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
+import { SharedFilterService } from '../shared-filter.service';
+import { PdfExportService } from '../../../../core/services/pdf-export.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
 
@@ -22,6 +28,7 @@ import { AccessibilityService } from '../../../../core/services/accessibility.se
   standalone: true,
   imports: [
     CommonModule,
+    ReactiveFormsModule,
     MatTableModule,
     MatPaginatorModule,
     MatButtonModule,
@@ -29,12 +36,17 @@ import { AccessibilityService } from '../../../../core/services/accessibility.se
     MatTooltipModule,
     MatDialogModule,
     MatSnackBarModule,
-    MatChipsModule
+    MatChipsModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    MatInputModule
   ],
   templateUrl: './trip-table.component.html',
   styleUrls: ['./trip-table.component.scss']
 })
 export class TripTableComponent implements OnInit, OnDestroy {
+  @ViewChild(MatPaginator) paginator?: MatPaginator;
+  
   displayedColumns = [
     'scheduledPickupDatetime',
     'pickupLocation',
@@ -44,6 +56,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'driverName',
     'status',
     'brokerPayment',
+    'driverPayment',
+    'lorryOwnerPayment',
     'profit',
     'actions'
   ];
@@ -55,19 +69,55 @@ export class TripTableComponent implements OnInit, OnDestroy {
   loading = false;
   hasActiveFilters = false;
 
+  // Filter form
+  filterForm: FormGroup;
+  statusOptions = Object.values(TripStatus);
+  brokers: Broker[] = [];
+
   private destroy$ = new Subject<void>();
   private deletedTrip: Trip | null = null;
 
   constructor(
+    private fb: FormBuilder,
     private tripService: TripService,
     private dashboardState: DashboardStateService,
+    private sharedFilterService: SharedFilterService,
+    private pdfExportService: PdfExportService,
     private router: Router,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private accessibilityService: AccessibilityService
-  ) {}
+  ) {
+    this.filterForm = this.fb.group({
+      status: [null],
+      brokerId: [null],
+      lorryId: [''],
+      driverName: ['']
+    });
+  }
 
   ngOnInit(): void {
+    // Load brokers
+    this.dashboardState.brokers$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(brokers => {
+        this.brokers = brokers;
+      });
+
+    // Initialize filter form with current filter values
+    const currentFilters = this.sharedFilterService.getCurrentFilters();
+    console.log('Initializing form with filters:', currentFilters);
+    this.filterForm.patchValue({
+      status: currentFilters.status,
+      brokerId: currentFilters.brokerId,
+      lorryId: currentFilters.lorryId || '',
+      driverName: currentFilters.driverName || ''
+    }, { emitEvent: false });
+    console.log('Form initialized with values:', this.filterForm.value);
+
+    // Note: Dropdown changes are handled by (selectionChange) events in the template
+    // Text inputs (lorryId, driverName) are handled by blur/Enter events
+
     // Subscribe to the combined filters and pagination observable
     this.dashboardState.filtersAndPagination$.pipe(
       switchMap(([filters, pagination]) => {
@@ -190,7 +240,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   viewTrip(trip: Trip): void {
-    console.log('View trip clicked:', trip.tripId);
     try {
       this.router.navigate(['/dispatcher/trips', trip.tripId]).catch(err => {
         console.error('Navigation error:', err);
@@ -203,7 +252,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   editTrip(trip: Trip): void {
-    console.log('Edit trip clicked:', trip.tripId);
     try {
       this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']).catch(err => {
         console.error('Navigation error:', err);
@@ -216,7 +264,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   deleteTrip(trip: Trip): void {
-    console.log('Delete trip clicked:', trip.tripId);
     try {
       const dialogRef = this.dialog.open(ConfirmDialogComponent, {
         width: '400px',
@@ -346,6 +393,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   getStatusLabel(status: TripStatus): string {
+    if (!status) return '';
     switch (status) {
       case TripStatus.Scheduled:
         return 'Scheduled';
@@ -362,6 +410,89 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
   }
 
+  clearField(fieldName: string): void {
+    this.filterForm.patchValue({ [fieldName]: '' });
+  }
+
+  clearAllFilters(): void {
+    // Get current date range to preserve it
+    const currentFilters = this.sharedFilterService.getCurrentFilters();
+    
+    // Update filters to clear only non-date filters
+    this.sharedFilterService.updateFilters({
+      dateRange: currentFilters.dateRange, // Preserve date range
+      status: null,
+      brokerId: null,
+      lorryId: null,
+      driverName: null,
+      driverId: null
+    });
+    
+    // Also clear the form fields visually
+    this.filterForm.patchValue({
+      status: null,
+      brokerId: null,
+      lorryId: '',
+      driverName: ''
+    });
+    
+    // Manually reset the paginator UI to page 0
+    if (this.paginator) {
+      this.paginator.pageIndex = 0;
+    }
+  }
+
+  exportPDF(): void {
+    this.pdfExportService.exportDashboard();
+  }
+
+  /**
+   * Apply filters to shared filter service
+   */
+  private applyFilters(): void {
+    console.log('=== Trip-table applyFilters called ===');
+    const formValue = this.filterForm.value;
+    console.log('Current form value:', formValue);
+    
+    const filtersToApply = {
+      status: formValue.status,
+      brokerId: formValue.brokerId,
+      lorryId: formValue.lorryId?.trim() || null,
+      driverName: formValue.driverName?.trim() || null
+    };
+    console.log('Filters to apply:', filtersToApply);
+    
+    this.sharedFilterService.updateFilters(filtersToApply);
+    console.log('=== Filters sent to shared service ===');
+  }
+
+  /**
+   * Handle dropdown selection change
+   * Called from template when user selects a value from status or broker dropdown
+   */
+  onDropdownChange(): void {
+    console.log('Dropdown changed, applying filters');
+    this.applyFilters();
+  }
+
+  /**
+   * Handle blur event on text input fields
+   * Called from template when user leaves the input field
+   */
+  onTextInputBlur(): void {
+    this.applyFilters();
+  }
+
+  /**
+   * Handle keydown event on text input fields
+   * Triggers filter refresh when Enter key is pressed
+   */
+  onTextInputKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Prevent form submission
+      this.applyFilters();
+    }
+  }
   /**
    * Get ARIA label for trip status
    */

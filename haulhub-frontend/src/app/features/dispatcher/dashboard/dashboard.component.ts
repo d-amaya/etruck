@@ -1,20 +1,20 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { FilterBarComponent } from './filter-bar/filter-bar.component';
-import { TripSummaryCardsComponent } from './trip-summary-cards/trip-summary-cards.component';
-import { PaymentSummaryComponent } from './payment-summary/payment-summary.component';
-import { DashboardChartsComponent } from './dashboard-charts/dashboard-charts.component';
+import { UnifiedFilterCardComponent } from './unified-filter-card/unified-filter-card.component';
 import { TripTableComponent } from './trip-table/trip-table.component';
 import { DashboardStateService, LoadingState, ErrorState } from './dashboard-state.service';
-import { TripSummarySkeletonComponent } from '../../../shared/components/skeleton-loader/trip-summary-skeleton.component';
-import { PaymentSummarySkeletonComponent } from '../../../shared/components/skeleton-loader/payment-summary-skeleton.component';
-import { DashboardChartsSkeletonComponent } from '../../../shared/components/skeleton-loader/dashboard-charts-skeleton.component';
+import { SharedFilterService, ViewMode } from './shared-filter.service';
 import { TripTableSkeletonComponent } from '../../../shared/components/skeleton-loader/trip-table-skeleton.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { ErrorStateComponent } from '../../../shared/components/error-state/error-state.component';
+import { AnalyticsWrapperComponent } from './analytics-wrapper/analytics-wrapper.component';
+import { PaymentsWrapperComponent } from './payments-wrapper/payments-wrapper.component';
 
 @Component({
   selector: 'app-dispatcher-dashboard',
@@ -22,17 +22,15 @@ import { ErrorStateComponent } from '../../../shared/components/error-state/erro
   imports: [
     CommonModule,
     MatProgressSpinnerModule,
-    FilterBarComponent,
-    TripSummaryCardsComponent,
-    PaymentSummaryComponent,
-    DashboardChartsComponent,
+    MatButtonModule,
+    MatIconModule,
+    UnifiedFilterCardComponent,
     TripTableComponent,
-    TripSummarySkeletonComponent,
-    PaymentSummarySkeletonComponent,
-    DashboardChartsSkeletonComponent,
     TripTableSkeletonComponent,
     LoadingOverlayComponent,
-    ErrorStateComponent
+    ErrorStateComponent,
+    AnalyticsWrapperComponent,
+    PaymentsWrapperComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -51,9 +49,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     retryCount: 0
   };
   
+  currentViewMode: ViewMode = 'table';
+  
   private destroy$ = new Subject<void>();
 
-  constructor(private dashboardState: DashboardStateService) {}
+  constructor(
+    private dashboardState: DashboardStateService,
+    private sharedFilterService: SharedFilterService,
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     // Start initial load
@@ -64,6 +69,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(loadingState => {
         this.loadingState = loadingState;
+        // Trigger change detection to avoid ExpressionChangedAfterItHasBeenCheckedError
+        this.cdr.detectChanges();
       });
     
     // Subscribe to error state
@@ -71,6 +78,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(errorState => {
         this.errorState = errorState;
+        this.cdr.detectChanges();
+      });
+    
+    // Subscribe to view mode changes
+    this.sharedFilterService.viewMode$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(mode => {
+        this.currentViewMode = mode;
+        this.cdr.detectChanges();
       });
     
     // Simulate initial load completion after components are ready
@@ -92,5 +108,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       this.dashboardState.completeLoad();
     }, 1500);
+  }
+
+  onCreateTrip(): void {
+    this.router.navigate(['/dispatcher/trips/create']);
   }
 }

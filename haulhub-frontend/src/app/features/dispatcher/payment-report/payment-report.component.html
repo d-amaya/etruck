@@ -1,86 +1,70 @@
 <div class="payment-report-container">
-  <mat-card>
-    <mat-card-header>
-      <div class="header-with-back">
-        <button mat-icon-button (click)="goBack()" class="back-button">
-          <mat-icon>arrow_back</mat-icon>
+  <!-- Filter Form (hidden by wrapper) -->
+  <form [formGroup]="filterForm" (ngSubmit)="onFilterSubmit()" class="filter-form">
+    <div class="filter-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Start Date</mat-label>
+        <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+        <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>End Date</mat-label>
+        <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+        <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+
+      <div class="filter-actions">
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading">
+          Apply Filters
         </button>
-        <div class="header-content">
-          <mat-card-title>Payment Reports</mat-card-title>
-          <mat-card-subtitle>Track broker payments, expenses, and profit</mat-card-subtitle>
-        </div>
+        <button mat-button type="button" (click)="onClearFilters()" [disabled]="loading">
+          Clear
+        </button>
       </div>
-    </mat-card-header>
+    </div>
+  </form>
 
-    <mat-card-content>
-      <!-- Filter Form -->
-      <form [formGroup]="filterForm" (ngSubmit)="onFilterSubmit()" class="filter-form">
-        <div class="filter-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Start Date</mat-label>
-            <input matInput [matDatepicker]="startPicker" formControlName="startDate">
-            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
-            <mat-datepicker #startPicker></mat-datepicker>
-          </mat-form-field>
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
 
-          <mat-form-field appearance="outline">
-            <mat-label>End Date</mat-label>
-            <input matInput [matDatepicker]="endPicker" formControlName="endDate">
-            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
-            <mat-datepicker #endPicker></mat-datepicker>
-          </mat-form-field>
-
-          <div class="filter-actions">
-            <button mat-raised-button color="primary" type="submit" [disabled]="loading">
-              Apply Filters
-            </button>
-            <button mat-button type="button" (click)="onClearFilters()" [disabled]="loading">
-              Clear
-            </button>
+  <!-- Report Content -->
+  <div *ngIf="!loading && report" class="report-content">
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+          <div class="summary-card income">
+            <div class="card-icon">
+              <mat-icon>attach_money</mat-icon>
+            </div>
+            <div class="card-content">
+              <span class="card-label">Broker Payments</span>
+              <span class="card-value">{{ formatCurrency(report.totalBrokerPayments) }}</span>
+            </div>
           </div>
-        </div>
-      </form>
 
-      <!-- Loading Spinner -->
-      <div *ngIf="loading" class="loading-container">
-        <mat-spinner></mat-spinner>
-      </div>
+          <div class="summary-card expense">
+            <div class="card-icon">
+              <mat-icon>payments</mat-icon>
+            </div>
+            <div class="card-content">
+              <span class="card-label">Driver Payments</span>
+              <span class="card-value">{{ formatCurrency(report.totalDriverPayments) }}</span>
+            </div>
+          </div>
 
-      <!-- Report Content -->
-      <div *ngIf="!loading && report" class="report-content">
-        <!-- Summary Cards -->
-        <div class="summary-cards">
-          <mat-card class="summary-card income">
-            <mat-card-content>
-              <div class="summary-label">Total Broker Payments (Income)</div>
-              <div class="summary-value">{{ formatCurrency(report.totalBrokerPayments) }}</div>
-              <div class="summary-subtitle">{{ report.tripCount }} trips</div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card expense">
-            <mat-card-content>
-              <div class="summary-label">Total Driver Payments (Expense)</div>
-              <div class="summary-value">{{ formatCurrency(report.totalDriverPayments) }}</div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card expense">
-            <mat-card-content>
-              <div class="summary-label">Total Lorry Owner Payments (Expense)</div>
-              <div class="summary-value">{{ formatCurrency(report.totalLorryOwnerPayments) }}</div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="summary-card profit" [class.negative]="report.profit < 0">
-            <mat-card-content>
-              <div class="summary-label">Profit</div>
-              <div class="summary-value">{{ formatCurrency(report.profit) }}</div>
-              <div class="summary-subtitle">
-                {{ report.profit >= 0 ? 'Positive' : 'Negative' }} margin
-              </div>
-            </mat-card-content>
-          </mat-card>
+          <div class="summary-card expense">
+            <div class="card-icon">
+              <mat-icon>local_shipping</mat-icon>
+            </div>
+            <div class="card-content">
+              <span class="card-label">Truck Payments</span>
+              <span class="card-value">{{ formatCurrency(report.totalLorryOwnerPayments) }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Tabbed Views -->
@@ -88,8 +72,8 @@
           <!-- By Broker Tab -->
           <mat-tab label="By Broker">
             <div class="tab-content">
-              <h3>Payments by Broker</h3>
-              <table mat-table [dataSource]="getBrokerGroupedData()" class="report-table">
+              <div class="data-table">
+                <table mat-table [dataSource]="getBrokerGroupedData()" class="analytics-table">
                 <ng-container matColumnDef="brokerName">
                   <th mat-header-cell *matHeaderCellDef>Broker Name</th>
                   <td mat-cell *matCellDef="let element">{{ element.brokerName }}</td>
@@ -108,6 +92,7 @@
                 <tr mat-header-row *matHeaderRowDef="brokerColumns"></tr>
                 <tr mat-row *matRowDef="let row; columns: brokerColumns;"></tr>
               </table>
+              </div>
 
               <div *ngIf="getBrokerGroupedData().length === 0" class="no-data">
                 No broker data available for the selected period
@@ -118,8 +103,8 @@
           <!-- By Driver Tab -->
           <mat-tab label="By Driver">
             <div class="tab-content">
-              <h3>Payments by Driver</h3>
-              <table mat-table [dataSource]="getDriverGroupedData()" class="report-table">
+              <div class="data-table">
+                <table mat-table [dataSource]="getDriverGroupedData()" class="analytics-table">
                 <ng-container matColumnDef="driverName">
                   <th mat-header-cell *matHeaderCellDef>Driver Name</th>
                   <td mat-cell *matCellDef="let element">{{ element.driverName }}</td>
@@ -138,6 +123,7 @@
                 <tr mat-header-row *matHeaderRowDef="driverColumns"></tr>
                 <tr mat-row *matRowDef="let row; columns: driverColumns;"></tr>
               </table>
+              </div>
 
               <div *ngIf="getDriverGroupedData().length === 0" class="no-data">
                 No driver data available for the selected period
@@ -145,11 +131,11 @@
             </div>
           </mat-tab>
 
-          <!-- By Lorry Owner Tab -->
-          <mat-tab label="By Lorry Owner">
+          <!-- By Truck Owner Tab -->
+          <mat-tab label="By Truck Owner">
             <div class="tab-content">
-              <h3>Payments by Lorry</h3>
-              <table mat-table [dataSource]="getLorryGroupedData()" class="report-table">
+              <div class="data-table">
+                <table mat-table [dataSource]="getLorryGroupedData()" class="analytics-table">
                 <ng-container matColumnDef="lorryId">
                   <th mat-header-cell *matHeaderCellDef>Lorry ID</th>
                   <td mat-cell *matCellDef="let element">{{ element.lorryId }}</td>
@@ -168,86 +154,10 @@
                 <tr mat-header-row *matHeaderRowDef="lorryColumns"></tr>
                 <tr mat-row *matRowDef="let row; columns: lorryColumns;"></tr>
               </table>
+              </div>
 
               <div *ngIf="getLorryGroupedData().length === 0" class="no-data">
                 No lorry data available for the selected period
-              </div>
-            </div>
-          </mat-tab>
-
-          <!-- Trip Details Tab -->
-          <mat-tab label="Trip Details">
-            <div class="tab-content">
-              <h3>Individual Trip Payments</h3>
-              <div class="table-container">
-                <table mat-table [dataSource]="report.trips" class="report-table trip-details-table">
-                  <ng-container matColumnDef="scheduledPickupDatetime">
-                    <th mat-header-cell *matHeaderCellDef>Date</th>
-                    <td mat-cell *matCellDef="let element">{{ formatDate(element.scheduledPickupDatetime) }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="pickupLocation">
-                    <th mat-header-cell *matHeaderCellDef>Pickup</th>
-                    <td mat-cell *matCellDef="let element">{{ element.pickupLocation }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="dropoffLocation">
-                    <th mat-header-cell *matHeaderCellDef>Dropoff</th>
-                    <td mat-cell *matCellDef="let element">{{ element.dropoffLocation }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="brokerName">
-                    <th mat-header-cell *matHeaderCellDef>Broker</th>
-                    <td mat-cell *matCellDef="let element">{{ element.brokerName }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="lorryId">
-                    <th mat-header-cell *matHeaderCellDef>Lorry</th>
-                    <td mat-cell *matCellDef="let element">{{ element.lorryId }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="driverName">
-                    <th mat-header-cell *matHeaderCellDef>Driver</th>
-                    <td mat-cell *matCellDef="let element">{{ element.driverName }}</td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="brokerPayment">
-                    <th mat-header-cell *matHeaderCellDef>Broker Payment</th>
-                    <td mat-cell *matCellDef="let element" class="income-cell">
-                      {{ formatCurrency(element.brokerPayment) }}
-                    </td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="lorryOwnerPayment">
-                    <th mat-header-cell *matHeaderCellDef>Lorry Owner Payment</th>
-                    <td mat-cell *matCellDef="let element" class="expense-cell">
-                      {{ formatCurrency(element.lorryOwnerPayment) }}
-                    </td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="driverPayment">
-                    <th mat-header-cell *matHeaderCellDef>Driver Payment</th>
-                    <td mat-cell *matCellDef="let element" class="expense-cell">
-                      {{ formatCurrency(element.driverPayment) }}
-                    </td>
-                  </ng-container>
-
-                  <ng-container matColumnDef="status">
-                    <th mat-header-cell *matHeaderCellDef>Status</th>
-                    <td mat-cell *matCellDef="let element">
-                      <span class="status-badge" [class]="'status-' + element.status.toLowerCase()">
-                        {{ element.status }}
-                      </span>
-                    </td>
-                  </ng-container>
-
-                  <tr mat-header-row *matHeaderRowDef="tripColumns"></tr>
-                  <tr mat-row *matRowDef="let row; columns: tripColumns;"></tr>
-                </table>
-              </div>
-
-              <div *ngIf="report.trips.length === 0" class="no-data">
-                No trips found for the selected period
               </div>
             </div>
           </mat-tab>
@@ -258,6 +168,4 @@
       <div *ngIf="!loading && !report" class="no-data">
         No payment data available. Please adjust your filters and try again.
       </div>
-    </mat-card-content>
-  </mat-card>
 </div>

@@ -746,14 +746,17 @@ export class TripsService {
     const trips: Trip[] = [];
     let lastEvaluatedKey = filters.lastEvaluatedKey;
     
-    // When using FilterExpression, DynamoDB applies the filter AFTER limiting results
-    // So we need to keep fetching until we have enough items or run out of data
-    // Fetch one extra item to determine if there are more pages
+    // When using FilterExpression AND application-layer filtering (driver name),
+    // we need to keep fetching until we have enough items that pass ALL filters
     const fetchLimit = requestedLimit + 1;
-    const maxIterations = 10; // Prevent infinite loops
+    const maxIterations = 20; // Increased to handle more filtering
     let iterations = 0;
     
-    while (trips.length < fetchLimit && iterations < maxIterations) {
+    // Check if we have filters that require more aggressive fetching
+    const hasDriverNameFilter = !!filters.driverName;
+    const hasMultipleFilters = [filters.brokerId, filters.status, filters.lorryId, filters.driverName].filter(f => f).length > 1;
+    
+    while (iterations < maxIterations) {
       iterations++;
       
       // Build query command for GSI1 on new trips table
@@ -765,8 +768,8 @@ export class TripsService {
           ...expressionAttributeValues,
           ...filterAttributeValues,
         },
-        // Fetch more items than needed to account for filtering
-        Limit: filterExpression ? fetchLimit * 3 : fetchLimit,
+        // Fetch more items when we have multiple filters to account for DynamoDB filtering
+        Limit: hasMultipleFilters ? 100 : (filterExpression ? 50 : fetchLimit),
         ScanIndexForward: false, // Return results in descending order (newest first)
       };
 
@@ -802,17 +805,37 @@ export class TripsService {
         break;
       }
       
-      // If we got fewer items than requested, there might not be more data
-      if (batchTrips.length === 0) {
-        break;
+      // Don't stop just because we got 0 results - with FilterExpression, 
+      // matching items might be in the next batch
+      // Only stop if we have enough matching results OR there's no more data
+      
+      // If we have a driver name filter, check if we have enough matches after filtering
+      if (hasDriverNameFilter) {
+        const currentMatches = this.applyDriverNameFilter(trips, filters.driverName);
+        if (currentMatches.length >= fetchLimit) {
+          break;
+        }
+      } else {
+        // No driver name filter, stop when we have enough trips
+        // But if we have multiple filters, keep fetching to ensure we find matches
+        if (trips.length >= fetchLimit && !hasMultipleFilters) {
+          break;
+        }
+        // With multiple filters, be more aggressive and fetch more data
+        if (trips.length >= fetchLimit * 2) {
+          break;
+        }
       }
     }
 
+    // Apply case-insensitive driver name filtering in application layer
+    const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+
     // Check if there are more items beyond the requested limit
-    const hasMoreItems = trips.length > requestedLimit;
+    const hasMoreItems = filteredTrips.length > requestedLimit;
     
     // Trim to requested limit
-    const trimmedTrips = trips.slice(0, requestedLimit);
+    const trimmedTrips = filteredTrips.slice(0, requestedLimit);
     
     const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
       trips: trimmedTrips 
@@ -924,7 +947,10 @@ export class TripsService {
 
     const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
 
-    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips };
+    // Apply case-insensitive driver name filtering in application layer
+    const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+
+    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: filteredTrips };
 
     if (result.LastEvaluatedKey) {
       response.lastEvaluatedKey = Buffer.from(
@@ -1037,9 +1063,12 @@ export class TripsService {
       new Date(a.scheduledPickupDatetime).getTime()
     );
 
+    // Apply case-insensitive driver name filtering in application layer
+    const filteredTrips = this.applyDriverNameFilter(allTrips, filters.driverName);
+
     // Apply limit if specified
     const limit = filters.limit || 50;
-    const limitedTrips = allTrips.slice(0, limit);
+    const limitedTrips = filteredTrips.slice(0, limit);
 
     return { trips: limitedTrips };
   }
@@ -1049,6 +1078,7 @@ export class TripsService {
   /**
    * Build secondary filter expressions for broker, status, lorry, driver
    * These are applied after the key condition query
+   * Note: driverName is NOT included here - it's filtered in application layer for case-insensitive matching
    */
   private buildSecondaryFilters(filters: any): {
     filterExpression: string;
@@ -1083,18 +1113,29 @@ export class TripsService {
       filterAttributeValues[':driverId'] = filters.driverId;
     }
 
-    // Add support for filtering by driver name (case-insensitive contains)
-    if (filters.driverName) {
-      filterExpressions.push('contains(#driverName, :driverName)');
-      filterAttributeNames['#driverName'] = 'driverName';
-      filterAttributeValues[':driverName'] = filters.driverName;
-    }
+    // Note: driverName filtering is done in application layer for case-insensitive matching
+    // DynamoDB's contains() is case-sensitive, so we filter after query
 
     return {
       filterExpression: filterExpressions.join(' AND '),
       filterAttributeNames,
       filterAttributeValues,
     };
+  }
+
+  /**
+   * Apply case-insensitive driver name filtering in application layer
+   * DynamoDB's contains() is case-sensitive, so we need to filter after query
+   */
+  private applyDriverNameFilter(trips: Trip[], driverName: string | undefined): Trip[] {
+    if (!driverName) {
+      return trips;
+    }
+
+    const searchTerm = driverName.toLowerCase();
+    return trips.filter(trip => 
+      trip.driverName && trip.driverName.toLowerCase().includes(searchTerm)
+    );
   }
 
   /**

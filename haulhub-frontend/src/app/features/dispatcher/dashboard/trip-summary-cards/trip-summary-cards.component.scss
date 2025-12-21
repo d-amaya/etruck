@@ -139,32 +139,77 @@
 
 @media (max-width: 1023px) {
   .summary-cards-container {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
   }
 
-  .summary-card {
-    .card-content {
-      gap: 12px;
+  .summary-card,
+  .card-accent {
+    min-height: 60px !important;
+    max-height: 60px !important;
+    padding: 6px 8px !important;
+
+    &.mat-mdc-card {
+      padding: 6px 8px !important;
+      min-height: 60px !important;
+      max-height: 60px !important;
     }
 
-    .card-icon {
-      width: 48px;
-      height: 48px;
+    ::ng-deep {
+      .mat-mdc-card {
+        padding: 6px 8px !important;
+        min-height: 60px !important;
+        max-height: 60px !important;
+      }
 
-      mat-icon {
-        font-size: 24px;
-        width: 24px;
-        height: 24px;
+      .mdc-card {
+        padding: 6px 8px !important;
+      }
+
+      mat-card-content,
+      .mat-mdc-card-content {
+        padding: 0 !important;
+        margin: 0 !important;
       }
     }
 
+    .card-content {
+      gap: 6px;
+      padding: 0 !important;
+      height: 100%;
+      align-items: center;
+    }
+
+    .card-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
     .card-count {
-      font-size: 28px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1;
+      margin: 0;
     }
 
     .card-label {
-      font-size: 13px;
+      font-size: 9px;
+      margin: 0;
+      line-height: 1.2;
     }
   }
 }

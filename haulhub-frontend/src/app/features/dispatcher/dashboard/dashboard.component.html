@@ -10,7 +10,8 @@
 
   <!-- Dashboard Content -->
   <div *ngIf="!errorState.hasError" class="dashboard-content">
-    <!-- Filters are now integrated in the compact top row -->
+    <!-- Unified Filter Card -->
+    <app-unified-filter-card></app-unified-filter-card>
 
     <!-- Loading Overlay for Filter Updates -->
     <div class="content-wrapper" [style.position]="loadingState.isFilterUpdate ? 'relative' : 'static'">
@@ -21,35 +22,27 @@
 
       <!-- Initial Load: Show Skeleton Loaders -->
       <div *ngIf="loadingState.isInitialLoad" class="skeleton-content">
-        <app-trip-summary-skeleton></app-trip-summary-skeleton>
-        <app-payment-summary-skeleton></app-payment-summary-skeleton>
-        <app-dashboard-charts-skeleton></app-dashboard-charts-skeleton>
         <app-trip-table-skeleton></app-trip-table-skeleton>
       </div>
 
-      <!-- Loaded Content -->
+      <!-- Loaded Content - View Mode Based -->
       <div *ngIf="!loadingState.isInitialLoad" class="loaded-content">
-        <!-- Compact Top Row: Filters + Charts + Payment Summary -->
-        <div class="compact-top-row">
-          <!-- Compact Filters -->
-          <div class="compact-filters-section">
-            <app-filter-bar></app-filter-bar>
-          </div>
-          
-          <!-- Charts with Type Selector -->
-          <div class="compact-charts-section">
-            <app-dashboard-charts></app-dashboard-charts>
-          </div>
-          
-          <!-- Compact Payment Summary -->
-          <div class="compact-payment-section">
-            <app-payment-summary></app-payment-summary>
+        <!-- Table View -->
+        <div *ngIf="currentViewMode === 'table'" class="table-view">
+          <!-- Trip Table -->
+          <div class="table-section">
+            <app-trip-table></app-trip-table>
           </div>
         </div>
 
-        <!-- Trip Table -->
-        <div class="table-section">
-          <app-trip-table></app-trip-table>
+        <!-- Analytics View -->
+        <div *ngIf="currentViewMode === 'analytics'" class="analytics-view">
+          <app-analytics-wrapper></app-analytics-wrapper>
+        </div>
+
+        <!-- Payments View -->
+        <div *ngIf="currentViewMode === 'payments'" class="payments-view">
+          <app-payments-wrapper></app-payments-wrapper>
         </div>
       </div>
     </div>

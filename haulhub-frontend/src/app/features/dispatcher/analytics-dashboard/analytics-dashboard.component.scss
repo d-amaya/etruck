@@ -2,10 +2,22 @@
   display: block;
   width: 100%;
   max-width: 100%;
+
+  ::ng-deep {
+    .mat-mdc-card-title {
+      color: #616161 !important;
+      font-size: 16px !important;
+    }
+
+    mat-card-title {
+      color: #616161 !important;
+      font-size: 16px !important;
+    }
+  }
 }
 
 .analytics-dashboard {
-  padding: 24px;
+  padding: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -67,22 +79,22 @@
 
   .summary-cards {
     display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 8px;
+    margin-bottom: 16px;
     overflow-x: auto;
 
     .summary-card {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
+      gap: 10px;
+      padding: 8px 12px;
       background: white;
-      border-radius: 8px;
+      border-radius: 6px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       border-left: 3px solid transparent;
       flex: 1;
-      min-width: 180px;
+      min-width: 140px;
 
       &:hover {
         transform: translateY(-1px);
@@ -123,28 +135,28 @@
 
       .card-icon {
         mat-icon {
-          font-size: 28px;
-          width: 28px;
-          height: 28px;
+          font-size: 24px;
+          width: 24px;
+          height: 24px;
         }
       }
 
       .card-content {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 1px;
         flex: 1;
 
         .card-label {
-          font-size: 11px;
+          font-size: 10px;
           color: #757575;
           font-weight: 500;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.3px;
         }
 
         .card-value {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 700;
           color: #212121;
           font-family: 'Roboto Mono', monospace;
@@ -202,9 +214,14 @@
             flex-shrink: 0;
 
             mat-card-title {
-              font-size: 18px;
+              font-size: 16px;
               font-weight: 600;
-              color: #212121;
+              color: #616161;
+            }
+
+            ::ng-deep .mat-mdc-card-title {
+              color: #616161 !important;
+              font-size: 16px !important;
             }
           }
 
@@ -327,10 +344,38 @@
 
     .summary-cards {
       flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
 
       .summary-card {
-        flex: 1 1 calc(50% - 6px);
-        min-width: 150px;
+        flex: 1 1 calc(50% - 3px);
+        min-width: 0;
+        padding: 4px 6px;
+        gap: 4px;
+        min-height: 42px;
+        max-height: 42px;
+
+        .card-icon {
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+          }
+        }
+
+        .card-content {
+          gap: 0px;
+
+          .card-label {
+            font-size: 8px;
+            letter-spacing: 0.2px;
+          }
+
+          .card-value {
+            font-size: 12px;
+            font-weight: 600;
+          }
+        }
       }
     }
 
@@ -338,6 +383,36 @@
       .charts-section {
         .tab-content {
           flex-direction: column;
+        }
+      }
+    }
+
+    // Tab styles for mobile
+    .charts-section {
+      ::ng-deep {
+        .mat-mdc-tab-labels {
+          .mat-mdc-tab {
+            min-width: 60px !important;
+            padding: 0 8px !important;
+
+            .mdc-tab__text-label {
+              font-size: 11px !important;
+              letter-spacing: 0.3px !important;
+            }
+          }
+        }
+
+        .mat-mdc-tab-label-container {
+          .mat-mdc-tab {
+            min-width: 60px !important;
+            padding: 0 8px !important;
+            height: 36px !important;
+
+            .mdc-tab__text-label {
+              font-size: 11px !important;
+              letter-spacing: 0.3px !important;
+            }
+          }
         }
       }
     }
@@ -507,12 +582,53 @@
 // Mobile responsive for data tables
 @media (max-width: 768px) {
   .data-table {
-    .analytics-table {
-      font-size: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
 
-      thead tr th,
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+
+    .analytics-table {
+      font-size: 9px;
+      min-width: 600px;
+      table-layout: auto;
+
+      thead tr th {
+        padding: 6px 8px;
+        font-size: 9px;
+        white-space: nowrap;
+      }
+
       tbody tr td {
-        padding: 8px 12px;
+        padding: 6px 8px;
+        font-size: 9px;
+        white-space: nowrap;
+
+        strong {
+          font-size: 9px;
+        }
+
+        .utilization-badge,
+        .completion-badge {
+          padding: 2px 6px;
+          font-size: 8px;
+          border-radius: 8px;
+        }
       }
     }
   }

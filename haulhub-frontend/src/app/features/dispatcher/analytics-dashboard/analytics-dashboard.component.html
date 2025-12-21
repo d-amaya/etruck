@@ -64,10 +64,6 @@
       <mat-tab label="Vehicle Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Vehicle Utilization</mat-card-title>
-              <mat-card-subtitle>Utilization rates and revenue by vehicle</mat-card-subtitle>
-            </mat-card-header>
             <mat-card-content>
               <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
                 <table class="analytics-table">
@@ -113,10 +109,6 @@
       <mat-tab label="Driver Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Driver Performance</mat-card-title>
-              <mat-card-subtitle>Performance metrics and earnings by driver</mat-card-subtitle>
-            </mat-card-header>
             <mat-card-content>
               <div *ngIf="driverPerformanceData && driverPerformanceData.length > 0" class="data-table">
                 <table class="analytics-table">
@@ -163,43 +155,7 @@
       <!-- Broker Performance Tab -->
       <mat-tab label="Broker Performance">
         <div class="tab-content">
-          <mat-card class="chart-card" *ngIf="brokerAnalyticsData">
-            <mat-card-header>
-              <mat-card-title>Broker Performance Summary</mat-card-title>
-              <mat-card-subtitle>Overview of all broker relationships</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="broker-summary-grid">
-                <div class="summary-stat">
-                  <mat-icon>business</mat-icon>
-                  <div class="stat-content">
-                    <span class="stat-label">Total Brokers</span>
-                    <span class="stat-value">{{ brokerAnalyticsData.totalBrokers }}</span>
-                  </div>
-                </div>
-                <div class="summary-stat">
-                  <mat-icon>local_shipping</mat-icon>
-                  <div class="stat-content">
-                    <span class="stat-label">Total Trips</span>
-                    <span class="stat-value">{{ brokerAnalyticsData.totalTrips }}</span>
-                  </div>
-                </div>
-                <div class="summary-stat">
-                  <mat-icon>attach_money</mat-icon>
-                  <div class="stat-content">
-                    <span class="stat-label">Total Revenue</span>
-                    <span class="stat-value">{{ formatCurrency(brokerAnalyticsData.totalRevenue) }}</span>
-                  </div>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
           <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Broker Performance Details</mat-card-title>
-              <mat-card-subtitle>Revenue, trips, and completion rates by broker</mat-card-subtitle>
-            </mat-card-header>
             <mat-card-content>
               <div *ngIf="brokerAnalyticsData && brokerAnalyticsData.brokers && brokerAnalyticsData.brokers.length > 0" class="data-table">
                 <table class="analytics-table">
@@ -247,10 +203,6 @@
       <mat-tab label="Fuel Efficiency">
         <div class="tab-content">
           <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Fuel Cost Trends</mat-card-title>
-              <mat-card-subtitle>Track fuel expenses over time</mat-card-subtitle>
-            </mat-card-header>
             <mat-card-content>
               <div *ngIf="fuelCostChartData">
                 <div class="chart-data-preview" style="margin-bottom: 16px;">
@@ -271,10 +223,6 @@
           </mat-card>
 
           <mat-card class="chart-card">
-            <mat-card-header>
-              <mat-card-title>Fuel Efficiency by Vehicle</mat-card-title>
-              <mat-card-subtitle>Compare fuel consumption across fleet</mat-card-subtitle>
-            </mat-card-header>
             <mat-card-content>
               <div *ngIf="fuelEfficiencyChartData">
                 <div class="chart-data-preview" style="margin-bottom: 16px;">
