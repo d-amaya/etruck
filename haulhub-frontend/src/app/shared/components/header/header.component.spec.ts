@@ -15,7 +15,8 @@ describe('HeaderComponent', () => {
   beforeEach(async () => {
     authServiceSpy = jasmine.createSpyObj('AuthService', [
       'logout',
-      'navigateToDashboard'
+      'navigateToDashboard',
+      'getDashboardRoute'
     ], {
       currentUser$: of({
         userId: 'test-user-id',
@@ -31,7 +32,7 @@ describe('HeaderComponent', () => {
       }
     });
 
-    routerSpy = jasmine.createSpyObj('Router', ['navigate'], {
+    routerSpy = jasmine.createSpyObj('Router', ['navigate', 'navigateByUrl'], {
       events: of()
     });
 
@@ -67,12 +68,6 @@ describe('HeaderComponent', () => {
     component.onLogout();
     
     expect(authServiceSpy.logout).toHaveBeenCalled();
-  });
-
-  it('should navigate to dashboard when logo is clicked', () => {
-    component.navigateHome();
-    
-    expect(authServiceSpy.navigateToDashboard).toHaveBeenCalled();
   });
 
   it('should format role names correctly', () => {

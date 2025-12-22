@@ -98,7 +98,9 @@ export class HeaderComponent implements OnInit {
   }
 
   navigateHome(): void {
-    this.authService.navigateToDashboard();
+    // Clear session storage and do a hard refresh
+    sessionStorage.clear();
+    window.location.reload();
   }
 
   navigateToDashboard(): void {
