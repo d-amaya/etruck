@@ -418,8 +418,8 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     console.log('[Analytics] Tab changed to index:', index);
     this.selectedTabIndex = index;
     
-    // If Fuel Efficiency tab (index 2) is selected and we have fuel chart data
-    if (index === 2 && this.fuelCostTrendData) {
+    // If Fuel Efficiency tab (index 3) is selected and we have fuel chart data
+    if (index === 3 && this.fuelCostTrendData) {
       console.log('[Analytics] Fuel Efficiency tab activated, creating fuel chart...');
       setTimeout(() => {
         this.createFuelCostChart();
