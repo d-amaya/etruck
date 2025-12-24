@@ -6,6 +6,7 @@ import { ConfigService } from '../../../src/config/config.service';
 import { BrokersService } from '../../../src/admin/brokers.service';
 import { StatusWorkflowService } from '../../../src/trips/status-workflow.service';
 import { StatusAuditService } from '../../../src/trips/status-audit.service';
+import { IndexSelectorService } from '../../../src/trips/index-selector.service';
 import { TripStatus, UserRole } from '@haulhub/shared';
 
 describe('TripsService', () => {
@@ -15,6 +16,7 @@ describe('TripsService', () => {
   let brokersService: jest.Mocked<BrokersService>;
   let statusWorkflowService: jest.Mocked<StatusWorkflowService>;
   let statusAuditService: jest.Mocked<StatusAuditService>;
+  let indexSelectorService: jest.Mocked<IndexSelectorService>;
 
   const mockDynamoDBClient = {
     send: jest.fn(),
@@ -57,6 +59,12 @@ describe('TripsService', () => {
             getStatusHistory: jest.fn(),
           },
         },
+        {
+          provide: IndexSelectorService,
+          useValue: {
+            selectOptimalIndex: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -66,6 +74,7 @@ describe('TripsService', () => {
     brokersService = module.get(BrokersService) as jest.Mocked<BrokersService>;
     statusWorkflowService = module.get(StatusWorkflowService) as jest.Mocked<StatusWorkflowService>;
     statusAuditService = module.get(StatusAuditService) as jest.Mocked<StatusAuditService>;
+    indexSelectorService = module.get(IndexSelectorService) as jest.Mocked<IndexSelectorService>;
   });
 
   afterEach(() => {

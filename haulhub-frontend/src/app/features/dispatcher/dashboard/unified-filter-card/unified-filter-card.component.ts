@@ -100,11 +100,6 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   }
 
   setDatePreset(preset: string): void {
-    // Don't update if this preset is already active
-    if (this.isPresetActive(preset)) {
-      return;
-    }
-
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     let startDate: Date;
@@ -143,7 +138,9 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     if (!startDate || !endDate) return false;
 
     const today = new Date();
+    today.setHours(23, 59, 59, 999);
     let expectedStart: Date;
+    let expectedEnd = today;
 
     switch (preset) {
       case '30days':
@@ -153,9 +150,11 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
         break;
       case 'month':
         expectedStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        expectedStart.setHours(0, 0, 0, 0);
         break;
       case 'year':
         expectedStart = new Date(today.getFullYear(), 0, 1);
+        expectedStart.setHours(0, 0, 0, 0);
         break;
       case '365days':
         expectedStart = new Date(today);
@@ -166,7 +165,11 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
         return false;
     }
 
-    return startDate.toDateString() === expectedStart.toDateString();
+    // Compare both start and end dates to properly detect active preset
+    const startMatches = startDate.toDateString() === expectedStart.toDateString();
+    const endMatches = endDate.toDateString() === expectedEnd.toDateString();
+    
+    return startMatches && endMatches;
   }
 
   ngOnDestroy(): void {

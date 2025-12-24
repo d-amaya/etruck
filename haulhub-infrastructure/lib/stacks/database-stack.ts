@@ -296,6 +296,24 @@ export class DatabaseStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // GSI4: Broker trip queries (Trip Filtering Optimization)
+    // Access pattern: Dispatcher queries trips by broker with date range
+    // GSI4PK = DISPATCHER#<DispatcherId>
+    // GSI4SK = BROKER#<BrokerId>#<YYYY-MM-DD>#<TripId>
+    // Selectivity: Medium (~200 items per broker)
+    this.tripsTable.addGlobalSecondaryIndex({
+      indexName: 'GSI4',
+      partitionKey: {
+        name: 'GSI4PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'GSI4SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     cdk.Tags.of(this.tripsTable).add('Component', 'Database');
 
     new cdk.CfnOutput(this, 'TripsTableName', {
@@ -313,6 +331,11 @@ export class DatabaseStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'TripsTableStreamArn', {
       value: this.tripsTable.tableStreamArn || 'N/A',
       description: 'Trips DynamoDB Table Stream ARN',
+    });
+
+    new cdk.CfnOutput(this, 'TripsTableGSI4IndexName', {
+      value: 'GSI4',
+      description: 'GSI4 Index Name (Broker-Optimized Index for Trip Filtering)',
     });
 
     // Brokers Table - Reference data for brokers

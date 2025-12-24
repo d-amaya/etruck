@@ -25,7 +25,7 @@ import { PaymentReportComponent } from '../../payment-report/payment-report.comp
     .payments-wrapper {
       width: 100%;
       
-      // Hide duplicate back button and filters
+      // Hide duplicate back button, filters, and loading spinner
       ::ng-deep app-payment-report {
         .header-with-back .back-button {
           display: none !important;
@@ -33,6 +33,13 @@ import { PaymentReportComponent } from '../../payment-report/payment-report.comp
         
         .filter-form {
           display: none !important;
+        }
+        
+        .loading-container {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
         }
       }
     }

@@ -25,9 +25,20 @@ import { AnalyticsDashboardComponent } from '../../analytics-dashboard/analytics
     .analytics-wrapper {
       width: 100%;
       
-      // Hide duplicate header and filters
+      // Hide duplicate header, filters, and loading spinner
       ::ng-deep app-analytics-dashboard {
         .page-header {
+          display: none !important;
+        }
+        
+        .loading-container {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+        
+        .error-container {
           display: none !important;
         }
       }

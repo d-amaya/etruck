@@ -6,6 +6,7 @@ import {
 import { DynamoDBClient, DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { ConfigService } from './config.service';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class AwsService {
   private cognitoClient: CognitoIdentityProviderClient;
   private dynamodbClient: DynamoDBDocumentClient;
   private s3Client: S3Client;
+  private cloudWatchClient: CloudWatchClient;
 
   constructor(private configService: ConfigService) {
     this.initializeClients();
@@ -44,6 +46,9 @@ export class AwsService {
 
     // Initialize S3 client
     this.s3Client = new S3Client(baseConfig);
+
+    // Initialize CloudWatch client
+    this.cloudWatchClient = new CloudWatchClient(baseConfig);
   }
 
   getCognitoClient(): CognitoIdentityProviderClient {
@@ -56,5 +61,9 @@ export class AwsService {
 
   getS3Client(): S3Client {
     return this.s3Client;
+  }
+
+  getCloudWatchClient(): CloudWatchClient {
+    return this.cloudWatchClient;
   }
 }

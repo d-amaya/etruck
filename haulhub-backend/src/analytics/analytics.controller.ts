@@ -8,6 +8,7 @@ import { AnalyticsService } from './analytics.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@haulhub/shared';
 
 @Controller('analytics')
@@ -17,79 +18,85 @@ export class AnalyticsController {
 
   @Get('fleet-overview')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
-  async getFleetOverview() {
-    return await this.analyticsService.getFleetOverview();
+  async getFleetOverview(@CurrentUser() user: CurrentUserData) {
+    return await this.analyticsService.getFleetOverview(user.userId);
   }
 
   @Get('trip-analytics')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getTripAnalytics(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getTripAnalytics(start, end);
+    return await this.analyticsService.getTripAnalytics(user.userId, start, end);
   }
 
   @Get('driver-performance')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getDriverPerformance(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getDriverPerformance(start, end);
+    return await this.analyticsService.getDriverPerformance(user.userId, start, end);
   }
 
   @Get('vehicle-utilization')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getVehicleUtilization(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getVehicleUtilization(start, end);
+    return await this.analyticsService.getVehicleUtilization(user.userId, start, end);
   }
 
   @Get('revenue-analytics')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getRevenueAnalytics(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getRevenueAnalytics(start, end);
+    return await this.analyticsService.getRevenueAnalytics(user.userId, start, end);
   }
 
   @Get('maintenance-alerts')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
-  async getMaintenanceAlerts() {
-    return await this.analyticsService.getMaintenanceAlerts();
+  async getMaintenanceAlerts(@CurrentUser() user: CurrentUserData) {
+    return await this.analyticsService.getMaintenanceAlerts(user.userId);
   }
 
   @Get('broker-analytics')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getBrokerAnalytics(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getBrokerAnalytics(start, end);
+    return await this.analyticsService.getBrokerAnalytics(user.userId, start, end);
   }
 
   @Get('fuel-analytics')
   @Roles(UserRole.Dispatcher, UserRole.Admin)
   async getFuelAnalytics(
+    @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getFuelAnalytics(start, end);
+    return await this.analyticsService.getFuelAnalytics(user.userId, start, end);
   }
 }

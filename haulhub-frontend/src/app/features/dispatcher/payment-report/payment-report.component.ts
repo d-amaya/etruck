@@ -96,26 +96,21 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
     
-    const formValue = this.filterForm.value;
+    // Use shared filter service values instead of form values
+    // This ensures we use the latest filter state from quick filter buttons
+    const sharedFilters = this.sharedFilterService.getCurrentFilters();
     
     const filters: PaymentReportFilters = {};
     
-    if (formValue.startDate) {
-      filters.startDate = formValue.startDate.toISOString();
+    if (sharedFilters.dateRange.startDate) {
+      filters.startDate = sharedFilters.dateRange.startDate.toISOString();
     }
     
-    if (formValue.endDate) {
-      filters.endDate = formValue.endDate.toISOString();
+    if (sharedFilters.dateRange.endDate) {
+      filters.endDate = sharedFilters.dateRange.endDate.toISOString();
     }
 
-    // Add groupBy based on active tab
-    if (this.activeTabIndex === 0) {
-      filters.groupBy = 'broker';
-    } else if (this.activeTabIndex === 1) {
-      filters.groupBy = 'driver';
-    } else if (this.activeTabIndex === 2) {
-      filters.groupBy = 'lorry';
-    }
+    // Don't add groupBy - fetch all grouped data at once
 
     this.tripService.getPaymentReport(filters).subscribe({
       next: (report) => {
@@ -155,7 +150,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
 
   onTabChange(event: MatTabChangeEvent): void {
     this.activeTabIndex = event.index;
-    this.loadReport();
+    // Don't reload - just switch the view of existing data
   }
 
   formatCurrency(amount: number): string {

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TripsService } from '../trips/trips.service';
 import { UsersService } from '../users/users.service';
-import { Trip, TripStatus, UserRole } from '@haulhub/shared';
+import { Trip, TripStatus } from '@haulhub/shared';
 
 export interface FleetOverview {
   drivers: {
@@ -65,26 +65,29 @@ export class AnalyticsService {
     private readonly usersService: UsersService,
   ) {}
 
-  async getFleetOverview(): Promise<FleetOverview> {
+  async getFleetOverview(dispatcherId: string): Promise<FleetOverview> {
     // Note: This is a simplified implementation that queries trips
     // In a production system, you'd want to cache these metrics or use a separate analytics table
     
     try {
-      // Get all trips to calculate metrics
-      // We'll scan the trips table to get counts by status
+      // Get all trips for this dispatcher using GSI1
+      // This replaces the SCAN operation with a Query operation
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
-      const scanCommand = new ScanCommand({
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      // Query GSI1 for all trips for this dispatcher
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: 'SK = :metadata',
+        IndexName: 'GSI1',
+        KeyConditionExpression: 'GSI1PK = :dispatcherPK',
         ExpressionAttributeValues: {
-          ':metadata': 'METADATA',
+          ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
         },
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Calculate trip metrics
@@ -164,39 +167,41 @@ export class AnalyticsService {
     }
   }
 
-  async getTripAnalytics(startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
+  async getTripAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~'; // ~ sorts after all trip IDs
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Calculate analytics
@@ -263,39 +268,41 @@ export class AnalyticsService {
     }
   }
 
-  async getDriverPerformance(startDate?: Date, endDate?: Date): Promise<DriverPerformance[]> {
+  async getDriverPerformance(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<DriverPerformance[]> {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Group trips by driver
@@ -352,39 +359,41 @@ export class AnalyticsService {
     }
   }
 
-  async getVehicleUtilization(startDate?: Date, endDate?: Date): Promise<VehicleUtilization[]> {
+  async getVehicleUtilization(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<VehicleUtilization[]> {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Group trips by vehicle
@@ -439,39 +448,41 @@ export class AnalyticsService {
     }
   }
 
-  async getRevenueAnalytics(startDate?: Date, endDate?: Date) {
+  async getRevenueAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date) {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Group trips by month
@@ -544,23 +555,24 @@ export class AnalyticsService {
     }
   }
 
-  async getMaintenanceAlerts() {
+  async getMaintenanceAlerts(dispatcherId: string) {
     try {
-      // Get all trips to identify vehicles and drivers that need attention
+      // Get all trips for this dispatcher using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: 'SK = :metadata',
+        IndexName: 'GSI1',
+        KeyConditionExpression: 'GSI1PK = :dispatcherPK',
         ExpressionAttributeValues: {
-          ':metadata': 'METADATA',
+          ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
         },
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Calculate vehicle usage metrics
@@ -671,39 +683,41 @@ export class AnalyticsService {
     }
   }
 
-  async getFuelAnalytics(startDate?: Date, endDate?: Date) {
+  async getFuelAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date) {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Filter trips with fuel data
@@ -857,39 +871,41 @@ export class AnalyticsService {
     }
   }
 
-  async getBrokerAnalytics(startDate?: Date, endDate?: Date) {
+  async getBrokerAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date) {
     try {
-      // Get all trips within date range
+      // Get all trips for this dispatcher within date range using GSI1
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
-      const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
-      // Build filter expression
-      let filterExpression = 'SK = :metadata';
+      // Build key condition expression with date range
+      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
       const expressionAttributeValues: any = {
-        ':metadata': 'METADATA',
+        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
+      // Add date range to KeyConditionExpression (not FilterExpression)
       if (startDate && endDate) {
-        filterExpression += ' AND scheduledPickupDatetime BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       } else if (startDate) {
-        filterExpression += ' AND scheduledPickupDatetime >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
       } else if (endDate) {
-        filterExpression += ' AND scheduledPickupDatetime <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString();
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
       }
       
-      const scanCommand = new ScanCommand({
+      const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        FilterExpression: filterExpression,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
       
-      const result = await dynamodbClient.send(scanCommand);
+      const result = await dynamodbClient.send(queryCommand);
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Group trips by broker

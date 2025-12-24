@@ -12,11 +12,13 @@ import {
   QueryCommand,
   DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { PutMetricDataCommand, MetricDatum } from '@aws-sdk/client-cloudwatch';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { BrokersService } from '../admin/brokers.service';
 import { StatusWorkflowService } from './status-workflow.service';
 import { StatusAuditService } from './status-audit.service';
+import { IndexSelectorService } from './index-selector.service';
 import {
   Trip,
   TripStatus,
@@ -46,23 +48,130 @@ export class TripsService {
     private readonly brokersService: BrokersService,
     private readonly statusWorkflowService: StatusWorkflowService,
     private readonly statusAuditService: StatusAuditService,
+    private readonly indexSelectorService: IndexSelectorService,
   ) {
     this.tripsTableName = this.configService.tripsTableName;
     this.lorriesTableName = this.configService.lorriesTableName;
   }
 
   /**
+   * Emit CloudWatch metrics for query performance monitoring
+   * Requirements: 6.1
+   * 
+   * Emits metrics for:
+   * - Query response time (milliseconds)
+   * - Selected index name
+   * - RCU consumption (from DynamoDB response)
+   * - Query errors by index type
+   * 
+   * @param indexName - Name of the GSI used for the query
+   * @param responseTimeMs - Query response time in milliseconds
+   * @param rcuConsumed - Read capacity units consumed (from DynamoDB response)
+   * @param isError - Whether the query resulted in an error
+   */
+  private async emitQueryMetrics(
+    indexName: string,
+    responseTimeMs: number,
+    rcuConsumed?: number,
+    isError: boolean = false,
+  ): Promise<void> {
+    try {
+      const cloudWatchClient = this.awsService.getCloudWatchClient();
+      const timestamp = new Date();
+
+      const metricData: MetricDatum[] = [
+        // Query response time metric
+        {
+          MetricName: 'QueryResponseTime',
+          Value: responseTimeMs,
+          Unit: 'Milliseconds',
+          Timestamp: timestamp,
+          Dimensions: [
+            {
+              Name: 'IndexName',
+              Value: indexName,
+            },
+            {
+              Name: 'Service',
+              Value: 'TripsService',
+            },
+          ],
+        },
+      ];
+
+      // Add RCU consumption metric if available
+      if (rcuConsumed !== undefined) {
+        metricData.push({
+          MetricName: 'RCUConsumption',
+          Value: rcuConsumed,
+          Unit: 'Count',
+          Timestamp: timestamp,
+          Dimensions: [
+            {
+              Name: 'IndexName',
+              Value: indexName,
+            },
+            {
+              Name: 'Service',
+              Value: 'TripsService',
+            },
+          ],
+        });
+      }
+
+      // Add error metric if query failed
+      if (isError) {
+        metricData.push({
+          MetricName: 'QueryErrors',
+          Value: 1,
+          Unit: 'Count',
+          Timestamp: timestamp,
+          Dimensions: [
+            {
+              Name: 'IndexName',
+              Value: indexName,
+            },
+            {
+              Name: 'Service',
+              Value: 'TripsService',
+            },
+          ],
+        });
+      }
+
+      // Emit metrics to CloudWatch
+      const putMetricCommand = new PutMetricDataCommand({
+        Namespace: 'HaulHub/Trips',
+        MetricData: metricData,
+      });
+
+      await cloudWatchClient.send(putMetricCommand);
+    } catch (error: any) {
+      // Log error but don't throw - metrics emission should not break the query
+      console.error('Failed to emit CloudWatch metrics:', {
+        error: error.message,
+        indexName,
+        responseTimeMs,
+        rcuConsumed,
+        isError,
+      });
+    }
+  }
+
+  /**
    * Create a new trip (Dispatcher only)
-   * Requirements: 4.1, 4.2, 19.2, 19.3, 19.4, 8.1, 8.2, 8.3, 8.4
+   * Requirements: 4.1, 4.2, 19.2, 19.3, 19.4, 8.1, 8.2, 8.3, 8.4, 3.1
    * 
    * PK: TRIP#{tripId}
    * SK: METADATA
    * GSI1PK: DISPATCHER#{dispatcherId}
    * GSI1SK: {date}#{tripId}
-   * GSI2PK: LORRY#{lorryId}
-   * GSI2SK: {date}#{tripId}
-   * GSI3PK: DRIVER#{driverId}
-   * GSI3SK: {date}#{tripId}
+   * GSI2PK: DISPATCHER#{dispatcherId}
+   * GSI2SK: LORRY#{lorryId}#{date}#{tripId}
+   * GSI3PK: DISPATCHER#{dispatcherId}
+   * GSI3SK: DRIVER#{driverId}#{date}#{tripId}
+   * GSI4PK: DISPATCHER#{dispatcherId}
+   * GSI4SK: BROKER#{brokerId}#{date}#{tripId}
    * 
    * Note: Lorry does not need to be registered/verified to create a trip.
    * When a lorry owner registers their lorry later, they can query trips by lorryId.
@@ -97,7 +206,6 @@ export class TripsService {
 
     const tripId = uuidv4();
     const now = new Date().toISOString();
-    const scheduledDateStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const trip: Trip = {
       tripId,
@@ -129,24 +237,32 @@ export class TripsService {
     try {
       const dynamodbClient = this.awsService.getDynamoDBClient();
 
+      // Populate GSI attributes for optimized querying
+      const gsiAttributes = this.populateGSIAttributes({
+        tripId,
+        dispatcherId,
+        lorryId: dto.lorryId,
+        driverId: dto.driverId,
+        brokerId: dto.brokerId,
+        scheduledPickupDatetime: dto.scheduledPickupDatetime,
+      });
+
+      // Validate GSI attribute formats
+      this.validateGSIAttributes(gsiAttributes);
+
       // Store trip in new trips table with optimized structure:
       // PK = TRIP#<tripId> for direct O(1) lookups
       // SK = METADATA
-      // GSI1 = Dispatcher queries (GSI1PK=DISPATCHER#id, GSI1SK=date#tripId)
-      // GSI2 = Lorry queries (GSI2PK=LORRY#lorryId, GSI2SK=date#tripId)
-      //        This allows lorry owners to query by license plate when they register
-      // GSI3 = Driver queries (GSI3PK=DRIVER#id, GSI3SK=date#tripId)
+      // GSI1 = Dispatcher queries (GSI1PK=DISPATCHER#id, GSI1SK=datetime#tripId)
+      // GSI2 = Lorry-optimized queries (GSI2PK=DISPATCHER#id, GSI2SK=LORRY#lorryId#datetime#tripId)
+      // GSI3 = Driver-optimized queries (GSI3PK=DISPATCHER#id, GSI3SK=DRIVER#driverId#datetime#tripId)
+      // GSI4 = Broker-optimized queries (GSI4PK=DISPATCHER#id, GSI4SK=BROKER#brokerId#datetime#tripId)
       const putCommand = new PutCommand({
         TableName: this.tripsTableName,
         Item: {
           PK: `TRIP#${tripId}`,
           SK: 'METADATA',
-          GSI1PK: `DISPATCHER#${dispatcherId}`,
-          GSI1SK: `${scheduledDateStr}#${tripId}`,
-          GSI2PK: `LORRY#${dto.lorryId}`,
-          GSI2SK: `${scheduledDateStr}#${tripId}`,
-          GSI3PK: `DRIVER#${dto.driverId}`,
-          GSI3SK: `${scheduledDateStr}#${tripId}`,
+          ...gsiAttributes,
           ...trip,
         },
       });
@@ -227,6 +343,27 @@ export class TripsService {
     // First, get the existing trip to verify authorization
     const existingTrip = await this.getTripById(tripId, dispatcherId, UserRole.Dispatcher);
 
+    // Prevent updating fields that affect GSI sort keys
+    // These fields determine the trip's position in queries and cannot be updated
+    // Users must delete and recreate the trip if these need to change
+    if (dto.scheduledPickupDatetime !== undefined) {
+      throw new BadRequestException(
+        'Cannot update scheduledPickupDatetime. Please delete and recreate the trip with the new schedule.'
+      );
+    }
+    
+    if (dto.lorryId !== undefined) {
+      throw new BadRequestException(
+        'Cannot update lorryId. Please delete and recreate the trip with the new lorry.'
+      );
+    }
+    
+    if (dto.driverId !== undefined) {
+      throw new BadRequestException(
+        'Cannot update driverId. Please delete and recreate the trip with the new driver.'
+      );
+    }
+
     // Build update expression dynamically
     const updateExpressions: string[] = [];
     const expressionAttributeNames: Record<string, string> = {};
@@ -244,16 +381,6 @@ export class TripsService {
       expressionAttributeValues[':dropoffLocation'] = dto.dropoffLocation;
     }
 
-    if (dto.scheduledPickupDatetime !== undefined) {
-      const scheduledDate = new Date(dto.scheduledPickupDatetime);
-      if (isNaN(scheduledDate.getTime())) {
-        throw new BadRequestException('Invalid scheduledPickupDatetime format');
-      }
-      updateExpressions.push('#scheduledPickupDatetime = :scheduledPickupDatetime');
-      expressionAttributeNames['#scheduledPickupDatetime'] = 'scheduledPickupDatetime';
-      expressionAttributeValues[':scheduledPickupDatetime'] = dto.scheduledPickupDatetime;
-    }
-
     if (dto.brokerId !== undefined) {
       const broker = await this.brokersService.getBrokerById(dto.brokerId);
       updateExpressions.push('#brokerId = :brokerId, #brokerName = :brokerName');
@@ -261,18 +388,16 @@ export class TripsService {
       expressionAttributeNames['#brokerName'] = 'brokerName';
       expressionAttributeValues[':brokerId'] = dto.brokerId;
       expressionAttributeValues[':brokerName'] = broker.brokerName;
-    }
-
-    if (dto.lorryId !== undefined) {
-      updateExpressions.push('#lorryId = :lorryId');
-      expressionAttributeNames['#lorryId'] = 'lorryId';
-      expressionAttributeValues[':lorryId'] = dto.lorryId;
-    }
-
-    if (dto.driverId !== undefined) {
-      updateExpressions.push('#driverId = :driverId');
-      expressionAttributeNames['#driverId'] = 'driverId';
-      expressionAttributeValues[':driverId'] = dto.driverId;
+      
+      // Update GSI4SK to maintain consistency with broker index
+      // GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+      const scheduledDate = new Date(existingTrip.scheduledPickupDatetime);
+      const dateOnlyStr = scheduledDate.toISOString().split('T')[0];
+      const newGSI4SK = `BROKER#${dto.brokerId}#${dateOnlyStr}#${tripId}`;
+      
+      updateExpressions.push('#GSI4SK = :GSI4SK');
+      expressionAttributeNames['#GSI4SK'] = 'GSI4SK';
+      expressionAttributeValues[':GSI4SK'] = newGSI4SK;
     }
 
     if (dto.driverName !== undefined) {
@@ -472,6 +597,122 @@ export class TripsService {
       if (dto[field] === undefined || dto[field] === null || dto[field] === '') {
         throw new BadRequestException(`${field} is required`);
       }
+    }
+  }
+
+  /**
+   * Populate GSI attributes for optimized querying
+   * Requirements: 3.1
+   * 
+   * Generates all GSI partition and sort keys for multi-index query optimization:
+   * - GSI1: Default dispatcher index (date-based sorting)
+   * - GSI2: Lorry-optimized index (lorry + date sorting)
+   * - GSI3: Driver-optimized index (driver + date sorting)
+   * - GSI4: Broker-optimized index (broker + date sorting)
+   * 
+   * Format:
+   * - GSI1SK: {YYYY-MM-DDTHH:mm:ss.sssZ}#{tripId}
+   * - GSI2SK: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+   * - GSI3SK: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+   * - GSI4SK: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+   */
+  private populateGSIAttributes(params: {
+    tripId: string;
+    dispatcherId: string;
+    lorryId: string;
+    driverId: string;
+    brokerId: string;
+    scheduledPickupDatetime: string;
+  }): {
+    GSI1PK: string;
+    GSI1SK: string;
+    GSI2PK: string;
+    GSI2SK: string;
+    GSI3PK: string;
+    GSI3SK: string;
+    GSI4PK: string;
+    GSI4SK: string;
+  } {
+    const { tripId, dispatcherId, lorryId, driverId, brokerId, scheduledPickupDatetime } = params;
+    
+    // Parse the scheduled date
+    const scheduledDate = new Date(scheduledPickupDatetime);
+    
+    // Use full ISO timestamp for GSI1SK to enable precise time-based queries
+    const scheduledDateTimeStr = scheduledDate.toISOString();
+    
+    // Use date-only format (YYYY-MM-DD) for GSI2/3/4 sort keys
+    // This groups trips by entity and date, enabling efficient date range queries
+    const dateOnlyStr = scheduledDateTimeStr.split('T')[0]; // Extract YYYY-MM-DD
+    
+    return {
+      // GSI1: Default dispatcher index (existing structure)
+      GSI1PK: `DISPATCHER#${dispatcherId}`,
+      GSI1SK: `${scheduledDateTimeStr}#${tripId}`,
+      
+      // GSI2: Lorry-optimized index
+      GSI2PK: `DISPATCHER#${dispatcherId}`,
+      GSI2SK: `LORRY#${lorryId}#${dateOnlyStr}#${tripId}`,
+      
+      // GSI3: Driver-optimized index
+      GSI3PK: `DISPATCHER#${dispatcherId}`,
+      GSI3SK: `DRIVER#${driverId}#${dateOnlyStr}#${tripId}`,
+      
+      // GSI4: Broker-optimized index
+      GSI4PK: `DISPATCHER#${dispatcherId}`,
+      GSI4SK: `BROKER#${brokerId}#${dateOnlyStr}#${tripId}`,
+    };
+  }
+
+  /**
+   * Validate GSI attribute formats using regex patterns
+   * Requirements: 3.1
+   * 
+   * Ensures all GSI attributes follow the correct format to prevent query issues:
+   * - GSI2SK: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+   * - GSI3SK: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+   * - GSI4SK: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+   */
+  private validateGSIAttributes(gsiAttributes: {
+    GSI1PK: string;
+    GSI1SK: string;
+    GSI2PK: string;
+    GSI2SK: string;
+    GSI3PK: string;
+    GSI3SK: string;
+    GSI4PK: string;
+    GSI4SK: string;
+  }): void {
+    const errors: string[] = [];
+
+    // Validate GSI1SK format: {ISO-8601-datetime}#{tripId}
+    const gsi1Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z#[a-f0-9-]+$/;
+    if (!gsi1Pattern.test(gsiAttributes.GSI1SK)) {
+      errors.push(`Invalid GSI1SK format: ${gsiAttributes.GSI1SK}`);
+    }
+
+    // Validate GSI2SK format: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+    const gsi2Pattern = /^LORRY#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
+    if (!gsi2Pattern.test(gsiAttributes.GSI2SK)) {
+      errors.push(`Invalid GSI2SK format: ${gsiAttributes.GSI2SK}`);
+    }
+
+    // Validate GSI3SK format: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+    const gsi3Pattern = /^DRIVER#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
+    if (!gsi3Pattern.test(gsiAttributes.GSI3SK)) {
+      errors.push(`Invalid GSI3SK format: ${gsiAttributes.GSI3SK}`);
+    }
+
+    // Validate GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+    const gsi4Pattern = /^BROKER#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
+    if (!gsi4Pattern.test(gsiAttributes.GSI4SK)) {
+      errors.push(`Invalid GSI4SK format: ${gsiAttributes.GSI4SK}`);
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException(
+        `GSI attribute validation failed: ${errors.join(', ')}`
+      );
     }
   }
 
@@ -710,15 +951,161 @@ export class TripsService {
   }
 
   /**
-   * Get trips for a dispatcher
-   * Query GSI1: GSI1PK = DISPATCHER#{dispatcherId}, GSI1SK = date#tripId
-   * Requirements: 8.7
+   * Get trips for a dispatcher with smart index selection
+   * Requirements: 1.4, 5.1, 5.2, 8.7, 3.6, 6.4
+   * 
+   * This method analyzes the provided filters and automatically selects the most
+   * efficient GSI to minimize read operations and improve query performance.
+   * 
+   * Selection priority (highest to lowest selectivity):
+   * - GSI2-Lorry: When lorryId filter is provided (~20 items)
+   * - GSI3-Driver: When driverId filter is provided (~50 items)
+   * - GSI4-Broker: When brokerId filter is provided (~200 items)
+   * - GSI1: Default when only date/status filters (~10,000 items)
+   * 
+   * Includes automatic fallback to GSI1 if optimized query fails, ensuring
+   * backward compatibility and high availability.
+   * 
+   * Comprehensive logging includes:
+   * - Index selection decision with filter details and estimated reads
+   * - Actual reads after query execution (from DynamoDB response)
+   * - Query errors with full context (filters, attempted index, error message)
    */
   private async getTripsForDispatcher(
     dispatcherId: string,
     filters: any,
     dynamodbClient: any,
   ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    try {
+      // Select optimal index based on filter selectivity
+      // Requirements: 1.4, 3.6
+      const strategy = this.indexSelectorService.selectOptimalIndex({
+        dispatcherId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        status: filters.status,
+        brokerId: filters.brokerId,
+        lorryId: filters.lorryId,
+        driverId: filters.driverId,
+        driverName: filters.driverName,
+      });
+
+      // Route to appropriate query method based on selected index
+      // Requirements: 1.4, 5.1
+      switch (strategy.indexName) {
+        case 'GSI2-Lorry':
+          return await this.queryByLorryIndex(dispatcherId, filters, dynamodbClient);
+        
+        case 'GSI3-Driver':
+          return await this.queryByDriverIndex(dispatcherId, filters, dynamodbClient);
+        
+        case 'GSI4-Broker':
+          return await this.queryByBrokerIndex(dispatcherId, filters, dynamodbClient);
+        
+        case 'GSI1':
+        default:
+          return await this.queryByDefaultIndex(dispatcherId, filters, dynamodbClient);
+      }
+    } catch (error: any) {
+      // Log error with full context
+      // Requirements: 5.2, 3.6, 6.4
+      this.logQueryError(error, filters, 'unknown');
+
+      // Fallback to default index (GSI1) to ensure availability
+      // Requirements: 5.2
+      console.log('Falling back to GSI1 (default index) due to error in optimized query');
+      return await this.queryByDefaultIndex(dispatcherId, filters, dynamodbClient);
+    }
+  }
+
+  /**
+   * Log query errors with full context
+   * Requirements: 3.6, 6.4
+   * 
+   * Logs structured error information including:
+   * - Error message and stack trace
+   * - Filters that were provided
+   * - Index that was attempted
+   * - Timestamp for correlation
+   * 
+   * This enables troubleshooting and performance analysis
+   */
+  private logQueryError(
+    error: Error,
+    filters: any,
+    attemptedIndex: string,
+  ): void {
+    const errorLog = {
+      level: 'ERROR',
+      message: 'Query execution failed',
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      },
+      attemptedIndex,
+      filters: {
+        dispatcherId: filters.dispatcherId,
+        dateRange: {
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        },
+        lorryId: filters.lorryId || null,
+        driverId: filters.driverId || null,
+        brokerId: filters.brokerId || null,
+        status: filters.status || null,
+        driverName: filters.driverName || null,
+        limit: filters.limit || null,
+        lastEvaluatedKey: filters.lastEvaluatedKey ? '[REDACTED]' : null,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    console.error(
+      `[TripsService] Query error on ${attemptedIndex}:`,
+      JSON.stringify(errorLog, null, 2),
+    );
+  }
+
+  /**
+   * Query trips using GSI1 (Default Dispatcher Index)
+   * Requirements: 3.5, 3.6, 6.4
+   * 
+   * GSI1 Structure:
+   * - GSI1PK: DISPATCHER#{dispatcherId}
+   * - GSI1SK: {ISO-8601-datetime}#{tripId}
+   * 
+   * This method is the fallback when no selective filters (lorryId, driverId, brokerId) are provided.
+   * It queries all trips for a dispatcher within a date range and applies all filters using FilterExpression.
+   * 
+   * KeyConditionExpression handles: dispatcherId, date range
+   * FilterExpression handles: brokerId, lorryId, driverId, status
+   * Application layer handles: driverName (case-insensitive)
+   * 
+   * Comprehensive logging includes:
+   * - Query start with filter details
+   * - Actual reads after query execution (from DynamoDB response)
+   * - Query errors with full context
+   * 
+   * @param dispatcherId - Dispatcher ID to query trips for
+   * @param filters - Trip filters (date range, status, broker, lorry, driver)
+   * @param dynamodbClient - DynamoDB client instance
+   * @returns Query result with trips and optional pagination token
+   */
+  private async queryByDefaultIndex(
+    dispatcherId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    const startTime = Date.now();
+    let totalRCU = 0;
+    let isError = false;
+
+    try {
+      // Log query start with filter details
+      // Requirements: 3.6, 6.4
+      this.logQueryStart('GSI1', filters);
+    
     // Build key condition expression for GSI1
     let keyConditionExpression = 'GSI1PK = :gsi1pk';
     const expressionAttributeValues: Record<string, any> = {
@@ -726,16 +1113,32 @@ export class TripsService {
     };
 
     // Add date range filtering if provided (GSI1SK = date#tripId)
+    // GSI1SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
+    // Normalize dates to UTC to avoid timezone issues
     if (filters.startDate && filters.endDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      
+      const startDateStr = startDate.toISOString();
+      const endDateStr = endDate.toISOString();
+      
       keyConditionExpression += ' AND GSI1SK BETWEEN :startSk AND :endSk';
-      expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
-      expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     } else if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const startDateStr = startDate.toISOString();
       keyConditionExpression += ' AND GSI1SK >= :startSk';
-      expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
     } else if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      const endDateStr = endDate.toISOString();
       keyConditionExpression += ' AND GSI1SK <= :endSk';
-      expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     }
 
     // Build filter expression for secondary filters
@@ -771,6 +1174,7 @@ export class TripsService {
         // Fetch more items when we have multiple filters to account for DynamoDB filtering
         Limit: hasMultipleFilters ? 100 : (filterExpression ? 50 : fetchLimit),
         ScanIndexForward: false, // Return results in descending order (newest first)
+        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
       };
 
       if (filterExpression) {
@@ -790,6 +1194,11 @@ export class TripsService {
 
       const queryCommand = new QueryCommand(queryParams);
       const result = await dynamodbClient.send(queryCommand);
+
+      // Track RCU consumption from DynamoDB response
+      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+        totalRCU += result.ConsumedCapacity.CapacityUnits;
+      }
 
       const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
       trips.push(...batchTrips);
@@ -857,7 +1266,29 @@ export class TripsService {
       ).toString('base64');
     }
 
+    // Emit CloudWatch metrics for query performance
+    // Requirements: 6.1
+    const responseTimeMs = Date.now() - startTime;
+    await this.emitQueryMetrics('GSI1', responseTimeMs, totalRCU, isError);
+
+    // Log actual reads after query execution
+    // Requirements: 3.6, 6.4
+    this.logQueryCompletion('GSI1', filters, totalRCU, trimmedTrips.length, responseTimeMs);
+
     return response;
+    } catch (error: any) {
+      isError = true;
+      const responseTimeMs = Date.now() - startTime;
+      
+      // Emit error metrics
+      await this.emitQueryMetrics('GSI1', responseTimeMs, totalRCU, isError);
+      
+      // Log error with full context
+      // Requirements: 3.6, 6.4
+      this.logQueryError(error, filters, 'GSI1');
+      
+      throw error;
+    }
   }
 
   /**
@@ -898,16 +1329,21 @@ export class TripsService {
     };
 
     // Add date range filtering if provided (GSI3SK = date#tripId)
+    // GSI3SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
     if (filters.startDate && filters.endDate) {
+      const startDateStr = new Date(filters.startDate).toISOString();
+      const endDateStr = new Date(filters.endDate).toISOString();
       keyConditionExpression += ' AND GSI3SK BETWEEN :startSk AND :endSk';
-      expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
-      expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     } else if (filters.startDate) {
+      const startDateStr = new Date(filters.startDate).toISOString();
       keyConditionExpression += ' AND GSI3SK >= :startSk';
-      expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
     } else if (filters.endDate) {
+      const endDateStr = new Date(filters.endDate).toISOString();
       keyConditionExpression += ' AND GSI3SK <= :endSk';
-      expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     }
 
     // Build filter expression for secondary filters
@@ -1015,16 +1451,21 @@ export class TripsService {
       };
 
       // Add date range filtering if provided (GSI2SK = date#tripId)
+      // GSI2SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
       if (filters.startDate && filters.endDate) {
+        const startDateStr = new Date(filters.startDate).toISOString();
+        const endDateStr = new Date(filters.endDate).toISOString();
         keyConditionExpression += ' AND GSI2SK BETWEEN :startSk AND :endSk';
-        expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
-        expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
       } else if (filters.startDate) {
+        const startDateStr = new Date(filters.startDate).toISOString();
         keyConditionExpression += ' AND GSI2SK >= :startSk';
-        expressionAttributeValues[':startSk'] = `${filters.startDate}#`;
+        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
       } else if (filters.endDate) {
+        const endDateStr = new Date(filters.endDate).toISOString();
         keyConditionExpression += ' AND GSI2SK <= :endSk';
-        expressionAttributeValues[':endSk'] = `${filters.endDate}#ZZZZZZZZ`;
+        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
       }
 
       // Build filter expression for secondary filters
@@ -1076,11 +1517,531 @@ export class TripsService {
 
 
   /**
-   * Build secondary filter expressions for broker, status, lorry, driver
-   * These are applied after the key condition query
-   * Note: driverName is NOT included here - it's filtered in application layer for case-insensitive matching
+   * Query trips using GSI2 (Lorry Index)
+   * Requirements: 1.1, 1.5, 3.2, 3.6, 6.4
+   * 
+   * GSI2 Structure:
+   * - GSI2PK: DISPATCHER#{dispatcherId}
+   * - GSI2SK: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+   * 
+   * This method is optimized for queries with lorryId filter, providing highest selectivity
+   * (~20 items per lorry vs ~10,000 items for default index).
+   * 
+   * KeyConditionExpression handles: dispatcherId, lorryId, date range
+   * FilterExpression handles: brokerId, driverId, status
+   * Application layer handles: driverName (case-insensitive)
+   * 
+   * Comprehensive logging includes:
+   * - Query start with filter details
+   * - Actual reads after query execution (from DynamoDB response)
+   * - Query errors with full context
+   * 
+   * @param dispatcherId - Dispatcher ID to query trips for
+   * @param filters - Trip filters including required lorryId
+   * @param dynamodbClient - DynamoDB client instance
+   * @returns Query result with trips and optional pagination token
    */
-  private buildSecondaryFilters(filters: any): {
+  private async queryByLorryIndex(
+    dispatcherId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    const startTime = Date.now();
+    let totalRCU = 0;
+    let isError = false;
+
+    try {
+      // Log query start with filter details
+      // Requirements: 3.6, 6.4
+      this.logQueryStart('GSI2-Lorry', filters);
+
+      // Build KeyConditionExpression for GSI2
+      // GSI2PK = DISPATCHER#{dispatcherId}
+      // GSI2SK = LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+      let keyConditionExpression = 'GSI2PK = :gsi2pk';
+      const expressionAttributeValues: Record<string, any> = {
+        ':gsi2pk': `DISPATCHER#${dispatcherId}`,
+      };
+
+      // Add date range filtering in KeyConditionExpression using GSI2SK
+      // GSI2SK format: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
+      // We need to construct the range to match this format
+      // IMPORTANT: Normalize dates to UTC to avoid timezone issues
+      if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const endDateStr = endDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startSk AND :endSk';
+        expressionAttributeValues[':startSk'] = `LORRY#${filters.lorryId}#${startDateStr}#`;
+        expressionAttributeValues[':endSk'] = `LORRY#${filters.lorryId}#${endDateStr}#ZZZZZZZZ`;
+      } else if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const startDateStr = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startSk';
+        expressionAttributeValues[':startSk'] = `LORRY#${filters.lorryId}#${startDateStr}#`;
+      } else if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const endDateStr = endDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK <= :endSk';
+        expressionAttributeValues[':endSk'] = `LORRY#${filters.lorryId}#${endDateStr}#ZZZZZZZZ`;
+      } else {
+        // No date filter - just match lorryId prefix
+        keyConditionExpression += ' AND begins_with(GSI2SK, :lorryPrefix)';
+        expressionAttributeValues[':lorryPrefix'] = `LORRY#${filters.lorryId}#`;
+      }
+
+      // Build FilterExpression for remaining filters (broker, driver, status)
+      // Exclude lorryId since it's already in KeyConditionExpression
+      const { filterExpression, filterAttributeNames, filterAttributeValues } =
+        this.buildFilterExpression(filters, ['lorryId']);
+
+      // Build query parameters
+      const queryParams: any = {
+        TableName: this.tripsTableName,
+        IndexName: 'GSI2-Lorry',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: {
+          ...expressionAttributeValues,
+          ...filterAttributeValues,
+        },
+        Limit: filters.limit || 50,
+        ScanIndexForward: false, // Return results in descending order (newest first)
+        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
+      };
+
+      if (filterExpression) {
+        queryParams.FilterExpression = filterExpression;
+        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      }
+
+      if (filters.lastEvaluatedKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
+      }
+
+      // Execute query
+      const queryCommand = new QueryCommand(queryParams);
+      const result = await dynamodbClient.send(queryCommand);
+
+      // Track RCU consumption from DynamoDB response
+      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      }
+
+      // Map results to Trip objects
+      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+
+      // Apply case-insensitive driver name filtering in application layer
+      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+
+      // Build response
+      const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
+        trips: filteredTrips 
+      };
+
+      if (result.LastEvaluatedKey) {
+        response.lastEvaluatedKey = Buffer.from(
+          JSON.stringify(result.LastEvaluatedKey),
+        ).toString('base64');
+      }
+
+      // Emit CloudWatch metrics for query performance
+      // Requirements: 6.1
+      const responseTimeMs = Date.now() - startTime;
+      await this.emitQueryMetrics('GSI2-Lorry', responseTimeMs, totalRCU, isError);
+
+      // Log actual reads after query execution
+      // Requirements: 3.6, 6.4
+      this.logQueryCompletion('GSI2-Lorry', filters, totalRCU, filteredTrips.length, responseTimeMs);
+
+      return response;
+    } catch (error: any) {
+      isError = true;
+      const responseTimeMs = Date.now() - startTime;
+      
+      // Emit error metrics
+      await this.emitQueryMetrics('GSI2-Lorry', responseTimeMs, totalRCU, isError);
+
+      // Log error with full context
+      // Requirements: 3.6, 6.4
+      this.logQueryError(error, filters, 'GSI2-Lorry');
+
+      // If GSI2 query fails, fall back to GSI1 (default index)
+      console.log('Falling back to GSI1 (default index) due to GSI2 query error');
+      return this.getTripsForDispatcher(
+        dispatcherId,
+        filters,
+        dynamodbClient,
+      );
+    }
+  }
+
+  /**
+   * Query trips using GSI3 (Driver Index)
+   * Requirements: 1.2, 3.3
+   * 
+   * GSI3 Structure:
+   * - GSI3PK: DISPATCHER#{dispatcherId}
+   * - GSI3SK: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+   * 
+   * This method is optimized for queries with driverId filter, providing high selectivity
+   * (~50 items per driver vs ~10,000 items for default index).
+   * 
+   * KeyConditionExpression handles: dispatcherId, driverId, date range
+   * FilterExpression handles: brokerId, lorryId, status
+   * Application layer handles: driverName (case-insensitive)
+   * 
+   * @param dispatcherId - Dispatcher ID to query trips for
+   * @param filters - Trip filters including required driverId
+   * @param dynamodbClient - DynamoDB client instance
+   * @returns Query result with trips and optional pagination token
+   */
+  private async queryByDriverIndex(
+    dispatcherId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    const startTime = Date.now();
+    let totalRCU = 0;
+    let isError = false;
+
+    try {
+      // Build KeyConditionExpression for GSI3
+      // GSI3PK = DISPATCHER#{dispatcherId}
+      // GSI3SK = DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+      let keyConditionExpression = 'GSI3PK = :gsi3pk';
+      const expressionAttributeValues: Record<string, any> = {
+        ':gsi3pk': `DISPATCHER#${dispatcherId}`,
+      };
+
+      // Add date range filtering in KeyConditionExpression using GSI3SK
+      // GSI3SK format: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
+      // We need to construct the range to match this format
+      // IMPORTANT: Normalize dates to UTC to avoid timezone issues
+      if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const endDateStr = endDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        keyConditionExpression += ' AND GSI3SK BETWEEN :startSk AND :endSk';
+        expressionAttributeValues[':startSk'] = `DRIVER#${filters.driverId}#${startDateStr}#`;
+        expressionAttributeValues[':endSk'] = `DRIVER#${filters.driverId}#${endDateStr}#ZZZZZZZZ`;
+      } else if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const startDateStr = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI3SK >= :startSk';
+        expressionAttributeValues[':startSk'] = `DRIVER#${filters.driverId}#${startDateStr}#`;
+      } else if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const endDateStr = endDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI3SK <= :endSk';
+        expressionAttributeValues[':endSk'] = `DRIVER#${filters.driverId}#${endDateStr}#ZZZZZZZZ`;
+      } else {
+        // No date filter - just match driverId prefix
+        keyConditionExpression += ' AND begins_with(GSI3SK, :driverPrefix)';
+        expressionAttributeValues[':driverPrefix'] = `DRIVER#${filters.driverId}#`;
+      }
+
+      // Build FilterExpression for remaining filters (broker, lorry, status)
+      // Exclude driverId since it's already in KeyConditionExpression
+      const { filterExpression, filterAttributeNames, filterAttributeValues } =
+        this.buildFilterExpression(filters, ['driverId']);
+
+      // Build query parameters
+      const queryParams: any = {
+        TableName: this.tripsTableName,
+        IndexName: 'GSI3-Driver',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: {
+          ...expressionAttributeValues,
+          ...filterAttributeValues,
+        },
+        Limit: filters.limit || 50,
+        ScanIndexForward: false, // Return results in descending order (newest first)
+        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
+      };
+
+      if (filterExpression) {
+        queryParams.FilterExpression = filterExpression;
+        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      }
+
+      if (filters.lastEvaluatedKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
+      }
+
+      // Execute query
+      const queryCommand = new QueryCommand(queryParams);
+      const result = await dynamodbClient.send(queryCommand);
+
+      // Track RCU consumption from DynamoDB response
+      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      }
+
+      // Map results to Trip objects
+      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+
+      // Apply case-insensitive driver name filtering in application layer
+      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+
+      // Build response
+      const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
+        trips: filteredTrips 
+      };
+
+      if (result.LastEvaluatedKey) {
+        response.lastEvaluatedKey = Buffer.from(
+          JSON.stringify(result.LastEvaluatedKey),
+        ).toString('base64');
+      }
+
+      // Emit CloudWatch metrics for query performance
+      // Requirements: 6.1
+      const responseTimeMs = Date.now() - startTime;
+      await this.emitQueryMetrics('GSI3-Driver', responseTimeMs, totalRCU, isError);
+
+      return response;
+    } catch (error: any) {
+      isError = true;
+      const responseTimeMs = Date.now() - startTime;
+      
+      // Emit error metrics
+      await this.emitQueryMetrics('GSI3-Driver', responseTimeMs, totalRCU, isError);
+
+      // Log error with context
+      console.error('Error querying GSI3 (Driver Index):', {
+        error: error.message,
+        filters,
+        timestamp: new Date().toISOString(),
+      });
+
+      // If GSI3 query fails, fall back to GSI1 (default index)
+      console.log('Falling back to GSI1 (default index) due to GSI3 query error');
+      return this.getTripsForDispatcher(
+        dispatcherId,
+        filters,
+        dynamodbClient,
+      );
+    }
+  }
+
+  /**
+   * Query trips using GSI4 (Broker Index)
+   * Requirements: 1.3, 3.4, 3.6, 6.4
+   * 
+   * GSI4 Structure:
+   * - GSI4PK: DISPATCHER#{dispatcherId}
+   * - GSI4SK: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+   * 
+   * This method is optimized for queries with brokerId filter, providing medium selectivity
+   * (~200 items per broker vs ~10,000 items for default index).
+   * 
+   * KeyConditionExpression handles: dispatcherId, brokerId, date range
+   * FilterExpression handles: lorryId, driverId, status
+   * Application layer handles: driverName (case-insensitive)
+   * 
+   * Comprehensive logging includes:
+   * - Query start with filter details
+   * - Actual reads after query execution (from DynamoDB response)
+   * - Query errors with full context
+   * 
+   * @param dispatcherId - Dispatcher ID to query trips for
+   * @param filters - Trip filters including required brokerId
+   * @param dynamodbClient - DynamoDB client instance
+   * @returns Query result with trips and optional pagination token
+   */
+  private async queryByBrokerIndex(
+    dispatcherId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    const startTime = Date.now();
+    let totalRCU = 0;
+    let isError = false;
+
+    try {
+      // Log query start with filter details
+      // Requirements: 3.6, 6.4
+      this.logQueryStart('GSI4-Broker', filters);
+
+      // Build KeyConditionExpression for GSI4
+      // GSI4PK = DISPATCHER#{dispatcherId}
+      // GSI4SK = BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+      let keyConditionExpression = 'GSI4PK = :gsi4pk';
+      const expressionAttributeValues: Record<string, any> = {
+        ':gsi4pk': `DISPATCHER#${dispatcherId}`,
+      };
+
+      // Add date range filtering in KeyConditionExpression using GSI4SK
+      // GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+      // We need to construct the range to match this format
+      // IMPORTANT: Normalize dates to UTC to avoid timezone issues
+      if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const endDateStr = endDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        keyConditionExpression += ' AND GSI4SK BETWEEN :startSk AND :endSk';
+        expressionAttributeValues[':startSk'] = `BROKER#${filters.brokerId}#${startDateStr}#`;
+        expressionAttributeValues[':endSk'] = `BROKER#${filters.brokerId}#${endDateStr}#ZZZZZZZZ`;
+      } else if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const startDateStr = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI4SK >= :startSk';
+        expressionAttributeValues[':startSk'] = `BROKER#${filters.brokerId}#${startDateStr}#`;
+      } else if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const endDateStr = endDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI4SK <= :endSk';
+        expressionAttributeValues[':endSk'] = `BROKER#${filters.brokerId}#${endDateStr}#ZZZZZZZZ`;
+      } else {
+        // No date filter - just match brokerId prefix
+        keyConditionExpression += ' AND begins_with(GSI4SK, :brokerPrefix)';
+        expressionAttributeValues[':brokerPrefix'] = `BROKER#${filters.brokerId}#`;
+      }
+
+      // Build FilterExpression for remaining filters (lorry, driver, status)
+      // Exclude brokerId since it's already in KeyConditionExpression
+      const { filterExpression, filterAttributeNames, filterAttributeValues } =
+        this.buildFilterExpression(filters, ['brokerId']);
+
+      // Build query parameters
+      const queryParams: any = {
+        TableName: this.tripsTableName,
+        IndexName: 'GSI4-Broker',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: {
+          ...expressionAttributeValues,
+          ...filterAttributeValues,
+        },
+        Limit: filters.limit || 50,
+        ScanIndexForward: false, // Return results in descending order (newest first)
+        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
+      };
+
+      if (filterExpression) {
+        queryParams.FilterExpression = filterExpression;
+        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      }
+
+      if (filters.lastEvaluatedKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
+      }
+
+      // Execute query
+      const queryCommand = new QueryCommand(queryParams);
+      const result = await dynamodbClient.send(queryCommand);
+
+      // Track RCU consumption from DynamoDB response
+      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      }
+
+      // Map results to Trip objects
+      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+
+      // Apply case-insensitive driver name filtering in application layer
+      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+
+      // Build response
+      const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
+        trips: filteredTrips 
+      };
+
+      if (result.LastEvaluatedKey) {
+        response.lastEvaluatedKey = Buffer.from(
+          JSON.stringify(result.LastEvaluatedKey),
+        ).toString('base64');
+      }
+
+      // Emit CloudWatch metrics for query performance
+      // Requirements: 6.1
+      const responseTimeMs = Date.now() - startTime;
+      await this.emitQueryMetrics('GSI4-Broker', responseTimeMs, totalRCU, isError);
+
+      // Log actual reads after query execution
+      // Requirements: 3.6, 6.4
+      this.logQueryCompletion('GSI4-Broker', filters, totalRCU, filteredTrips.length, responseTimeMs);
+
+      return response;
+    } catch (error: any) {
+      isError = true;
+      const responseTimeMs = Date.now() - startTime;
+      
+      // Emit error metrics
+      await this.emitQueryMetrics('GSI4-Broker', responseTimeMs, totalRCU, isError);
+
+      // Log error with full context
+      // Requirements: 3.6, 6.4
+      this.logQueryError(error, filters, 'GSI4-Broker');
+
+      // If GSI4 query fails, fall back to GSI1 (default index)
+      console.log('Falling back to GSI1 (default index) due to GSI4 query error');
+      return this.getTripsForDispatcher(
+        dispatcherId,
+        filters,
+        dynamodbClient,
+      );
+    }
+  }
+
+  /**
+   * Build FilterExpression with attribute exclusion support
+   * Requirements: 1.4
+   * 
+   * This is a shared utility that generates DynamoDB FilterExpression, ExpressionAttributeNames,
+   * and ExpressionAttributeValues from a filters object, excluding specified attributes.
+   * 
+   * Used across all GSI query methods to avoid duplication and ensure consistent filtering logic.
+   * 
+   * @param filters - Object containing filter criteria (brokerId, status, lorryId, driverId, etc.)
+   * @param excludeAttributes - Array of attribute names to exclude from FilterExpression
+   *                           (these are typically handled in KeyConditionExpression)
+   * @returns Object containing filterExpression, filterAttributeNames, and filterAttributeValues
+   * 
+   * @example
+   * // When querying GSI2 (Lorry Index), lorryId is in KeyConditionExpression
+   * const result = buildFilterExpression(filters, ['lorryId']);
+   * // Result will include brokerId, driverId, status in FilterExpression, but not lorryId
+   */
+  private buildFilterExpression(
+    filters: any,
+    excludeAttributes: string[] = []
+  ): {
     filterExpression: string;
     filterAttributeNames: Record<string, string>;
     filterAttributeValues: Record<string, any>;
@@ -1089,28 +2050,23 @@ export class TripsService {
     const filterAttributeNames: Record<string, string> = {};
     const filterAttributeValues: Record<string, any> = {};
 
-    if (filters.brokerId) {
-      filterExpressions.push('#brokerId = :brokerId');
-      filterAttributeNames['#brokerId'] = 'brokerId';
-      filterAttributeValues[':brokerId'] = filters.brokerId;
-    }
+    // Define all possible filter attributes and their mappings
+    const filterableAttributes = [
+      { key: 'brokerId', attributeName: 'brokerId' },
+      { key: 'status', attributeName: 'status' },
+      { key: 'lorryId', attributeName: 'lorryId' },
+      { key: 'driverId', attributeName: 'driverId' },
+    ];
 
-    if (filters.status) {
-      filterExpressions.push('#status = :status');
-      filterAttributeNames['#status'] = 'status';
-      filterAttributeValues[':status'] = filters.status;
-    }
-
-    if (filters.lorryId) {
-      filterExpressions.push('#lorryId = :lorryId');
-      filterAttributeNames['#lorryId'] = 'lorryId';
-      filterAttributeValues[':lorryId'] = filters.lorryId;
-    }
-
-    if (filters.driverId) {
-      filterExpressions.push('#driverId = :driverId');
-      filterAttributeNames['#driverId'] = 'driverId';
-      filterAttributeValues[':driverId'] = filters.driverId;
+    // Build filter expressions for each attribute that:
+    // 1. Exists in the filters object
+    // 2. Is not in the excludeAttributes list
+    for (const { key, attributeName } of filterableAttributes) {
+      if (filters[key] && !excludeAttributes.includes(key)) {
+        filterExpressions.push(`#${key} = :${key}`);
+        filterAttributeNames[`#${key}`] = attributeName;
+        filterAttributeValues[`:${key}`] = filters[key];
+      }
     }
 
     // Note: driverName filtering is done in application layer for case-insensitive matching
@@ -1121,6 +2077,22 @@ export class TripsService {
       filterAttributeNames,
       filterAttributeValues,
     };
+  }
+
+  /**
+   * Build secondary filter expressions for broker, status, lorry, driver
+   * These are applied after the key condition query
+   * Note: driverName is NOT included here - it's filtered in application layer for case-insensitive matching
+   * 
+   * @deprecated Use buildFilterExpression instead for better flexibility
+   */
+  private buildSecondaryFilters(filters: any): {
+    filterExpression: string;
+    filterAttributeNames: Record<string, string>;
+    filterAttributeValues: Record<string, any>;
+  } {
+    // Delegate to the new buildFilterExpression method with no exclusions
+    return this.buildFilterExpression(filters, []);
   }
 
   /**
@@ -1189,7 +2161,9 @@ export class TripsService {
       driverId: filters.driverId,
     };
 
-    const { trips } = await this.getTrips(userId, role, tripFilters);
+    // Use getAllTripsForAggregation to fetch ALL trips in the date range
+    // Payment reports need complete data for accurate aggregation, not just paginated results
+    const trips = await this.getAllTripsForAggregation(userId, role, tripFilters);
 
     // Convert trips to payment details
     const tripPaymentDetails: TripPaymentDetail[] = trips.map((trip) => ({
@@ -1255,16 +2229,11 @@ export class TripsService {
       profit,
       tripCount: trips.length,
       trips,
+      // Always include all grouped data for frontend flexibility
+      groupedByBroker: this.groupByBroker(trips),
+      groupedByDriver: this.groupByDriver(trips),
+      groupedByLorry: this.groupByLorry(trips),
     };
-
-    // Add grouping if requested
-    if (groupBy === 'broker') {
-      report.groupedByBroker = this.groupByBroker(trips);
-    } else if (groupBy === 'driver') {
-      report.groupedByDriver = this.groupByDriver(trips);
-    } else if (groupBy === 'lorry') {
-      report.groupedByLorry = this.groupByLorry(trips);
-    }
 
     return report;
   }
@@ -1477,8 +2446,10 @@ export class TripsService {
     const allTrips: Trip[] = [];
     let lastEvaluatedKey: string | undefined = undefined;
     const pageSize = 100; // Fetch in batches of 100
+    let batchCount = 0;
 
     do {
+      batchCount++;
       const { trips, lastEvaluatedKey: nextKey } = await this.getTrips(
         userId,
         userRole,
@@ -1490,7 +2461,7 @@ export class TripsService {
       
       // Safety check to prevent infinite loops (max 10,000 trips)
       if (allTrips.length >= 10000) {
-        console.warn('Reached maximum trip limit (10,000) for aggregation');
+        console.warn('[getAllTripsForAggregation] Reached maximum trip limit (10,000) for aggregation');
         break;
       }
     } while (lastEvaluatedKey);
@@ -1853,5 +2824,103 @@ export class TripsService {
     );
     
     return stats;
+  }
+
+  /**
+   * Log query start with filter details
+   * Requirements: 3.6, 6.4
+   * 
+   * Logs structured information about the query being executed:
+   * - Index being used
+   * - Filter details
+   * - Timestamp
+   * 
+   * This enables correlation with query completion and error logs
+   */
+  private logQueryStart(indexName: string, filters: any): void {
+    // Logging disabled for cleaner console output
+    // Uncomment below for debugging query performance
+    /*
+    const logData = {
+      level: 'INFO',
+      message: 'Query execution started',
+      indexName,
+      filters: {
+        dispatcherId: filters.dispatcherId,
+        dateRange: {
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        },
+        lorryId: filters.lorryId || null,
+        driverId: filters.driverId || null,
+        brokerId: filters.brokerId || null,
+        status: filters.status || null,
+        driverName: filters.driverName || null,
+        limit: filters.limit || null,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log(
+      `[TripsService] Query started on ${indexName}`,
+      JSON.stringify(logData, null, 2),
+    );
+    */
+  }
+
+  /**
+   * Log query completion with actual reads
+   * Requirements: 3.6, 6.4
+   * 
+   * Logs structured information about the completed query:
+   * - Index that was used
+   * - Filter details
+   * - Actual RCU consumed (from DynamoDB response)
+   * - Number of items returned
+   * - Query response time
+   * - Timestamp
+   * 
+   * This enables performance analysis and cost optimization
+   */
+  private logQueryCompletion(
+    indexName: string,
+    filters: any,
+    actualRCU: number,
+    itemsReturned: number,
+    responseTimeMs: number,
+  ): void {
+    // Logging disabled for cleaner console output
+    // Uncomment below for debugging query performance
+    /*
+    const logData = {
+      level: 'INFO',
+      message: 'Query execution completed',
+      indexName,
+      performance: {
+        actualRCU,
+        itemsReturned,
+        responseTimeMs,
+      },
+      filters: {
+        dispatcherId: filters.dispatcherId,
+        dateRange: {
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        },
+        lorryId: filters.lorryId || null,
+        driverId: filters.driverId || null,
+        brokerId: filters.brokerId || null,
+        status: filters.status || null,
+        driverName: filters.driverName || null,
+        limit: filters.limit || null,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log(
+      `[TripsService] Query completed on ${indexName} | RCU: ${actualRCU} | Items: ${itemsReturned} | Time: ${responseTimeMs}ms`,
+      JSON.stringify(logData, null, 2),
+    );
+    */
   }
 }

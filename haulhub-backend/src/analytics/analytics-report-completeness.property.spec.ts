@@ -102,32 +102,36 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get fleet overview report
-            const report = await service.getFleetOverview();
+            // Get fleet overview report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getFleetOverview(dispatcherId);
 
             // Verify all required data categories are present
-            expect(report).toHaveProperty('drivers');
-            expect(report).toHaveProperty('vehicles');
-            expect(report).toHaveProperty('trips');
+            expect(report).toBeDefined();
+            expect(report.drivers).toBeDefined();
+            expect(report).toBeDefined();
+            expect(report.drivers).toBeDefined();
+            expect(report.vehicles).toBeDefined();
+            expect(report.trips).toBeDefined();
 
             // Verify drivers section completeness
-            expect(report.drivers).toHaveProperty('total');
-            expect(report.drivers).toHaveProperty('active');
-            expect(report.drivers).toHaveProperty('onTrip');
-            expect(report.drivers).toHaveProperty('utilization');
+            expect(report.drivers.total).toBeDefined();
+            expect(report.drivers.active).toBeDefined();
+            expect(report.drivers.onTrip).toBeDefined();
+            expect(report.drivers.utilization).toBeDefined();
 
             // Verify vehicles section completeness
-            expect(report.vehicles).toHaveProperty('total');
-            expect(report.vehicles).toHaveProperty('available');
-            expect(report.vehicles).toHaveProperty('inUse');
-            expect(report.vehicles).toHaveProperty('maintenance');
-            expect(report.vehicles).toHaveProperty('utilization');
+            expect(report.vehicles.total).toBeDefined();
+            expect(report.vehicles.available).toBeDefined();
+            expect(report.vehicles.inUse).toBeDefined();
+            expect(report.vehicles.maintenance).toBeDefined();
+            expect(report.vehicles.utilization).toBeDefined();
 
             // Verify trips section completeness
-            expect(report.trips).toHaveProperty('total');
-            expect(report.trips).toHaveProperty('completed');
-            expect(report.trips).toHaveProperty('inProgress');
-            expect(report.trips).toHaveProperty('planned');
+            expect(report.trips.total).toBeDefined();
+            expect(report.trips.completed).toBeDefined();
+            expect(report.trips.inProgress).toBeDefined();
+            expect(report.trips.planned).toBeDefined();
 
             // Verify all values are numbers
             expect(typeof report.drivers.total).toBe('number');
@@ -174,19 +178,21 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get trip analytics report
-            const report = await service.getTripAnalytics();
+            // Get trip analytics report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getTripAnalytics(dispatcherId);
 
             // Verify all required fields are present
-            expect(report).toHaveProperty('totalTrips');
-            expect(report).toHaveProperty('completedTrips');
-            expect(report).toHaveProperty('totalRevenue');
-            expect(report).toHaveProperty('totalExpenses');
-            expect(report).toHaveProperty('totalProfit');
-            expect(report).toHaveProperty('averageDistance');
-            expect(report).toHaveProperty('averageRevenue');
-            expect(report).toHaveProperty('onTimeDeliveryRate');
-            expect(report).toHaveProperty('fuelEfficiency');
+            expect(report).toBeDefined();
+            expect(report.totalTrips).toBeDefined();
+            expect(report.completedTrips).toBeDefined();
+            expect(report.totalRevenue).toBeDefined();
+            expect(report.totalExpenses).toBeDefined();
+            expect(report.totalProfit).toBeDefined();
+            expect(report.averageDistance).toBeDefined();
+            expect(report.averageRevenue).toBeDefined();
+            expect(report.onTimeDeliveryRate).toBeDefined();
+            expect(report.fuelEfficiency).toBeDefined();
 
             // Verify all values are numbers
             expect(typeof report.totalTrips).toBe('number');
@@ -245,8 +251,9 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get driver performance report
-            const report = await service.getDriverPerformance();
+            // Get driver performance report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getDriverPerformance(dispatcherId);
 
             // Verify report is an array
             expect(Array.isArray(report)).toBe(true);
@@ -254,14 +261,14 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
             // If there are drivers, verify each entry has all required fields
             if (report.length > 0) {
               for (const driverPerf of report) {
-                expect(driverPerf).toHaveProperty('driverId');
-                expect(driverPerf).toHaveProperty('driverName');
-                expect(driverPerf).toHaveProperty('totalTrips');
-                expect(driverPerf).toHaveProperty('completedTrips');
-                expect(driverPerf).toHaveProperty('totalDistance');
-                expect(driverPerf).toHaveProperty('totalRevenue');
-                expect(driverPerf).toHaveProperty('averageRevenue');
-                expect(driverPerf).toHaveProperty('onTimeDeliveryRate');
+                expect(driverPerf.driverId).toBeDefined();
+                expect(driverPerf.driverName).toBeDefined();
+                expect(driverPerf.totalTrips).toBeDefined();
+                expect(driverPerf.completedTrips).toBeDefined();
+                expect(driverPerf.totalDistance).toBeDefined();
+                expect(driverPerf.totalRevenue).toBeDefined();
+                expect(driverPerf.averageRevenue).toBeDefined();
+                expect(driverPerf.onTimeDeliveryRate).toBeDefined();
 
                 // Verify all values are of correct type
                 expect(typeof driverPerf.driverId).toBe('string');
@@ -305,8 +312,9 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get vehicle utilization report
-            const report = await service.getVehicleUtilization();
+            // Get vehicle utilization report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getVehicleUtilization(dispatcherId);
 
             // Verify report is an array
             expect(Array.isArray(report)).toBe(true);
@@ -314,13 +322,13 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
             // If there are vehicles, verify each entry has all required fields
             if (report.length > 0) {
               for (const vehicleUtil of report) {
-                expect(vehicleUtil).toHaveProperty('vehicleId');
-                expect(vehicleUtil).toHaveProperty('vehicleName');
-                expect(vehicleUtil).toHaveProperty('totalTrips');
-                expect(vehicleUtil).toHaveProperty('totalDistance');
-                expect(vehicleUtil).toHaveProperty('totalRevenue');
-                expect(vehicleUtil).toHaveProperty('utilizationRate');
-                expect(vehicleUtil).toHaveProperty('averageRevenuePerTrip');
+                expect(vehicleUtil.vehicleId).toBeDefined();
+                expect(vehicleUtil.vehicleName).toBeDefined();
+                expect(vehicleUtil.totalTrips).toBeDefined();
+                expect(vehicleUtil.totalDistance).toBeDefined();
+                expect(vehicleUtil.totalRevenue).toBeDefined();
+                expect(vehicleUtil.utilizationRate).toBeDefined();
+                expect(vehicleUtil.averageRevenuePerTrip).toBeDefined();
 
                 // Verify all values are of correct type
                 expect(typeof vehicleUtil.vehicleId).toBe('string');
@@ -362,25 +370,27 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get revenue analytics report
-            const report = await service.getRevenueAnalytics();
+            // Get revenue analytics report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getRevenueAnalytics(dispatcherId);
 
             // Verify all required fields are present
-            expect(report).toHaveProperty('monthlyData');
-            expect(report).toHaveProperty('totalRevenue');
-            expect(report).toHaveProperty('totalExpenses');
-            expect(report).toHaveProperty('totalProfit');
-            expect(report).toHaveProperty('averageMonthlyRevenue');
+            expect(report).toBeDefined();
+            expect(report.monthlyData).toBeDefined();
+            expect(report.totalRevenue).toBeDefined();
+            expect(report.totalExpenses).toBeDefined();
+            expect(report.totalProfit).toBeDefined();
+            expect(report.averageMonthlyRevenue).toBeDefined();
 
             // Verify monthlyData is an array
             expect(Array.isArray(report.monthlyData)).toBe(true);
 
             // Verify each monthly entry has required fields
             for (const monthData of report.monthlyData) {
-              expect(monthData).toHaveProperty('month');
-              expect(monthData).toHaveProperty('revenue');
-              expect(monthData).toHaveProperty('expenses');
-              expect(monthData).toHaveProperty('profit');
+              expect(monthData.month).toBeDefined();
+              expect(monthData.revenue).toBeDefined();
+              expect(monthData.expenses).toBeDefined();
+              expect(monthData.profit).toBeDefined();
 
               expect(typeof monthData.month).toBe('string');
               expect(typeof monthData.revenue).toBe('number');
@@ -428,12 +438,14 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get maintenance alerts report
-            const report = await service.getMaintenanceAlerts();
+            // Get maintenance alerts report (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const report = await service.getMaintenanceAlerts(dispatcherId);
 
             // Verify all required fields are present
-            expect(report).toHaveProperty('vehicleAlerts');
-            expect(report).toHaveProperty('driverAlerts');
+            expect(report).toBeDefined();
+            expect(report.vehicleAlerts).toBeDefined();
+            expect(report.driverAlerts).toBeDefined();
 
             // Verify both are arrays
             expect(Array.isArray(report.vehicleAlerts)).toBe(true);
@@ -441,10 +453,10 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
 
             // Verify each vehicle alert has required fields
             for (const alert of report.vehicleAlerts) {
-              expect(alert).toHaveProperty('vehicleId');
-              expect(alert).toHaveProperty('alertType');
-              expect(alert).toHaveProperty('message');
-              expect(alert).toHaveProperty('severity');
+              expect(alert.vehicleId).toBeDefined();
+              expect(alert.alertType).toBeDefined();
+              expect(alert.message).toBeDefined();
+              expect(alert.severity).toBeDefined();
 
               expect(typeof alert.vehicleId).toBe('string');
               expect(typeof alert.alertType).toBe('string');
@@ -454,11 +466,11 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
 
             // Verify each driver alert has required fields
             for (const alert of report.driverAlerts) {
-              expect(alert).toHaveProperty('driverId');
-              expect(alert).toHaveProperty('driverName');
-              expect(alert).toHaveProperty('alertType');
-              expect(alert).toHaveProperty('message');
-              expect(alert).toHaveProperty('severity');
+              expect(alert.driverId).toBeDefined();
+              expect(alert.driverName).toBeDefined();
+              expect(alert.alertType).toBeDefined();
+              expect(alert.message).toBeDefined();
+              expect(alert.severity).toBeDefined();
 
               expect(typeof alert.driverId).toBe('string');
               expect(typeof alert.driverName).toBe('string');
@@ -482,12 +494,13 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
               Items: trips,
             });
 
-            // Get all reports
-            const fleetOverview = await service.getFleetOverview();
-            const tripAnalytics = await service.getTripAnalytics();
-            const driverPerformance = await service.getDriverPerformance();
-            const vehicleUtilization = await service.getVehicleUtilization();
-            const revenueAnalytics = await service.getRevenueAnalytics();
+            // Get all reports (use dispatcherId from first trip)
+            const dispatcherId = trips[0].dispatcherId;
+            const fleetOverview = await service.getFleetOverview(dispatcherId);
+            const tripAnalytics = await service.getTripAnalytics(dispatcherId);
+            const driverPerformance = await service.getDriverPerformance(dispatcherId);
+            const vehicleUtilization = await service.getVehicleUtilization(dispatcherId);
+            const revenueAnalytics = await service.getRevenueAnalytics(dispatcherId);
 
             // Verify trip count consistency
             expect(fleetOverview.trips.total).toBe(tripAnalytics.totalTrips);

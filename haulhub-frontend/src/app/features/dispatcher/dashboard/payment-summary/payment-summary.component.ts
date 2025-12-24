@@ -8,6 +8,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TripService, PaymentSummary } from '../../../../core/services/trip.service';
 import { DashboardStateService } from '../dashboard-state.service';
+import { SharedFilterService } from '../shared-filter.service';
 
 @Component({
   selector: 'app-payment-summary',
@@ -30,12 +31,13 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
   constructor(
     private tripService: TripService,
     private dashboardState: DashboardStateService,
+    private sharedFilterService: SharedFilterService,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    // Subscribe to filter changes
-    this.dashboardState.filters$
+    // Subscribe to shared filter changes (same as analytics and payment-report)
+    this.sharedFilterService.filters$
       .pipe(takeUntil(this.destroy$))
       .subscribe(filters => {
         this.loadPaymentSummary(filters);
@@ -45,7 +47,7 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
     this.dashboardState.refreshPaymentSummary$
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
-        const filters = this.dashboardState.getCurrentFilters();
+        const filters = this.sharedFilterService.getCurrentFilters();
         this.loadPaymentSummary(filters);
       });
   }
@@ -53,8 +55,11 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
   private loadPaymentSummary(filters: any): void {
     const apiFilters = this.buildApiFilters(filters);
     
+    console.log('[PaymentSummaryComponent] Loading payment summary with filters:', apiFilters);
+    
     this.tripService.getPaymentSummary(apiFilters).subscribe({
       next: (summary) => {
+        console.log('[PaymentSummaryComponent] Received payment summary:', summary);
         this.paymentSummary = summary;
         this.hasError = false;
       },
@@ -63,6 +68,7 @@ export class PaymentSummaryComponent implements OnInit, OnDestroy {
         if (error.name === 'AbortError' || error.status === 0) {
           return;
         }
+        console.error('[PaymentSummaryComponent] Error loading payment summary:', error);
         this.handleError(error);
       }
     });
