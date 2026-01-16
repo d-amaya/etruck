@@ -58,6 +58,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'brokerPayment',
     'driverPayment',
     'lorryOwnerPayment',
+    'fuelCost',
     'profit',
     'actions'
   ];
@@ -373,6 +374,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   calculateProfit(trip: Trip): number {
     return calculateTripProfit(trip);
+  }
+
+  calculateFuelCost(trip: Trip): number {
+    return calculateFuelCost(trip);
   }
 
   getStatusClass(status: TripStatus): string {
