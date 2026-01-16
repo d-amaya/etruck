@@ -28,7 +28,7 @@
   </form>
 
   <!-- Loading Spinner -->
-  <div *ngIf="loading" class="loading-container">
+  <div *ngIf="loading && !isWrapped" class="loading-container">
     <mat-spinner></mat-spinner>
   </div>
 

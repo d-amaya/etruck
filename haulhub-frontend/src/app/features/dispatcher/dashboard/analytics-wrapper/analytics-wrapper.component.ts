@@ -18,7 +18,7 @@ import { AnalyticsDashboardComponent } from '../../analytics-dashboard/analytics
   ],
   template: `
     <div class="analytics-wrapper">
-      <app-analytics-dashboard></app-analytics-dashboard>
+      <app-analytics-dashboard [isWrapped]="true"></app-analytics-dashboard>
     </div>
   `,
   styles: [`
@@ -36,6 +36,11 @@ import { AnalyticsDashboardComponent } from '../../analytics-dashboard/analytics
           visibility: hidden !important;
           opacity: 0 !important;
           pointer-events: none !important;
+          z-index: -1 !important;
+          position: absolute !important;
+          width: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
         
         .error-container {

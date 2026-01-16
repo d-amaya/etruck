@@ -31,7 +31,7 @@
   </div>
 
   <!-- Loading State -->
-  <div *ngIf="isLoading" class="loading-container">
+  <div *ngIf="isLoading && !isWrapped" class="loading-container">
     <mat-spinner></mat-spinner>
     <p>Loading analytics data...</p>
   </div>

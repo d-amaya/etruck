@@ -19,6 +19,7 @@ import { TripService } from '../../../core/services/trip.service';
 import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
 import { SharedFilterService } from '../dashboard/shared-filter.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
+import { Input } from '@angular/core';
 
 @Component({
   selector: 'app-payment-report',
@@ -42,6 +43,8 @@ import { DashboardStateService } from '../dashboard/dashboard-state.service';
   styleUrls: ['./payment-report.component.scss']
 })
 export class PaymentReportComponent implements OnInit, OnDestroy {
+  @Input() isWrapped = false; // Set by wrapper component
+  
   private destroy$ = new Subject<void>();
   filterForm: FormGroup;
   report: DispatcherPaymentReport | null = null;
@@ -93,8 +96,12 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loading = true;
-    this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
+    // Only show component-level loading spinner if not wrapped
+    if (!this.isWrapped) {
+      this.loading = true;
+      // Only set dashboard loading state when not wrapped (standalone mode)
+      this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
+    }
     
     // Use shared filter service values instead of form values
     // This ensures we use the latest filter state from quick filter buttons
@@ -116,6 +123,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       next: (report) => {
         this.report = report as DispatcherPaymentReport;
         this.loading = false;
+        // Always complete loading (trip-table does this too)
         this.dashboardStateService.setLoadingState(false);
         this.dashboardStateService.clearError();
       },
@@ -125,6 +133,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
           duration: 3000
         });
         this.loading = false;
+        // Always complete loading even on error
         this.dashboardStateService.setLoadingState(false);
         this.dashboardStateService.setError('Failed to load payment report. Please try again.');
       }

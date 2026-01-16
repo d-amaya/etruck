@@ -70,7 +70,14 @@ export class DashboardStateService {
 
   public filters$: Observable<DashboardFilters> = this.filtersSubject.asObservable();
   public pagination$: Observable<PaginationState> = this.paginationSubject.asObservable();
-  public loading$: Observable<LoadingState> = this.loadingSubject.asObservable();
+  public loading$: Observable<LoadingState> = this.loadingSubject.asObservable().pipe(
+    distinctUntilChanged((prev, curr) => 
+      prev.isLoading === curr.isLoading && 
+      prev.isInitialLoad === curr.isInitialLoad && 
+      prev.isFilterUpdate === curr.isFilterUpdate &&
+      prev.loadingMessage === curr.loadingMessage
+    )
+  );
   public error$: Observable<ErrorState> = this.errorSubject.asObservable();
 
   // Combined observable that debounces and deduplicates filter/pagination changes
@@ -120,8 +127,8 @@ export class DashboardStateService {
     this.paginationSubject.next(newPagination);
     this.savePaginationToStorage(newPagination);
     
-    // Show filter update loading state
-    this.setLoadingState(true, false, true, 'Updating filters...');
+    // Show filter update loading state with simple message
+    this.setLoadingState(true, false, true);
     this.clearError();
   }
 
@@ -205,12 +212,21 @@ export class DashboardStateService {
     };
   }
 
-  setLoadingState(isLoading: boolean, isInitialLoad: boolean = false, isFilterUpdate: boolean = false, message: string = 'Loading...'): void {
+  setLoadingState(isLoading: boolean, isInitialLoad: boolean = false, isFilterUpdate: boolean = false, message?: string): void {
+    // When turning off loading, preserve the existing message if no new message provided
+    const loadingMessage = message !== undefined ? message : (isLoading ? 'Loading...' : this.loadingSubject.value.loadingMessage);
+    
+    // Clear any existing timeout when state changes
+    if (this.loadingTimeout) {
+      clearTimeout(this.loadingTimeout);
+      this.loadingTimeout = null;
+    }
+    
     this.loadingSubject.next({
       isLoading,
       isInitialLoad,
       isFilterUpdate,
-      loadingMessage: message
+      loadingMessage
     });
 
     // Set timeout for error handling if loading takes too long
@@ -221,11 +237,6 @@ export class DashboardStateService {
           this.setLoadingState(false);
         }
       }, 30000); // 30 second timeout for large datasets
-    } else {
-      if (this.loadingTimeout) {
-        clearTimeout(this.loadingTimeout);
-        this.loadingTimeout = null;
-      }
     }
   }
 

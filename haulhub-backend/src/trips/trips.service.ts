@@ -958,9 +958,9 @@ export class TripsService {
    * efficient GSI to minimize read operations and improve query performance.
    * 
    * Selection priority (highest to lowest selectivity):
-   * - GSI2-Lorry: When lorryId filter is provided (~20 items)
-   * - GSI3-Driver: When driverId filter is provided (~50 items)
-   * - GSI4-Broker: When brokerId filter is provided (~200 items)
+   * - GSI2: When lorryId filter is provided (~20 items)
+   * - GSI3: When driverId filter is provided (~50 items)
+   * - GSI4: When brokerId filter is provided (~200 items)
    * - GSI1: Default when only date/status filters (~10,000 items)
    * 
    * Includes automatic fallback to GSI1 if optimized query fails, ensuring
@@ -993,13 +993,13 @@ export class TripsService {
       // Route to appropriate query method based on selected index
       // Requirements: 1.4, 5.1
       switch (strategy.indexName) {
-        case 'GSI2-Lorry':
+        case 'GSI2':
           return await this.queryByLorryIndex(dispatcherId, filters, dynamodbClient);
         
-        case 'GSI3-Driver':
+        case 'GSI3':
           return await this.queryByDriverIndex(dispatcherId, filters, dynamodbClient);
         
-        case 'GSI4-Broker':
+        case 'GSI4':
           return await this.queryByBrokerIndex(dispatcherId, filters, dynamodbClient);
         
         case 'GSI1':
@@ -1553,7 +1553,7 @@ export class TripsService {
     try {
       // Log query start with filter details
       // Requirements: 3.6, 6.4
-      this.logQueryStart('GSI2-Lorry', filters);
+      this.logQueryStart('GSI2', filters);
 
       // Build KeyConditionExpression for GSI2
       // GSI2PK = DISPATCHER#{dispatcherId}
@@ -1604,7 +1604,7 @@ export class TripsService {
       // Build query parameters
       const queryParams: any = {
         TableName: this.tripsTableName,
-        IndexName: 'GSI2-Lorry',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: {
           ...expressionAttributeValues,
@@ -1659,11 +1659,11 @@ export class TripsService {
       // Emit CloudWatch metrics for query performance
       // Requirements: 6.1
       const responseTimeMs = Date.now() - startTime;
-      await this.emitQueryMetrics('GSI2-Lorry', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI2', responseTimeMs, totalRCU, isError);
 
       // Log actual reads after query execution
       // Requirements: 3.6, 6.4
-      this.logQueryCompletion('GSI2-Lorry', filters, totalRCU, filteredTrips.length, responseTimeMs);
+      this.logQueryCompletion('GSI2', filters, totalRCU, filteredTrips.length, responseTimeMs);
 
       return response;
     } catch (error: any) {
@@ -1671,11 +1671,11 @@ export class TripsService {
       const responseTimeMs = Date.now() - startTime;
       
       // Emit error metrics
-      await this.emitQueryMetrics('GSI2-Lorry', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI2', responseTimeMs, totalRCU, isError);
 
       // Log error with full context
       // Requirements: 3.6, 6.4
-      this.logQueryError(error, filters, 'GSI2-Lorry');
+      this.logQueryError(error, filters, 'GSI2');
 
       // If GSI2 query fails, fall back to GSI1 (default index)
       console.log('Falling back to GSI1 (default index) due to GSI2 query error');
@@ -1766,7 +1766,7 @@ export class TripsService {
       // Build query parameters
       const queryParams: any = {
         TableName: this.tripsTableName,
-        IndexName: 'GSI3-Driver',
+        IndexName: 'GSI3',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: {
           ...expressionAttributeValues,
@@ -1821,7 +1821,7 @@ export class TripsService {
       // Emit CloudWatch metrics for query performance
       // Requirements: 6.1
       const responseTimeMs = Date.now() - startTime;
-      await this.emitQueryMetrics('GSI3-Driver', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI3', responseTimeMs, totalRCU, isError);
 
       return response;
     } catch (error: any) {
@@ -1829,7 +1829,7 @@ export class TripsService {
       const responseTimeMs = Date.now() - startTime;
       
       // Emit error metrics
-      await this.emitQueryMetrics('GSI3-Driver', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI3', responseTimeMs, totalRCU, isError);
 
       // Log error with context
       console.error('Error querying GSI3 (Driver Index):', {
@@ -1885,7 +1885,7 @@ export class TripsService {
     try {
       // Log query start with filter details
       // Requirements: 3.6, 6.4
-      this.logQueryStart('GSI4-Broker', filters);
+      this.logQueryStart('GSI4', filters);
 
       // Build KeyConditionExpression for GSI4
       // GSI4PK = DISPATCHER#{dispatcherId}
@@ -1936,7 +1936,7 @@ export class TripsService {
       // Build query parameters
       const queryParams: any = {
         TableName: this.tripsTableName,
-        IndexName: 'GSI4-Broker',
+        IndexName: 'GSI4',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: {
           ...expressionAttributeValues,
@@ -1991,11 +1991,11 @@ export class TripsService {
       // Emit CloudWatch metrics for query performance
       // Requirements: 6.1
       const responseTimeMs = Date.now() - startTime;
-      await this.emitQueryMetrics('GSI4-Broker', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI4', responseTimeMs, totalRCU, isError);
 
       // Log actual reads after query execution
       // Requirements: 3.6, 6.4
-      this.logQueryCompletion('GSI4-Broker', filters, totalRCU, filteredTrips.length, responseTimeMs);
+      this.logQueryCompletion('GSI4', filters, totalRCU, filteredTrips.length, responseTimeMs);
 
       return response;
     } catch (error: any) {
@@ -2003,11 +2003,11 @@ export class TripsService {
       const responseTimeMs = Date.now() - startTime;
       
       // Emit error metrics
-      await this.emitQueryMetrics('GSI4-Broker', responseTimeMs, totalRCU, isError);
+      await this.emitQueryMetrics('GSI4', responseTimeMs, totalRCU, isError);
 
       // Log error with full context
       // Requirements: 3.6, 6.4
-      this.logQueryError(error, filters, 'GSI4-Broker');
+      this.logQueryError(error, filters, 'GSI4');
 
       // If GSI4 query fails, fall back to GSI1 (default index)
       console.log('Falling back to GSI1 (default index) due to GSI4 query error');

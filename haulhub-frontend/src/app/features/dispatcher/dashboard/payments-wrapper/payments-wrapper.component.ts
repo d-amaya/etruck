@@ -18,7 +18,7 @@ import { PaymentReportComponent } from '../../payment-report/payment-report.comp
   ],
   template: `
     <div class="payments-wrapper">
-      <app-payment-report></app-payment-report>
+      <app-payment-report [isWrapped]="true"></app-payment-report>
     </div>
   `,
   styles: [`
@@ -40,6 +40,11 @@ import { PaymentReportComponent } from '../../payment-report/payment-report.comp
           visibility: hidden !important;
           opacity: 0 !important;
           pointer-events: none !important;
+          z-index: -1 !important;
+          position: absolute !important;
+          width: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
       }
     }

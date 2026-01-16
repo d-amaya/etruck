@@ -7,7 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
   standalone: true,
   imports: [CommonModule, MatProgressSpinnerModule],
   template: `
-    <div class="loading-overlay" [class.visible]="isVisible">
+    <div class="loading-overlay" [class.visible]="isVisible" *ngIf="isVisible">
       <div class="loading-content">
         <mat-spinner [diameter]="40" [strokeWidth]="4"></mat-spinner>
         <p class="loading-text">{{ message }}</p>

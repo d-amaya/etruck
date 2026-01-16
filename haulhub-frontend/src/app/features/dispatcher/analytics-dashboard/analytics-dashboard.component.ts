@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -62,6 +62,7 @@ interface ChartData {
   styleUrls: ['./analytics-dashboard.component.scss']
 })
 export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
+  @Input() isWrapped = false; // Set by wrapper component
   @ViewChild('fuelCostChart') fuelCostChartRef!: ElementRef<HTMLCanvasElement>;
   
   isLoading = true;
@@ -177,12 +178,18 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   }
 
   private loadAllAnalytics(): void {
-    this.isLoading = true;
+    // Only show component-level loading spinner if not wrapped
+    if (!this.isWrapped) {
+      this.isLoading = true;
+      // Only set dashboard loading state when not wrapped (standalone mode)
+      this.dashboardStateService.setLoadingState(true, false, true, 'Loading analytics...');
+    }
     this.error = null;
     
-    // Notify dashboard state service that we're loading
-    this.dashboardStateService.setLoadingState(true, false, true, 'Loading analytics...');
-    this.dashboardStateService.clearError();
+    // Clear any errors when wrapped
+    if (this.isWrapped) {
+      this.dashboardStateService.clearError();
+    }
 
     // Validate date range (max 365 days)
     if (this.startDate && this.endDate) {
@@ -221,7 +228,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
           this.loadFuelEfficiencyData();
           this.isLoading = false;
           
-          // Notify dashboard state service that loading is complete
+          // Always complete loading (trip-table does this too)
           this.dashboardStateService.completeLoad();
         },
         error: (error) => {
@@ -229,7 +236,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
           this.error = 'Failed to load analytics data. Please try again.';
           this.isLoading = false;
           
-          // Notify dashboard state service of error
+          // Always complete loading even on error
           this.dashboardStateService.setError('Failed to load analytics data. Please try again.', true);
           this.dashboardStateService.completeLoad();
           

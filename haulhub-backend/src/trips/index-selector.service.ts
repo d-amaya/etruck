@@ -18,7 +18,7 @@ export interface TripFilters {
  * Interface for index selection strategy result
  */
 export interface IndexSelectionStrategy {
-  indexName: 'GSI1' | 'GSI2-Lorry' | 'GSI3-Driver' | 'GSI4-Broker';
+  indexName: 'GSI1' | 'GSI2' | 'GSI3' | 'GSI4';
   estimatedReads: number;
   filterExpressionAttributes: string[];
   rationale: string;
@@ -30,9 +30,9 @@ export interface IndexSelectionStrategy {
  * Requirements: 1.4, 2.4, 3.2, 3.3, 3.4, 3.5, 3.6
  * 
  * Selection Priority (highest to lowest selectivity):
- * 1. GSI2-Lorry: When lorryId filter is provided (~20 items per lorry)
- * 2. GSI3-Driver: When driverId filter is provided (no lorryId) (~50 items per driver)
- * 3. GSI4-Broker: When brokerId filter is provided (no lorry/driver) (~200 items per broker)
+ * 1. GSI2: When lorryId filter is provided (~20 items per lorry)
+ * 2. GSI3: When driverId filter is provided (no lorryId) (~50 items per driver)
+ * 3. GSI4: When brokerId filter is provided (no lorry/driver) (~200 items per broker)
  * 4. GSI1: Default when only date/status filters provided (~10,000 items)
  * 
  * The service logs selection decisions with filter details and estimated read counts
@@ -65,30 +65,30 @@ export class IndexSelectorService {
     // Requirements: 3.2
     if (filters.lorryId) {
       strategy = {
-        indexName: 'GSI2-Lorry',
+        indexName: 'GSI2',
         estimatedReads: this.ESTIMATED_TRIPS_PER_LORRY,
         filterExpressionAttributes: this.getFilterExpressionAttributes(filters, ['lorryId']),
-        rationale: `Selected GSI2-Lorry index due to lorryId filter. Highest selectivity (~${this.ESTIMATED_TRIPS_PER_LORRY} items per lorry).`,
+        rationale: `Selected GSI2 index due to lorryId filter. Highest selectivity (~${this.ESTIMATED_TRIPS_PER_LORRY} items per lorry).`,
       };
     }
     // Priority 2: Driver filter (high selectivity)
     // Requirements: 3.3
     else if (filters.driverId) {
       strategy = {
-        indexName: 'GSI3-Driver',
+        indexName: 'GSI3',
         estimatedReads: this.ESTIMATED_TRIPS_PER_DRIVER,
         filterExpressionAttributes: this.getFilterExpressionAttributes(filters, ['driverId']),
-        rationale: `Selected GSI3-Driver index due to driverId filter. High selectivity (~${this.ESTIMATED_TRIPS_PER_DRIVER} items per driver).`,
+        rationale: `Selected GSI3 index due to driverId filter. High selectivity (~${this.ESTIMATED_TRIPS_PER_DRIVER} items per driver).`,
       };
     }
     // Priority 3: Broker filter (medium selectivity)
     // Requirements: 3.4
     else if (filters.brokerId) {
       strategy = {
-        indexName: 'GSI4-Broker',
+        indexName: 'GSI4',
         estimatedReads: this.ESTIMATED_TRIPS_PER_BROKER,
         filterExpressionAttributes: this.getFilterExpressionAttributes(filters, ['brokerId']),
-        rationale: `Selected GSI4-Broker index due to brokerId filter. Medium selectivity (~${this.ESTIMATED_TRIPS_PER_BROKER} items per broker).`,
+        rationale: `Selected GSI4 index due to brokerId filter. Medium selectivity (~${this.ESTIMATED_TRIPS_PER_BROKER} items per broker).`,
       };
     }
     // Priority 4: Default index (low selectivity)
