@@ -1,7 +1,9 @@
 <div class="trip-create-container">
   <mat-card>
     <mat-card-header>
-      <mat-card-title>Create New Trip</mat-card-title>
+      <mat-card-title>
+        <h1>Create New Trip</h1>
+      </mat-card-title>
       <mat-card-subtitle>Enter comprehensive trip details including vehicle assignment, mileage, and financial information</mat-card-subtitle>
     </mat-card-header>
 
@@ -157,14 +159,21 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Lorry Owner Payment ($)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="lorryOwnerPayment" placeholder="0.00">
+              <mat-hint>Amount to pay lorry owner</mat-hint>
+              <mat-error>{{ getErrorMessage('lorryOwnerPayment') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Driver Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="driverPayment" placeholder="0.00">
               <mat-hint>Amount to pay driver</mat-hint>
               <mat-error>{{ getErrorMessage('driverPayment') }}</mat-error>
             </mat-form-field>
-          </div>
 
-          <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Driver Rate ($/mile)</mat-label>
               <input matInput type="number" step="0.01" formControlName="driverRate" placeholder="0.00">
@@ -176,12 +185,22 @@
               <input matInput type="number" step="0.01" formControlName="lumperFees" placeholder="0.00">
               <mat-hint>Loading/unloading fees</mat-hint>
             </mat-form-field>
+          </div>
 
+          <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Detention Fees ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="detentionFees" placeholder="0.00">
               <mat-hint>Delay charges</mat-hint>
             </mat-form-field>
+          </div>
+
+          <!-- Calculated Profit Display -->
+          <div class="profit-display">
+            <span class="profit-label">{{ getProfitLabel() }}</span>
+            <span class="profit-value" [ngClass]="calculateProfit() >= 0 ? 'profit-positive' : 'profit-negative'">
+              {{ formatProfitAmount() }}
+            </span>
           </div>
         </div>
 

@@ -102,6 +102,7 @@ export class TripCreateComponent implements OnInit {
       // Financial Details (Enhanced)
       orderRate: ['', [Validators.required, Validators.min(0.01)]],
       brokerPayment: ['', [Validators.required, Validators.min(0.01)]],
+      lorryOwnerPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverRate: ['', Validators.min(0)],
       
@@ -226,6 +227,7 @@ export class TripCreateComponent implements OnInit {
       // Financial details (enhanced)
       orderRate: parseFloat(formValue.orderRate),
       brokerPayment: parseFloat(formValue.brokerPayment),
+      lorryOwnerPayment: parseFloat(formValue.lorryOwnerPayment),
       driverPayment: parseFloat(formValue.driverPayment),
       driverRate: formValue.driverRate ? parseFloat(formValue.driverRate) : undefined,
       
@@ -308,5 +310,47 @@ export class TripCreateComponent implements OnInit {
       return `Value must be at least ${control.errors['min'].min}`;
     }
     return 'Invalid value';
+  }
+
+  /**
+   * Calculate profit/loss for the trip
+   * Profit = Broker Payment - (Lorry Owner Payment + Driver Payment + Fuel Cost + Lumper Fees + Detention Fees)
+   */
+  calculateProfit(): number {
+    const brokerPayment = parseFloat(this.tripForm.get('brokerPayment')?.value) || 0;
+    const lorryOwnerPayment = parseFloat(this.tripForm.get('lorryOwnerPayment')?.value) || 0;
+    const driverPayment = parseFloat(this.tripForm.get('driverPayment')?.value) || 0;
+    const lumperFees = parseFloat(this.tripForm.get('lumperFees')?.value) || 0;
+    const detentionFees = parseFloat(this.tripForm.get('detentionFees')?.value) || 0;
+    
+    // Calculate fuel cost if fuel data is provided
+    let fuelCost = 0;
+    const fuelAvgCost = parseFloat(this.tripForm.get('fuelAvgCost')?.value) || 0;
+    const fuelAvgGallonsPerMile = parseFloat(this.tripForm.get('fuelAvgGallonsPerMile')?.value) || 0;
+    
+    if (fuelAvgCost > 0 && fuelAvgGallonsPerMile > 0) {
+      const totalMiles = parseFloat(this.tripForm.get('totalMiles')?.value) || 0;
+      fuelCost = totalMiles * fuelAvgGallonsPerMile * fuelAvgCost;
+    }
+    
+    const totalExpenses = lorryOwnerPayment + driverPayment + fuelCost + lumperFees + detentionFees;
+    return brokerPayment - totalExpenses;
+  }
+
+  /**
+   * Get the label for profit display
+   */
+  getProfitLabel(): string {
+    const profit = this.calculateProfit();
+    return profit >= 0 ? 'Estimated Profit:' : 'Estimated Loss:';
+  }
+
+  /**
+   * Format profit amount for display
+   */
+  formatProfitAmount(): string {
+    const profit = this.calculateProfit();
+    const absProfit = Math.abs(profit);
+    return `$${absProfit.toFixed(2)}`;
   }
 }
