@@ -30,6 +30,36 @@
     }
 
     mat-card-content {
+      .info-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        background-color: #e3f2fd;
+        border-left: 4px solid #1976d2;
+        border-radius: 4px;
+
+        mat-icon {
+          color: #1976d2;
+          font-size: 24px;
+          width: 24px;
+          height: 24px;
+          flex-shrink: 0;
+        }
+
+        .info-content {
+          flex: 1;
+          font-size: 14px;
+          line-height: 1.5;
+          color: rgba(0, 0, 0, 0.87);
+
+          strong {
+            font-weight: 600;
+          }
+        }
+      }
+
       form {
         .form-section {
           margin-bottom: 32px;

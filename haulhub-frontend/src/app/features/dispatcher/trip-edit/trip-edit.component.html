@@ -6,6 +6,15 @@
     </mat-card-header>
 
     <mat-card-content>
+      <!-- Information Alert -->
+      <div class="info-alert">
+        <mat-icon>info</mat-icon>
+        <div class="info-content">
+          <strong>Note:</strong> Scheduled pickup date/time, truck, and driver cannot be changed after trip creation. 
+          To change these fields, please delete this trip and create a new one.
+        </div>
+      </div>
+
       <form [formGroup]="tripForm" (ngSubmit)="onSubmit()">
         
         <!-- Basic Trip Information -->

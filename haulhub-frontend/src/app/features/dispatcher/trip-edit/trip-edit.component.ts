@@ -75,19 +75,19 @@ export class TripEditComponent implements OnInit {
       // Status
       status: ['', Validators.required],
       
-      // Schedule Information
-      scheduledPickupDatetime: ['', Validators.required],
-      scheduledPickupTime: ['', Validators.required],
+      // Schedule Information - DISABLED: Cannot be changed after creation (affects GSI keys)
+      scheduledPickupDatetime: [{ value: '', disabled: true }, Validators.required],
+      scheduledPickupTime: [{ value: '', disabled: true }, Validators.required],
       
       // Broker Information
       brokerId: ['', Validators.required],
       orderConfirmation: [''],
       
-      // Vehicle Assignment (truck license plate)
-      truckId: ['', [Validators.required, Validators.minLength(2)]],
+      // Vehicle Assignment (truck license plate) - DISABLED: Cannot be changed after creation (affects GSI keys)
+      truckId: [{ value: '', disabled: true }, [Validators.required, Validators.minLength(2)]],
       
-      // Driver Assignment
-      driverId: ['', [Validators.required, Validators.minLength(2)]],
+      // Driver Assignment - DISABLED: Cannot be changed after creation (affects GSI keys)
+      driverId: [{ value: '', disabled: true }, [Validators.required, Validators.minLength(2)]],
       driverName: ['', [Validators.required, Validators.minLength(2)]],
       
       // Mileage Tracking (Enhanced)
@@ -269,7 +269,7 @@ export class TripEditComponent implements OnInit {
 
     const formValue = this.tripForm.getRawValue(); // Get all values including disabled fields
     
-    // Combine date and time into ISO string
+    // Combine date and time into ISO string (even though backend will ignore it)
     const date = new Date(formValue.scheduledPickupDatetime);
     const [hours, minutes] = formValue.scheduledPickupTime.split(':');
     date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
@@ -288,15 +288,15 @@ export class TripEditComponent implements OnInit {
       pickupLocation: formValue.pickupLocation.trim(),
       dropoffLocation: formValue.dropoffLocation.trim(),
       status: formValue.status,
-      scheduledPickupDatetime: date.toISOString(),
+      scheduledPickupDatetime: date.toISOString(), // Sent but backend will ignore
       brokerId: formValue.brokerId,
       orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
       
       // Vehicle assignment (truck license plate)
-      truckId: formValue.truckId.trim(),
+      truckId: formValue.truckId.trim(), // Sent but backend will ignore
       
       // Driver assignment
-      driverId: formValue.driverId.trim(),
+      driverId: formValue.driverId.trim(), // Sent but backend will ignore
       driverName: formValue.driverName.trim(),
       
       // Mileage tracking (enhanced)

@@ -343,31 +343,14 @@ export class TripsService {
     // First, get the existing trip to verify authorization
     const existingTrip = await this.getTripById(tripId, dispatcherId, UserRole.Dispatcher);
 
-    // Prevent updating fields that affect GSI sort keys
-    // These fields determine the trip's position in queries and cannot be updated
-    // Users must delete and recreate the trip if these need to change
-    if (dto.scheduledPickupDatetime !== undefined) {
-      throw new BadRequestException(
-        'Cannot update scheduledPickupDatetime. Please delete and recreate the trip with the new schedule.'
-      );
-    }
-    
-    if (dto.lorryId !== undefined) {
-      throw new BadRequestException(
-        'Cannot update lorryId. Please delete and recreate the trip with the new lorry.'
-      );
-    }
-    
-    if (dto.driverId !== undefined) {
-      throw new BadRequestException(
-        'Cannot update driverId. Please delete and recreate the trip with the new driver.'
-      );
-    }
-
     // Build update expression dynamically
     const updateExpressions: string[] = [];
     const expressionAttributeNames: Record<string, string> = {};
     const expressionAttributeValues: Record<string, any> = {};
+
+    // Note: scheduledPickupDatetime, lorryId, and driverId are silently ignored
+    // These fields affect GSI sort keys and cannot be updated
+    // The UI prevents users from changing them (disabled fields)
 
     if (dto.pickupLocation !== undefined) {
       updateExpressions.push('#pickupLocation = :pickupLocation');

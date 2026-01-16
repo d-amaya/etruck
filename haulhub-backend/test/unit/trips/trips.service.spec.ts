@@ -363,17 +363,29 @@ describe('TripsService', () => {
       expect(brokersService.getBrokerById).toHaveBeenCalledWith('new-broker-123');
     });
 
-    it('should throw BadRequestException for invalid datetime', async () => {
+    it('should silently ignore scheduledPickupDatetime updates (immutable field)', async () => {
       // Mock getTripById
       mockDynamoDBClient.send.mockResolvedValueOnce({
         Item: existingTrip,
       });
 
-      const updateDto = { scheduledPickupDatetime: 'invalid-date' };
+      // Mock successful update
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Attributes: { ...existingTrip, pickupLocation: 'New Location' },
+      });
 
-      await expect(service.updateTrip('trip-123', 'dispatcher-123', updateDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      const updateDto = { 
+        scheduledPickupDatetime: 'invalid-date', // Should be ignored
+        pickupLocation: 'New Location' // Should be updated
+      };
+
+      const result = await service.updateTrip('trip-123', 'dispatcher-123', updateDto);
+      
+      // Should succeed and return updated trip
+      expect(result).toBeDefined();
+      expect(result.pickupLocation).toBe('New Location');
+      // scheduledPickupDatetime remains unchanged
+      expect(result.scheduledPickupDatetime).toBe(existingTrip.scheduledPickupDatetime);
     });
 
     it('should throw BadRequestException for negative payment', async () => {
