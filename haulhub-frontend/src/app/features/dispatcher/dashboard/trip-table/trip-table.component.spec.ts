@@ -79,7 +79,16 @@ describe('TripTableComponent', () => {
     sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [
       'getCurrentFilters',
       'updateFilters'
-    ]);
+    ], {
+      filters$: of({
+        dateRange: { startDate: null, endDate: null },
+        status: null,
+        brokerId: null,
+        lorryId: null,
+        driverId: null,
+        driverName: null
+      })
+    });
     sharedFilterServiceSpy.getCurrentFilters.and.returnValue({
       dateRange: { startDate: null, endDate: null },
       status: null,

@@ -1,4 +1,7 @@
 <div class="trip-table-container" role="region" aria-label="Trip list">
+  <!-- Dashboard Charts Widget -->
+  <app-dashboard-charts-widget></app-dashboard-charts-widget>
+
   <!-- Table Filters -->
   <div class="table-filters" *ngIf="!loading">
     <form [formGroup]="filterForm" class="filter-row">

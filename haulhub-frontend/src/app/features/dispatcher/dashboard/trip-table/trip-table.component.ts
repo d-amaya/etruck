@@ -22,6 +22,7 @@ import { SharedFilterService } from '../shared-filter.service';
 import { PdfExportService } from '../../../../core/services/pdf-export.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
+import { DashboardChartsWidgetComponent } from '../dashboard-charts-widget/dashboard-charts-widget.component';
 
 @Component({
   selector: 'app-trip-table',
@@ -39,7 +40,8 @@ import { AccessibilityService } from '../../../../core/services/accessibility.se
     MatChipsModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatInputModule
+    MatInputModule,
+    DashboardChartsWidgetComponent
   ],
   templateUrl: './trip-table.component.html',
   styleUrls: ['./trip-table.component.scss']
