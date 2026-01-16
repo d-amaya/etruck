@@ -200,39 +200,9 @@ describe('PaymentReportComponent', () => {
     expect(component.activeTabIndex).toBe(0);
   });
 
-  it('should include groupBy parameter when activeTabIndex is 0 (By Broker)', () => {
+  it('should NOT include groupBy parameter - fetches all grouped data at once', () => {
     tripService.getPaymentReport.and.returnValue(of(mockReport));
     component.activeTabIndex = 0;
-    
-    component.loadReport();
-    
-    const callArgs = tripService.getPaymentReport.calls.mostRecent().args[0];
-    expect(callArgs?.groupBy).toBe('broker');
-  });
-
-  it('should include groupBy parameter when activeTabIndex is 1 (By Driver)', () => {
-    tripService.getPaymentReport.and.returnValue(of(mockReport));
-    component.activeTabIndex = 1;
-    
-    component.loadReport();
-    
-    const callArgs = tripService.getPaymentReport.calls.mostRecent().args[0];
-    expect(callArgs?.groupBy).toBe('driver');
-  });
-
-  it('should include groupBy parameter when activeTabIndex is 2 (By Lorry Owner)', () => {
-    tripService.getPaymentReport.and.returnValue(of(mockReport));
-    component.activeTabIndex = 2;
-    
-    component.loadReport();
-    
-    const callArgs = tripService.getPaymentReport.calls.mostRecent().args[0];
-    expect(callArgs?.groupBy).toBe('lorry');
-  });
-
-  it('should not include groupBy parameter when activeTabIndex is 3 (Trip Details)', () => {
-    tripService.getPaymentReport.and.returnValue(of(mockReport));
-    component.activeTabIndex = 3;
     
     component.loadReport();
     
@@ -240,7 +210,7 @@ describe('PaymentReportComponent', () => {
     expect(callArgs?.groupBy).toBeUndefined();
   });
 
-  it('should update activeTabIndex and reload report on tab change', () => {
+  it('should NOT reload report on tab change - just switches view', () => {
     tripService.getPaymentReport.and.returnValue(of(mockReport));
     fixture.detectChanges();
     
@@ -250,8 +220,6 @@ describe('PaymentReportComponent', () => {
     component.onTabChange(mockEvent);
     
     expect(component.activeTabIndex).toBe(1);
-    expect(tripService.getPaymentReport).toHaveBeenCalled();
-    const callArgs = tripService.getPaymentReport.calls.mostRecent().args[0];
-    expect(callArgs?.groupBy).toBe('driver');
+    expect(tripService.getPaymentReport).not.toHaveBeenCalled();
   });
 });
