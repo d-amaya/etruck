@@ -195,12 +195,16 @@ export class DashboardStateService {
   }
 
   private getDefaultFilters(): DashboardFilters {
-    // Set default date range to last 30 days
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999); // End of today
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-    startDate.setHours(0, 0, 0, 0); // Start of day 30 days ago
+    // Set default date range to current month (first to last day)
+    const today = new Date();
+    
+    // First day of current month
+    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Last day of current month
+    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
     
     return {
       dateRange: { startDate, endDate },

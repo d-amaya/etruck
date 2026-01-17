@@ -25,7 +25,7 @@
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>From</mat-label>
               <input matInput [matDatepicker]="startPicker" formControlName="startDate"
-                     [max]="maxDate" [min]="minDate">
+                     [min]="minDate">
               <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
               <mat-datepicker #startPicker></mat-datepicker>
             </mat-form-field>
@@ -33,19 +33,19 @@
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>To</mat-label>
               <input matInput [matDatepicker]="endPicker" formControlName="endDate"
-                     [max]="maxDate" [min]="minDate">
+                     [min]="minDate">
               <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
               <mat-datepicker #endPicker></mat-datepicker>
             </mat-form-field>
 
             <div class="date-presets">
-              <button mat-button type="button" (click)="setDatePreset('30days')"
-                      [class.active]="isPresetActive('30days')">
-                Last 30 Days
-              </button>
               <button mat-button type="button" (click)="setDatePreset('month')"
                       [class.active]="isPresetActive('month')">
                 This Month
+              </button>
+              <button mat-button type="button" (click)="setDatePreset('30days')"
+                      [class.active]="isPresetActive('30days')">
+                Last 30 Days
               </button>
               <button mat-button type="button" (click)="setDatePreset('year')"
                       [class.active]="isPresetActive('year')">

@@ -41,7 +41,7 @@ export class TripCreateComponent implements OnInit {
   loading = false;
   loadingBrokers = true;
   loadingVehicles = true;
-  minDate = new Date();
+  minDate!: Date;
 
   constructor(
     private fb: FormBuilder,
@@ -51,6 +51,10 @@ export class TripCreateComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // Set minimum date to 1 month ago
+    this.minDate = new Date();
+    this.minDate.setMonth(this.minDate.getMonth() - 1);
+    
     this.initializeForm();
     this.loadBrokers();
     this.loadVehicles();
@@ -84,11 +88,9 @@ export class TripCreateComponent implements OnInit {
       
       // Broker Information
       brokerId: ['', Validators.required],
-      orderConfirmation: [''],
       
-      // Vehicle Assignment (Enhanced - separate truck and trailer)
+      // Vehicle Assignment (truck license plate - lorryId)
       truckId: ['', [Validators.required, Validators.minLength(2)]],
-      trailerId: [''],
       
       // Driver Assignment
       driverId: ['', [Validators.required, Validators.minLength(2)]],
@@ -99,12 +101,10 @@ export class TripCreateComponent implements OnInit {
       emptyMiles: ['', [Validators.required, Validators.min(0)]],
       totalMiles: [{ value: '', disabled: true }], // Auto-calculated
       
-      // Financial Details (Enhanced)
-      orderRate: ['', [Validators.required, Validators.min(0.01)]],
+      // Financial Details
       brokerPayment: ['', [Validators.required, Validators.min(0.01)]],
       lorryOwnerPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverPayment: ['', [Validators.required, Validators.min(0.01)]],
-      driverRate: ['', Validators.min(0)],
       
       // Enhanced Pickup Details
       pickupCompany: [''],
@@ -209,11 +209,9 @@ export class TripCreateComponent implements OnInit {
       dropoffLocation: formValue.dropoffLocation.trim(),
       scheduledPickupDatetime: date.toISOString(),
       brokerId: formValue.brokerId,
-      orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
       
-      // Vehicle assignment (enhanced)
-      truckId: formValue.truckId.trim(),
-      trailerId: formValue.trailerId?.trim() || undefined,
+      // Vehicle assignment - use lorryId (truckId) as required by CreateTripDto
+      lorryId: formValue.truckId.trim(),
       
       // Driver assignment
       driverId: formValue.driverId.trim(),
@@ -224,44 +222,25 @@ export class TripCreateComponent implements OnInit {
       emptyMiles: parseFloat(formValue.emptyMiles),
       totalMiles: parseFloat(formValue.totalMiles),
       
-      // Financial details (enhanced)
-      orderRate: parseFloat(formValue.orderRate),
+      // Financial details (enhanced) - brokerPayment is required, not orderRate
       brokerPayment: parseFloat(formValue.brokerPayment),
       lorryOwnerPayment: parseFloat(formValue.lorryOwnerPayment),
       driverPayment: parseFloat(formValue.driverPayment),
-      driverRate: formValue.driverRate ? parseFloat(formValue.driverRate) : undefined,
       
-      // Enhanced pickup details
-      pickupCompany: formValue.pickupCompany?.trim() || undefined,
-      pickupPhone: formValue.pickupPhone?.trim() || undefined,
-      pickupAddress: formValue.pickupAddress?.trim() || undefined,
-      pickupCity: formValue.pickupCity?.trim() || undefined,
-      pickupState: formValue.pickupState?.trim() || undefined,
-      pickupZip: formValue.pickupZip?.trim() || undefined,
-      pickupNotes: formValue.pickupNotes?.trim() || undefined,
+      // Additional fees (optional)
+      lumperFees: parseFloat(formValue.lumperFees) || undefined,
+      detentionFees: parseFloat(formValue.detentionFees) || undefined,
       
-      // Enhanced delivery details
-      deliveryCompany: formValue.deliveryCompany?.trim() || undefined,
-      deliveryPhone: formValue.deliveryPhone?.trim() || undefined,
-      deliveryAddress: formValue.deliveryAddress?.trim() || undefined,
-      deliveryCity: formValue.deliveryCity?.trim() || undefined,
-      deliveryState: formValue.deliveryState?.trim() || undefined,
-      deliveryZip: formValue.deliveryZip?.trim() || undefined,
-      deliveryDate: deliveryDatetime,
-      deliveryNotes: formValue.deliveryNotes?.trim() || undefined,
-      
-      // Additional fees
-      lumperFees: parseFloat(formValue.lumperFees) || 0,
-      detentionFees: parseFloat(formValue.detentionFees) || 0,
-      
-      // Fuel management
+      // Fuel management (optional)
       fuelAvgCost: formValue.fuelAvgCost ? parseFloat(formValue.fuelAvgCost) : undefined,
       fuelAvgGallonsPerMile: formValue.fuelAvgGallonsPerMile ? parseFloat(formValue.fuelAvgGallonsPerMile) : undefined,
-      
-      // Notes
-      notes: formValue.notes?.trim() || undefined
     };
 
+    // Note: Enhanced pickup/delivery details are not supported in CreateTripDto
+    // They can be added later via the edit/update endpoint
+
+    console.log('Trip data being sent:', JSON.stringify(tripData, null, 2));
+    
     this.loading = true;
     this.tripService.createTrip(tripData).subscribe({
       next: (trip) => {

@@ -42,12 +42,6 @@
               <input matInput type="time" formControlName="scheduledPickupTime" placeholder="HH:MM">
               <mat-error>{{ getErrorMessage('scheduledPickupTime') }}</mat-error>
             </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Order Confirmation #</mat-label>
-              <input matInput formControlName="orderConfirmation" placeholder="Optional">
-              <mat-hint>Broker's order confirmation number</mat-hint>
-            </mat-form-field>
           </div>
         </div>
 
@@ -68,12 +62,12 @@
           </div>
         </div>
 
-        <!-- Vehicle Assignment (Enhanced) -->
+        <!-- Vehicle Assignment -->
         <div class="form-section">
           <h3>Vehicle Assignment</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Truck</mat-label>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Truck (License Plate)</mat-label>
               <mat-select formControlName="truckId" [disabled]="loadingVehicles">
                 <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
                   {{ truck.name }} - {{ truck.licensePlate }}
@@ -81,17 +75,6 @@
               </mat-select>
               <mat-hint *ngIf="loadingVehicles">Loading trucks...</mat-hint>
               <mat-error>{{ getErrorMessage('truckId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Trailer (Optional)</mat-label>
-              <mat-select formControlName="trailerId" [disabled]="loadingVehicles">
-                <mat-option [value]="''">None</mat-option>
-                <mat-option *ngFor="let trailer of trailers" [value]="trailer.trailerId">
-                  {{ trailer.name }} - {{ trailer.licensePlate }}
-                </mat-option>
-              </mat-select>
-              <mat-hint>Select trailer if needed</mat-hint>
             </mat-form-field>
           </div>
         </div>
@@ -145,13 +128,6 @@
           <h3>Financial Details</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Order Rate ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="orderRate" placeholder="0.00">
-              <mat-hint>Total order amount</mat-hint>
-              <mat-error>{{ getErrorMessage('orderRate') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Broker Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="brokerPayment" placeholder="0.00">
               <mat-hint>Amount broker will pay</mat-hint>
@@ -164,22 +140,16 @@
               <mat-hint>Amount to pay lorry owner</mat-hint>
               <mat-error>{{ getErrorMessage('lorryOwnerPayment') }}</mat-error>
             </mat-form-field>
-          </div>
 
-          <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Driver Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="driverPayment" placeholder="0.00">
               <mat-hint>Amount to pay driver</mat-hint>
               <mat-error>{{ getErrorMessage('driverPayment') }}</mat-error>
             </mat-form-field>
+          </div>
 
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Driver Rate ($/mile)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="driverRate" placeholder="0.00">
-              <mat-hint>Per-mile rate (optional)</mat-hint>
-            </mat-form-field>
-
+          <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Lumper Fees ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="lumperFees" placeholder="0.00">

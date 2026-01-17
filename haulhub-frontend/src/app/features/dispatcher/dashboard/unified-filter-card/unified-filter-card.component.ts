@@ -35,7 +35,7 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   dateRangeError: string | null = null;
 
-  maxDate = new Date();
+  maxDate: Date | null = null; // No maximum date - allow future dates
   minDate = new Date();
 
   private destroy$ = new Subject<void>();
@@ -44,7 +44,8 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private sharedFilterService: SharedFilterService
   ) {
-    this.minDate.setFullYear(this.minDate.getFullYear() - 5);
+    // Allow dates from 1 year ago onwards (no future limit)
+    this.minDate.setFullYear(this.minDate.getFullYear() - 1);
 
     this.filterForm = this.fb.group({
       startDate: [null],
@@ -103,26 +104,34 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     let startDate: Date;
-    let endDate = today;
+    let endDate: Date;
 
     switch (preset) {
       case '30days':
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
+        endDate = today;
         break;
       case 'month':
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
         startDate.setHours(0, 0, 0, 0);
+        // Set end date to last day of current month
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate.setHours(23, 59, 59, 999);
         break;
       case 'year':
         startDate = new Date(today.getFullYear(), 0, 1);
         startDate.setHours(0, 0, 0, 0);
+        // Set end date to last day of current year (December 31)
+        endDate = new Date(today.getFullYear(), 11, 31);
+        endDate.setHours(23, 59, 59, 999);
         break;
       case '365days':
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 365);
         startDate.setHours(0, 0, 0, 0);
+        endDate = today;
         break;
       default:
         return;
@@ -140,26 +149,34 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     let expectedStart: Date;
-    let expectedEnd = today;
+    let expectedEnd: Date;
 
     switch (preset) {
       case '30days':
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 30);
         expectedStart.setHours(0, 0, 0, 0);
+        expectedEnd = today;
         break;
       case 'month':
         expectedStart = new Date(today.getFullYear(), today.getMonth(), 1);
         expectedStart.setHours(0, 0, 0, 0);
+        // Last day of current month
+        expectedEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        expectedEnd.setHours(23, 59, 59, 999);
         break;
       case 'year':
         expectedStart = new Date(today.getFullYear(), 0, 1);
         expectedStart.setHours(0, 0, 0, 0);
+        // Last day of current year (December 31)
+        expectedEnd = new Date(today.getFullYear(), 11, 31);
+        expectedEnd.setHours(23, 59, 59, 999);
         break;
       case '365days':
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 365);
         expectedStart.setHours(0, 0, 0, 0);
+        expectedEnd = today;
         break;
       default:
         return false;

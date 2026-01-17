@@ -28,7 +28,7 @@ export class SharedFilterService {
   private defaultFilters: DashboardFilters = {
     dateRange: {
       startDate: this.getDefaultStartDate(),
-      endDate: new Date()
+      endDate: this.getDefaultEndDate()
     },
     status: null,
     brokerId: null,
@@ -55,13 +55,23 @@ export class SharedFilterService {
   }
 
   /**
-   * Get default start date (30 days ago)
+   * Get default start date (first day of current month)
    */
   private getDefaultStartDate(): Date {
     const date = new Date();
-    date.setDate(date.getDate() - 30);
-    date.setHours(0, 0, 0, 0);
-    return date;
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+    firstDay.setHours(0, 0, 0, 0);
+    return firstDay;
+  }
+
+  /**
+   * Get default end date (last day of current month)
+   */
+  private getDefaultEndDate(): Date {
+    const date = new Date();
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    lastDay.setHours(23, 59, 59, 999);
+    return lastDay;
   }
 
   /**
@@ -131,7 +141,7 @@ export class SharedFilterService {
       ...this.defaultFilters,
       dateRange: {
         startDate: this.getDefaultStartDate(),
-        endDate: new Date()
+        endDate: this.getDefaultEndDate()
       }
     };
     this.filtersSubject.next(newFilters);
