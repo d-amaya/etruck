@@ -97,9 +97,9 @@
           </div>
         </div>
 
-        <!-- Mileage Tracking (Enhanced) -->
+        <!-- Mileage & Fuel Management -->
         <div class="form-section">
-          <h3>Mileage Tracking</h3>
+          <h3>Mileage & Fuel Management</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Loaded Miles</mat-label>
@@ -119,6 +119,20 @@
               <mat-label>Total Miles</mat-label>
               <input matInput type="number" formControlName="totalMiles" readonly>
               <mat-hint>Auto-calculated</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Avg Fuel Cost ($/gallon)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="fuelAvgCost" placeholder="0.00">
+              <mat-hint>Average fuel price (optional)</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Avg Gallons Per Mile</mat-label>
+              <input matInput type="number" step="0.001" formControlName="fuelAvgGallonsPerMile" placeholder="0.000">
+              <mat-hint>Fuel efficiency (optional)</mat-hint>
             </mat-form-field>
           </div>
         </div>
@@ -171,24 +185,6 @@
             <span class="profit-value" [ngClass]="calculateProfit() >= 0 ? 'profit-positive' : 'profit-negative'">
               {{ formatProfitAmount() }}
             </span>
-          </div>
-        </div>
-
-        <!-- Fuel Management -->
-        <div class="form-section">
-          <h3>Fuel Management (Optional)</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Avg Fuel Cost ($/gallon)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="fuelAvgCost" placeholder="0.00">
-              <mat-hint>Average fuel price</mat-hint>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Avg Gallons Per Mile</mat-label>
-              <input matInput type="number" step="0.001" formControlName="fuelAvgGallonsPerMile" placeholder="0.000">
-              <mat-hint>Fuel efficiency</mat-hint>
-            </mat-form-field>
           </div>
         </div>
 

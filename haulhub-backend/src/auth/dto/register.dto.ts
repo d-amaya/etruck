@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsOptional, ValidateIf } from 'class-validator';
 import { UserRole } from '@haulhub/shared';
 
 export class RegisterDto {
@@ -23,8 +23,8 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Role is required' })
   role!: UserRole;
 
+  @ValidateIf((o) => o.driverLicenseNumber !== undefined && o.driverLicenseNumber !== null && o.driverLicenseNumber !== '')
   @IsString()
-  @IsOptional()
   @MinLength(3, { message: 'Driver license number must be at least 3 characters' })
   driverLicenseNumber?: string;
 }

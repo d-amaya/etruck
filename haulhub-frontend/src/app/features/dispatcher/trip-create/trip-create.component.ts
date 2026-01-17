@@ -236,19 +236,110 @@ export class TripCreateComponent implements OnInit {
       fuelAvgGallonsPerMile: formValue.fuelAvgGallonsPerMile ? parseFloat(formValue.fuelAvgGallonsPerMile) : undefined,
     };
 
-    // Note: Enhanced pickup/delivery details are not supported in CreateTripDto
-    // They can be added later via the edit/update endpoint
+    // Collect optional pickup/delivery details for update after creation
+    const optionalDetails: any = {};
+    let hasOptionalDetails = false;
+
+    // Enhanced pickup details
+    if (formValue.pickupCompany?.trim()) {
+      optionalDetails.pickupCompany = formValue.pickupCompany.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupPhone?.trim()) {
+      optionalDetails.pickupPhone = formValue.pickupPhone.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupAddress?.trim()) {
+      optionalDetails.pickupAddress = formValue.pickupAddress.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupCity?.trim()) {
+      optionalDetails.pickupCity = formValue.pickupCity.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupState?.trim()) {
+      optionalDetails.pickupState = formValue.pickupState.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupZip?.trim()) {
+      optionalDetails.pickupZip = formValue.pickupZip.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.pickupNotes?.trim()) {
+      optionalDetails.pickupNotes = formValue.pickupNotes.trim();
+      hasOptionalDetails = true;
+    }
+
+    // Enhanced delivery details
+    if (formValue.deliveryCompany?.trim()) {
+      optionalDetails.deliveryCompany = formValue.deliveryCompany.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryPhone?.trim()) {
+      optionalDetails.deliveryPhone = formValue.deliveryPhone.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryAddress?.trim()) {
+      optionalDetails.deliveryAddress = formValue.deliveryAddress.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryCity?.trim()) {
+      optionalDetails.deliveryCity = formValue.deliveryCity.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryState?.trim()) {
+      optionalDetails.deliveryState = formValue.deliveryState.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryZip?.trim()) {
+      optionalDetails.deliveryZip = formValue.deliveryZip.trim();
+      hasOptionalDetails = true;
+    }
+    if (deliveryDatetime) {
+      optionalDetails.deliveryDate = deliveryDatetime;
+      hasOptionalDetails = true;
+    }
+    if (formValue.deliveryNotes?.trim()) {
+      optionalDetails.deliveryNotes = formValue.deliveryNotes.trim();
+      hasOptionalDetails = true;
+    }
+    if (formValue.notes?.trim()) {
+      optionalDetails.notes = formValue.notes.trim();
+      hasOptionalDetails = true;
+    }
 
     console.log('Trip data being sent:', JSON.stringify(tripData, null, 2));
     
     this.loading = true;
     this.tripService.createTrip(tripData).subscribe({
       next: (trip) => {
-        this.snackBar.open('Trip created successfully!', 'Close', {
-          duration: 3000,
-          panelClass: ['success-snackbar']
-        });
-        this.router.navigate(['/dispatcher/dashboard']);
+        // If there are optional details, update the trip immediately
+        if (hasOptionalDetails) {
+          this.tripService.updateTrip(trip.tripId, optionalDetails).subscribe({
+            next: () => {
+              this.snackBar.open('Trip created successfully!', 'Close', {
+                duration: 3000,
+                panelClass: ['success-snackbar']
+              });
+              this.router.navigate(['/dispatcher/dashboard']);
+            },
+            error: (error) => {
+              console.error('Error updating trip details:', error);
+              // Trip was created but details failed to save
+              this.snackBar.open('Trip created but some details failed to save. You can edit the trip to add them.', 'Close', {
+                duration: 5000,
+                panelClass: ['warning-snackbar']
+              });
+              this.router.navigate(['/dispatcher/dashboard']);
+            }
+          });
+        } else {
+          this.snackBar.open('Trip created successfully!', 'Close', {
+            duration: 3000,
+            panelClass: ['success-snackbar']
+          });
+          this.router.navigate(['/dispatcher/dashboard']);
+        }
       },
       error: (error) => {
         console.error('Error creating trip:', error);
