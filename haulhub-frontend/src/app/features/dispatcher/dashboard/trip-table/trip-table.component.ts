@@ -78,7 +78,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
   brokers: Broker[] = [];
 
   private destroy$ = new Subject<void>();
-  private deletedTrip: Trip | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -292,27 +291,17 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private performDelete(trip: Trip): void {
     this.tripService.deleteTrip(trip.tripId).subscribe({
       next: () => {
-        this.deletedTrip = trip;
         this.trips = this.trips.filter(t => t.tripId !== trip.tripId);
         this.totalTrips--;
 
         // Trigger payment summary refresh after deletion
         this.dashboardState.triggerPaymentSummaryRefresh();
 
-        const snackBarRef = this.snackBar.open(
+        this.snackBar.open(
           'Trip deleted successfully',
-          'Undo',
-          { duration: 5000 }
+          'Close',
+          { duration: 3000 }
         );
-
-        snackBarRef.onAction().subscribe(() => {
-          this.undoDelete();
-        });
-
-        // Clear deleted trip after snackbar duration
-        setTimeout(() => {
-          this.deletedTrip = null;
-        }, 5000);
       },
       error: (error) => {
         console.error('Error deleting trip:', error);
@@ -321,27 +310,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
         });
       }
     });
-  }
-
-  private undoDelete(): void {
-    if (this.deletedTrip) {
-      this.tripService.createTrip(this.deletedTrip).subscribe({
-        next: () => {
-          this.snackBar.open('Trip restored successfully', 'Close', {
-            duration: 3000
-          });
-          // Reload trips to show the restored trip
-          this.dashboardState.updateFilters({});
-        },
-        error: (error) => {
-          console.error('Error restoring trip:', error);
-          this.snackBar.open('Error restoring trip. Please try again.', 'Close', {
-            duration: 5000
-          });
-        }
-      });
-      this.deletedTrip = null;
-    }
   }
 
   createTrip(): void {

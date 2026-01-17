@@ -56,12 +56,31 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
 
   ngOnInit(): void {
     console.log('[Charts Widget] Initializing...');
-    // Subscribe to filter changes but only use date range for charts
+    
+    // Track previous date range to detect changes
+    let previousDateRange: { startDate: Date | null; endDate: Date | null } | null = null;
+    
+    // Subscribe to filter changes but only reload when date range changes
     this.sharedFilterService.filters$
       .pipe(
         takeUntil(this.destroy$),
         switchMap(filters => {
-          console.log('[Charts Widget] Filters changed, using only date range:', filters.dateRange);
+          console.log('[Charts Widget] Filters changed');
+          
+          // Check if date range actually changed
+          const dateRangeChanged = !previousDateRange ||
+            filters.dateRange.startDate?.getTime() !== previousDateRange.startDate?.getTime() ||
+            filters.dateRange.endDate?.getTime() !== previousDateRange.endDate?.getTime();
+          
+          // Update previous date range
+          previousDateRange = { ...filters.dateRange };
+          
+          if (!dateRangeChanged && this.trips.length > 0) {
+            console.log('[Charts Widget] Date range unchanged, skipping reload');
+            return []; // Return empty observable to skip
+          }
+          
+          console.log('[Charts Widget] Date range changed, reloading trips');
           this.loading = true;
           // Build API filters with ONLY date range (ignore other filters)
           const apiFilters = this.buildApiFiltersForCharts(filters);
@@ -71,6 +90,8 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       )
       .subscribe({
         next: (response) => {
+          if (!response || !response.trips) return; // Skip if empty response
+          
           console.log('[Charts Widget] Received trips:', response.trips?.length);
           this.trips = response.trips || [];
           this.loading = false;
@@ -81,6 +102,34 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         },
         error: (error) => {
           console.error('[Charts Widget] Error loading trips for charts:', error);
+          this.loading = false;
+        }
+      });
+    
+    // Subscribe to payment summary refresh (triggered by trip add/delete)
+    this.dashboardState.refreshPaymentSummary$
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(() => {
+          console.log('[Charts Widget] Payment summary refresh triggered (trip added/deleted), reloading trips');
+          this.loading = true;
+          const currentFilters = this.dashboardState.getCurrentFilters();
+          const apiFilters = this.buildApiFiltersForCharts(currentFilters);
+          return this.tripService.getTrips(apiFilters);
+        })
+      )
+      .subscribe({
+        next: (response) => {
+          console.log('[Charts Widget] Received trips after refresh:', response.trips?.length);
+          this.trips = response.trips || [];
+          this.loading = false;
+          this.calculateChartData();
+          console.log('[Charts Widget] Chart data calculated after refresh');
+          // Render charts after a delay to ensure view is ready
+          setTimeout(() => this.tryRenderCharts(), 200);
+        },
+        error: (error) => {
+          console.error('[Charts Widget] Error loading trips for charts after refresh:', error);
           this.loading = false;
         }
       });

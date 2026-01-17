@@ -51,7 +51,9 @@ describe('TripTableComponent', () => {
       'updatePagination',
       'updateFilters',
       'getActiveFilterCount',
-      'updateFilteredTrips'
+      'updateFilteredTrips',
+      'triggerPaymentSummaryRefresh',
+      'getCurrentFilters'
     ], {
       filters$: of({
         dateRange: { startDate: null, endDate: null },
@@ -73,7 +75,16 @@ describe('TripTableComponent', () => {
         },
         { page: 0, pageSize: 25 }
       ]),
-      brokers$: of([])
+      brokers$: of([]),
+      refreshPaymentSummary$: EMPTY
+    });
+    dashboardStateSpy.getCurrentFilters.and.returnValue({
+      dateRange: { startDate: null, endDate: null },
+      status: null,
+      brokerId: null,
+      lorryId: null,
+      driverId: null,
+      driverName: null
     });
     
     sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [
