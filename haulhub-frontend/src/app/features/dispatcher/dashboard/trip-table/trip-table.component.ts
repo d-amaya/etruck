@@ -16,7 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { TripService } from '../../../../core/services';
-import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData, calculateTripExpenses } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
 import { PdfExportService } from '../../../../core/services/pdf-export.service';
@@ -57,11 +57,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'lorryId',
     'driverName',
     'status',
-    'brokerPayment',
-    'driverPayment',
-    'lorryOwnerPayment',
-    'fuelCost',
-    'profit',
+    'revenue',
+    'expenses',
+    'profitLoss',
     'actions'
   ];
 
@@ -344,6 +342,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   calculateProfit(trip: Trip): number {
     return calculateTripProfit(trip);
+  }
+
+  calculateExpenses(trip: Trip): number {
+    return calculateTripExpenses(trip);
   }
 
   calculateFuelCost(trip: Trip): number {

@@ -144,45 +144,27 @@
         </td>
       </ng-container>
 
-      <!-- Broker Payment Column -->
-      <ng-container matColumnDef="brokerPayment">
-        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Broker Pay</th>
+      <!-- Revenue Column -->
+      <ng-container matColumnDef="revenue">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Revenue</th>
         <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
-            [attr.aria-label]="'Broker payment: ' + formatCurrency(trip.brokerPayment)">
+            [attr.aria-label]="'Revenue: ' + formatCurrency(trip.brokerPayment)">
           {{ formatCurrency(trip.brokerPayment) }}
         </td>
       </ng-container>
 
-      <!-- Driver Payment Column -->
-      <ng-container matColumnDef="driverPayment">
-        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Driver Pay</th>
+      <!-- Expenses Column -->
+      <ng-container matColumnDef="expenses">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Expenses</th>
         <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
-            [attr.aria-label]="'Driver payment: ' + formatCurrency(trip.driverPayment)">
-          {{ formatCurrency(trip.driverPayment) }}
+            [attr.aria-label]="'Expenses: ' + formatCurrency(calculateExpenses(trip))">
+          {{ formatCurrency(calculateExpenses(trip)) }}
         </td>
       </ng-container>
 
-      <!-- Lorry Owner Payment Column -->
-      <ng-container matColumnDef="lorryOwnerPayment">
-        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Owner Pay</th>
-        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
-            [attr.aria-label]="'Lorry owner payment: ' + formatCurrency(trip.lorryOwnerPayment)">
-          {{ formatCurrency(trip.lorryOwnerPayment) }}
-        </td>
-      </ng-container>
-
-      <!-- Fuel Cost Column -->
-      <ng-container matColumnDef="fuelCost">
-        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Fuel Cost</th>
-        <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
-            [attr.aria-label]="'Fuel cost: ' + formatCurrency(calculateFuelCost(trip))">
-          {{ formatCurrency(calculateFuelCost(trip)) }}
-        </td>
-      </ng-container>
-
-      <!-- Profit Column -->
-      <ng-container matColumnDef="profit">
-        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Profit</th>
+      <!-- Profit/Loss Column -->
+      <ng-container matColumnDef="profitLoss">
+        <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Profit/Loss</th>
         <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
             [attr.aria-label]="getProfitAriaLabel(trip)">
           <span [class.positive-profit]="calculateProfit(trip) >= 0" 
