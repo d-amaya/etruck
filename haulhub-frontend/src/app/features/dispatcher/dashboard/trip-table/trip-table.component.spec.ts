@@ -227,9 +227,7 @@ describe('TripTableComponent', () => {
 
   it('should format date correctly', () => {
     const formatted = component.formatDate('2024-01-15T10:00:00Z');
-    expect(formatted).toContain('Jan');
-    expect(formatted).toContain('15');
-    expect(formatted).toContain('2024');
+    expect(formatted).toBe('1/15/2024');
   });
 
   it('should return correct status class', () => {
