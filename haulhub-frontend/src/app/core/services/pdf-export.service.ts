@@ -67,35 +67,87 @@ export class PdfExportService {
   ): void {
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Brand Colors (as tuples for jsPDF)
+    const primaryBlue: [number, number, number] = [25, 118, 210]; // #1976d2
+    const lightBlue: [number, number, number] = [227, 242, 253]; // #e3f2fd
+    const darkGray: [number, number, number] = [66, 66, 66];
+    const lightGray: [number, number, number] = [245, 245, 245];
+    const profitGreen: [number, number, number] = [46, 125, 50]; // #2e7d32
+    const lossRed: [number, number, number] = [211, 47, 47]; // #d32f2f
+
     let yPosition = 20;
 
-    // Header
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Dispatcher Dashboard Report', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
+    // ========== HEADER SECTION ==========
+    // Add colored banner at top
+    doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
 
-    // Applied Filters
-    doc.setFontSize(10);
+    // Company Name
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('eTrucky', 14, 22);
+
+    // Report Title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Dispatcher Dashboard Report', pageWidth / 2, 22, { align: 'center' });
+
+    // Generation Date (top right)
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 22, { align: 'right' });
+
+    yPosition = 45;
+
+    // ========== APPLIED FILTERS SECTION ==========
     const filterText = this.buildFilterText(filters);
     if (filterText) {
-      doc.text(filterText, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 8;
+      doc.setFillColor(lightBlue[0], lightBlue[1], lightBlue[2]);
+      doc.rect(14, yPosition - 5, pageWidth - 28, 12, 'F');
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text(filterText, pageWidth / 2, yPosition + 2, { align: 'center' });
+      yPosition += 18;
     }
 
-    // Generation Date
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
+    // ========== SUMMARY CARDS SECTION ==========
+    const cardWidth = (pageWidth - 28 - 30) / 4; // 4 cards with gaps
+    const cardHeight = 25;
+    const cardGap = 10;
+    const cardY = yPosition;
 
-    // Trip Summary Section
-    doc.setFontSize(14);
+    // Card 1: Total Trips
+    this.drawSummaryCard(doc, 14, cardY, cardWidth, cardHeight, 
+      'Total Trips', trips.length.toString(), primaryBlue);
+
+    // Card 2: Total Revenue
+    this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
+      'Total Revenue', this.formatCurrency(paymentSummary.totalBrokerPayments), profitGreen);
+
+    // Card 3: Total Expenses
+    this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,
+      'Total Expenses', this.formatCurrency(paymentSummary.totalDriverPayments + paymentSummary.totalLorryOwnerPayments), lossRed);
+
+    // Card 4: Net Profit
+    const isProfit = paymentSummary.totalProfit >= 0;
+    this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 3, cardY, cardWidth, cardHeight,
+      isProfit ? 'Net Profit' : 'Net Loss', 
+      this.formatCurrency(Math.abs(paymentSummary.totalProfit)), 
+      isProfit ? profitGreen : lossRed);
+
+    yPosition = cardY + cardHeight + 15;
+
+    // ========== TRIP STATUS BREAKDOWN ==========
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('Trip Summary by Status', 14, yPosition);
-    yPosition += 8;
+    doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.text('Trip Status Breakdown', 14, yPosition);
+    yPosition += 6;
 
     const summaryData = [
       ['Scheduled', summaryByStatus[TripStatus.Scheduled] || 0],
@@ -110,47 +162,24 @@ export class PdfExportService {
       head: [['Status', 'Count']],
       body: summaryData,
       theme: 'grid',
-      headStyles: { fillColor: [66, 66, 66], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 4 },
+      headStyles: { 
+        fillColor: primaryBlue,
+        textColor: [255, 255, 255], 
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      styles: { fontSize: 9, cellPadding: 3 },
       columnStyles: {
         0: { cellWidth: 60 },
         1: { cellWidth: 40, halign: 'right' }
       },
-      margin: { left: 14 }
+      margin: { left: 14 },
+      alternateRowStyles: { fillColor: lightGray }
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;
 
-    // Payment Summary Section
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Payment Summary', 14, yPosition);
-    yPosition += 8;
-
-    const paymentData = [
-      ['Broker Payments', this.formatCurrency(paymentSummary.totalBrokerPayments)],
-      ['Driver Payments', this.formatCurrency(paymentSummary.totalDriverPayments)],
-      ['Lorry Owner Payments', this.formatCurrency(paymentSummary.totalLorryOwnerPayments)],
-      ['Profit', this.formatCurrency(paymentSummary.totalProfit)]
-    ];
-
-    autoTable(doc, {
-      startY: yPosition,
-      head: [['Category', 'Amount']],
-      body: paymentData,
-      theme: 'grid',
-      headStyles: { fillColor: [66, 66, 66], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 4 },
-      columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 60, halign: 'right' }
-      },
-      margin: { left: 14 }
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
-
-    // Trips Table Section
+    // ========== TRIPS TABLE SECTION ==========
     if (trips.length > 0) {
       // Check if we need a new page
       if (yPosition > 150) {
@@ -158,57 +187,150 @@ export class PdfExportService {
         yPosition = 20;
       }
 
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Trips (${trips.length} total)`, 14, yPosition);
-      yPosition += 8;
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text(`Trip Details (${trips.length} trips)`, 14, yPosition);
+      yPosition += 6;
 
-      const tripTableData = trips.map(trip => [
-        this.formatDate(trip.scheduledPickupDatetime),
-        trip.pickupLocation,
-        trip.dropoffLocation,
-        trip.brokerName,
-        trip.lorryId,
-        trip.driverName,
-        this.getStatusLabel(trip.status),
-        this.formatCurrency(trip.brokerPayment),
-        this.formatCurrency(trip.driverPayment),
-        this.formatCurrency(trip.lorryOwnerPayment),
-        this.formatCurrency(this.calculateProfit(trip))
-      ]);
+      const tripTableData = trips.map(trip => {
+        const profit = this.calculateProfit(trip);
+        return [
+          this.formatDate(trip.scheduledPickupDatetime),
+          this.truncateText(trip.pickupLocation, 20),
+          this.truncateText(trip.dropoffLocation, 20),
+          this.truncateText(trip.brokerName, 18),
+          trip.lorryId,
+          this.truncateText(trip.driverName, 18),
+          this.getStatusLabel(trip.status),
+          this.formatCurrency(trip.brokerPayment),
+          this.formatCurrency(trip.driverPayment),
+          this.formatCurrency(trip.lorryOwnerPayment),
+          this.formatCurrency(profit)
+        ];
+      });
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Date', 'Pickup', 'Dropoff', 'Broker', 'Lorry', 'Driver', 'Status', 'Broker Pay', 'Driver Pay', 'Owner Pay', 'Profit']],
+        head: [['Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Driver', 'Status', 'Broker Pay', 'Driver Pay', 'Owner Pay', 'Profit']],
         body: tripTableData,
         theme: 'striped',
-        headStyles: { fillColor: [66, 66, 66], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { 
+          fillColor: primaryBlue,
+          textColor: [255, 255, 255], 
+          fontStyle: 'bold', 
+          fontSize: 8,
+          halign: 'center'
+        },
+        styles: { 
+          fontSize: 7, 
+          cellPadding: 2,
+          overflow: 'linebreak'
+        },
         columnStyles: {
           0: { cellWidth: 20 },
-          1: { cellWidth: 28 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 18 },
-          5: { cellWidth: 22 },
-          6: { cellWidth: 18 },
+          1: { cellWidth: 26 },
+          2: { cellWidth: 26 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 16 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 18, halign: 'center' },
           7: { cellWidth: 20, halign: 'right' },
           8: { cellWidth: 20, halign: 'right' },
           9: { cellWidth: 20, halign: 'right' },
-          10: { cellWidth: 20, halign: 'right' }
+          10: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
         },
-        margin: { left: 14, right: 14 }
+        alternateRowStyles: { fillColor: lightGray },
+        margin: { left: 14, right: 14 },
+        didParseCell: (data) => {
+          // Color profit column based on value
+          if (data.column.index === 10 && data.section === 'body') {
+            const profitText = data.cell.text[0];
+            if (profitText && profitText.includes('-')) {
+              data.cell.styles.textColor = lossRed;
+            } else {
+              data.cell.styles.textColor = profitGreen;
+            }
+          }
+          
+          // Color status column
+          if (data.column.index === 6 && data.section === 'body') {
+            const status = data.cell.text[0];
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fontSize = 7;
+          }
+        }
       });
     } else {
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(100, 100, 100);
       doc.text('No trips found matching the selected filters.', 14, yPosition);
     }
 
+    // ========== FOOTER ON EACH PAGE ==========
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      
+      // Footer line
+      doc.setDrawColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+      
+      // Footer text
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('eTrucky - Transportation Management System', 14, pageHeight - 10);
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+    }
+
     // Save PDF
     const filename = this.generateFilename(filters);
     doc.save(filename);
+  }
+
+  /**
+   * Draw a summary card with icon, label, and value
+   */
+  private drawSummaryCard(
+    doc: jsPDF, 
+    x: number, 
+    y: number, 
+    width: number, 
+    height: number, 
+    label: string, 
+    value: string,
+    color: [number, number, number]
+  ): void {
+    // Card background
+    doc.setFillColor(250, 250, 250);
+    doc.roundedRect(x, y, width, height, 3, 3, 'F');
+    
+    // Colored top border
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.rect(x, y, width, 3, 'F');
+    
+    // Label
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(label, x + width / 2, y + 12, { align: 'center' });
+    
+    // Value
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(color[0], color[1], color[2]);
+    doc.text(value, x + width / 2, y + 20, { align: 'center' });
+  }
+
+  /**
+   * Truncate text to fit in cell
+   */
+  private truncateText(text: string, maxLength: number): string {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
   }
 
   private buildFilterText(filters: DashboardFilters): string {
@@ -311,5 +433,35 @@ export class PdfExportService {
 
   private calculateProfit(trip: Trip): number {
     return calculateTripProfit(trip);
+  }
+
+  /**
+   * Draw a professional truck logo using vector shapes
+   */
+  private drawTruckLogo(doc: jsPDF, x: number, y: number, scale: number, color: [number, number, number]): void {
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(0.3);
+    
+    // Truck cabin (front)
+    doc.roundedRect(x, y + 3*scale, 3*scale, 5*scale, 0.5*scale, 0.5*scale, 'FD');
+    
+    // Truck cargo box (back)
+    doc.roundedRect(x + 3*scale, y + 1*scale, 7*scale, 7*scale, 0.5*scale, 0.5*scale, 'FD');
+    
+    // Wheels
+    doc.circle(x + 1.5*scale, y + 8.5*scale, 1.2*scale, 'FD');
+    doc.circle(x + 5*scale, y + 8.5*scale, 1.2*scale, 'FD');
+    doc.circle(x + 8*scale, y + 8.5*scale, 1.2*scale, 'FD');
+    
+    // Window detail on cabin
+    const primaryBlue: [number, number, number] = [25, 118, 210];
+    doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.rect(x + 0.5*scale, y + 3.5*scale, 2*scale, 2*scale, 'F');
+    
+    // Cargo door lines for detail
+    doc.setDrawColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.setLineWidth(0.5);
+    doc.line(x + 6*scale, y + 2*scale, x + 6*scale, y + 7*scale);
   }
 }
