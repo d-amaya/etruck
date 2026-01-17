@@ -5,7 +5,6 @@ import { AwsService } from '../../../src/config/aws.service';
 import { ConfigService } from '../../../src/config/config.service';
 import { BrokersService } from '../../../src/admin/brokers.service';
 import { StatusWorkflowService } from '../../../src/trips/status-workflow.service';
-import { StatusAuditService } from '../../../src/trips/status-audit.service';
 import { IndexSelectorService } from '../../../src/trips/index-selector.service';
 import { TripStatus, UserRole } from '@haulhub/shared';
 
@@ -15,7 +14,6 @@ describe('TripsService', () => {
   let configService: jest.Mocked<ConfigService>;
   let brokersService: jest.Mocked<BrokersService>;
   let statusWorkflowService: jest.Mocked<StatusWorkflowService>;
-  let statusAuditService: jest.Mocked<StatusAuditService>;
   let indexSelectorService: jest.Mocked<IndexSelectorService>;
 
   const mockDynamoDBClient = {
@@ -53,13 +51,6 @@ describe('TripsService', () => {
           },
         },
         {
-          provide: StatusAuditService,
-          useValue: {
-            recordStatusChange: jest.fn(),
-            getStatusHistory: jest.fn(),
-          },
-        },
-        {
           provide: IndexSelectorService,
           useValue: {
             selectOptimalIndex: jest.fn(),
@@ -73,7 +64,6 @@ describe('TripsService', () => {
     configService = module.get(ConfigService) as jest.Mocked<ConfigService>;
     brokersService = module.get(BrokersService) as jest.Mocked<BrokersService>;
     statusWorkflowService = module.get(StatusWorkflowService) as jest.Mocked<StatusWorkflowService>;
-    statusAuditService = module.get(StatusAuditService) as jest.Mocked<StatusAuditService>;
     indexSelectorService = module.get(IndexSelectorService) as jest.Mocked<IndexSelectorService>;
   });
 

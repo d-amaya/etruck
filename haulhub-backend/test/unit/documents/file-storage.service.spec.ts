@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { FileStorageService } from './file-storage.service';
-import { ConfigService } from '../config/config.service';
-import { AwsService } from '../config/aws.service';
+import { FileStorageService } from '../../../src/documents/file-storage.service';
+import { ConfigService } from '../../../src/config/config.service';
+import { AwsService } from '../../../src/config/aws.service';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 
 // Define the Multer File interface for testing

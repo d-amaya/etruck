@@ -7,6 +7,6 @@ import { BrokersService } from './brokers.service';
 @Module({
   controllers: [AdminController, BrokersController],
   providers: [AdminService, BrokersService],
-  exports: [AdminService, BrokersService],
+  exports: [BrokersService],  // Only BrokersService is used by TripsService
 })
 export class AdminModule {}

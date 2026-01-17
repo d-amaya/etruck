@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { TripsService } from '../trips/trips.service';
-import { UsersService } from '../users/users.service';
 import { Trip, TripStatus } from '@haulhub/shared';
 
 export interface FleetOverview {
@@ -62,7 +61,6 @@ export interface VehicleUtilization {
 export class AnalyticsService {
   constructor(
     private readonly tripsService: TripsService,
-    private readonly usersService: UsersService,
   ) {}
 
   async getFleetOverview(dispatcherId: string): Promise<FleetOverview> {

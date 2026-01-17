@@ -1,11 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TripsService } from './trips.service';
-import { AwsService } from '../config/aws.service';
-import { ConfigService } from '../config/config.service';
-import { BrokersService } from '../admin/brokers.service';
-import { StatusWorkflowService } from './status-workflow.service';
-import { StatusAuditService } from './status-audit.service';
-import { IndexSelectorService } from './index-selector.service';
+import { TripsService } from '../../../src/trips/trips.service';
+import { AwsService } from '../../../src/config/aws.service';
+import { ConfigService } from '../../../src/config/config.service';
+import { BrokersService } from '../../../src/admin/brokers.service';
+import { StatusWorkflowService } from '../../../src/trips/status-workflow.service';
+import { IndexSelectorService } from '../../../src/trips/index-selector.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('TripsService - GSI Attributes', () => {
@@ -43,10 +42,6 @@ describe('TripsService - GSI Attributes', () => {
         },
         {
           provide: StatusWorkflowService,
-          useValue: {},
-        },
-        {
-          provide: StatusAuditService,
           useValue: {},
         },
         {

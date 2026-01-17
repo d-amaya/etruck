@@ -9,7 +9,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { EnhancedDriverService } from './enhanced-driver.service';
+import { DriversService } from './drivers.service';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import {
@@ -21,8 +21,8 @@ import {
 } from '@haulhub/shared';
 
 @Controller('drivers')
-export class EnhancedDriverController {
-  constructor(private readonly enhancedDriverService: EnhancedDriverService) {}
+export class DriversController {
+  constructor(private readonly driversService: DriversService) {}
 
   /**
    * GET /drivers/profile
@@ -31,7 +31,7 @@ export class EnhancedDriverController {
   @Get('profile')
   @Roles(UserRole.Driver)
   async getDriverProfile(@CurrentUser() user: CurrentUserData) {
-    return this.enhancedDriverService.getEnhancedDriverProfile(user.userId);
+    return this.driversService.getEnhancedDriverProfile(user.userId);
   }
 
   /**
@@ -45,7 +45,7 @@ export class EnhancedDriverController {
     @CurrentUser() user: CurrentUserData,
     @Body() updateDto: UpdateEnhancedDriverDto,
   ) {
-    return this.enhancedDriverService.updateEnhancedDriverProfile(user.userId, updateDto);
+    return this.driversService.updateEnhancedDriverProfile(user.userId, updateDto);
   }
 
   /**
@@ -55,7 +55,7 @@ export class EnhancedDriverController {
   @Get(':id/profile')
   @Roles(UserRole.Admin, UserRole.Dispatcher)
   async getDriverById(@Param('id') driverId: string) {
-    return this.enhancedDriverService.getEnhancedDriverProfile(driverId);
+    return this.driversService.getEnhancedDriverProfile(driverId);
   }
 
   /**
@@ -68,7 +68,7 @@ export class EnhancedDriverController {
     @Param('id') driverId: string,
     @Body() updateDto: UpdateEnhancedDriverDto,
   ) {
-    return this.enhancedDriverService.updateEnhancedDriverProfile(driverId, updateDto);
+    return this.driversService.updateEnhancedDriverProfile(driverId, updateDto);
   }
 
   /**
@@ -82,7 +82,7 @@ export class EnhancedDriverController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.enhancedDriverService.getDriverPaymentHistory(user.userId, startDate, endDate);
+    return this.driversService.getDriverPaymentHistory(user.userId, startDate, endDate);
   }
 
   /**
@@ -96,7 +96,7 @@ export class EnhancedDriverController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.enhancedDriverService.getDriverPaymentHistory(driverId, startDate, endDate);
+    return this.driversService.getDriverPaymentHistory(driverId, startDate, endDate);
   }
 
   /**
@@ -106,7 +106,7 @@ export class EnhancedDriverController {
   @Get('profile/advances')
   @Roles(UserRole.Driver)
   async getDriverAdvances(@CurrentUser() user: CurrentUserData) {
-    return this.enhancedDriverService.getDriverAdvances(user.userId);
+    return this.driversService.getDriverAdvances(user.userId);
   }
 
   /**
@@ -116,7 +116,7 @@ export class EnhancedDriverController {
   @Get(':id/advances')
   @Roles(UserRole.Admin, UserRole.Dispatcher)
   async getDriverAdvancesById(@Param('id') driverId: string) {
-    return this.enhancedDriverService.getDriverAdvances(driverId);
+    return this.driversService.getDriverAdvances(driverId);
   }
 
   /**
@@ -134,7 +134,7 @@ export class EnhancedDriverController {
     if (!advanceDto.driverId) {
       throw new BadRequestException('Driver ID is required');
     }
-    return this.enhancedDriverService.recordDriverAdvance(advanceDto.driverId, advanceDto);
+    return this.driversService.recordDriverAdvance(advanceDto.driverId, advanceDto);
   }
 
   /**
@@ -147,7 +147,7 @@ export class EnhancedDriverController {
     @Param('id') driverId: string,
     @Body() advanceDto: RecordAdvanceDto,
   ) {
-    return this.enhancedDriverService.recordDriverAdvance(driverId, advanceDto);
+    return this.driversService.recordDriverAdvance(driverId, advanceDto);
   }
 
   /**
@@ -156,7 +156,7 @@ export class EnhancedDriverController {
    */
   @Get('validate/cdl')
   async validateCDL(@Query() cdlInfo: ValidateCDLDto) {
-    return this.enhancedDriverService.validateCDLInfo(cdlInfo);
+    return this.driversService.validateCDLInfo(cdlInfo);
   }
 
   /**
@@ -165,6 +165,6 @@ export class EnhancedDriverController {
    */
   @Get('validate/banking')
   async validateBanking(@Query() bankingInfo: ValidateBankingDto) {
-    return this.enhancedDriverService.validateBankingInfo(bankingInfo);
+    return this.driversService.validateBankingInfo(bankingInfo);
   }
 }

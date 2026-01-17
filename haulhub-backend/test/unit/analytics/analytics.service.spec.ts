@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AnalyticsService } from './analytics.service';
-import { TripsService } from '../trips/trips.service';
-import { UsersService } from '../users/users.service';
+import { AnalyticsService } from '../../../src/analytics/analytics.service';
+import { TripsService } from '../../../src/trips/trips.service';
 import { TripStatus } from '@haulhub/shared';
 
 describe('AnalyticsService', () => {
@@ -39,8 +38,6 @@ describe('AnalyticsService', () => {
     })),
   };
 
-  const mockUsersService = {};
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,10 +45,6 @@ describe('AnalyticsService', () => {
         {
           provide: TripsService,
           useValue: mockTripsService,
-        },
-        {
-          provide: UsersService,
-          useValue: mockUsersService,
         },
       ],
     }).compile();

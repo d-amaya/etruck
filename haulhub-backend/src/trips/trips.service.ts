@@ -17,7 +17,6 @@ import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { BrokersService } from '../admin/brokers.service';
 import { StatusWorkflowService } from './status-workflow.service';
-import { StatusAuditService } from './status-audit.service';
 import { IndexSelectorService } from './index-selector.service';
 import {
   Trip,
@@ -32,8 +31,6 @@ import {
   LorryOwnerPaymentReport,
   TripPaymentDetail,
   TripFilters,
-  StatusChangeRequest,
-  StatusAuditTrail,
 } from '@haulhub/shared';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,7 +44,6 @@ export class TripsService {
     private readonly configService: ConfigService,
     private readonly brokersService: BrokersService,
     private readonly statusWorkflowService: StatusWorkflowService,
-    private readonly statusAuditService: StatusAuditService,
     private readonly indexSelectorService: IndexSelectorService,
   ) {
     this.tripsTableName = this.configService.tripsTableName;
@@ -2668,22 +2664,6 @@ export class TripsService {
   }
 
   /**
-   * Get status audit trail for a trip
-   * Requirements: 11.2 - Status change audit trails with timestamps and user information
-   */
-  async getStatusAuditTrail(
-    tripId: string,
-    userId: string,
-    userRole: UserRole
-  ): Promise<StatusAuditTrail> {
-    // Verify user has access to this trip
-    await this.getTripById(tripId, userId, userRole);
-    
-    // Get audit trail from DynamoDB
-    return this.statusAuditService.getAuditTrail(tripId);
-  }
-
-  /**
    * Get available status transitions for a trip
    * Requirements: 11.3 - Workflow automation rules and validations
    */
@@ -2731,82 +2711,6 @@ export class TripsService {
       currentStatus: trip.status,
       availableTransitions
     };
-  }
-
-  /**
-   * Change trip status with audit trail and workflow validation
-   * Requirements: 11.1, 11.2, 11.3 - Enhanced status tracking with audit and validation
-   */
-  async changeStatusWithAudit(
-    tripId: string,
-    userId: string,
-    userName: string,
-    userRole: UserRole,
-    request: StatusChangeRequest
-  ): Promise<Trip> {
-    // Get the trip
-    const trip = await this.getTripById(tripId, userId, userRole);
-    
-    // Validate the status transition
-    const validation = this.statusWorkflowService.validateStatusTransition(
-      trip.status,
-      request.newStatus,
-      userRole
-    );
-    
-    if (!validation.isValid) {
-      throw new BadRequestException(validation.errorMessage);
-    }
-    
-    // Create audit entry
-    const auditEntry = this.statusWorkflowService.createAuditEntry(
-      tripId,
-      trip.status,
-      request.newStatus,
-      userId,
-      userName,
-      request,
-      false // Not automatic
-    );
-    
-    // Save audit entry
-    await this.statusAuditService.saveAuditEntry(auditEntry);
-    
-    // Update trip status
-    const updatedTrip = await this.updateTripStatus(
-      tripId,
-      userId,
-      userRole,
-      request.newStatus
-    );
-    
-    return updatedTrip;
-  }
-
-  /**
-   * Get workflow statistics for reporting
-   * Requirements: 11.4 - Status-based filtering and reporting
-   */
-  async getWorkflowStatistics(
-    userId: string,
-    userRole: UserRole,
-    startDate?: string,
-    endDate?: string
-  ): Promise<any> {
-    // For now, return basic statistics
-    // In production, this would aggregate data from multiple trips
-    
-    if (userRole !== UserRole.Dispatcher && userRole !== UserRole.Admin) {
-      throw new ForbiddenException('Only dispatchers and admins can view workflow statistics');
-    }
-    
-    // Get status change statistics
-    const stats = await this.statusAuditService.getStatusChangeStatistics(
-      startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      endDate || new Date().toISOString()
-    );
-    
-    return stats;
   }
 
   /**

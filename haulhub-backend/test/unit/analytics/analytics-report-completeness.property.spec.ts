@@ -10,9 +10,8 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import * as fc from 'fast-check';
-import { AnalyticsService } from './analytics.service';
-import { TripsService } from '../trips/trips.service';
-import { UsersService } from '../users/users.service';
+import { AnalyticsService } from '../../../src/analytics/analytics.service';
+import { TripsService } from '../../../src/trips/trips.service';
 import { TripStatus } from '@haulhub/shared';
 
 describe('Analytics Report Data Completeness (Property-Based)', () => {
@@ -61,8 +60,6 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
     mapItemToTrip: jest.fn((item) => item),
   };
 
-  const mockUsersService = {};
-
   beforeEach(async () => {
     mockDynamoDBClient = {
       send: jest.fn(),
@@ -76,10 +73,6 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
         {
           provide: TripsService,
           useValue: mockTripsService,
-        },
-        {
-          provide: UsersService,
-          useValue: mockUsersService,
         },
       ],
     }).compile();

@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { DocumentsService } from './documents.service';
-import { FileStorageService } from './file-storage.service';
-import { DocumentFoldersService } from './document-folders.service';
-import { BatchUploadDocumentDto } from './dto';
+import { DocumentsService } from '../../../src/documents/documents.service';
+import { FileStorageService } from '../../../src/documents/file-storage.service';
+import { DocumentFoldersService } from '../../../src/documents/document-folders.service';
+import { BatchUploadDocumentDto } from '../../../src/documents/dto';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;

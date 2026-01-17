@@ -252,20 +252,6 @@ export class TripsController {
   }
 
   /**
-   * GET /trips/:id/audit-trail
-   * Get complete status audit trail for a trip
-   * Requirements: 11.2 - Status change audit trails with timestamps and user information
-   */
-  @Get(':id/audit-trail')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
-  async getAuditTrail(
-    @CurrentUser() user: CurrentUserData,
-    @Param('id') tripId: string,
-  ) {
-    return this.tripsService.getStatusAuditTrail(tripId, user.userId, user.role as UserRole);
-  }
-
-  /**
    * GET /trips/:id/available-transitions
    * Get available status transitions for a trip based on current status and user role
    * Requirements: 11.3 - Workflow automation rules and validations
@@ -277,41 +263,5 @@ export class TripsController {
     @Param('id') tripId: string,
   ) {
     return this.tripsService.getAvailableStatusTransitions(tripId, user.userId, user.role as UserRole);
-  }
-
-  /**
-   * POST /trips/:id/status-change
-   * Change trip status with audit trail and workflow validation
-   * Requirements: 11.1, 11.2, 11.3 - Enhanced status tracking with audit and validation
-   */
-  @Post(':id/status-change')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.Admin)
-  async changeStatus(
-    @CurrentUser() user: CurrentUserData,
-    @Param('id') tripId: string,
-    @Body() request: any, // StatusChangeRequest from shared package
-  ) {
-    return this.tripsService.changeStatusWithAudit(
-      tripId,
-      user.userId,
-      user.email,
-      user.role as UserRole,
-      request
-    );
-  }
-
-  /**
-   * GET /trips/workflow/statistics
-   * Get workflow statistics for reporting
-   * Requirements: 11.4 - Status-based filtering and reporting
-   */
-  @Get('workflow/statistics')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
-  async getWorkflowStatistics(
-    @CurrentUser() user: CurrentUserData,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.tripsService.getWorkflowStatistics(user.userId, user.role as UserRole, startDate, endDate);
   }
 }

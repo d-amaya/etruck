@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EnhancedDriverController } from './enhanced-driver.controller';
-import { EnhancedDriverService } from './enhanced-driver.service';
+import { DriversController } from '../../../src/drivers/drivers.controller';
+import { DriversService } from '../../../src/drivers/drivers.service';
 import { CDLClass, UpdateEnhancedDriverDto, UserRole, VerificationStatus } from '@haulhub/shared';
 
-describe('EnhancedDriverController', () => {
-  let controller: EnhancedDriverController;
-  let mockEnhancedDriverService: jest.Mocked<EnhancedDriverService>;
+describe('DriversController', () => {
+  let controller: DriversController;
+  let mockEnhancedDriverService: jest.Mocked<DriversService>;
 
   const mockCurrentUser = {
     userId: 'driver-123',
@@ -46,13 +46,13 @@ describe('EnhancedDriverController', () => {
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [EnhancedDriverController],
+      controllers: [DriversController],
       providers: [
-        { provide: EnhancedDriverService, useValue: mockEnhancedDriverService },
+        { provide: DriversService, useValue: mockEnhancedDriverService },
       ],
     }).compile();
 
-    controller = module.get<EnhancedDriverController>(EnhancedDriverController);
+    controller = module.get<DriversController>(DriversController);
   });
 
   afterEach(() => {

@@ -19,7 +19,7 @@ import {
 } from '@haulhub/shared';
 
 @Injectable()
-export class EnhancedDriverService {
+export class DriversService {
   private readonly usersTableName: string;
 
   constructor(

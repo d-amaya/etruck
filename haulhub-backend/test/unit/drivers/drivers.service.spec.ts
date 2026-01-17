@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { EnhancedDriverService } from './enhanced-driver.service';
-import { AwsService } from '../config/aws.service';
-import { ConfigService } from '../config/config.service';
+import { DriversService } from '../../../src/drivers/drivers.service';
+import { AwsService } from '../../../src/config/aws.service';
+import { ConfigService } from '../../../src/config/config.service';
 import { CDLClass, UpdateEnhancedDriverDto } from '@haulhub/shared';
 
-describe('EnhancedDriverService', () => {
-  let service: EnhancedDriverService;
+describe('DriversService', () => {
+  let service: DriversService;
   let mockAwsService: jest.Mocked<AwsService>;
   let mockConfigService: jest.Mocked<ConfigService>;
   let mockDynamoDBClient: any;
@@ -26,13 +26,13 @@ describe('EnhancedDriverService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        EnhancedDriverService,
+        DriversService,
         { provide: AwsService, useValue: mockAwsService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
-    service = module.get<EnhancedDriverService>(EnhancedDriverService);
+    service = module.get<DriversService>(DriversService);
   });
 
   afterEach(() => {
