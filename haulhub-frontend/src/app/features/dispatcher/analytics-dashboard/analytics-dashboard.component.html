@@ -66,6 +66,9 @@
           <mat-card class="chart-card">
             <mat-card-content>
               <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
+                <div class="column-descriptions">
+                  <p><strong>Utilization Rate:</strong> Percentage of days the vehicle was actively used for trips. <strong>Avg Revenue/Trip:</strong> Average revenue earned per trip for this vehicle.</p>
+                </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
@@ -111,6 +114,9 @@
           <mat-card class="chart-card">
             <mat-card-content>
               <div *ngIf="driverPerformanceData && driverPerformanceData.length > 0" class="data-table">
+                <div class="column-descriptions">
+                  <p><strong>Completion Rate:</strong> Percentage of trips successfully completed on time. <strong>Avg Earnings/Trip:</strong> Average payment received per trip.</p>
+                </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
@@ -158,6 +164,9 @@
           <mat-card class="chart-card">
             <mat-card-content>
               <div *ngIf="brokerAnalyticsData && brokerAnalyticsData.brokers && brokerAnalyticsData.brokers.length > 0" class="data-table">
+                <div class="column-descriptions">
+                  <p><strong>Completion Rate:</strong> Percentage of trips from this broker that were successfully completed. <strong>Avg Revenue/Trip:</strong> Average payment received per trip from this broker.</p>
+                </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
@@ -232,6 +241,9 @@
                 </div>
                 
                 <div class="data-table" *ngIf="fuelEfficiencyChartData.vehicles && fuelEfficiencyChartData.vehicles.length > 0">
+                  <div class="column-descriptions">
+                    <p><strong>Avg MPG:</strong> Average miles per gallon fuel efficiency for this vehicle. <strong>Total Gallons:</strong> Total fuel consumed across all trips.</p>
+                  </div>
                   <table class="analytics-table">
                     <thead>
                       <tr>
