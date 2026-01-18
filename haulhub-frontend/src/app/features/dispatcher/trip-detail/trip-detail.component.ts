@@ -72,12 +72,6 @@ export class TripDetailComponent implements OnInit {
     }
   }
 
-  onUpdateStatus(): void {
-    if (this.trip) {
-      this.router.navigate(['/dispatcher/trips', this.trip.tripId, 'status']);
-    }
-  }
-
   getStatusClass(status: TripStatus): string {
     switch (status) {
       case TripStatus.Scheduled:

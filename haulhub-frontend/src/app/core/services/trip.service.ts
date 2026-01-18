@@ -77,9 +77,4 @@ export class TripService {
   deleteTrip(tripId: string): Observable<{ message: string }> {
     return this.apiService.delete<{ message: string }>(`/trips/${tripId}`);
   }
-
-  // Enhanced status workflow methods
-  getAvailableTransitions(tripId: string): Observable<any> {
-    return this.apiService.get<any>(`/trips/${tripId}/available-transitions`);
-  }
 }

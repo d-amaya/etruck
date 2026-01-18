@@ -3,7 +3,6 @@ import { TripsService } from '../../../src/trips/trips.service';
 import { AwsService } from '../../../src/config/aws.service';
 import { ConfigService } from '../../../src/config/config.service';
 import { BrokersService } from '../../../src/admin/brokers.service';
-import { StatusWorkflowService } from '../../../src/trips/status-workflow.service';
 import { IndexSelectorService } from '../../../src/trips/index-selector.service';
 import { BadRequestException } from '@nestjs/common';
 
@@ -39,10 +38,6 @@ describe('TripsService - GSI Attributes', () => {
               brokerName: 'Test Broker',
             }),
           },
-        },
-        {
-          provide: StatusWorkflowService,
-          useValue: {},
         },
         {
           provide: IndexSelectorService,

@@ -16,7 +16,6 @@ import { PutMetricDataCommand, MetricDatum } from '@aws-sdk/client-cloudwatch';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { BrokersService } from '../admin/brokers.service';
-import { StatusWorkflowService } from './status-workflow.service';
 import { IndexSelectorService } from './index-selector.service';
 import {
   Trip,
@@ -43,7 +42,6 @@ export class TripsService {
     private readonly awsService: AwsService,
     private readonly configService: ConfigService,
     private readonly brokersService: BrokersService,
-    private readonly statusWorkflowService: StatusWorkflowService,
     private readonly indexSelectorService: IndexSelectorService,
   ) {
     this.tripsTableName = this.configService.tripsTableName;
@@ -2661,56 +2659,6 @@ export class TripsService {
       console.error('Error deleting trip:', error);
       throw new InternalServerErrorException('Failed to delete trip');
     }
-  }
-
-  /**
-   * Get available status transitions for a trip
-   * Requirements: 11.3 - Workflow automation rules and validations
-   */
-  async getAvailableStatusTransitions(
-    tripId: string,
-    userId: string,
-    userRole: UserRole
-  ): Promise<{
-    currentStatus: TripStatus;
-    availableTransitions: Array<{
-      status: TripStatus;
-      label: string;
-      color: string;
-      icon: string;
-      description: string;
-      requiresApproval: boolean;
-    }>;
-  }> {
-    // Get the trip
-    const trip = await this.getTripById(tripId, userId, userRole);
-    
-    // Get available transitions based on current status and user role
-    const availableStatuses = this.statusWorkflowService.getAvailableTransitions(
-      trip.status,
-      userRole
-    );
-    
-    // Enrich with display information
-    const availableTransitions = availableStatuses.map(status => {
-      const displayInfo = this.statusWorkflowService.getStatusDisplayInfo(status);
-      const validation = this.statusWorkflowService.validateStatusTransition(
-        trip.status,
-        status,
-        userRole
-      );
-      
-      return {
-        status,
-        ...displayInfo,
-        requiresApproval: validation.warnings?.includes('This status change requires approval') || false
-      };
-    });
-    
-    return {
-      currentStatus: trip.status,
-      availableTransitions
-    };
   }
 
   /**

@@ -250,18 +250,4 @@ export class TripsController {
     await this.tripsService.deleteTrip(tripId, user.userId);
     return { message: 'Trip deleted successfully' };
   }
-
-  /**
-   * GET /trips/:id/available-transitions
-   * Get available status transitions for a trip based on current status and user role
-   * Requirements: 11.3 - Workflow automation rules and validations
-   */
-  @Get(':id/available-transitions')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.Admin)
-  async getAvailableTransitions(
-    @CurrentUser() user: CurrentUserData,
-    @Param('id') tripId: string,
-  ) {
-    return this.tripsService.getAvailableStatusTransitions(tripId, user.userId, user.role as UserRole);
-  }
 }

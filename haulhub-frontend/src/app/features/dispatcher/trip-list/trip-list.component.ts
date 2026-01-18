@@ -263,10 +263,6 @@ export class TripListComponent implements OnInit {
     this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']);
   }
 
-  onUpdateStatus(trip: Trip): void {
-    this.router.navigate(['/dispatcher/trips', trip.tripId, 'status']);
-  }
-
   onCreateTrip(): void {
     this.router.navigate(['/dispatcher/trips/create']);
   }
