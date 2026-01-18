@@ -61,8 +61,6 @@ const apiStack = new ApiStack(app, `HaulHub-Api-${environment}`, {
   userPoolId: authStack.userPool.userPoolId,
   userPoolArn: authStack.userPool.userPoolArn,
   userPoolClientId: authStack.userPoolClient.userPoolClientId,
-  tableName: databaseStack.table.tableName,
-  tableArn: databaseStack.table.tableArn,
   tripsTableName: databaseStack.tripsTable.tableName,
   tripsTableArn: databaseStack.tripsTable.tableArn,
   brokersTableName: databaseStack.brokersTable.tableName,

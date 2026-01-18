@@ -18,7 +18,6 @@ describe('BrokersService', () => {
   };
 
   const mockConfigService = {
-    dynamodbTableName: 'test-table',
     brokersTableName: 'test-brokers-table',
   };
 

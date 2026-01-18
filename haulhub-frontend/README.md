@@ -32,19 +32,24 @@ HaulHub Frontend is a modern Angular application built with standalone component
 haulhub-frontend/
 ├── src/
 │   ├── app/
-│   │   ├── core/              # Core services (API, auth)
+│   │   ├── core/              # Core services and guards
+│   │   │   ├── guards/        # Auth guards
+│   │   │   ├── interceptors/  # HTTP interceptors
+│   │   │   └── services/      # Core services (API, auth, trip, admin, analytics)
 │   │   ├── features/          # Feature modules (lazy-loaded)
 │   │   │   ├── auth/          # Authentication (login, register)
-│   │   │   ├── dispatcher/    # Dispatcher features
-│   │   │   ├── lorry-owner/   # Lorry owner features
-│   │   │   ├── driver/        # Driver features
-│   │   │   └── admin/         # Admin features
-│   │   ├── shared/            # Shared components, pipes, directives
+│   │   │   ├── dispatcher/    # Dispatcher dashboard and trip management
+│   │   │   ├── truck-owner/   # Truck owner features
+│   │   │   ├── driver/        # Driver features (dashboard, trips, payment reports)
+│   │   │   └── admin/         # Admin features (verification, broker management)
+│   │   ├── shared/            # Shared components
+│   │   │   └── components/    # Reusable UI components
 │   │   ├── app.component.ts   # Root component
 │   │   ├── app.config.ts      # Application configuration
 │   │   └── app.routes.ts      # Route definitions
 │   ├── assets/                # Static assets
 │   ├── environments/          # Environment configurations
+│   ├── styles/                # Global styles and design system
 │   ├── index.html             # Main HTML file
 │   ├── main.ts                # Application entry point
 │   └── styles.scss            # Global styles
@@ -131,10 +136,10 @@ Update these values based on your backend API endpoints.
 The application uses lazy-loaded feature modules for optimal performance:
 
 - **Auth Module**: `/auth` - Login and registration
-- **Dispatcher Module**: `/dispatcher` - Dispatcher dashboard and features
-- **Lorry Owner Module**: `/lorry-owner` - Lorry owner dashboard and features
-- **Driver Module**: `/driver` - Driver dashboard and features
-- **Admin Module**: `/admin` - Admin dashboard and features
+- **Dispatcher Module**: `/dispatcher` - Dashboard, trip management, analytics
+- **Truck Owner Module**: `/truck-owner` - Dashboard, truck/trailer management
+- **Driver Module**: `/driver` - Dashboard, trip list, payment reports
+- **Admin Module**: `/admin` - Dashboard, user/lorry verification, broker management
 
 ### Angular Material Theme
 

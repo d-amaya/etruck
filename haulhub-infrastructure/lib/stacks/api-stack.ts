@@ -24,8 +24,6 @@ export interface ApiStackProps extends HaulHubStackProps {
   userPoolId: string;
   userPoolArn: string;
   userPoolClientId: string;
-  tableName: string;
-  tableArn: string;
   tripsTableName: string;
   tripsTableArn: string;
   brokersTableName: string;
@@ -56,26 +54,7 @@ export class ApiStack extends cdk.Stack {
       ],
     });
 
-    // Grant DynamoDB permissions for main table (backward compatibility)
-    lambdaRole.addToPolicy(new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: [
-        'dynamodb:GetItem',
-        'dynamodb:PutItem',
-        'dynamodb:UpdateItem',
-        'dynamodb:DeleteItem',
-        'dynamodb:Query',
-        'dynamodb:Scan',
-        'dynamodb:BatchGetItem',
-        'dynamodb:BatchWriteItem',
-      ],
-      resources: [
-        props.tableArn,
-        `${props.tableArn}/index/*`, // GSI access
-      ],
-    }));
-
-    // Grant DynamoDB permissions for new dedicated tables
+    // Grant DynamoDB permissions for dedicated tables
     lambdaRole.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
@@ -151,7 +130,6 @@ export class ApiStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(props.config.lambdaTimeout),
       environment: {
         NODE_ENV: props.environment,
-        DYNAMODB_TABLE_NAME: props.tableName, // Retained for backward compatibility
         TRIPS_TABLE_NAME: props.tripsTableName,
         BROKERS_TABLE_NAME: props.brokersTableName,
         LORRIES_TABLE_NAME: props.lorriesTableName,

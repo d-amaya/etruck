@@ -54,7 +54,7 @@ describe('AdminService', () => {
         {
           provide: ConfigService,
           useValue: {
-            dynamodbTableName: 'HaulHub',
+            usersTableName: 'haulhub-users-table-dev',
             lorriesTableName: 'haulhub-lorries-table-dev',
           },
         },

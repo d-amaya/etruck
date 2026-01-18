@@ -23,14 +23,14 @@ import {
 
 @Injectable()
 export class AdminService {
-  private readonly tableName: string;
+  private readonly usersTableName: string;
   private readonly lorriesTableName: string;
 
   constructor(
     private readonly awsService: AwsService,
     private readonly configService: ConfigService,
   ) {
-    this.tableName = this.configService.dynamodbTableName;
+    this.usersTableName = this.configService.usersTableName;
     this.lorriesTableName = this.configService.lorriesTableName;
   }
 
@@ -231,10 +231,10 @@ export class AdminService {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
     try {
-      // Scan the table for users with Pending verification status
-      // Note: In production with large datasets, consider adding GSI4 for user status queries
+      // Scan the UsersTable for users with Pending verification status
+      // Note: In production with large datasets, consider adding GSI for user status queries
       const scanCommand = new ScanCommand({
-        TableName: this.tableName,
+        TableName: this.usersTableName,
         FilterExpression:
           'begins_with(PK, :pkPrefix) AND SK = :sk AND #verificationStatus = :status',
         ExpressionAttributeNames: {
@@ -284,9 +284,9 @@ export class AdminService {
     }
 
     try {
-      // First, check if the user exists
+      // First, check if the user exists in UsersTable
       const getCommand = new GetCommand({
-        TableName: this.tableName,
+        TableName: this.usersTableName,
         Key: {
           PK: `USER#${userId}`,
           SK: 'PROFILE',
@@ -328,9 +328,9 @@ export class AdminService {
       expressionAttributeNames['#updatedAt'] = 'updatedAt';
       expressionAttributeValues[':updatedAt'] = new Date().toISOString();
 
-      // Update the user
+      // Update the user in UsersTable
       const updateCommand = new UpdateCommand({
-        TableName: this.tableName,
+        TableName: this.usersTableName,
         Key: {
           PK: `USER#${userId}`,
           SK: 'PROFILE',

@@ -1,68 +1,129 @@
 # HaulHub Backend
 
-NestJS-based backend API for HaulHub transportation management system, designed for AWS Lambda deployment.
+NestJS-based REST API for the HaulHub transportation management system, designed for serverless deployment on AWS Lambda.
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your AWS credentials and configuration
+
+# Build shared package (required before running backend)
+cd ../haulhub-shared && npm run build && cd ../haulhub-backend
+
+# Run in development mode
+npm run start:dev
+
+# Run tests
+npm test
+```
+
+The API will be available at `http://localhost:3000`.
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Architecture Overview](#architecture-overview)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
 - [Environment Configuration](#environment-configuration)
 - [Development](#development)
-- [Authentication System](#authentication-system)
 - [Module Overview](#module-overview)
-- [Building](#building)
+- [API Endpoints](#api-endpoints)
+- [Authentication & Authorization](#authentication--authorization)
 - [Testing](#testing)
-- [Deployment](#deployment)
-- [API Documentation](#api-documentation)
+- [Building & Deployment](#building--deployment)
+- [Troubleshooting](#troubleshooting)
 
-## Overview
+## Architecture Overview
 
-The HaulHub backend is a serverless NestJS application that provides REST APIs for managing transportation logistics. It handles user authentication via AWS Cognito, stores data in DynamoDB, and manages documents in S3.
+**Technology Stack:**
+- **Framework**: NestJS with TypeScript
+- **Deployment**: AWS Lambda with API Gateway (serverless)
+- **Authentication**: AWS Cognito with JWT tokens
+- **Database**: AWS DynamoDB (single-table design)
+- **Storage**: AWS S3 for document uploads
+- **Monitoring**: AWS CloudWatch for metrics and logs
 
 **Key Features:**
-- JWT-based authentication with Cognito
+- JWT-based authentication with AWS Cognito
 - Role-based access control (Admin, Dispatcher, LorryOwner, Driver)
-- Serverless architecture (AWS Lambda)
-- Single-table DynamoDB design
-- Presigned S3 URLs for document uploads
-- Comprehensive input validation
-- Type-safe with TypeScript
+- Single-table DynamoDB design with GSI optimization
+- Presigned S3 URLs for secure document uploads
+- CloudWatch metrics for query performance monitoring
+- Comprehensive input validation with class-validator
+- Property-based testing for business logic
 
 ## Project Structure
 
 ```
-src/
-├── admin/              # Admin module (user/lorry verification, broker management)
-├── auth/               # Authentication module (login, register, token management)
-│   ├── guards/         # JWT and role-based guards
-│   ├── decorators/     # Custom decorators (@Public, @Roles, @CurrentUser)
-│   ├── dto/            # Data transfer objects
-│   └── interfaces/     # TypeScript interfaces
-├── config/             # Configuration module (environment variables, AWS clients)
-├── lorries/            # Lorries module (registration, document management)
-├── trips/              # Trips module (CRUD, status updates, reporting)
-├── users/              # Users module (profile management)
-├── app.module.ts       # Root application module
-├── main.ts             # Standard NestJS entry point (for local development)
-└── lambda.ts           # AWS Lambda handler entry point
+haulhub-backend/
+├── src/
+│   ├── admin/                  # Admin operations (user/lorry verification, broker management)
+│   │   ├── admin.controller.ts
+│   │   ├── admin.service.ts
+│   │   ├── brokers.controller.ts
+│   │   └── brokers.service.ts
+│   ├── analytics/              # Analytics and reporting
+│   │   ├── analytics.controller.ts
+│   │   └── analytics.service.ts
+│   ├── auth/                   # Authentication and authorization
+│   │   ├── guards/             # JWT and role-based guards
+│   │   ├── decorators/         # Custom decorators (@Public, @Roles, @CurrentUser)
+│   │   ├── dto/                # Login, register, refresh DTOs
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   └── jwt-validator.service.ts
+│   ├── config/                 # Configuration and AWS clients
+│   │   ├── aws.service.ts      # AWS SDK client initialization
+│   │   └── config.service.ts   # Environment variable management
+│   ├── documents/              # Document management system
+│   │   ├── dto/
+│   │   ├── documents.controller.ts
+│   │   ├── documents.service.ts
+│   │   ├── file-storage.service.ts
+│   │   └── document-folders.service.ts
+│   ├── fuel/                   # Fuel analytics and efficiency
+│   │   └── fuel.service.ts
+│   ├── lorries/                # Lorry registration and verification
+│   │   ├── lorries.controller.ts
+│   │   └── lorries.service.ts
+│   ├── trips/                  # Trip management (core business logic)
+│   │   ├── trips.controller.ts
+│   │   ├── trips.service.ts
+│   │   └── index-selector.service.ts  # GSI query optimization
+│   ├── app.module.ts           # Root application module
+│   ├── main.ts                 # Local development entry point
+│   └── lambda.ts               # AWS Lambda handler
+├── test/
+│   └── unit/                   # Unit tests (mirrors src/ structure)
+│       ├── admin/
+│       ├── analytics/
+│       ├── auth/
+│       ├── documents/
+│       ├── lorries/
+│       └── trips/
+├── .env                        # Environment variables (not in git)
+├── .env.example                # Environment template
+├── jest.config.js              # Jest test configuration
+├── nest-cli.json               # NestJS CLI configuration
+├── package.json
+└── tsconfig.json
 ```
 
 ## Prerequisites
 
-- Node.js 18.x or higher
-- npm or yarn
-- AWS CLI configured with appropriate credentials
-- AWS Cognito User Pool (created by infrastructure stack)
-- DynamoDB table (created by infrastructure stack)
-- S3 bucket for documents (created by infrastructure stack)
-
-## Installation
-
-```bash
-npm install
-```
+- **Node.js**: 18.x or higher
+- **npm**: 9.x or higher
+- **AWS CLI**: Configured with appropriate credentials
+- **AWS Resources** (created by infrastructure stack):
+  - Cognito User Pool
+  - DynamoDB table
+  - S3 bucket for documents
+  - CloudWatch for metrics
 
 ## Environment Configuration
 
@@ -73,62 +134,360 @@ Create a `.env` file in the `haulhub-backend` directory:
 AWS_REGION=us-east-1
 
 # Cognito Configuration
-COGNITO_USER_POOL_ID=your-user-pool-id
-COGNITO_CLIENT_ID=your-client-id
+COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # DynamoDB Configuration
-DYNAMODB_TABLE_NAME=HaulHub
+TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
+BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
+LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
+USERS_TABLE_NAME=HaulHub-UsersTable-dev
 
 # S3 Configuration
-S3_DOCUMENTS_BUCKET_NAME=your-documents-bucket-name
+S3_DOCUMENTS_BUCKET_NAME=haulhub-documents-bucket
 
 # CORS Configuration
-ALLOWED_ORIGINS=https://your-cloudfront-domain.cloudfront.net
+ALLOWED_ORIGINS=https://your-cloudfront-domain.cloudfront.net,http://localhost:4200
 
 # Application Configuration
 NODE_ENV=development
 PORT=3000
 ```
 
+**Important**: The `.env.example` file provides a template. Copy it and fill in your actual AWS resource values.
+
 ## Development
 
-Run the application in development mode with hot-reload:
+### Running Locally
 
 ```bash
+# Development mode with hot-reload
 npm run start:dev
+
+# Standard mode
+npm start
 ```
 
-The API will be available at `http://localhost:3000`.
+### Development Workflow
 
-## Authentication System
+1. **Build shared package first** (critical for monorepo):
+   ```bash
+   cd ../haulhub-shared && npm run build && cd ../haulhub-backend
+   ```
 
-### Overview
+2. **Start the development server**:
+   ```bash
+   npm run start:dev
+   ```
 
-The authentication system uses AWS Cognito for user management and JWT tokens for API authentication. All routes are protected by default using global guards.
+3. **Test your changes**:
+   ```bash
+   npm test
+   ```
 
-### Components
+### Working with Shared Package
 
-#### Guards
+The backend depends on `@haulhub/shared` for types, DTOs, and utilities. When making changes to the shared package:
 
-**JwtAuthGuard**
-- Validates Cognito JWT tokens using JWKS
-- Verifies token signature with Cognito's public keys
+```bash
+# 1. Make changes in haulhub-shared
+cd ../haulhub-shared
+
+# 2. Build the shared package
+npm run build
+
+# 3. Return to backend and test
+cd ../haulhub-backend
+npm test
+```
+
+
+## Module Overview
+
+### Auth Module (`src/auth/`)
+
+Handles user authentication and authorization using AWS Cognito.
+
+**Features:**
+- User registration with email verification
+- Login with JWT token generation
+- Token refresh (1-hour access token, 1-year refresh token)
+- JWT validation using JWKS (JSON Web Key Set)
+- Global authentication guards
+- Role-based access control
+
+**Key Components:**
+- `AuthService`: Cognito integration, token management
+- `JwtValidatorService`: Token validation with public key verification
+- `JwtAuthGuard`: Global authentication guard
+- `RolesGuard`: Role-based authorization guard
+- Custom decorators: `@Public()`, `@Roles()`, `@CurrentUser()`
+
+### Trips Module (`src/trips/`)
+
+Core business logic for managing transportation trips.
+
+**Features:**
+- Trip creation with broker, lorry, and driver assignment
+- Trip updates and status management
+- Role-based trip queries with GSI optimization
+- Payment reporting and analytics
+- Dashboard summaries (status, payments, timeline)
+- Trip deletion
+
+**Key Components:**
+- `TripsService`: CRUD operations, payment calculations, reporting
+- `IndexSelectorService`: Intelligent GSI selection for optimal query performance
+- CloudWatch metrics integration for monitoring
+
+**Access Patterns:**
+- Dispatchers: Query by dispatcher ID (primary key)
+- Drivers: Query by driver ID (GSI1)
+- Lorry Owners: Query by lorry ID (GSI2)
+
+### Lorries Module (`src/lorries/`)
+
+Manages lorry (truck) registration and verification.
+
+**Features:**
+- Lorry registration by owners
+- Document upload with presigned S3 URLs
+- Verification status tracking
+- Document viewing with presigned URLs
+
+**Verification Statuses:**
+- `Pending`: Initial status after registration
+- `Approved`: Admin approved the lorry
+- `Rejected`: Admin rejected with reason
+- `NeedsMoreEvidence`: Admin requests additional documents
+
+### Admin Module (`src/admin/`)
+
+Administrative functions for system management.
+
+**Features:**
+- User verification (approve/reject user accounts)
+- Lorry verification (approve/reject lorry registrations)
+- Broker management (CRUD operations)
+- Pending items dashboard
+
+**Key Components:**
+- `AdminService`: User and lorry verification logic
+- `BrokersService`: Broker CRUD operations
+- GSI3 for efficient pending lorry queries
+
+### Analytics Module (`src/analytics/`)
+
+Provides business intelligence and reporting.
+
+**Features:**
+- Fleet overview (drivers, vehicles, trips)
+- Trip analytics (revenue, expenses, profit)
+- Driver performance metrics
+- Vehicle utilization reports
+- Revenue analytics
+- Broker analytics
+- Fuel analytics
+- Maintenance alerts
+
+**Access:** Dispatcher and Admin roles only
+
+### Documents Module (`src/documents/`)
+
+Advanced document management system (in development).
+
+**Features:**
+- File upload to S3
+- Document metadata management
+- Folder organization
+- Bulk operations (update, delete, move)
+- Batch uploads
+- Document search and filtering
+- Permission management
+
+### Fuel Module (`src/fuel/`)
+
+Fuel cost tracking and efficiency analysis.
+
+**Features:**
+- Fuel price tracking by location
+- Vehicle fuel efficiency calculations
+- Fuel cost analysis with monthly breakdowns
+- Optimization suggestions
+
+### Config Module (`src/config/`)
+
+Centralized configuration and AWS client management.
+
+**Features:**
+- Environment variable validation
+- AWS SDK client initialization (Cognito, DynamoDB, S3, CloudWatch)
+- Singleton pattern for client reuse
+
+
+## API Endpoints
+
+### Authentication (`/auth`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| POST | `/auth/register` | No | - | Register new user |
+| POST | `/auth/login` | No | - | Login and get tokens |
+| POST | `/auth/refresh` | No | - | Refresh access token |
+| POST | `/auth/logout` | Yes | All | Logout and invalidate tokens |
+
+### Brokers (`/brokers`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| GET | `/brokers` | No | - | List all brokers (optional: `?activeOnly=true`) |
+| GET | `/brokers/:id` | No | - | Get broker by ID |
+| POST | `/brokers` | Yes | Admin | Create new broker |
+| PATCH | `/brokers/:id` | Yes | Admin | Update broker |
+| DELETE | `/brokers/:id` | Yes | Admin | Soft delete broker |
+
+### Lorries (`/lorries`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| POST | `/lorries` | Yes | LorryOwner | Register new lorry |
+| GET | `/lorries` | Yes | LorryOwner | Get all lorries for owner |
+| GET | `/lorries/:id` | Yes | LorryOwner, Admin | Get lorry by ID |
+| POST | `/lorries/:id/documents` | Yes | LorryOwner | Get presigned URL for document upload |
+| GET | `/lorries/:id/documents` | Yes | LorryOwner, Admin | List all documents for lorry |
+| GET | `/lorries/:id/documents/:docId` | Yes | LorryOwner, Admin | Get presigned URL to view document |
+
+### Trips (`/trips`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| POST | `/trips` | Yes | Dispatcher | Create new trip |
+| GET | `/trips` | Yes | Dispatcher, Driver, LorryOwner | List trips with filters |
+| GET | `/trips/:id` | Yes | Dispatcher, Driver, LorryOwner, Admin | Get trip by ID |
+| PATCH | `/trips/:id` | Yes | Dispatcher | Update trip details |
+| PATCH | `/trips/:id/status` | Yes | Dispatcher, Driver | Update trip status |
+| DELETE | `/trips/:id` | Yes | Dispatcher | Delete trip |
+| GET | `/trips/reports/payments` | Yes | Dispatcher, Driver, LorryOwner | Payment reports with aggregation |
+| GET | `/trips/dashboard/summary-by-status` | Yes | Dispatcher | Trip counts by status |
+| GET | `/trips/dashboard/payment-summary` | Yes | Dispatcher | Aggregated payment metrics |
+| GET | `/trips/dashboard/payments-timeline` | Yes | Dispatcher | Time-series payment data |
+
+### Admin (`/admin`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| GET | `/admin/dashboard` | Yes | Admin | Admin dashboard summary |
+| GET | `/admin/lorries/pending` | Yes | Admin | List pending lorry verifications |
+| PATCH | `/admin/lorries/:id/verify` | Yes | Admin | Approve/reject lorry |
+| GET | `/admin/users/pending` | Yes | Admin | List pending user verifications |
+| PATCH | `/admin/users/:id/verify` | Yes | Admin | Approve/reject user |
+
+### Analytics (`/analytics`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| GET | `/analytics/fleet-overview` | Yes | Dispatcher, Admin | Fleet statistics |
+| GET | `/analytics/trip-analytics` | Yes | Dispatcher, Admin | Trip metrics with date filters |
+| GET | `/analytics/driver-performance` | Yes | Dispatcher, Admin | Driver performance metrics |
+| GET | `/analytics/vehicle-utilization` | Yes | Dispatcher, Admin | Vehicle utilization reports |
+| GET | `/analytics/revenue-analytics` | Yes | Dispatcher, Admin | Revenue analysis |
+| GET | `/analytics/maintenance-alerts` | Yes | Dispatcher, Admin | Maintenance alerts |
+| GET | `/analytics/broker-analytics` | Yes | Dispatcher, Admin | Broker performance metrics |
+| GET | `/analytics/fuel-analytics` | Yes | Dispatcher, Admin | Fuel cost and efficiency |
+
+### Documents (`/documents`)
+
+| Method | Endpoint | Auth | Roles | Description |
+|--------|----------|------|-------|-------------|
+| POST | `/documents` | Yes | All | Upload document with file |
+| GET | `/documents` | Yes | All | List documents with filters |
+| GET | `/documents/search` | Yes | All | Advanced document search |
+| GET | `/documents/stats` | Yes | All | Document statistics |
+| GET | `/documents/:id` | Yes | All | Get document by ID |
+| PATCH | `/documents/:id` | Yes | All | Update document metadata |
+| DELETE | `/documents/:id` | Yes | All | Delete document |
+| POST | `/documents/bulk-update` | Yes | All | Bulk update documents |
+| POST | `/documents/bulk-delete` | Yes | All | Bulk delete documents |
+| POST | `/documents/bulk-move` | Yes | All | Bulk move documents |
+| POST | `/documents/batch-upload` | Yes | All | Upload multiple files |
+| GET | `/documents/folders` | Yes | All | List folders |
+| POST | `/documents/folders` | Yes | All | Create folder |
+| DELETE | `/documents/folders/:id` | Yes | All | Delete folder |
+
+
+## Authentication & Authorization
+
+### How It Works
+
+1. **Registration**: User registers via `/auth/register` → Cognito creates user → Email verification sent
+2. **Login**: User logs in via `/auth/login` → Cognito validates credentials → Returns JWT tokens
+3. **API Requests**: Client includes `Authorization: Bearer <access-token>` header
+4. **Token Validation**: `JwtAuthGuard` validates token using Cognito's public keys (JWKS)
+5. **Role Check**: `RolesGuard` verifies user has required role for the endpoint
+6. **Request Processing**: User data attached to request, available via `@CurrentUser()` decorator
+
+### Request Flow Diagram
+
+```
+Client Request
+    ↓
+    Authorization: Bearer <jwt-token>
+    ↓
+┌─────────────────────────────────────┐
+│  1. JwtAuthGuard                    │
+│  - Extract token from header        │
+│  - Validate with Cognito JWKS       │
+│  - Decode JWT payload               │
+│  - Attach to request.user           │
+└─────────────────────────────────────┘
+    ↓
+    request.user = {
+      userId: 'uuid',
+      email: 'user@example.com',
+      role: 'Dispatcher',
+      username: 'john'
+    }
+    ↓
+┌─────────────────────────────────────┐
+│  2. RolesGuard                      │
+│  - Check request.user.role          │
+│  - Verify against @Roles()          │
+│  - Allow or deny (403)              │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  3. @CurrentUser() Decorator        │
+│  - Read request.user                │
+│  - Extract requested property       │
+│  - Pass to controller method        │
+└─────────────────────────────────────┘
+    ↓
+Controller Method Executes
+    ↓
+Response to Client
+```
+
+### Token Lifecycle
+
+- **Access Token**: 1 hour expiration, used for API authentication
+- **Refresh Token**: 1 year expiration, used to obtain new access tokens
+- **Token Refresh**: Call `/auth/refresh` with refresh token before access token expires
+
+### Guards
+
+**JwtAuthGuard** (Applied globally to all routes):
+- Validates JWT token signature using Cognito JWKS
 - Checks token expiration
 - Extracts user information (userId, email, role, username)
-- Attaches user data to request object
+- Attaches user to request object
 
-**RolesGuard**
-- Enforces role-based access control
+**RolesGuard** (Applied to protected routes):
 - Checks if user has required role(s)
-- Supports multiple roles per route
-- Returns 403 Forbidden when user lacks required role
+- Returns 403 Forbidden if user lacks permission
 
-#### Decorators
+### Decorators
 
-**@Public()**
-- Marks routes as public (bypasses JWT authentication)
-- Use for login, register, and other unauthenticated endpoints
-
+**@Public()** - Bypass authentication:
 ```typescript
 @Public()
 @Post('login')
@@ -137,10 +496,7 @@ async login(@Body() loginDto: LoginDto) {
 }
 ```
 
-**@Roles(...roles)**
-- Specifies which roles can access a route
-- Accepts one or more UserRole values
-
+**@Roles(...roles)** - Require specific roles:
 ```typescript
 @Roles(UserRole.Admin)
 @Get('users/pending')
@@ -149,187 +505,402 @@ async getPendingUsers() {
 }
 ```
 
-**@CurrentUser()**
-- Extracts authenticated user from request
-- Can return entire user object or specific property
+**@CurrentUser()** - Extract authenticated user:
+
+This decorator extracts user information that was attached to the request by `JwtAuthGuard`.
+
+**How it works:**
+
+1. `JwtAuthGuard` validates the JWT token and extracts claims
+2. Guard attaches user data to `request.user`:
+   ```typescript
+   request.user = {
+     userId: payload.sub,           // From JWT 'sub' claim
+     email: payload.email,          // From JWT 'email' claim  
+     role: payload['cognito:groups'][0],  // From Cognito groups
+     username: payload.username,    // From JWT username claim
+   };
+   ```
+3. `@CurrentUser()` decorator reads `request.user` and passes it to your method
+
+**Usage examples:**
 
 ```typescript
+// Get entire user object
 @Get('profile')
 async getProfile(@CurrentUser() user: CurrentUserData) {
-  return this.usersService.getProfile(user.userId);
+  // user = { userId: '123', email: 'user@example.com', role: 'Dispatcher', username: 'john' }
+  return { userId: user.userId, email: user.email };
 }
 
-// Extract specific property
+// Extract specific property (cleaner when you only need one field)
 @Post('trips')
 async createTrip(
-  @CurrentUser('userId') userId: string,
-  @Body() createTripDto: CreateTripDto,
+  @CurrentUser('userId') userId: string,  // Just the userId string
+  @Body() dto: CreateTripDto,
 ) {
-  return this.tripsService.createTrip(userId, createTripDto);
+  return this.tripsService.createTrip(userId, dto);
+}
+
+// Extract multiple properties
+@Get('dashboard')
+async getDashboard(
+  @CurrentUser('userId') userId: string,
+  @CurrentUser('role') role: string,
+) {
+  return this.service.getDashboard(userId, role);
 }
 ```
 
-### Authentication Endpoints
+**Available properties:**
+- `userId`: Cognito user ID (UUID)
+- `email`: User's email address
+- `role`: User's role (Dispatcher, Driver, LorryOwner, Admin)
+- `username`: Cognito username
 
-#### POST /auth/register
+### User Roles
 
-Register a new user account.
-
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123",
-  "fullName": "John Doe",
-  "phoneNumber": "+1234567890",
-  "role": "Dispatcher"
+```typescript
+enum UserRole {
+  Dispatcher = 'Dispatcher',  // Manages trips, assigns drivers
+  LorryOwner = 'LorryOwner',  // Owns trucks, views trips for their vehicles
+  Driver = 'Driver',          // Drives trucks, updates trip status
+  Admin = 'Admin'             // System administration, verifications
 }
 ```
 
-**Response (201):**
-```json
-{
-  "message": "User registered successfully. Please check your email for verification.",
-  "userId": "uuid-here"
-}
+### Making Authenticated Requests
+
+```bash
+# 1. Login to get token
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password"}'
+
+# 2. Use token in subsequent requests
+curl -X GET http://localhost:3000/trips \
+  -H "Authorization: Bearer eyJraWQiOiJ..."
 ```
 
-#### POST /auth/login
+### Frontend to API Communication
 
-Authenticate user and receive tokens.
+**How the Angular frontend calls the backend API:**
 
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123"
-}
+1. **Frontend Configuration** (`environment.ts`):
+   ```typescript
+   export const environment = {
+     production: false,
+     apiUrl: 'https://abc123.execute-api.us-east-1.amazonaws.com/dev'
+   };
+   ```
+
+2. **HTTP Interceptor** adds Authorization header:
+   ```typescript
+   // In auth.interceptor.ts
+   intercept(req: HttpRequest<any>, next: HttpHandler) {
+     const token = this.authService.getAccessToken();
+     
+     if (token) {
+       req = req.clone({
+         setHeaders: {
+           Authorization: `Bearer ${token}`
+         }
+       });
+     }
+     
+     return next.handle(req);
+   }
+   ```
+
+3. **Service makes API call**:
+   ```typescript
+   // In trip.service.ts
+   createTrip(dto: CreateTripDto): Observable<Trip> {
+     return this.http.post<Trip>(`${environment.apiUrl}/trips`, dto);
+     // Interceptor automatically adds Authorization header
+   }
+   ```
+
+4. **Request flow**:
+   ```
+   Browser (Angular)
+       ↓
+   HTTP Request: POST https://api-gateway-url/dev/trips
+   Headers: Authorization: Bearer <token>
+       ↓
+   API Gateway (checks CORS, forwards to Lambda)
+       ↓
+   Lambda (NestJS validates token, processes request)
+       ↓
+   Response with CORS headers
+       ↓
+   Browser receives response
+   ```
+
+### CORS Troubleshooting
+
+**Problem**: "CORS policy: No 'Access-Control-Allow-Origin' header"
+
+**Solution**: Verify both CORS configurations match:
+
+1. **Check API Gateway CORS** (in `api-stack.ts`):
+   - Must include CloudFront domain in `allowOrigins`
+   - Must include `Authorization` in `allowHeaders`
+
+2. **Check Lambda CORS** (in `lambda.ts`):
+   - `ALLOWED_ORIGINS` environment variable must include CloudFront domain
+   - Must enable `credentials: true`
+
+3. **Check Frontend makes requests to correct URL**:
+   - `environment.apiUrl` should point to API Gateway URL
+   - Not CloudFront URL (CloudFront serves frontend, not API)
+
+**Common mistake**: Trying to call API through CloudFront. The frontend is served by CloudFront, but API calls go directly to API Gateway.
+
+```
+✅ Correct:
+Frontend: https://d123abc.cloudfront.net (or etrucky.com)
+API:      https://abc123.execute-api.us-east-1.amazonaws.com/dev
+
+❌ Wrong:
+Frontend: https://d123abc.cloudfront.net
+API:      https://d123abc.cloudfront.net/api  (CloudFront doesn't route to API)
 ```
 
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 3600,
-  "userId": "uuid-here",
-  "role": "Dispatcher",
-  "email": "user@example.com",
-  "fullName": "John Doe"
-}
+
+## Testing
+
+### Test Organization
+
+Tests are located in the `test/` directory and mirror the `src/` structure:
+
+```
+test/
+├── unit/
+│   ├── admin/
+│   │   ├── admin.service.spec.ts
+│   │   ├── brokers.controller.spec.ts
+│   │   └── brokers.service.spec.ts
+│   ├── analytics/
+│   │   ├── analytics.service.spec.ts
+│   │   └── analytics-report-completeness.property.spec.ts
+│   ├── auth/
+│   │   ├── auth.controller.spec.ts
+│   │   ├── auth.service.spec.ts
+│   │   └── guards/
+│   │       ├── jwt-auth.guard.spec.ts
+│   │       └── roles.guard.spec.ts
+│   ├── documents/
+│   │   ├── documents.service.spec.ts
+│   │   ├── file-storage.service.spec.ts
+│   │   └── enhanced-document-management.spec.ts
+│   ├── lorries/
+│   │   ├── lorries.controller.spec.ts
+│   │   └── lorries.service.spec.ts
+│   └── trips/
+│       ├── trips.controller.spec.ts
+│       ├── trips.service.spec.ts
+│       ├── trips.service.gsi-attributes.spec.ts
+│       ├── financial-calculation.property.spec.ts
+│       ├── mileage-calculation.property.spec.ts
+│       └── mileage-validation.property.spec.ts
+└── jest-e2e.json
 ```
 
-#### POST /auth/refresh
+### Running Tests
 
-Refresh access token using refresh token.
+```bash
+# Run all tests
+npm test
 
-**Request:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:cov
+
+# Run specific test file
+npm test -- trips.service.spec
+
+# Run tests matching pattern
+npm test -- --testPathPattern="guards"
 ```
 
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 3600,
-  "userId": "uuid-here",
-  "role": "Dispatcher",
-  "email": "user@example.com",
-  "fullName": "John Doe"
-}
+### Test Types
+
+**Unit Tests** (`*.spec.ts`):
+- Test individual components in isolation
+- Mock external dependencies (AWS services, databases)
+- Fast execution, comprehensive coverage
+
+**Property-Based Tests** (`*.property.spec.ts`):
+- Test business logic with generated data
+- Use `fast-check` library for property testing
+- Validate calculations, validations, and business rules
+- Examples: financial calculations, mileage validation
+
+### Writing Tests
+
+**Basic Test Structure:**
+```typescript
+describe('ServiceName', () => {
+  let service: ServiceType;
+  let mockDependency: jest.Mocked<DependencyType>;
+
+  beforeEach(() => {
+    mockDependency = {
+      method: jest.fn(),
+    } as any;
+    
+    service = new ServiceType(mockDependency);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should do something', async () => {
+    // Arrange
+    mockDependency.method.mockResolvedValue('result');
+    
+    // Act
+    const result = await service.doSomething();
+    
+    // Assert
+    expect(result).toBe('result');
+    expect(mockDependency.method).toHaveBeenCalledWith(expectedArgs);
+  });
+});
 ```
 
-#### POST /auth/logout
+**Property-Based Test Example:**
+```typescript
+import * as fc from 'fast-check';
 
-Invalidate user session and tokens.
-
-**Headers:**
-```
-Authorization: Bearer <access-token>
-```
-
-**Response (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
-### Token Validation Process
-
-1. Extract token from `Authorization: Bearer <token>` header
-2. Decode token header to get Key ID (kid)
-3. Retrieve public key from Cognito JWKS endpoint
-4. Verify token signature using RS256 algorithm
-5. Check token expiration timestamp
-6. Validate token type (must be access token)
-7. Extract user claims and attach to request
-
-### Error Responses
-
-**401 Unauthorized**
-- Missing authorization header
-- Invalid token format
-- Expired access token
-- Invalid token signature
-
-**403 Forbidden**
-- User lacks required role
-- Insufficient permissions
-
-**Example:**
-```json
-{
-  "statusCode": 401,
-  "message": "Access token has expired",
-  "error": "Unauthorized"
-}
+describe('Financial Calculations', () => {
+  it('should calculate profit correctly for any valid payments', () => {
+    fc.assert(
+      fc.property(
+        fc.float({ min: 100, max: 10000 }), // brokerPayment
+        fc.float({ min: 50, max: 5000 }),   // driverPayment
+        fc.float({ min: 50, max: 5000 }),   // lorryOwnerPayment
+        (broker, driver, lorry) => {
+          const profit = broker - driver - lorry;
+          expect(profit).toBe(broker - driver - lorry);
+        }
+      )
+    );
+  });
+});
 ```
 
-## Module Overview
+### Test Coverage
 
-### Auth Module
-- User registration with Cognito
-- Login and token generation
-- Token refresh (1-year refresh token, 1-hour access token)
-- JWT validation with JWKS
-- Global authentication guards
-- Role-based access control
+Current test coverage: **123 tests across 13 test suites**
 
-### Trips Module
-- Trip creation and management
-- Role-based trip queries
-- Status updates
-- Payment reporting
+- ✅ Auth Module: 28 tests (service, controller, guards)
+- ✅ Admin Module: 33 tests (service, brokers service, brokers controller)
+- ✅ Lorries Module: 21 tests (service, controller)
+- ✅ Trips Module: 21 tests (service, controller, property tests)
+- ✅ Documents Module: 3 tests (service, file storage)
+- ✅ Analytics Module: 17 tests (service, property tests)
 
-### Lorries Module
-- Lorry registration
-- Document upload with presigned URLs
-- Verification status tracking
+**Coverage Goals:**
+- Unit tests: 80%+ code coverage
+- Critical paths: 100% coverage (auth, payments, calculations)
 
-### Users Module
-- User profile management
-- Profile updates
+### Mocking Best Practices
 
-### Admin Module
-- User verification
-- Lorry verification
-- Broker management
+**DO Mock:**
+- AWS SDK clients (Cognito, DynamoDB, S3, CloudWatch)
+- External API calls
+- Time-dependent functions
 
-### Config Module
-- Environment variable management
-- AWS SDK client initialization (Cognito, DynamoDB, S3)
+**DON'T Mock:**
+- Utility functions from `@haulhub/shared`
+- Pure calculation functions
+- Business logic that should be tested
 
-## Building
+**Example - Mock AWS Services:**
+```typescript
+const mockDynamoDBClient = {
+  send: jest.fn(),
+};
 
-### Standard Build
+const mockAwsService = {
+  getDynamoDBClient: jest.fn().mockReturnValue(mockDynamoDBClient),
+};
+```
+
+
+## Building & Deployment
+
+### Complete Deployment Architecture
+
+HaulHub uses a serverless architecture with separate frontend and backend deployments:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         User's Browser                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ HTTPS
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    CloudFront Distribution                       │
+│  - Serves static files (HTML, JS, CSS) from S3                 │
+│  - Global CDN with edge caching                                 │
+│  - Custom domain: etrucky.com                                   │
+│  - HTTPS only (redirects HTTP → HTTPS)                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ Origin Request
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                      S3 Bucket (Frontend)                        │
+│  - index.html, *.js, *.css, assets                             │
+│  - Private bucket (CloudFront access only)                      │
+│  - Versioning enabled                                           │
+└─────────────────────────────────────────────────────────────────┘
+
+                    Angular App Loads in Browser
+                             │
+                             │ API Calls (HTTPS)
+                             │ Authorization: Bearer <token>
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                       API Gateway (REST)                         │
+│  - CORS configured for CloudFront domain                        │
+│  - Throttling: 1000 req/sec, burst 2000                        │
+│  - CloudWatch logging enabled                                   │
+│  - Stage: dev/prod                                              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ Lambda Proxy Integration
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    Lambda Function (Backend)                     │
+│  - NestJS application wrapped with serverless-express           │
+│  - Runtime: Node.js 20.x                                        │
+│  - Memory: 512MB, Timeout: 30s                                  │
+│  - Environment variables injected by CDK                        │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ AWS SDK Calls
+                             ↓
+┌──────────────────┬──────────────────┬──────────────────────────┐
+│   DynamoDB       │   S3 Bucket      │   Cognito User Pool      │
+│   (Database)     │   (Documents)    │   (Authentication)       │
+└──────────────────┴──────────────────┴──────────────────────────┘
+```
+
+### Local Build
 
 ```bash
 npm run build
 ```
+
+Output: `dist/` directory with compiled JavaScript
 
 ### Lambda Build
 
@@ -339,724 +910,492 @@ Build for AWS Lambda deployment:
 npm run build:lambda
 ```
 
-This creates a `dist/` directory with compiled code and package files ready for Lambda deployment.
+This command:
+1. Compiles TypeScript to JavaScript
+2. Copies `package.json` and `package-lock.json` to `dist/`
+3. Prepares the bundle for Lambda deployment
 
-## Testing
+### Deployment Process
 
-Tests are organized in a separate `test/` directory that mirrors the `src/` structure:
-
-```
-test/
-├── unit/                    # Unit tests (mirrors src/ structure)
-│   └── auth/
-│       └── guards/
-├── e2e/                     # End-to-end tests
-└── README.md                # Test documentation
-```
-
-### Running Tests
+#### Step 1: Build Backend
 
 ```bash
-# Unit tests
-npm run test
-
-# Unit tests with coverage
-npm run test:cov
-
-# E2E tests
-npm run test:e2e
-
-# Watch mode
-npm run test:watch
-
-# Run specific test pattern
-npm test -- --testPathPattern="guards"
+cd haulhub-backend
+npm run build:lambda
 ```
 
-### Test Coverage
+This creates `.lambda-package/` directory with:
+- Compiled JavaScript files
+- `package.json` and `package-lock.json`
+- `node_modules/` (production dependencies only)
 
-Current test coverage includes:
-- ✅ JwtAuthGuard (8 test cases)
-- ✅ RolesGuard (6 test cases)
-- ✅ BrokersService (10 test cases)
-- ✅ TripsService (15 test cases)
-- ✅ TripsController (6 test cases)
-- **Total: 45 tests passing**
-- Additional tests will be added as modules are implemented
+#### Step 2: Deploy Infrastructure
 
-**Coverage Goals:**
-- Unit tests: 80%+ code coverage
-- Critical paths: 100% coverage (authentication, authorization, payment calculations)
+```bash
+cd ../haulhub-infrastructure
+npm run deploy
+```
 
-## Deployment
+The CDK will:
+1. **Create/Update Lambda Function**
+   - Package code from `.lambda-package/`
+   - Set environment variables
+   - Configure IAM role with DynamoDB, S3, Cognito permissions
+   - Set up CloudWatch logging
 
-The backend is designed to run as an AWS Lambda function behind API Gateway. Deployment is handled by the CDK infrastructure in `haulhub-infrastructure`.
+2. **Create/Update API Gateway**
+   - REST API with Lambda proxy integration
+   - CORS configuration for CloudFront domain
+   - Throttling and rate limiting
+   - Stage deployment (dev/prod)
+
+3. **Output API URL**
+   - Example: `https://abc123.execute-api.us-east-1.amazonaws.com/dev/`
+
+#### Step 3: Build Frontend
+
+```bash
+cd ../haulhub-frontend
+npm run build
+```
+
+This creates `dist/` directory with:
+- `index.html`
+- Compiled JavaScript bundles
+- CSS files
+- Assets (images, fonts)
+
+#### Step 4: Deploy Frontend to S3
+
+```bash
+# Use the command from CDK output
+aws s3 sync dist/ s3://haulhub-frontend-dev/ --delete --profile your-profile
+```
+
+#### Step 5: Invalidate CloudFront Cache
+
+```bash
+# Use the command from CDK output
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --paths "/*" \
+  --profile your-profile
+```
+
+### CORS Configuration
+
+CORS is configured in **two places** to allow frontend-to-API communication:
+
+#### 1. API Gateway CORS (Infrastructure)
+
+Configured in `api-stack.ts`:
+
+```typescript
+defaultCorsPreflightOptions: {
+  allowOrigins: [
+    'http://localhost:4200',           // Local development
+    'https://localhost:4200',
+    'https://etrucky.com',             // Production domain
+    'https://www.etrucky.com',
+    'https://d123abc.cloudfront.net',  // CloudFront domain
+  ],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Amz-Date',
+    'X-Api-Key',
+  ],
+  allowCredentials: true,
+  maxAge: Duration.hours(1),
+}
+```
+
+This handles **preflight OPTIONS requests** from the browser.
+
+#### 2. Lambda CORS (Application)
+
+Configured in `src/lambda.ts` and `src/main.ts`:
+
+```typescript
+nestApp.enableCors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+});
+```
+
+This adds **CORS headers to actual responses**.
+
+**Environment Variable:**
+```bash
+ALLOWED_ORIGINS=https://d123abc.cloudfront.net,http://localhost:4200
+```
+
+### Why Two CORS Configurations?
+
+1. **API Gateway CORS**: Handles preflight OPTIONS requests before they reach Lambda
+2. **Lambda CORS**: Adds CORS headers to actual API responses (GET, POST, etc.)
+
+Both must allow the same origins for CORS to work properly.
 
 ### Lambda Handler
 
-The Lambda handler is located at `src/lambda.ts` and uses `@vendia/serverless-express` to wrap the NestJS application for Lambda execution.
+The Lambda handler (`src/lambda.ts`) uses `@vendia/serverless-express` to wrap the NestJS application for Lambda execution. It:
+- Caches the NestJS application instance for warm starts
+- Enables CORS for CloudFront domain
+- Configures global validation pipes
+- Logs incoming events for debugging
 
-### Deployment Steps
+### Environment Variables in Lambda
 
-1. Build the backend: `npm run build:lambda`
-2. Deploy infrastructure: `cd ../haulhub-infrastructure && npm run deploy`
-3. The CDK will package and deploy the Lambda function automatically
+Environment variables are automatically configured by the CDK stack:
+- `COGNITO_USER_POOL_ID`
+- `COGNITO_CLIENT_ID`
+- `TRIPS_TABLE_NAME`
+- `BROKERS_TABLE_NAME`
+- `LORRIES_TABLE_NAME`
+- `USERS_TABLE_NAME`
+- `DOCUMENTS_BUCKET_NAME`
+- `ALLOWED_ORIGINS`
+- `AWS_REGION`
+- `NODE_ENV`
 
-## API Documentation
+## Complete Deployment Guide
 
-### Testing Protected Routes
+### Prerequisites
 
-When testing protected routes, include the JWT token in the Authorization header:
+1. **AWS Account** with appropriate permissions
+2. **AWS CLI** configured with profile
+3. **Node.js 18+** installed
+4. **All packages built**:
+   ```bash
+   cd haulhub-shared && npm run build
+   cd ../haulhub-backend && npm run build:lambda
+   cd ../haulhub-frontend && npm run build
+   ```
+
+### Step-by-Step Deployment
+
+#### 1. Deploy Infrastructure (First Time)
 
 ```bash
-curl -X GET http://localhost:3000/users/me \
-  -H "Authorization: Bearer eyJraWQiOiJ..."
+cd haulhub-infrastructure
+
+# Install dependencies
+npm install
+
+# Bootstrap CDK (first time only)
+cdk bootstrap aws://ACCOUNT-ID/REGION --profile your-profile
+
+# Deploy all stacks
+npm run deploy
 ```
 
-### Available User Roles
+This creates:
+- **AuthStack**: Cognito User Pool and App Client
+- **DatabaseStack**: DynamoDB tables with GSIs
+- **StorageStack**: S3 bucket for documents
+- **ApiStack**: Lambda function and API Gateway
+- **FrontendStack**: S3 bucket and CloudFront distribution
+
+**Important Outputs** (save these):
+- `ApiUrl`: API Gateway endpoint (e.g., `https://abc123.execute-api.us-east-1.amazonaws.com/dev/`)
+- `DistributionDomainName`: CloudFront domain (e.g., `d123abc.cloudfront.net`)
+- `FrontendBucketName`: S3 bucket name for frontend
+- `UserPoolId`: Cognito User Pool ID
+- `UserPoolClientId`: Cognito App Client ID
+
+#### 2. Configure Frontend Environment
+
+Update `haulhub-frontend/src/environments/environment.prod.ts`:
 
 ```typescript
-enum UserRole {
-  Dispatcher = 'Dispatcher',
-  LorryOwner = 'LorryOwner',
-  Driver = 'Driver',
-  Admin = 'Admin'
-}
+export const environment = {
+  production: true,
+  apiUrl: 'https://abc123.execute-api.us-east-1.amazonaws.com/dev',  // From CDK output
+  cognitoUserPoolId: 'us-east-1_xxxxxxxxx',  // From CDK output
+  cognitoClientId: 'xxxxxxxxxxxxxxxxxxxxxxxxxx',  // From CDK output
+  region: 'us-east-1'
+};
 ```
 
-### CurrentUserData Interface
-
-```typescript
-interface CurrentUserData {
-  userId: string;        // Cognito user ID (sub claim)
-  email: string;         // User's email address
-  role: string;          // User's role
-  username: string;      // Cognito username
-}
-```
-
-## Architecture
-
-- **Framework**: NestJS with TypeScript
-- **Deployment**: AWS Lambda with serverless-express
-- **Authentication**: AWS Cognito with JWT tokens (JWKS validation)
-- **Database**: AWS DynamoDB (single table design)
-- **Storage**: AWS S3 for documents
-- **Validation**: class-validator and class-transformer
-- **Security**: Global guards, role-based access control, token validation
-
-## Security Features
-
-1. **Token Validation**: Proper JWT verification with Cognito public keys
-2. **Key Caching**: Public keys cached for 10 minutes to reduce latency
-3. **Global Protection**: All routes protected by default (opt-out with @Public)
-4. **Type Safety**: TypeScript interfaces ensure type-safe user data access
-5. **Error Handling**: Appropriate HTTP status codes for different scenarios
-6. **No Token Storage**: Stateless authentication (tokens not stored server-side)
-7. **CORS**: Configured to allow only CloudFront domain
-8. **Input Validation**: Comprehensive validation using class-validator
-
-## Best Practices
-
-1. **Always use @Public() for public routes**: Explicitly mark public routes
-2. **Use specific roles**: Be explicit about which roles can access each route
-3. **Extract only what you need**: Use `@CurrentUser('userId')` when you only need the user ID
-4. **Validate ownership**: Even with authentication, validate that users can only access their own resources
-5. **Log authorization failures**: Monitor 403 errors to detect potential security issues
-
-## Troubleshooting
-
-### "Authorization header is missing"
-- Ensure you're sending the `Authorization` header
-- Format: `Authorization: Bearer <token>`
-
-### "Access token has expired"
-- Use the refresh token to obtain a new access token
-- Access tokens expire after 1 hour
-
-### "Invalid access token"
-- Ensure you're using an access token, not a refresh token
-- Verify the token hasn't been tampered with
-
-### "Access denied. Required roles: ..."
-- Check that your user has the required role
-- Verify the role was correctly assigned during registration
-
----
-
-# Brokers API
-
-## Overview
-
-The Brokers API provides endpoints for managing broker companies in the HaulHub system. Brokers are companies that advertise transportation deals, and dispatchers select from this list when creating trips.
-
-## Endpoints
-
-### GET /brokers
-
-Retrieve all brokers in the system. Optionally filter to show only active brokers.
-
-**Authentication:** Not required (public endpoint)
-
-**Query Parameters:**
-- `activeOnly` (optional): Set to `"true"` to filter only active brokers
-
-**Response:**
-```json
-[
-  {
-    "brokerId": "uuid",
-    "brokerName": "TQL (Total Quality Logistics)",
-    "isActive": true,
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-]
-```
-
-**Example:**
-```bash
-# Get all brokers
-curl http://localhost:3000/brokers
-
-# Get only active brokers
-curl http://localhost:3000/brokers?activeOnly=true
-```
-
-### GET /brokers/:id
-
-Retrieve a specific broker by ID.
-
-**Authentication:** Not required (public endpoint)
-
-**Path Parameters:**
-- `id`: Broker ID (UUID)
-
-**Response:**
-```json
-{
-  "brokerId": "uuid",
-  "brokerName": "TQL (Total Quality Logistics)",
-  "isActive": true,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### POST /brokers
-
-Create a new broker. Admin only.
-
-**Authentication:** Required (Admin role)
-
-**Request Body:**
-```json
-{
-  "brokerName": "New Broker Company"
-}
-```
-
-**Validation:**
-- `brokerName`: Required, string, minimum 2 characters
-
-**Response:** `201 Created`
-```json
-{
-  "brokerId": "uuid",
-  "brokerName": "New Broker Company",
-  "isActive": true,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### PATCH /brokers/:id
-
-Update an existing broker. Admin only.
-
-**Authentication:** Required (Admin role)
-
-**Path Parameters:**
-- `id`: Broker ID (UUID)
-
-**Request Body:**
-```json
-{
-  "brokerName": "Updated Broker Name",
-  "isActive": false
-}
-```
-
-**Validation:**
-- `brokerName`: Optional, string, minimum 2 characters
-- `isActive`: Optional, boolean
-
-### DELETE /brokers/:id
-
-Soft delete a broker by setting `isActive` to `false`. Admin only. Historical trip data referencing this broker is preserved.
-
-**Authentication:** Required (Admin role)
-
-**Path Parameters:**
-- `id`: Broker ID (UUID)
-
-**Response:** `204 No Content`
-
-## Seeding Initial Brokers
-
-To seed the database with initial broker data, run:
+#### 3. Build and Deploy Frontend
 
 ```bash
-npm run seed:brokers
+cd haulhub-frontend
+
+# Build for production
+npm run build
+
+# Deploy to S3 (use bucket name from CDK output)
+aws s3 sync dist/haulhub-frontend/ s3://haulhub-frontend-dev/ \
+  --delete \
+  --profile your-profile
+
+# Invalidate CloudFront cache (use distribution ID from CDK output)
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --paths "/*" \
+  --profile your-profile
 ```
 
-This will create the following brokers if none exist:
-- TQL (Total Quality Logistics)
-- C.H. Robinson
-- XPO Logistics
-- Coyote Logistics
-- Echo Global Logistics
+#### 4. Verify Deployment
 
-## Broker DynamoDB Schema
-
-Brokers are stored in DynamoDB with the following structure:
-
-**Primary Key:**
-- `PK`: `BROKER#<brokerId>`
-- `SK`: `METADATA`
-
-**Attributes:**
-- `brokerId`: UUID
-- `brokerName`: String
-- `isActive`: Boolean
-- `createdAt`: ISO 8601 timestamp
-- `updatedAt`: ISO 8601 timestamp
-
-**Access Pattern:**
-- Query all brokers: Query with `PK` begins with `BROKER#`
-- Get specific broker: Get item with `PK=BROKER#<id>` and `SK=METADATA`
-
-## Integration with Trips
-
-When dispatchers create trips, they select a broker from the list of active brokers. The trip stores:
-- `brokerId`: Reference to the broker
-- `brokerName`: Denormalized broker name for display
-
-This design allows:
-1. Fast trip creation without additional lookups
-2. Historical trip data remains intact even if broker is deleted
-3. Broker name updates don't affect existing trips
-
----
-
-# Lorries API
-
-## Overview
-
-The Lorries API provides endpoints for lorry owners to register their vehicles and upload verification documents. Admins can review and approve/reject lorry registrations. Documents are stored securely in S3 with presigned URLs for upload and viewing.
-
-## Endpoints
-
-### POST /lorries
-
-Register a new lorry. Lorry Owner only.
-
-**Authentication:** Required (LorryOwner role)
-
-**Request Body:**
-```json
-{
-  "lorryId": "ABC-1234",
-  "make": "Freightliner",
-  "model": "Cascadia",
-  "year": 2020
-}
-```
-
-**Validation:**
-- `lorryId`: Required, string (license plate)
-- `make`: Required, string
-- `model`: Required, string
-- `year`: Required, number, between 1900 and current year + 1
-
-**Response:** `201 Created`
-```json
-{
-  "lorryId": "ABC-1234",
-  "ownerId": "uuid",
-  "make": "Freightliner",
-  "model": "Cascadia",
-  "year": 2020,
-  "verificationStatus": "Pending",
-  "verificationDocuments": [],
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Error Responses:**
-- `409 Conflict`: Lorry with this ID already registered for this owner
-- `400 Bad Request`: Invalid year or missing required fields
-
-### GET /lorries
-
-Get all lorries for the current owner.
-
-**Authentication:** Required (LorryOwner role)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "lorryId": "ABC-1234",
-    "ownerId": "uuid",
-    "make": "Freightliner",
-    "model": "Cascadia",
-    "year": 2020,
-    "verificationStatus": "Approved",
-    "verificationDocuments": [
-      {
-        "documentId": "uuid",
-        "fileName": "registration.pdf",
-        "fileSize": 1024000,
-        "contentType": "application/pdf",
-        "uploadedAt": "2024-01-01T00:00:00.000Z"
-      }
-    ],
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-]
-```
-
-### GET /lorries/:id
-
-Get a specific lorry by ID. Lorry Owner and Admin only.
-
-**Authentication:** Required (LorryOwner or Admin role)
-
-**Path Parameters:**
-- `id`: Lorry ID (license plate)
-
-**Authorization:**
-- Lorry owners can only access their own lorries
-- Admins can access any lorry (to be implemented in task 13)
-
-**Response:** `200 OK`
-```json
-{
-  "lorryId": "ABC-1234",
-  "ownerId": "uuid",
-  "make": "Freightliner",
-  "model": "Cascadia",
-  "year": 2020,
-  "verificationStatus": "Approved",
-  "verificationDocuments": [...],
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Error Responses:**
-- `403 Forbidden`: User does not own this lorry
-- `404 Not Found`: Lorry not found
-
-### POST /lorries/:id/documents
-
-Generate a presigned S3 URL for uploading a verification document. Lorry Owner only.
-
-**Authentication:** Required (LorryOwner role)
-
-**Path Parameters:**
-- `id`: Lorry ID (license plate)
-
-**Request Body:**
-```json
-{
-  "fileName": "registration.pdf",
-  "fileSize": 1024000,
-  "contentType": "application/pdf"
-}
-```
-
-**Validation:**
-- `fileName`: Required, string
-- `fileSize`: Required, number, maximum 10MB (10485760 bytes)
-- `contentType`: Required, string
-
-**Response:** `201 Created`
-```json
-{
-  "uploadUrl": "https://bucket.s3.amazonaws.com/lorries/ABC-1234/documents/uuid?X-Amz-Algorithm=...",
-  "documentId": "uuid",
-  "expiresIn": 900
-}
-```
-
-**Usage:**
-1. Call this endpoint to get a presigned URL
-2. Use the `uploadUrl` to upload the file directly to S3 via PUT request
-3. The document metadata is automatically stored in DynamoDB
-4. The lorry's `verificationDocuments` array is updated
-
-**Example Upload:**
 ```bash
-# Step 1: Get presigned URL
-curl -X POST http://localhost:3000/lorries/ABC-1234/documents \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "fileName": "registration.pdf",
-    "fileSize": 1024000,
-    "contentType": "application/pdf"
-  }'
+# Check frontend is accessible
+curl https://d123abc.cloudfront.net
 
-# Step 2: Upload file to S3 using presigned URL
-curl -X PUT "<uploadUrl>" \
-  -H "Content-Type: application/pdf" \
-  --data-binary @registration.pdf
+# Check API is accessible
+curl https://abc123.execute-api.us-east-1.amazonaws.com/dev/brokers
+
+# Test CORS (should return CORS headers)
+curl -X OPTIONS https://abc123.execute-api.us-east-1.amazonaws.com/dev/trips \
+  -H "Origin: https://d123abc.cloudfront.net" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Authorization,Content-Type" \
+  -v
 ```
 
-**Error Responses:**
-- `400 Bad Request`: File size exceeds 10MB limit
-- `403 Forbidden`: User does not own this lorry
-- `404 Not Found`: Lorry not found
+### Updating the Application
 
-### GET /lorries/:id/documents
+#### Backend Updates
 
-Get all documents for a lorry. Lorry Owner and Admin only.
-
-**Authentication:** Required (LorryOwner or Admin role)
-
-**Path Parameters:**
-- `id`: Lorry ID (license plate)
-
-**Authorization:**
-- Lorry owners can only access documents for their own lorries
-- Admins can access documents for any lorry
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "documentId": "uuid",
-    "fileName": "registration.pdf",
-    "fileSize": 1024000,
-    "contentType": "application/pdf",
-    "uploadedAt": "2024-01-01T00:00:00.000Z"
-  }
-]
-```
-
-**Error Responses:**
-- `403 Forbidden`: User does not have permission to access these documents
-
-### GET /lorries/:id/documents/:docId
-
-Generate a presigned S3 URL for viewing a verification document. Lorry Owner and Admin only.
-
-**Authentication:** Required (LorryOwner or Admin role)
-
-**Path Parameters:**
-- `id`: Lorry ID (license plate)
-- `docId`: Document ID (UUID)
-
-**Authorization:**
-- Lorry owners can only view documents for their own lorries
-- Admins can view documents for any lorry
-
-**Response:** `200 OK`
-```json
-{
-  "viewUrl": "https://bucket.s3.amazonaws.com/lorries/ABC-1234/documents/uuid?X-Amz-Algorithm=..."
-}
-```
-
-**Usage:**
-1. Call this endpoint to get a presigned URL
-2. Use the `viewUrl` to download/view the file directly from S3
-3. The URL expires after 15 minutes
-
-**Example:**
 ```bash
-# Get presigned URL for viewing
-curl -X GET http://localhost:3000/lorries/ABC-1234/documents/uuid \
-  -H "Authorization: Bearer <token>"
+# 1. Make changes to backend code
+cd haulhub-backend
 
-# Download the file using the presigned URL
-curl "<viewUrl>" -o document.pdf
+# 2. Build for Lambda
+npm run build:lambda
+
+# 3. Deploy (CDK will update Lambda function)
+cd ../haulhub-infrastructure
+npm run deploy
 ```
 
-**Error Responses:**
-- `403 Forbidden`: User does not have permission to access this document
-- `404 Not Found`: Document not found
+#### Frontend Updates
 
-## Lorry Verification Status
+```bash
+# 1. Make changes to frontend code
+cd haulhub-frontend
 
-Lorries can have the following verification statuses:
+# 2. Build
+npm run build
 
-```typescript
-enum LorryVerificationStatus {
-  Pending = 'Pending',              // Initial status after registration
-  Approved = 'Approved',            // Admin approved the lorry
-  Rejected = 'Rejected',            // Admin rejected the lorry
-  NeedsMoreEvidence = 'NeedsMoreEvidence'  // Admin needs more documents
-}
+# 3. Deploy to S3
+aws s3 sync dist/haulhub-frontend/ s3://haulhub-frontend-dev/ --delete
+
+# 4. Invalidate cache
+aws cloudfront create-invalidation --distribution-id E1234567890ABC --paths "/*"
 ```
+
+### Environment-Specific Deployments
+
+The infrastructure supports multiple environments (dev, staging, prod):
+
+```bash
+# Deploy to dev
+cdk deploy --context environment=dev --profile dev-profile
+
+# Deploy to production
+cdk deploy --context environment=prod --profile prod-profile
+```
+
+Each environment gets separate:
+- Lambda functions
+- API Gateway stages
+- S3 buckets
+- CloudFront distributions
+- DynamoDB tables
+
+### Custom Domain Setup (Production)
+
+For production with custom domain (etrucky.com):
+
+1. **Certificate is created automatically** by CDK in `us-east-1`
+2. **Add DNS validation records** from ACM console to your domain registrar
+3. **Wait for certificate validation** (can take 30 minutes)
+4. **Add DNS records** to point to CloudFront:
+   ```
+   etrucky.com     → CNAME → d123abc.cloudfront.net
+   www.etrucky.com → CNAME → d123abc.cloudfront.net
+   ```
+5. **Access via custom domain**: `https://etrucky.com`
+
+### Deployment Scripts
+
+Use the convenience scripts in `scripts/` directory:
+
+```bash
+# Deploy backend only
+./scripts/deploy-backend.sh
+
+# Deploy frontend only
+./scripts/deploy-frontend.sh
+
+# Deploy infrastructure
+./scripts/deploy-infrastructure.sh
+```
+
+### Complete Request Flow Example
+
+Here's what happens when a user creates a trip:
+
+```
+1. User clicks "Create Trip" in Angular app
+   ↓
+2. Angular service calls:
+   this.http.post('https://api-gateway-url/dev/trips', tripData)
+   ↓
+3. HTTP Interceptor adds Authorization header:
+   Authorization: Bearer eyJraWQiOiJ...
+   ↓
+4. Browser sends preflight OPTIONS request (CORS check):
+   OPTIONS https://api-gateway-url/dev/trips
+   Origin: https://d123abc.cloudfront.net
+   ↓
+5. API Gateway responds with CORS headers:
+   Access-Control-Allow-Origin: https://d123abc.cloudfront.net
+   Access-Control-Allow-Methods: POST, GET, ...
+   Access-Control-Allow-Headers: Authorization, Content-Type
+   ↓
+6. Browser sends actual POST request:
+   POST https://api-gateway-url/dev/trips
+   Authorization: Bearer eyJraWQiOiJ...
+   Content-Type: application/json
+   ↓
+7. API Gateway forwards to Lambda
+   ↓
+8. Lambda (NestJS):
+   - JwtAuthGuard validates token with Cognito
+   - RolesGuard checks user role (Dispatcher)
+   - @CurrentUser() extracts user data
+   - TripsController.createTrip() executes
+   - TripsService saves to DynamoDB
+   ↓
+9. Lambda returns response with CORS headers:
+   Access-Control-Allow-Origin: https://d123abc.cloudfront.net
+   Access-Control-Allow-Credentials: true
+   ↓
+10. API Gateway forwards response to browser
+    ↓
+11. Angular receives response and updates UI
+```
+
+### CloudFront Caching Strategy
+
+**Static Assets** (JS, CSS, images):
+- **Dev**: 5 minutes cache
+- **Prod**: 7 days cache
+- Compressed with Gzip and Brotli
+
+**index.html**:
+- **Dev**: No cache (0 seconds)
+- **Prod**: 5 minutes cache
+- Ensures users get latest app version
+
+**SPA Routing**:
+- 404 errors redirect to `index.html`
+- Allows Angular router to handle all routes
+- TTL: 5 minutes
+
+**Cache Invalidation**:
+```bash
+# After deploying new frontend version
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --paths "/*"
+```
+
+This forces CloudFront to fetch fresh files from S3.
 
 ## DynamoDB Schema
 
-### Lorry Entity
+### Single-Table Design
+
+HaulHub uses a single DynamoDB table with multiple entity types and access patterns.
+
+**Table Name**: `HaulHub`
 
 **Primary Key:**
-- `PK`: `LORRY_OWNER#<ownerId>`
-- `SK`: `LORRY#<lorryId>`
+- `PK` (Partition Key): String
+- `SK` (Sort Key): String
 
-**GSI3 (Verification Status Index):**
-- `GSI3PK`: `LORRY_STATUS#<verificationStatus>`
-- `GSI3SK`: `LORRY#<lorryId>`
+**Global Secondary Indexes:**
+- **GSI1**: `GSI1PK` (PK), `GSI1SK` (SK) - Driver queries
+- **GSI2**: `GSI2PK` (PK), `GSI2SK` (SK) - Lorry queries
+- **GSI3**: `GSI3PK` (PK), `GSI3SK` (SK) - Verification status queries
 
-**Attributes:**
-- `lorryId`: String (license plate)
-- `ownerId`: String (UUID)
-- `make`: String
-- `model`: String
-- `year`: Number
-- `verificationStatus`: Enum
-- `verificationDocuments`: Array of DocumentMetadata
-- `rejectionReason`: String (optional)
-- `createdAt`: ISO 8601 timestamp
-- `updatedAt`: ISO 8601 timestamp
+### Entity Patterns
 
-### Document Metadata Entity
-
-**Primary Key:**
-- `PK`: `LORRY#<lorryId>`
-- `SK`: `DOCUMENT#<documentId>`
-
-**Attributes:**
-- `documentId`: String (UUID)
-- `lorryId`: String (license plate)
-- `ownerId`: String (UUID)
-- `s3Key`: String (S3 object key)
-- `fileName`: String
-- `fileSize`: Number (bytes)
-- `contentType`: String (MIME type)
-- `uploadedAt`: ISO 8601 timestamp
-
-## S3 Document Storage
-
-Documents are stored in S3 with the following structure:
-
+**User:**
 ```
-s3://documents-bucket/
-  lorries/
-    ABC-1234/
-      documents/
-        uuid-1/
-        uuid-2/
+PK: USER#<userId>
+SK: PROFILE
 ```
 
-**Security:**
-- Bucket has public access blocked
-- All access via presigned URLs only
-- Upload URLs expire after 15 minutes
-- View URLs expire after 15 minutes
-- Encryption at rest enabled
-
-## Access Patterns
-
-1. **Register lorry**: Insert into DynamoDB with PK and GSI3
-2. **Get lorries by owner**: Query by PK `LORRY_OWNER#<ownerId>`
-3. **Get lorry by ID and owner**: Get item with PK and SK
-4. **Get pending lorries (Admin)**: Query GSI3 with `GSI3PK=LORRY_STATUS#Pending`
-5. **Upload document**: Generate presigned URL, store metadata in DynamoDB
-6. **Get documents for lorry**: Query by PK `LORRY#<lorryId>` with SK begins with `DOCUMENT#`
-7. **View document**: Get document metadata, generate presigned URL for S3 object
-
----
-
-# Trips API
-
-## Overview
-
-The Trips API provides endpoints for managing transportation trips. Dispatchers can create and manage trips, while drivers and lorry owners can view trips relevant to them. The API supports trip creation, updates, status management, and payment reporting.
-
-## Endpoints
-
-### POST /trips
-
-Create a new trip. Dispatcher only.
-
-**Authentication:** Required (Dispatcher role)
-
-**Request Body:**
-```json
-{
-  "pickupLocation": "123 Main St, Los Angeles, CA",
-  "dropoffLocation": "456 Oak Ave, San Francisco, CA",
-  "scheduledPickupDatetime": "2024-02-15T08:00:00.000Z",
-  "brokerId": "uuid",
-  "lorryId": "ABC-1234",
-  "driverId": "DRV-001",
-  "driverName": "John Doe",
-  "brokerPayment": 2500.00,
-  "lorryOwnerPayment": 1500.00,
-  "driverPayment": 800.00,
-  "distance": 380
-}
+**Broker:**
+```
+PK: BROKER#<brokerId>
+SK: METADATA
 ```
 
-**Validation:**
-- `pickupLocation`: Required, string
-- `dropoffLocation`: Required, string
-- `scheduledPickupDatetime`: Required, ISO 8601 datetime string
-- `brokerId`: Required, string (must be a valid broker ID)
-- `lorryId`: Required, string (license plate)
-- `driverId`: Required, string (driver identifier)
-- `driverName`: Required, string
-- `brokerPayment`: Required, positive number
-- `lorryOwnerPayment`: Required, positive number
-- `driverPayment`: Required, positive number
-- `distance`: Optional, number (miles)
-
-**Response:** `201 Created`
-```json
-{
-  "tripId": "uuid",
-  "dispatcherId": "uuid",
-  "pickupLocation": "123 Main St, Los Angeles, CA",
-  "dropoffLocation": "456 Oak Ave, San Francisco, CA",
-  "scheduledPickupDatetime": "2024-02-15T08:00:00.000Z",
-  "brokerId": "uuid",
-  "brokerName": "TQL (Total Quality Logistics)",
-  "lorryId": "ABC-1234",
-  "driverId": "DRV-001",
-  "driverName": "John Doe",
-  "brokerPayment": 2500.00,
-  "lorryOwnerPayment": 1500.00,
-  "driverPayment": 800.00,
-  "status": "Scheduled",
-  "distance": 380,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
+**Lorry:**
+```
+PK: LORRY_OWNER#<ownerId>
+SK: LORRY#<lorryId>
+GSI3PK: LORRY_STATUS#<verificationStatus>
+GSI3SK: LORRY#<lorryId>
 ```
 
-**Error Responses:**
-- `400 Bad Request`: Missing required fields, invalid datetime format, or negative payment amounts
-- `400 Bad Request`: Broker ID not found
+**Trip:**
+```
+PK: DISPATCHER#<dispatcherId>
+SK: TRIP#<scheduledDate>#<tripId>
+GSI1PK: DRIVER#<driverId>
+GSI1SK: TRIP#<scheduledDate>#<tripId>
+GSI2PK: LORRY#<lorryId>
+GSI2SK: TRIP#<scheduledDate>#<tripId>
+```
 
-**Example:**
+**Document Metadata:**
+```
+PK: LORRY#<lorryId>
+SK: DOCUMENT#<documentId>
+```
+
+### Query Optimization
+
+The `IndexSelectorService` intelligently selects the optimal GSI based on query filters:
+- Analyzes filter combinations
+- Selects most efficient index
+- Emits CloudWatch metrics for monitoring
+- Supports query performance optimization
+
+
+## Common Workflows
+
+### Creating a Trip (Dispatcher)
+
 ```bash
-curl -X POST http://localhost:3000/trips \
-  -H "Authorization: Bearer <token>" \
+# 1. Login as dispatcher
+curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "pickupLocation": "123 Main St, Los Angeles, CA",
-    "dropoffLocation": "456 Oak Ave, San Francisco, CA",
+    "email": "dispatcher@example.com",
+    "password": "password"
+  }'
+
+# 2. Create trip
+curl -X POST http://localhost:3000/trips \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pickupLocation": "Los Angeles, CA",
+    "dropoffLocation": "San Francisco, CA",
     "scheduledPickupDatetime": "2024-02-15T08:00:00.000Z",
-    "brokerId": "uuid",
+    "brokerId": "<broker-uuid>",
     "lorryId": "ABC-1234",
     "driverId": "DRV-001",
     "driverName": "John Doe",
@@ -1067,687 +1406,583 @@ curl -X POST http://localhost:3000/trips \
   }'
 ```
 
-### GET /trips/:id
+### Registering a Lorry (Lorry Owner)
 
-Get a specific trip by ID.
-
-**Authentication:** Required (Dispatcher, Driver, LorryOwner, or Admin role)
-
-**Path Parameters:**
-- `id`: Trip ID (UUID)
-
-**Authorization:**
-- Dispatchers can only access trips they created
-- Drivers can access trips assigned to them (to be implemented in task 17)
-- Lorry owners can access trips involving their lorries (to be implemented in task 17)
-- Admins can access any trip
-
-**Response:** `200 OK`
-```json
-{
-  "tripId": "uuid",
-  "dispatcherId": "uuid",
-  "pickupLocation": "123 Main St, Los Angeles, CA",
-  "dropoffLocation": "456 Oak Ave, San Francisco, CA",
-  "scheduledPickupDatetime": "2024-02-15T08:00:00.000Z",
-  "brokerId": "uuid",
-  "brokerName": "TQL (Total Quality Logistics)",
-  "lorryId": "ABC-1234",
-  "driverId": "DRV-001",
-  "driverName": "John Doe",
-  "brokerPayment": 2500.00,
-  "lorryOwnerPayment": 1500.00,
-  "driverPayment": 800.00,
-  "status": "Scheduled",
-  "distance": 380,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Error Responses:**
-- `404 Not Found`: Trip not found
-- `400 Bad Request`: Getting trip by ID for non-dispatcher roles requires using GET /trips with filters (to be implemented in task 17)
-
-**Note:** Currently, only dispatchers can retrieve trips by ID directly. Other roles should use the GET /trips endpoint with filters (to be implemented in task 17).
-
-### PATCH /trips/:id
-
-Update trip details. Dispatcher only.
-
-**Authentication:** Required (Dispatcher role)
-
-**Path Parameters:**
-- `id`: Trip ID (UUID)
-
-**Request Body:** (all fields optional)
-```json
-{
-  "pickupLocation": "Updated pickup location",
-  "dropoffLocation": "Updated dropoff location",
-  "scheduledPickupDatetime": "2024-02-16T09:00:00.000Z",
-  "brokerId": "new-broker-uuid",
-  "lorryId": "XYZ-5678",
-  "driverId": "DRV-002",
-  "driverName": "Jane Smith",
-  "brokerPayment": 2600.00,
-  "lorryOwnerPayment": 1600.00,
-  "driverPayment": 850.00,
-  "distance": 400
-}
-```
-
-**Validation:**
-- All fields are optional
-- If provided, `scheduledPickupDatetime` must be valid ISO 8601 format
-- If provided, payment amounts must be positive numbers
-- If `brokerId` is provided, it must be a valid broker ID
-
-**Authorization:**
-- Only the dispatcher who created the trip can update it
-
-**Response:** `200 OK`
-```json
-{
-  "tripId": "uuid",
-  "dispatcherId": "uuid",
-  "pickupLocation": "Updated pickup location",
-  "dropoffLocation": "Updated dropoff location",
-  ...
-  "updatedAt": "2024-01-02T00:00:00.000Z"
-}
-```
-
-**Error Responses:**
-- `404 Not Found`: Trip not found or user is not the dispatcher who created it
-- `400 Bad Request`: Invalid datetime format or negative payment amounts
-
-**Example:**
 ```bash
-curl -X PATCH http://localhost:3000/trips/uuid \
+# 1. Register lorry
+curl -X POST http://localhost:3000/lorries \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "pickupLocation": "Updated pickup location",
-    "brokerPayment": 2600.00
-  }'
-```
-
-## Trip Status Values
-
-Trips can have the following status values:
-
-```typescript
-enum TripStatus {
-  Scheduled = 'Scheduled',      // Initial status after creation
-  PickedUp = 'PickedUp',        // Driver picked up the load
-  InTransit = 'InTransit',      // Load is in transit
-  Delivered = 'Delivered',      // Load delivered to destination
-  Paid = 'Paid'                 // Payment completed
-}
-```
-
-**Status Updates:** To be implemented in task 16 (PATCH /trips/:id/status)
-
-## DynamoDB Schema
-
-### Trip Entity
-
-**Primary Key:**
-- `PK`: `DISPATCHER#<dispatcherId>`
-- `SK`: `TRIP#<scheduledDate>#<tripId>`
-
-**GSI1 (Driver Index):**
-- `GSI1PK`: `DRIVER#<driverId>`
-- `GSI1SK`: `TRIP#<scheduledDate>#<tripId>`
-
-**GSI2 (Lorry Index):**
-- `GSI2PK`: `LORRY#<lorryId>`
-- `GSI2SK`: `TRIP#<scheduledDate>#<tripId>`
-
-**Attributes:**
-- `tripId`: String (UUID)
-- `dispatcherId`: String (UUID)
-- `pickupLocation`: String
-- `dropoffLocation`: String
-- `scheduledPickupDatetime`: ISO 8601 timestamp
-- `brokerId`: String (UUID)
-- `brokerName`: String (fetched from broker record)
-- `lorryId`: String (license plate)
-- `driverId`: String (driver identifier)
-- `driverName`: String
-- `brokerPayment`: Number (amount broker pays dispatcher)
-- `lorryOwnerPayment`: Number (amount dispatcher pays lorry owner)
-- `driverPayment`: Number (amount dispatcher pays driver)
-- `status`: Enum (TripStatus)
-- `distance`: Number (optional, miles)
-- `deliveredAt`: ISO 8601 timestamp (optional, set when status changes to Delivered)
-- `createdAt`: ISO 8601 timestamp
-- `updatedAt`: ISO 8601 timestamp
-
-## Access Patterns
-
-1. **Create trip**: Insert into DynamoDB with PK, SK, GSI1, and GSI2
-2. **Get trip by ID (dispatcher)**: Query by PK `DISPATCHER#<dispatcherId>` with SK contains tripId
-3. **Get trips by dispatcher**: Query by PK `DISPATCHER#<dispatcherId>` (to be implemented in task 17)
-4. **Get trips by driver**: Query GSI1 by `GSI1PK=DRIVER#<driverId>` (to be implemented in task 17)
-5. **Get trips by lorry**: Query GSI2 by `GSI2PK=LORRY#<lorryId>` (to be implemented in task 17)
-6. **Update trip**: Update item with PK and SK
-7. **Update trip status**: Update status attribute (to be implemented in task 16)
-
-## Future Endpoints
-
-The following endpoints will be implemented in upcoming tasks:
-
-- **PATCH /trips/:id/status** (Task 16): Update trip status with validation
-- **GET /trips** (Task 17): Get trips with role-based filtering and pagination
-- **GET /trips/reports/payments** (Task 18): Generate payment reports for all roles
-
----
-
-# Admin API
-
-## Overview
-
-The Admin API provides endpoints for system administrators to manage user verifications, lorry verifications, and broker lists. All admin endpoints require the Admin role.
-
-## Endpoints
-
-### GET /admin/dashboard
-
-Get admin dashboard summary.
-
-**Authentication:** Required (Admin role)
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Admin dashboard",
-  "adminUser": {
-    "userId": "uuid",
-    "email": "admin@example.com",
-    "role": "Admin"
-  }
-}
-```
-
-### GET /admin/lorries/pending
-
-Get all lorries with pending verification status (Pending or NeedsMoreEvidence).
-
-**Authentication:** Required (Admin role)
-
-**Response:** `200 OK`
-```json
-[
-  {
     "lorryId": "ABC-1234",
-    "ownerId": "uuid",
     "make": "Freightliner",
     "model": "Cascadia",
-    "year": 2020,
-    "verificationStatus": "Pending",
-    "verificationDocuments": [
-      {
-        "documentId": "uuid",
-        "fileName": "registration.pdf",
-        "fileSize": 1024000,
-        "contentType": "application/pdf",
-        "uploadedAt": "2024-01-01T00:00:00.000Z"
-      }
-    ],
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-]
+    "year": 2020
+  }'
+
+# 2. Get presigned URL for document upload
+curl -X POST http://localhost:3000/lorries/ABC-1234/documents \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileName": "registration.pdf",
+    "fileSize": 1024000,
+    "contentType": "application/pdf"
+  }'
+
+# 3. Upload document to S3 using presigned URL
+curl -X PUT "<uploadUrl>" \
+  -H "Content-Type: application/pdf" \
+  --data-binary @registration.pdf
 ```
 
-**Query Details:**
-- Uses GSI3 (Verification Status Index) for efficient querying
-- Queries both `LORRY_STATUS#Pending` and `LORRY_STATUS#NeedsMoreEvidence`
-- Returns combined results
+### Verifying a Lorry (Admin)
 
-### PATCH /admin/lorries/:id/verify
-
-Approve, reject, or request more evidence for a lorry registration.
-
-**Authentication:** Required (Admin role)
-
-**Path Parameters:**
-- `id`: Lorry ID (license plate)
-
-**Request Body:**
-```json
-{
-  "decision": "Approved",
-  "reason": "Optional rejection reason"
-}
-```
-
-**Validation:**
-- `decision`: Required, must be one of: `"Approved"`, `"Rejected"`, `"NeedsMoreEvidence"`
-- `reason`: Required when decision is `"Rejected"` or `"NeedsMoreEvidence"`
-
-**Response:** `200 OK`
-```json
-{
-  "lorryId": "ABC-1234",
-  "ownerId": "uuid",
-  "make": "Freightliner",
-  "model": "Cascadia",
-  "year": 2020,
-  "verificationStatus": "Approved",
-  "verificationDocuments": [...],
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Example - Approve:**
 ```bash
+# 1. Get pending lorries
+curl -X GET http://localhost:3000/admin/lorries/pending \
+  -H "Authorization: Bearer <admin-token>"
+
+# 2. View lorry documents
+curl -X GET http://localhost:3000/lorries/ABC-1234/documents/uuid \
+  -H "Authorization: Bearer <admin-token>"
+
+# 3. Approve lorry
 curl -X PATCH http://localhost:3000/admin/lorries/ABC-1234/verify \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{
-    "decision": "Approved"
-  }'
+  -d '{"decision": "Approved"}'
 ```
 
-**Example - Reject:**
+### Viewing Trips (Driver)
+
 ```bash
+# Get all trips assigned to driver
+curl -X GET "http://localhost:3000/trips?startDate=2024-01-01&endDate=2024-12-31" \
+  -H "Authorization: Bearer <driver-token>"
+
+# Get payment report
+curl -X GET "http://localhost:3000/trips/reports/payments?startDate=2024-01-01" \
+  -H "Authorization: Bearer <driver-token>"
+```
+
+## Troubleshooting
+
+### "Authorization header is missing"
+
+**Cause**: Request doesn't include JWT token
+
+**Solution**: Add `Authorization: Bearer <token>` header to request
+
+### "Access token has expired"
+
+**Cause**: Access token expired (1-hour lifetime)
+
+**Solution**: Use refresh token to get new access token:
+```bash
+curl -X POST http://localhost:3000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "<refresh-token>"}'
+```
+
+### "Access denied. Required roles: ..."
+
+**Cause**: User doesn't have required role for endpoint
+
+**Solution**: Verify user role in Cognito or use account with appropriate role
+
+### "Module not found: @haulhub/shared"
+
+**Cause**: Shared package not built or not installed
+
+**Solution**:
+```bash
+cd ../haulhub-shared
+npm run build
+cd ../haulhub-backend
+npm install
+```
+
+### Tests failing with "X is not a function"
+
+**Cause**: Jest can't resolve shared package imports
+
+**Solution**:
+1. Build shared package: `cd ../haulhub-shared && npm run build`
+2. Verify Jest config points to `dist/`: Check `jest.config.js`
+3. Run tests again: `npm test`
+
+### DynamoDB connection errors
+
+**Cause**: AWS credentials not configured or invalid table names
+
+**Solution**:
+1. Configure AWS CLI: `aws configure`
+2. Verify tables exist: `aws dynamodb list-tables`
+3. Check `.env` file has correct table names (TRIPS_TABLE_NAME, BROKERS_TABLE_NAME, LORRIES_TABLE_NAME, USERS_TABLE_NAME)
+
+### CORS errors in browser
+
+**Cause**: Frontend origin not in `ALLOWED_ORIGINS`
+
+**Solution**: Add frontend URL to `.env`:
+```bash
+ALLOWED_ORIGINS=http://localhost:4200,https://your-cloudfront-domain.cloudfront.net
+```
+
+
+## API Examples
+
+### Authentication Flow
+
+```bash
+# Register new user
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "dispatcher@example.com",
+    "password": "SecurePass123!",
+    "fullName": "John Dispatcher",
+    "phoneNumber": "+12345678901",
+    "role": "Dispatcher"
+  }'
+
+# Login
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "dispatcher@example.com",
+    "password": "SecurePass123!"
+  }'
+
+# Response:
+{
+  "accessToken": "eyJraWQiOiJ...",
+  "refreshToken": "eyJraWQiOiJ...",
+  "expiresIn": 3600,
+  "userId": "uuid",
+  "role": "Dispatcher",
+  "email": "dispatcher@example.com",
+  "fullName": "John Dispatcher"
+}
+```
+
+### Trip Management
+
+```bash
+# Create trip
+curl -X POST http://localhost:3000/trips \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pickupLocation": "Los Angeles, CA",
+    "dropoffLocation": "San Francisco, CA",
+    "scheduledPickupDatetime": "2024-02-15T08:00:00.000Z",
+    "brokerId": "broker-uuid",
+    "lorryId": "ABC-1234",
+    "driverId": "DRV-001",
+    "driverName": "John Doe",
+    "brokerPayment": 2500,
+    "lorryOwnerPayment": 1500,
+    "driverPayment": 800,
+    "distance": 380
+  }'
+
+# Update trip status (Driver or Dispatcher)
+curl -X PATCH http://localhost:3000/trips/<trip-id>/status \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "PickedUp"}'
+
+# Get trips with filters
+curl -X GET "http://localhost:3000/trips?startDate=2024-01-01&endDate=2024-12-31&status=Delivered" \
+  -H "Authorization: Bearer <token>"
+
+# Get payment report
+curl -X GET "http://localhost:3000/trips/reports/payments?startDate=2024-01-01&groupBy=broker" \
+  -H "Authorization: Bearer <token>"
+```
+
+### Analytics
+
+```bash
+# Fleet overview
+curl -X GET http://localhost:3000/analytics/fleet-overview \
+  -H "Authorization: Bearer <dispatcher-token>"
+
+# Trip analytics with date range
+curl -X GET "http://localhost:3000/analytics/trip-analytics?startDate=2024-01-01&endDate=2024-12-31" \
+  -H "Authorization: Bearer <dispatcher-token>"
+
+# Driver performance
+curl -X GET "http://localhost:3000/analytics/driver-performance?startDate=2024-01-01" \
+  -H "Authorization: Bearer <dispatcher-token>"
+
+# Fuel analytics
+curl -X GET "http://localhost:3000/analytics/fuel-analytics?startDate=2024-01-01" \
+  -H "Authorization: Bearer <dispatcher-token>"
+```
+
+### Admin Operations
+
+```bash
+# Get pending lorry verifications
+curl -X GET http://localhost:3000/admin/lorries/pending \
+  -H "Authorization: Bearer <admin-token>"
+
+# Approve lorry
+curl -X PATCH http://localhost:3000/admin/lorries/ABC-1234/verify \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "Approved"}'
+
+# Reject lorry with reason
 curl -X PATCH http://localhost:3000/admin/lorries/ABC-1234/verify \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{
     "decision": "Rejected",
-    "reason": "Registration document is not clear enough"
+    "reason": "Registration document is not clear"
   }'
-```
 
-**Example - Request More Evidence:**
-```bash
-curl -X PATCH http://localhost:3000/admin/lorries/ABC-1234/verify \
-  -H "Authorization: Bearer <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decision": "NeedsMoreEvidence",
-    "reason": "Please provide proof of insurance"
-  }'
-```
-
-**Error Responses:**
-- `400 Bad Request`: Invalid decision or missing reason when required
-- `404 Not Found`: Lorry not found
-- `403 Forbidden`: User does not have Admin role
-
-**Behavior:**
-- Updates lorry verification status in DynamoDB
-- Updates GSI3 index to reflect new status
-- Stores rejection reason if provided
-- Removes rejection reason when approved
-- Updates `updatedAt` timestamp
-
-## Lorry Verification Workflow
-
-1. **Lorry Owner registers lorry**: Status set to `Pending`
-2. **Lorry Owner uploads documents**: Documents stored in S3, metadata in DynamoDB
-3. **Admin queries pending lorries**: Uses GSI3 to find all pending lorries
-4. **Admin views documents**: Generates presigned URLs to view documents in S3
-5. **Admin makes decision**:
-   - **Approve**: Status changes to `Approved`, lorry can be used in trips
-   - **Reject**: Status changes to `Rejected`, reason stored
-   - **Request More Evidence**: Status changes to `NeedsMoreEvidence`, reason stored
-6. **Lorry Owner sees status**: Can view status and reason in their lorry list
-7. **If more evidence needed**: Lorry Owner uploads additional documents, status remains `NeedsMoreEvidence` until admin reviews again
-
-## DynamoDB Access Patterns
-
-### Query Pending Lorries
-
-Uses GSI3 (Verification Status Index):
-
-```
-GSI3PK = LORRY_STATUS#Pending
-GSI3PK = LORRY_STATUS#NeedsMoreEvidence
-```
-
-This allows efficient querying without scanning the entire table.
-
-### Update Lorry Status
-
-Updates both the main table and GSI3:
-
-```
-PK: LORRY_OWNER#<ownerId>
-SK: LORRY#<lorryId>
-GSI3PK: LORRY_STATUS#<newStatus>
-GSI3SK: LORRY#<lorryId>
-```
-
-The GSI3PK is updated to reflect the new status, allowing the lorry to appear in the correct admin queries.
-
-## Requirements Mapping
-
-This implementation satisfies the following requirements:
-
-- **12.1**: Admin can view pending lorry registrations (GET /admin/lorries/pending)
-- **12.2**: Admin can view lorry details and documents (uses existing GET /lorries/:id/documents/:docId)
-- **12.3**: Admin can approve lorry registration (PATCH with decision="Approved")
-- **12.4**: Admin can reject lorry registration with reason (PATCH with decision="Rejected")
-- **12.5**: Admin can request more evidence (PATCH with decision="NeedsMoreEvidence")
-
-## User Verification
-
-### GET /admin/users/pending
-
-Get all users with pending verification status.
-
-**Authentication:** Required (Admin role)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "userId": "uuid",
-    "email": "user@example.com",
-    "fullName": "John Doe",
-    "phoneNumber": "+12345678901",
-    "role": "Dispatcher",
-    "verificationStatus": "Pending",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-]
-```
-
-**Query Details:**
-- Scans the table for users with `verificationStatus = Pending`
-- Filters for items where `PK` begins with `USER#` and `SK = PROFILE`
-- Note: For production with large datasets, consider adding GSI4 for user status queries
-
-**Example:**
-```bash
+# Get pending user verifications
 curl -X GET http://localhost:3000/admin/users/pending \
   -H "Authorization: Bearer <admin-token>"
-```
 
-### PATCH /admin/users/:id/verify
-
-Verify or reject a user identity.
-
-**Authentication:** Required (Admin role)
-
-**Path Parameters:**
-- `id`: User ID (UUID)
-
-**Request Body:**
-```json
-{
-  "decision": "Verified",
-  "reason": "Optional rejection reason"
-}
-```
-
-**Validation:**
-- `decision`: Required, must be one of: `"Verified"`, `"Rejected"`
-- `reason`: Required when decision is `"Rejected"`
-
-**Response:** `200 OK`
-```json
-{
-  "userId": "uuid",
-  "email": "user@example.com",
-  "fullName": "John Doe",
-  "phoneNumber": "+12345678901",
-  "role": "Dispatcher",
-  "verificationStatus": "Verified",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Example - Verify:**
-```bash
-curl -X PATCH http://localhost:3000/admin/users/uuid/verify \
+# Verify user
+curl -X PATCH http://localhost:3000/admin/users/<user-id>/verify \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{
-    "decision": "Verified"
-  }'
+  -d '{"decision": "Verified"}'
 ```
 
-**Example - Reject:**
+
+## Development Best Practices
+
+### 1. Monorepo Workflow
+
+Always build the shared package before working on the backend:
+
 ```bash
-curl -X PATCH http://localhost:3000/admin/users/uuid/verify \
-  -H "Authorization: Bearer <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decision": "Rejected",
-    "reason": "Unable to verify identity with provided information"
-  }'
+# When starting work
+cd haulhub-shared && npm run build && cd ../haulhub-backend
+
+# When shared package changes
+cd ../haulhub-shared && npm run build && cd ../haulhub-backend && npm test
 ```
 
-**Error Responses:**
-- `400 Bad Request`: Invalid decision or missing reason when required
-- `404 Not Found`: User not found
-- `403 Forbidden`: User does not have Admin role
-
-**Behavior:**
-- Updates user verification status in DynamoDB
-- Stores rejection reason if provided
-- Removes rejection reason when verified
-- Updates `updatedAt` timestamp
-
-## User Verification Workflow
-
-1. **User registers**: Status set to `Pending`
-2. **Admin queries pending users**: Scans table to find all pending users
-3. **Admin reviews user profile**: Views user information (name, email, phone, role)
-4. **Admin makes decision**:
-   - **Verify**: Status changes to `Verified`, user can access protected features
-   - **Reject**: Status changes to `Rejected`, reason stored
-5. **User sees status**: Rejected users see message indicating verification is required
-
-## User Verification Status
-
-Users can have the following verification statuses:
+### 2. Adding New Endpoints
 
 ```typescript
-enum VerificationStatus {
-  Pending = 'Pending',      // Initial status after registration
-  Verified = 'Verified',    // Admin verified the user
-  Rejected = 'Rejected'     // Admin rejected the user
+// 1. Define DTO in shared package or local dto/ folder
+export class CreateEntityDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 }
-```
 
-## DynamoDB Schema for Users
+// 2. Add controller method
+@Post()
+@Roles(UserRole.Dispatcher)
+async create(
+  @CurrentUser('userId') userId: string,
+  @Body() dto: CreateEntityDto,
+) {
+  return this.service.create(userId, dto);
+}
 
-**Primary Key:**
-- `PK`: `USER#<userId>`
-- `SK`: `PROFILE`
+// 3. Implement service method
+async create(userId: string, dto: CreateEntityDto) {
+  // Business logic here
+}
 
-**Attributes:**
-- `userId`: String (UUID)
-- `email`: String
-- `fullName`: String
-- `phoneNumber`: String
-- `role`: Enum (Dispatcher, LorryOwner, Driver, Admin)
-- `verificationStatus`: Enum (Pending, Verified, Rejected)
-- `rejectionReason`: String (optional)
-- `createdAt`: ISO 8601 timestamp
-- `updatedAt`: ISO 8601 timestamp
-
-## Requirements Mapping
-
-This implementation satisfies the following requirements:
-
-- **13.1**: Admin can view pending user verifications (GET /admin/users/pending)
-- **13.2**: Admin can view user profile information (included in pending users response)
-- **13.3**: Admin can verify a user (PATCH with decision="Verified")
-- **13.4**: Admin can reject a user with reason (PATCH with decision="Rejected")
-- **13.5**: Rejected users see verification required message (enforced at application level)
-
----
-
-# Testing
-
-Tests are organized in a separate `test/` directory that mirrors the `src/` structure:
-
-```
-test/
-├── unit/                    # Unit tests (mirrors src/ structure)
-│   ├── auth/
-│   │   └── guards/
-│   └── admin/
-├── e2e/                     # End-to-end tests
-└── README.md                # Test documentation
-```
-
-## Test Organization
-
-### Unit Tests (`test/unit/`)
-
-Unit tests mirror the `src/` directory structure exactly. For example:
-
-- Source: `src/auth/guards/jwt-auth.guard.ts`
-- Test: `test/unit/auth/guards/jwt-auth.guard.spec.ts`
-
-This makes it easy to:
-- Find tests for any source file
-- Maintain parallel structures
-- Keep source directories clean
-
-### E2E Tests (`test/e2e/`)
-
-End-to-end tests will be added here for testing complete user flows and API integration.
-
-## Writing Tests
-
-### Import Paths
-
-When importing source files in tests, use relative paths from the test file to the source file:
-
-```typescript
-// test/unit/auth/guards/jwt-auth.guard.spec.ts
-import { JwtAuthGuard } from '../../../../src/auth/guards/jwt-auth.guard';
-import { AuthService } from '../../../../src/auth/auth.service';
-```
-
-### Test File Naming
-
-- Unit tests: `*.spec.ts`
-- E2E tests: `*.e2e-spec.ts`
-
-### Test Structure
-
-Follow the AAA pattern (Arrange, Act, Assert):
-
-```typescript
-describe('ComponentName', () => {
-  let component: ComponentType;
-  
-  beforeEach(() => {
-    // Arrange: Set up test dependencies
-  });
-
-  it('should do something', () => {
-    // Arrange: Set up test data
-    const input = 'test';
-    
-    // Act: Execute the code under test
-    const result = component.doSomething(input);
-    
-    // Assert: Verify the result
-    expect(result).toBe('expected');
+// 4. Write tests
+describe('create', () => {
+  it('should create entity', async () => {
+    // Test implementation
   });
 });
 ```
 
-## Test Coverage Goals
+### 3. Error Handling
 
-- **Unit Tests**: 80%+ code coverage
-- **Critical Paths**: 100% coverage (authentication, authorization, payment calculations)
-- **Edge Cases**: Test error handling and boundary conditions
-
-## Current Test Coverage
-
-- ✅ AuthService: 10 test cases
-- ✅ AuthController: 10 test cases
-- ✅ JwtAuthGuard: 8 test cases
-- ✅ RolesGuard: 6 test cases
-- ✅ BrokersService: 10 test cases
-- ✅ BrokersController: 7 test cases
-- ✅ UsersService: 10 test cases
-- ✅ UsersController: 4 test cases
-- ✅ LorriesService: 14 test cases
-- ✅ LorriesController: 7 test cases
-- ✅ TripsService: 15 test cases
-- ✅ TripsController: 6 test cases
-- ✅ AdminService: 16 test cases
-- **Total: 123 tests passing across 13 test suites**
-- All completed backend modules have comprehensive test coverage
-
-## Best Practices
-
-1. **One test file per source file**: Keep tests focused and organized
-2. **Descriptive test names**: Use clear, descriptive test names that explain what is being tested
-3. **Mock external dependencies**: Use mocks for AWS services, databases, etc.
-4. **Test behavior, not implementation**: Focus on what the code does, not how it does it
-5. **Keep tests independent**: Each test should be able to run in isolation
-6. **Clean up after tests**: Use `afterEach` to reset mocks and clean up state
-
-## Mocking
-
-### Mock Services
+Use NestJS built-in exceptions:
 
 ```typescript
-const mockAuthService = {
-  validateToken: jest.fn(),
-  login: jest.fn(),
-};
+import { 
+  NotFoundException, 
+  BadRequestException, 
+  ForbiddenException,
+  UnauthorizedException 
+} from '@nestjs/common';
+
+// Not found
+throw new NotFoundException('Trip not found');
+
+// Invalid input
+throw new BadRequestException('Invalid date format');
+
+// Permission denied
+throw new ForbiddenException('You do not own this lorry');
+
+// Authentication failed
+throw new UnauthorizedException('Invalid credentials');
 ```
 
-### Mock AWS SDK
+### 4. Validation
+
+Use class-validator decorators in DTOs:
 
 ```typescript
-const mockCognitoClient = {
-  send: jest.fn(),
-};
+import { IsString, IsNumber, IsPositive, IsDateString, IsOptional } from 'class-validator';
+
+export class CreateTripDto {
+  @IsString()
+  pickupLocation: string;
+
+  @IsDateString()
+  scheduledPickupDatetime: string;
+
+  @IsNumber()
+  @IsPositive()
+  brokerPayment: number;
+
+  @IsNumber()
+  @IsOptional()
+  distance?: number;
+}
 ```
 
-### Mock Request/Response
+### 5. AWS Service Usage
+
+Access AWS clients through `AwsService`:
 
 ```typescript
-const mockRequest = {
-  headers: { authorization: 'Bearer token' },
-  user: undefined,
-};
+constructor(private readonly awsService: AwsService) {}
+
+async someMethod() {
+  const dynamoClient = this.awsService.getDynamoDBClient();
+  const s3Client = this.awsService.getS3Client();
+  const cognitoClient = this.awsService.getCognitoClient();
+  const cloudWatchClient = this.awsService.getCloudWatchClient();
+}
 ```
 
-## Debugging Tests
+### 6. CloudWatch Metrics
 
-### Run Tests in Debug Mode
+Emit custom metrics for monitoring:
+
+```typescript
+const metricData: MetricDatum[] = [{
+  MetricName: 'QueryResponseTime',
+  Value: responseTimeMs,
+  Unit: 'Milliseconds',
+  Timestamp: new Date(),
+  Dimensions: [
+    { Name: 'IndexName', Value: indexName },
+    { Name: 'Service', Value: 'TripsService' },
+  ],
+}];
+
+await cloudWatchClient.send(new PutMetricDataCommand({
+  Namespace: 'HaulHub/Trips',
+  MetricData: metricData,
+}));
+```
+
+## Security Considerations
+
+### Current Implementation
+
+- **Authentication**: JWT tokens validated with Cognito JWKS
+- **Authorization**: Role-based access control on all protected routes
+- **Data Access**: Users can only access their own data (enforced in service layer)
+- **Document Storage**: Presigned URLs with 15-minute expiration
+- **CORS**: Restricted to CloudFront domain in production
+- **Input Validation**: All DTOs validated with class-validator
+
+### Future Enhancements
+
+- Encryption at rest for sensitive data (banking info, SSN)
+- Rate limiting for API endpoints
+- Request logging and audit trails
+- IP whitelisting for admin operations
+- Multi-factor authentication
+
+## Performance Optimization
+
+### DynamoDB Query Optimization
+
+- **Use GSIs for access patterns**: Avoid table scans
+- **Composite sort keys**: Enable range queries (e.g., `TRIP#<date>#<id>`)
+- **Index selection**: `IndexSelectorService` chooses optimal GSI
+- **Batch operations**: Use BatchGetItem and BatchWriteItem when possible
+
+### Lambda Cold Start Optimization
+
+- **Connection reuse**: AWS clients initialized once and cached
+- **Minimal dependencies**: Keep Lambda package size small
+- **Lazy loading**: Load heavy modules only when needed
+
+### Caching Strategy
+
+- **JWKS caching**: Public keys cached for 10 minutes
+- **Lambda instance reuse**: NestJS app cached between invocations
+- **Future**: Consider ElastiCache for frequently accessed data
+
+
+## Useful Scripts
 
 ```bash
-node --inspect-brk node_modules/.bin/jest --runInBand
+# Development
+npm run start:dev          # Run with hot-reload
+npm start                  # Run without hot-reload
+
+# Building
+npm run build              # Standard build
+npm run build:lambda       # Build for Lambda deployment
+
+# Testing
+npm test                   # Run all tests
+npm run test:watch         # Run tests in watch mode
+npm run test:cov           # Run tests with coverage report
+npm test -- <pattern>      # Run tests matching pattern
+
+# Data Management (from scripts/ directory)
+../scripts/seed-brokers.sh              # Seed initial broker data
+../scripts/seed-complete-database.sh    # Seed all tables with test data
+../scripts/create-cognito-users.sh      # Create test users in Cognito
 ```
 
-Then attach your debugger (VS Code, Chrome DevTools, etc.)
+## Project Dependencies
 
-### Verbose Output
+### Core Dependencies
 
-```bash
-npm test -- --verbose
-```
+- `@nestjs/core`, `@nestjs/common`: NestJS framework
+- `@nestjs/platform-express`: Express adapter for NestJS
+- `@vendia/serverless-express`: Lambda wrapper for Express apps
+- `@haulhub/shared`: Shared types, DTOs, and utilities
 
-### Only Run Failed Tests
+### AWS SDK
 
-```bash
-npm test -- --onlyFailures
-```
+- `@aws-sdk/client-cognito-identity-provider`: Cognito operations
+- `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb`: DynamoDB operations
+- `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`: S3 operations
+- `@aws-sdk/client-cloudwatch`: CloudWatch metrics
 
----
+### Validation & Transformation
+
+- `class-validator`: DTO validation decorators
+- `class-transformer`: Object transformation
+
+### Authentication
+
+- `jsonwebtoken`: JWT token handling
+- `jwks-rsa`: JWKS client for Cognito public keys
+
+### Testing
+
+- `jest`: Test framework
+- `ts-jest`: TypeScript support for Jest
+- `fast-check`: Property-based testing
+- `@nestjs/testing`: NestJS testing utilities
+
+## Contributing
+
+### Code Style
+
+- Use TypeScript strict mode
+- Follow NestJS conventions (modules, controllers, services)
+- Use dependency injection
+- Write tests for all new features
+- Document complex business logic
+
+### Commit Guidelines
+
+1. Build shared package if modified
+2. Run tests and ensure they pass
+3. Check TypeScript compilation
+4. Write descriptive commit messages
+
+### Pull Request Checklist
+
+- [ ] Shared package built and tests pass
+- [ ] Backend tests pass with coverage
+- [ ] No TypeScript errors
+- [ ] Environment variables documented
+- [ ] API endpoints documented
+- [ ] Error handling implemented
+- [ ] Authorization checks in place
+
+## Additional Resources
+
+- [NestJS Documentation](https://docs.nestjs.com/)
+- [AWS SDK for JavaScript v3](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/)
+- [DynamoDB Single-Table Design](https://aws.amazon.com/blogs/compute/creating-a-single-table-design-with-amazon-dynamodb/)
+- [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
+- [Property-Based Testing with fast-check](https://github.com/dubzzz/fast-check)
 
 ## License
 
 ISC
+
+---
+
+## Quick Reference
+
+### User Roles
+- `Admin`: System administration
+- `Dispatcher`: Trip management
+- `LorryOwner`: Vehicle ownership
+- `Driver`: Trip execution
+
+### Trip Statuses
+- `Scheduled` → `PickedUp` → `InTransit` → `Delivered` → `Paid`
+
+### Verification Statuses
+- `Pending` → `Approved` / `Rejected` / `NeedsMoreEvidence`
+
+### Common HTTP Status Codes
+- `200 OK`: Successful GET/PATCH
+- `201 Created`: Successful POST
+- `204 No Content`: Successful DELETE
+- `400 Bad Request`: Invalid input
+- `401 Unauthorized`: Missing/invalid token
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Resource not found
+- `409 Conflict`: Resource already exists
+
+### Environment Variables
+```bash
+AWS_REGION                    # AWS region (e.g., us-east-1)
+COGNITO_USER_POOL_ID         # Cognito User Pool ID
+COGNITO_CLIENT_ID            # Cognito App Client ID
+TRIPS_TABLE_NAME             # DynamoDB Trips table name
+BROKERS_TABLE_NAME           # DynamoDB Brokers table name
+LORRIES_TABLE_NAME           # DynamoDB Lorries table name
+USERS_TABLE_NAME             # DynamoDB Users table name
+S3_DOCUMENTS_BUCKET_NAME     # S3 bucket for documents
+ALLOWED_ORIGINS              # CORS allowed origins (comma-separated)
+NODE_ENV                     # Environment (development/production)
+PORT                         # Local server port (default: 3000)
+```
+
+### Key Commands
+```bash
+# Setup
+npm install
+cd ../haulhub-shared && npm run build && cd ../haulhub-backend
+
+# Development
+npm run start:dev
+
+# Testing
+npm test
+npm run test:cov
+
+# Building
+npm run build:lambda
+
+# Deployment
+cd ../haulhub-infrastructure && npm run deploy
+```

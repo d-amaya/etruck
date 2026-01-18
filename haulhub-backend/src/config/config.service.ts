@@ -14,10 +14,6 @@ export class ConfigService {
     return process.env.COGNITO_CLIENT_ID || '';
   }
 
-  get dynamodbTableName(): string {
-    return process.env.DYNAMODB_TABLE_NAME || 'HaulHub';
-  }
-
   get tripsTableName(): string {
     return process.env.TRIPS_TABLE_NAME || 'haulhub-trips-table-dev';
   }
