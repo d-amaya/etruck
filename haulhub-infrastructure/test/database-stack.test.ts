@@ -25,14 +25,32 @@ describe('DatabaseStack', () => {
     template = Template.fromStack(stack);
   });
 
-  describe('DynamoDB Table', () => {
-    test('should create a DynamoDB table with correct name', () => {
+  describe('DynamoDB Tables', () => {
+    test('should create trips table with correct name', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'HaulHub-Table-dev',
+        TableName: 'HaulHub-TripsTable-dev',
       });
     });
 
-    test('should configure single table design with PK and SK', () => {
+    test('should create brokers table with correct name', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-BrokersTable-dev',
+      });
+    });
+
+    test('should create lorries table with correct name', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-LorriesTable-dev',
+      });
+    });
+
+    test('should create users table with correct name', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-UsersTable-dev',
+      });
+    });
+
+    test('should configure all tables with PK and SK', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
         KeySchema: [
           {
@@ -71,19 +89,11 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should enable DynamoDB streams', () => {
+    test('should enable DynamoDB streams on trips table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
         StreamSpecification: {
           StreamViewType: 'NEW_AND_OLD_IMAGES',
-        },
-      });
-    });
-
-    test('should configure TTL attribute', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TimeToLiveSpecification: {
-          AttributeName: 'ttl',
-          Enabled: true,
         },
       });
     });
@@ -101,8 +111,9 @@ describe('DatabaseStack', () => {
   });
 
   describe('Global Secondary Indexes', () => {
-    test('should create GSI1 for driver trip queries', () => {
+    test('should create GSI1 on trips table for dispatcher queries', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
         GlobalSecondaryIndexes: Match.arrayWith([
           {
             IndexName: 'GSI1',
@@ -124,8 +135,9 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should create GSI2 for lorry trip queries', () => {
+    test('should create GSI2 on trips table for lorry owner queries', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
         GlobalSecondaryIndexes: Match.arrayWith([
           {
             IndexName: 'GSI2',
@@ -147,8 +159,9 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should create GSI3 for lorry verification status queries', () => {
+    test('should create GSI3 on trips table for driver queries', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
         GlobalSecondaryIndexes: Match.arrayWith([
           {
             IndexName: 'GSI3',
@@ -170,8 +183,81 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should define all GSI attributes', () => {
+    test('should create GSI4 on trips table for broker queries', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          {
+            IndexName: 'GSI4',
+            KeySchema: [
+              {
+                AttributeName: 'GSI4PK',
+                KeyType: 'HASH',
+              },
+              {
+                AttributeName: 'GSI4SK',
+                KeyType: 'RANGE',
+              },
+            ],
+            Projection: {
+              ProjectionType: 'ALL',
+            },
+          },
+        ]),
+      });
+    });
+
+    test('should create GSI1 on lorries table for admin verification', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-LorriesTable-dev',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          {
+            IndexName: 'GSI1',
+            KeySchema: [
+              {
+                AttributeName: 'GSI1PK',
+                KeyType: 'HASH',
+              },
+              {
+                AttributeName: 'GSI1SK',
+                KeyType: 'RANGE',
+              },
+            ],
+            Projection: {
+              ProjectionType: 'ALL',
+            },
+          },
+        ]),
+      });
+    });
+
+    test('should create GSI2 on lorries table for document queries', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-LorriesTable-dev',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          {
+            IndexName: 'GSI2',
+            KeySchema: [
+              {
+                AttributeName: 'GSI2PK',
+                KeyType: 'HASH',
+              },
+              {
+                AttributeName: 'GSI2SK',
+                KeyType: 'RANGE',
+              },
+            ],
+            Projection: {
+              ProjectionType: 'ALL',
+            },
+          },
+        ]),
+      });
+    });
+
+    test('should define all GSI attributes on trips table', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'HaulHub-TripsTable-dev',
         AttributeDefinitions: Match.arrayWith([
           { AttributeName: 'GSI1PK', AttributeType: 'S' },
           { AttributeName: 'GSI1SK', AttributeType: 'S' },
@@ -179,64 +265,91 @@ describe('DatabaseStack', () => {
           { AttributeName: 'GSI2SK', AttributeType: 'S' },
           { AttributeName: 'GSI3PK', AttributeType: 'S' },
           { AttributeName: 'GSI3SK', AttributeType: 'S' },
+          { AttributeName: 'GSI4PK', AttributeType: 'S' },
+          { AttributeName: 'GSI4SK', AttributeType: 'S' },
         ]),
       });
     });
 
-    test('should create exactly four GSIs', () => {
-      const table = template.findResources('AWS::DynamoDB::Table');
-      const tableResource = Object.values(table)[0] as any;
-      expect(tableResource.Properties.GlobalSecondaryIndexes.length).toBe(4);
+    test('trips table should have exactly four GSIs', () => {
+      const tables = template.findResources('AWS::DynamoDB::Table');
+      const tripsTable = Object.values(tables).find((table: any) => 
+        table.Properties.TableName === 'HaulHub-TripsTable-dev'
+      ) as any;
+      expect(tripsTable.Properties.GlobalSecondaryIndexes.length).toBe(4);
+    });
+
+    test('lorries table should have exactly two GSIs', () => {
+      const tables = template.findResources('AWS::DynamoDB::Table');
+      const lorriesTable = Object.values(tables).find((table: any) => 
+        table.Properties.TableName === 'HaulHub-LorriesTable-dev'
+      ) as any;
+      expect(lorriesTable.Properties.GlobalSecondaryIndexes.length).toBe(2);
     });
   });
 
   describe('Stack Outputs', () => {
-    test('should export table name', () => {
-      template.hasOutput('TableName', {
-        Description: 'DynamoDB Table Name',
+    test('should export trips table name', () => {
+      template.hasOutput('TripsTableName', {
+        Description: 'Trips DynamoDB Table Name',
         Export: {
-          Name: 'HaulHub-TableName-dev',
+          Name: 'HaulHub-TripsTableName-dev',
         },
       });
     });
 
-    test('should export table ARN', () => {
-      template.hasOutput('TableArn', {
-        Description: 'DynamoDB Table ARN',
+    test('should export trips table ARN', () => {
+      template.hasOutput('TripsTableArn', {
+        Description: 'Trips DynamoDB Table ARN',
         Export: {
-          Name: 'HaulHub-TableArn-dev',
+          Name: 'HaulHub-TripsTableArn-dev',
         },
       });
     });
 
-    test('should output table stream ARN', () => {
-      template.hasOutput('TableStreamArn', {
-        Description: 'DynamoDB Table Stream ARN',
+    test('should output trips table stream ARN', () => {
+      template.hasOutput('TripsTableStreamArn', {
+        Description: 'Trips DynamoDB Table Stream ARN',
       });
     });
 
-    test('should output GSI1 index name', () => {
-      template.hasOutput('GSI1IndexName', {
-        Description: 'GSI1 Index Name (Driver Trip Queries)',
+    test('should export brokers table name', () => {
+      template.hasOutput('BrokersTableName', {
+        Description: 'Brokers DynamoDB Table Name',
+        Export: {
+          Name: 'HaulHub-BrokersTableName-dev',
+        },
       });
     });
 
-    test('should output GSI2 index name', () => {
-      template.hasOutput('GSI2IndexName', {
-        Description: 'GSI2 Index Name (Lorry Trip Queries)',
+    test('should export lorries table name', () => {
+      template.hasOutput('LorriesTableName', {
+        Description: 'Lorries DynamoDB Table Name',
+        Export: {
+          Name: 'HaulHub-LorriesTableName-dev',
+        },
       });
     });
 
-    test('should output GSI3 index name', () => {
-      template.hasOutput('GSI3IndexName', {
-        Description: 'GSI3 Index Name (Lorry Verification Status Queries)',
+    test('should export users table name', () => {
+      template.hasOutput('UsersTableName', {
+        Description: 'Users DynamoDB Table Name',
+        Export: {
+          Name: 'HaulHub-UsersTableName-dev',
+        },
+      });
+    });
+
+    test('should output GSI4 index name for broker queries', () => {
+      template.hasOutput('TripsTableGSI4IndexName', {
+        Description: 'GSI4 Index Name (Broker-Optimized Index for Trip Filtering)',
       });
     });
   });
 
   describe('Resource Count', () => {
-    test('should create five DynamoDB tables (main + 4 dedicated tables)', () => {
-      template.resourceCountIs('AWS::DynamoDB::Table', 5);
+    test('should create four DynamoDB tables (Trips, Brokers, Lorries, Users)', () => {
+      template.resourceCountIs('AWS::DynamoDB::Table', 4);
     });
   });
 
