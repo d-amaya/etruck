@@ -1119,8 +1119,9 @@ export class TripsService {
     }
 
     // Build filter expression for secondary filters
+    // No exclusions needed for GSI1 since all filters are applied via FilterExpression
     const { filterExpression, filterAttributeNames, filterAttributeValues } =
-      this.buildSecondaryFilters(filters);
+      this.buildFilterExpression(filters, []);
 
     const requestedLimit = filters.limit ? Number(filters.limit) : 50;
     const trips: Trip[] = [];
@@ -1129,17 +1130,37 @@ export class TripsService {
     // When using FilterExpression AND application-layer filtering (driver name),
     // we need to keep fetching until we have enough items that pass ALL filters
     const fetchLimit = requestedLimit + 1;
-    const maxIterations = 20; // Increased to handle more filtering
+    const queryStartTime = Date.now();
+    const maxQueryTimeMs = 10000; // 10 seconds - balance between completeness and UX
     let iterations = 0;
     
     // Check if we have filters that require more aggressive fetching
     const hasDriverNameFilter = !!filters.driverName;
     const hasMultipleFilters = [filters.brokerId, filters.status, filters.lorryId, filters.driverName].filter(f => f).length > 1;
     
-    while (iterations < maxIterations) {
+    // Dynamic batch size based on filter selectivity
+    // No filters: Use page size (dense data, immediate results)
+    // DynamoDB filters only: Moderate batch (200-300)
+    // Application-layer filters: Large batch (500)
+    // Multiple filters: Largest batch (500)
+    const hasDynamoDBFilters = !!(filters.brokerId || filters.status || filters.lorryId);
+    let batchSize: number;
+    
+    if (hasDriverNameFilter || hasMultipleFilters) {
+      // Most sparse: application-layer filtering or multiple filters
+      batchSize = 500;
+    } else if (hasDynamoDBFilters) {
+      // Moderate sparsity: DynamoDB FilterExpression
+      batchSize = 200;
+    } else {
+      // Dense data: no filters, just date range
+      batchSize = Math.max(fetchLimit, 50); // At least 50 for efficiency
+    }
+    
+    while (Date.now() - queryStartTime < maxQueryTimeMs) {
       iterations++;
       
-      // Build query command for GSI1 on new trips table
+      // Build query command for GSI1 on new trips table with dynamic batch size
       const queryParams: any = {
         TableName: this.tripsTableName,
         IndexName: 'GSI1',
@@ -1148,8 +1169,7 @@ export class TripsService {
           ...expressionAttributeValues,
           ...filterAttributeValues,
         },
-        // Fetch more items when we have multiple filters to account for DynamoDB filtering
-        Limit: hasMultipleFilters ? 100 : (filterExpression ? 50 : fetchLimit),
+        Limit: batchSize, // Dynamic based on filter selectivity
         ScanIndexForward: false, // Return results in descending order (newest first)
         ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
       };
@@ -1214,6 +1234,16 @@ export class TripsService {
       }
     }
 
+    // Check if we hit the timeout limit
+    const queryTimeMs = Date.now() - queryStartTime;
+    if (queryTimeMs >= maxQueryTimeMs) {
+      console.warn(`[GSI1] Query timeout reached after ${iterations} iterations and ${queryTimeMs}ms. Returning partial results.`, {
+        requestedLimit,
+        itemsFound: trips.length,
+        filters,
+      });
+    }
+
     // Apply case-insensitive driver name filtering in application layer
     const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
 
@@ -1247,6 +1277,13 @@ export class TripsService {
     // Requirements: 6.1
     const responseTimeMs = Date.now() - startTime;
     await this.emitQueryMetrics('GSI1', responseTimeMs, totalRCU, isError);
+    
+    console.log('[DEBUG-GSI1] Final trips with broker info:', trimmedTrips.map(t => ({
+      tripId: t.tripId,
+      status: t.status,
+      brokerId: t.brokerId,
+      brokerName: t.brokerName
+    })));
 
     // Log actual reads after query execution
     // Requirements: 3.6, 6.4
@@ -1324,8 +1361,9 @@ export class TripsService {
     }
 
     // Build filter expression for secondary filters
+    // Exclude driverId since it's already in KeyConditionExpression
     const { filterExpression, filterAttributeNames, filterAttributeValues } =
-      this.buildSecondaryFilters(filters);
+      this.buildFilterExpression(filters, ['driverId']);
 
     // Build query command for GSI3 on new trips table
     const queryParams: any = {
@@ -1446,8 +1484,9 @@ export class TripsService {
       }
 
       // Build filter expression for secondary filters
+      // Exclude lorryId since it's already in KeyConditionExpression
       const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildSecondaryFilters(filters);
+        this.buildFilterExpression(filters, ['lorryId']);
 
       // Build query command for GSI2 on new trips table
       const queryParams: any = {
@@ -1575,62 +1614,140 @@ export class TripsService {
 
       // Build FilterExpression for remaining filters (broker, driver, status)
       // Exclude lorryId since it's already in KeyConditionExpression
+      // NOTE: Also exclude status to filter in application layer for consistency
       const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildFilterExpression(filters, ['lorryId']);
+        this.buildFilterExpression(filters, ['lorryId', 'status']);
 
-      // Build query parameters
-      const queryParams: any = {
-        TableName: this.tripsTableName,
-        IndexName: 'GSI2',
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ...filterAttributeValues,
-        },
-        Limit: filters.limit || 50,
-        ScanIndexForward: false, // Return results in descending order (newest first)
-        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
-      };
-
-      if (filterExpression) {
-        queryParams.FilterExpression = filterExpression;
-        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+      const trips: Trip[] = [];
+      let lastEvaluatedKey = filters.lastEvaluatedKey;
+      
+      // When using FilterExpression, keep fetching until we have enough results
+      const fetchLimit = requestedLimit + 1;
+      const queryStartTime = Date.now();
+      const maxQueryTimeMs = 10000; // 10 seconds - balance between completeness and UX
+      let iterations = 0;
+      
+      const hasMultipleFilters = [filters.status, filters.brokerId, filters.driverId, filters.driverName].filter(f => f).length > 0;
+      
+      // Dynamic batch size based on filter selectivity
+      // Lorry filter is highly selective (~20 items), so we can use smaller batches
+      const hasDynamoDBFilters = !!(filters.brokerId || filters.status || filters.driverId);
+      const hasDriverNameFilter = !!filters.driverName;
+      let batchSize: number;
+      
+      if (hasDriverNameFilter || hasMultipleFilters) {
+        // Most sparse: application-layer filtering or multiple filters
+        batchSize = 500;
+      } else if (hasDynamoDBFilters) {
+        // Moderate sparsity: DynamoDB FilterExpression
+        batchSize = 200;
+      } else {
+        // Dense data: lorry filter only, no additional filters
+        // Since GSI2 is already highly selective (~20 items), use smaller batch
+        batchSize = Math.max(fetchLimit, 100);
       }
+      
+      while (Date.now() - queryStartTime < maxQueryTimeMs) {
+        iterations++;
+        
+        // Build query parameters with dynamic batch size for efficiency
+        const queryParams: any = {
+          TableName: this.tripsTableName,
+          IndexName: 'GSI2',
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeValues: {
+            ...expressionAttributeValues,
+            ...filterAttributeValues,
+          },
+          Limit: batchSize, // Dynamic based on filter selectivity
+          ScanIndexForward: false,
+          ReturnConsumedCapacity: 'TOTAL',
+        };
 
-      if (filters.lastEvaluatedKey) {
-        try {
-          queryParams.ExclusiveStartKey = JSON.parse(
-            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
-          );
-        } catch (error) {
-          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        if (filterExpression) {
+          queryParams.FilterExpression = filterExpression;
+          queryParams.ExpressionAttributeNames = filterAttributeNames;
         }
+
+        if (lastEvaluatedKey) {
+          try {
+            queryParams.ExclusiveStartKey = JSON.parse(
+              Buffer.from(lastEvaluatedKey, 'base64').toString('utf-8'),
+            );
+          } catch (error) {
+            throw new BadRequestException('Invalid lastEvaluatedKey format');
+          }
+        }
+
+        // Execute query
+        const queryCommand = new QueryCommand(queryParams);
+        const result = await dynamodbClient.send(queryCommand);
+
+        // Track RCU consumption
+        if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+          totalRCU += result.ConsumedCapacity.CapacityUnits;
+        }
+
+        // Map and filter results
+        const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+        let filteredBatch = this.applyDriverNameFilter(batchTrips, filters.driverName);
+        
+        // Apply status filtering in application layer
+        if (filters.status) {
+          filteredBatch = filteredBatch.filter(trip => trip.status === filters.status);
+        }
+        
+        trips.push(...filteredBatch);
+        
+        console.log('[DEBUG-GSI2-LOOP] Iteration', iterations, 'complete. Total trips:', trips.length, '/ Requested:', requestedLimit);
+
+        // Check if we have enough results or no more items
+        if (!result.LastEvaluatedKey || trips.length >= requestedLimit) {
+          lastEvaluatedKey = result.LastEvaluatedKey 
+            ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+            : undefined;
+          console.log('[DEBUG-GSI2-LOOP] Breaking loop. Has more data:', !!result.LastEvaluatedKey);
+          break;
+        }
+
+        lastEvaluatedKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
       }
 
-      // Execute query
-      const queryCommand = new QueryCommand(queryParams);
-      const result = await dynamodbClient.send(queryCommand);
-
-      // Track RCU consumption from DynamoDB response
-      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
-        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      // Check if we hit the timeout limit
+      const queryTimeMs = Date.now() - queryStartTime;
+      if (queryTimeMs >= maxQueryTimeMs) {
+        console.warn(`[GSI2] Query timeout reached after ${iterations} iterations and ${queryTimeMs}ms. Returning partial results.`, {
+          requestedLimit,
+          itemsFound: trips.length,
+          filters,
+        });
       }
 
-      // Map results to Trip objects
-      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
-
-      // Apply case-insensitive driver name filtering in application layer
-      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+      const trimmedTrips = trips.slice(0, requestedLimit);
+      
+      console.log('[DEBUG-GSI2-FINAL] Collected', trips.length, 'trips, trimmed to', trimmedTrips.length);
+      console.log('[DEBUG-GSI2-FINAL] Trip IDs:', trimmedTrips.map(t => t.tripId).join(', '));
 
       // Build response
-      const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
-        trips: filteredTrips 
+      const response: { trips: Trip[]; lastEvaluatedKey?: string} = { 
+        trips: trimmedTrips 
       };
 
-      if (result.LastEvaluatedKey) {
-        response.lastEvaluatedKey = Buffer.from(
-          JSON.stringify(result.LastEvaluatedKey),
-        ).toString('base64');
+      // CRITICAL: Set lastEvaluatedKey based on the LAST RETURNED ITEM, not last fetched item
+      // This ensures no items are lost between pages when application-layer filtering is applied
+      if (trips.length > requestedLimit && trimmedTrips.length > 0) {
+        const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
+        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
+        const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        const lastKey = {
+          PK: `TRIP#${lastReturnedTrip.tripId}`,
+          SK: 'METADATA',
+          GSI2PK: `DISPATCHER#${dispatcherId}`,
+          GSI2SK: `LORRY#${lastReturnedTrip.lorryId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+        };
+        response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
 
       // Emit CloudWatch metrics for query performance
@@ -1640,7 +1757,7 @@ export class TripsService {
 
       // Log actual reads after query execution
       // Requirements: 3.6, 6.4
-      this.logQueryCompletion('GSI2', filters, totalRCU, filteredTrips.length, responseTimeMs);
+      this.logQueryCompletion('GSI2', filters, totalRCU, trimmedTrips.length, responseTimeMs);
 
       return response;
     } catch (error: any) {
@@ -1740,59 +1857,130 @@ export class TripsService {
       const { filterExpression, filterAttributeNames, filterAttributeValues } =
         this.buildFilterExpression(filters, ['driverId']);
 
-      // Build query parameters
-      const queryParams: any = {
-        TableName: this.tripsTableName,
-        IndexName: 'GSI3',
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ...filterAttributeValues,
-        },
-        Limit: filters.limit || 50,
-        ScanIndexForward: false, // Return results in descending order (newest first)
-        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
-      };
-
-      if (filterExpression) {
-        queryParams.FilterExpression = filterExpression;
-        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+      const trips: Trip[] = [];
+      let lastEvaluatedKey = filters.lastEvaluatedKey;
+      
+      // When using FilterExpression, keep fetching until we have enough results
+      const fetchLimit = requestedLimit + 1;
+      const queryStartTime = Date.now();
+      const maxQueryTimeMs = 10000; // 10 seconds - balance between completeness and UX
+      let iterations = 0;
+      
+      const hasMultipleFilters = [filters.status, filters.brokerId, filters.lorryId, filters.driverName].filter(f => f).length > 0;
+      
+      // Dynamic batch size based on filter selectivity
+      // Driver filter is selective (~50 items), so we can use smaller batches
+      const hasDynamoDBFilters = !!(filters.brokerId || filters.status || filters.lorryId);
+      const hasDriverNameFilter = !!filters.driverName;
+      let batchSize: number;
+      
+      if (hasDriverNameFilter || hasMultipleFilters) {
+        // Most sparse: application-layer filtering or multiple filters
+        batchSize = 500;
+      } else if (hasDynamoDBFilters) {
+        // Moderate sparsity: DynamoDB FilterExpression
+        batchSize = 200;
+      } else {
+        // Dense data: driver filter only, no additional filters
+        // Since GSI3 is already selective (~50 items), use smaller batch
+        batchSize = Math.max(fetchLimit, 100);
       }
+      
+      while (Date.now() - queryStartTime < maxQueryTimeMs) {
+        iterations++;
+        
+        // Build query parameters with dynamic batch size for efficiency
+        const queryParams: any = {
+          TableName: this.tripsTableName,
+          IndexName: 'GSI3',
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeValues: {
+            ...expressionAttributeValues,
+            ...filterAttributeValues,
+          },
+          Limit: batchSize, // Dynamic based on filter selectivity
+          ScanIndexForward: false,
+          ReturnConsumedCapacity: 'TOTAL',
+        };
 
-      if (filters.lastEvaluatedKey) {
-        try {
-          queryParams.ExclusiveStartKey = JSON.parse(
-            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
-          );
-        } catch (error) {
-          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        if (filterExpression) {
+          queryParams.FilterExpression = filterExpression;
+          queryParams.ExpressionAttributeNames = filterAttributeNames;
         }
+
+        if (lastEvaluatedKey) {
+          try {
+            queryParams.ExclusiveStartKey = JSON.parse(
+              Buffer.from(lastEvaluatedKey, 'base64').toString('utf-8'),
+            );
+          } catch (error) {
+            throw new BadRequestException('Invalid lastEvaluatedKey format');
+          }
+        }
+
+        // Execute query
+        const queryCommand = new QueryCommand(queryParams);
+        const result = await dynamodbClient.send(queryCommand);
+
+        // Track RCU
+        if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+          totalRCU += result.ConsumedCapacity.CapacityUnits;
+        }
+
+        // Map and filter results
+        const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+        let filteredBatch = this.applyDriverNameFilter(batchTrips, filters.driverName);
+        
+        // Apply status filtering in application layer
+        if (filters.status) {
+          filteredBatch = filteredBatch.filter(trip => trip.status === filters.status);
+        }
+        
+        trips.push(...filteredBatch);
+
+        // Check if we have enough results or no more items
+        if (!result.LastEvaluatedKey || trips.length >= requestedLimit) {
+          lastEvaluatedKey = result.LastEvaluatedKey 
+            ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+            : undefined;
+          break;
+        }
+
+        lastEvaluatedKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
       }
 
-      // Execute query
-      const queryCommand = new QueryCommand(queryParams);
-      const result = await dynamodbClient.send(queryCommand);
-
-      // Track RCU consumption from DynamoDB response
-      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
-        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      // Check if we hit the timeout limit
+      const queryTimeMs = Date.now() - queryStartTime;
+      if (queryTimeMs >= maxQueryTimeMs) {
+        console.warn(`[GSI3] Query timeout reached after ${iterations} iterations and ${queryTimeMs}ms. Returning partial results.`, {
+          requestedLimit,
+          itemsFound: trips.length,
+          filters,
+        });
       }
 
-      // Map results to Trip objects
-      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
-
-      // Apply case-insensitive driver name filtering in application layer
-      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
+      const trimmedTrips = trips.slice(0, requestedLimit);
 
       // Build response
       const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
-        trips: filteredTrips 
+        trips: trimmedTrips 
       };
 
-      if (result.LastEvaluatedKey) {
-        response.lastEvaluatedKey = Buffer.from(
-          JSON.stringify(result.LastEvaluatedKey),
-        ).toString('base64');
+      // CRITICAL: Set lastEvaluatedKey based on the LAST RETURNED ITEM, not last fetched item
+      // This ensures no items are lost between pages when application-layer filtering is applied
+      if (trips.length > requestedLimit && trimmedTrips.length > 0) {
+        const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
+        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
+        const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        const lastKey = {
+          PK: `TRIP#${lastReturnedTrip.tripId}`,
+          SK: 'METADATA',
+          GSI3PK: `DISPATCHER#${dispatcherId}`,
+          GSI3SK: `DRIVER#${lastReturnedTrip.driverId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+        };
+        response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
 
       // Emit CloudWatch metrics for query performance
@@ -1840,10 +2028,9 @@ export class TripsService {
    * FilterExpression handles: lorryId, driverId, status
    * Application layer handles: driverName (case-insensitive)
    * 
-   * Comprehensive logging includes:
-   * - Query start with filter details
-   * - Actual reads after query execution (from DynamoDB response)
-   * - Query errors with full context
+   * IMPORTANT: Uses pagination loop when FilterExpression is present because DynamoDB
+   * applies Limit BEFORE FilterExpression, which can result in 0 items returned even
+   * when matching items exist beyond the limit.
    * 
    * @param dispatcherId - Dispatcher ID to query trips for
    * @param filters - Trip filters including required brokerId
@@ -1860,29 +2047,22 @@ export class TripsService {
     let isError = false;
 
     try {
-      // Log query start with filter details
-      // Requirements: 3.6, 6.4
       this.logQueryStart('GSI4', filters);
 
       // Build KeyConditionExpression for GSI4
-      // GSI4PK = DISPATCHER#{dispatcherId}
-      // GSI4SK = BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
       let keyConditionExpression = 'GSI4PK = :gsi4pk';
       const expressionAttributeValues: Record<string, any> = {
         ':gsi4pk': `DISPATCHER#${dispatcherId}`,
       };
 
-      // Add date range filtering in KeyConditionExpression using GSI4SK
-      // GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
-      // We need to construct the range to match this format
-      // IMPORTANT: Normalize dates to UTC to avoid timezone issues
+      // Add date range filtering
       if (filters.startDate && filters.endDate) {
         const startDate = new Date(filters.startDate);
         startDate.setUTCHours(0, 0, 0, 0);
         const endDate = new Date(filters.endDate);
         endDate.setUTCHours(23, 59, 59, 999);
-        const startDateStr = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
-        const endDateStr = endDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
         
         keyConditionExpression += ' AND GSI4SK BETWEEN :startSk AND :endSk';
         expressionAttributeValues[':startSk'] = `BROKER#${filters.brokerId}#${startDateStr}#`;
@@ -1900,99 +2080,141 @@ export class TripsService {
         keyConditionExpression += ' AND GSI4SK <= :endSk';
         expressionAttributeValues[':endSk'] = `BROKER#${filters.brokerId}#${endDateStr}#ZZZZZZZZ`;
       } else {
-        // No date filter - just match brokerId prefix
         keyConditionExpression += ' AND begins_with(GSI4SK, :brokerPrefix)';
         expressionAttributeValues[':brokerPrefix'] = `BROKER#${filters.brokerId}#`;
       }
 
-      // Build FilterExpression for remaining filters (lorry, driver, status)
-      // Exclude brokerId since it's already in KeyConditionExpression
+      // Build FilterExpression
       const { filterExpression, filterAttributeNames, filterAttributeValues } =
         this.buildFilterExpression(filters, ['brokerId']);
 
-      // Build query parameters
-      const queryParams: any = {
-        TableName: this.tripsTableName,
-        IndexName: 'GSI4',
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ...filterAttributeValues,
-        },
-        Limit: filters.limit || 50,
-        ScanIndexForward: false, // Return results in descending order (newest first)
-        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
-      };
-
-      if (filterExpression) {
-        queryParams.FilterExpression = filterExpression;
-        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+      const trips: Trip[] = [];
+      let lastEvaluatedKey = filters.lastEvaluatedKey;
+      
+      // Keep fetching until we have enough results OR no more data
+      const fetchLimit = requestedLimit + 1;
+      const queryStartTime = Date.now();
+      const maxQueryTimeMs = 10000; // 10 seconds - balance between completeness and UX
+      let iterations = 0;
+      
+      const hasMultipleFilters = [filters.status, filters.lorryId, filters.driverId, filters.driverName].filter(f => f).length > 0;
+      
+      // Dynamic batch size based on filter selectivity
+      // Broker filter is moderately selective (~200 items), adjust batch accordingly
+      const hasDynamoDBFilters = !!(filters.lorryId || filters.status || filters.driverId);
+      const hasDriverNameFilter = !!filters.driverName;
+      let batchSize: number;
+      
+      if (hasDriverNameFilter || hasMultipleFilters) {
+        // Most sparse: application-layer filtering or multiple filters
+        batchSize = 500;
+      } else if (hasDynamoDBFilters) {
+        // Moderate sparsity: DynamoDB FilterExpression
+        batchSize = 200;
+      } else {
+        // Dense data: broker filter only, no additional filters
+        // Since GSI4 is already moderately selective (~200 items), use smaller batch
+        batchSize = Math.max(fetchLimit, 150);
       }
+      
+      while (Date.now() - queryStartTime < maxQueryTimeMs) {
+        iterations++;
+        
+        // Build query parameters with dynamic batch size for efficiency
+        const queryParams: any = {
+          TableName: this.tripsTableName,
+          IndexName: 'GSI4',
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeValues: {
+            ...expressionAttributeValues,
+            ...filterAttributeValues,
+          },
+          Limit: batchSize, // Dynamic based on filter selectivity
+          ScanIndexForward: false,
+          ReturnConsumedCapacity: 'TOTAL',
+        };
 
-      if (filters.lastEvaluatedKey) {
-        try {
-          queryParams.ExclusiveStartKey = JSON.parse(
-            Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
-          );
-        } catch (error) {
-          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        if (filterExpression) {
+          queryParams.FilterExpression = filterExpression;
+          queryParams.ExpressionAttributeNames = filterAttributeNames;
         }
+
+        if (lastEvaluatedKey) {
+          try {
+            queryParams.ExclusiveStartKey = JSON.parse(
+              Buffer.from(lastEvaluatedKey, 'base64').toString('utf-8'),
+            );
+          } catch (error) {
+            throw new BadRequestException('Invalid lastEvaluatedKey format');
+          }
+        }
+
+        const queryCommand = new QueryCommand(queryParams);
+        const result = await dynamodbClient.send(queryCommand);
+        
+        if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
+          totalRCU += result.ConsumedCapacity.CapacityUnits;
+        }
+
+        const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+        const filteredBatch = this.applyDriverNameFilter(batchTrips, filters.driverName);
+        trips.push(...filteredBatch);
+
+        if (!result.LastEvaluatedKey || trips.length >= requestedLimit) {
+          lastEvaluatedKey = result.LastEvaluatedKey 
+            ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+            : undefined;
+          break;
+        }
+
+        lastEvaluatedKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
       }
 
-      // Execute query
-      const queryCommand = new QueryCommand(queryParams);
-      const result = await dynamodbClient.send(queryCommand);
-
-      // Track RCU consumption from DynamoDB response
-      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
-        totalRCU = result.ConsumedCapacity.CapacityUnits;
+      // Check if we hit the timeout limit
+      const queryTimeMs = Date.now() - queryStartTime;
+      if (queryTimeMs >= maxQueryTimeMs) {
+        console.warn(`[GSI4] Query timeout reached after ${iterations} iterations and ${queryTimeMs}ms. Returning partial results.`, {
+          requestedLimit,
+          itemsFound: trips.length,
+          filters,
+        });
       }
 
-      // Map results to Trip objects
-      const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+      const trimmedTrips = trips.slice(0, requestedLimit);
 
-      // Apply case-insensitive driver name filtering in application layer
-      const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
-
-      // Build response
       const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
-        trips: filteredTrips 
+        trips: trimmedTrips 
       };
 
-      if (result.LastEvaluatedKey) {
-        response.lastEvaluatedKey = Buffer.from(
-          JSON.stringify(result.LastEvaluatedKey),
-        ).toString('base64');
+      // CRITICAL: Set lastEvaluatedKey based on the LAST RETURNED ITEM, not last fetched item
+      // This ensures no items are lost between pages when application-layer filtering is applied
+      if (trips.length > requestedLimit && trimmedTrips.length > 0) {
+        const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
+        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
+        const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        const lastKey = {
+          PK: `TRIP#${lastReturnedTrip.tripId}`,
+          SK: 'METADATA',
+          GSI4PK: `DISPATCHER#${dispatcherId}`,
+          GSI4SK: `BROKER#${lastReturnedTrip.brokerId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+        };
+        response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
 
-      // Emit CloudWatch metrics for query performance
-      // Requirements: 6.1
       const responseTimeMs = Date.now() - startTime;
       await this.emitQueryMetrics('GSI4', responseTimeMs, totalRCU, isError);
-
-      // Log actual reads after query execution
-      // Requirements: 3.6, 6.4
-      this.logQueryCompletion('GSI4', filters, totalRCU, filteredTrips.length, responseTimeMs);
+      this.logQueryCompletion('GSI4', filters, totalRCU, trimmedTrips.length, responseTimeMs);
 
       return response;
     } catch (error: any) {
       isError = true;
       const responseTimeMs = Date.now() - startTime;
-      
-      // Emit error metrics
       await this.emitQueryMetrics('GSI4', responseTimeMs, totalRCU, isError);
-
-      // Log error with full context
-      // Requirements: 3.6, 6.4
       this.logQueryError(error, filters, 'GSI4');
-
-      // If GSI4 query fails, fall back to GSI1 (default index)
       console.log('Falling back to GSI1 (default index) due to GSI4 query error');
-      return this.getTripsForDispatcher(
-        dispatcherId,
-        filters,
-        dynamodbClient,
-      );
+      return this.getTripsForDispatcher(dispatcherId, filters, dynamodbClient);
     }
   }
 

@@ -119,11 +119,25 @@ export class DashboardStateService {
   updateFilters(filters: Partial<DashboardFilters>): void {
     const currentFilters = this.filtersSubject.value;
     const newFilters = { ...currentFilters, ...filters };
+    
+    console.log('[DASHBOARD-STATE] updateFilters called:', {
+      currentFilters,
+      partialFilters: filters,
+      newFilters
+    });
+    
     this.filtersSubject.next(newFilters);
     this.saveFiltersToStorage(newFilters);
     
     // Reset to page 0 and clear pagination tokens when filters change
-    const newPagination = { page: 0, pageSize: this.paginationSubject.value.pageSize, pageTokens: [] };
+    const currentPagination = this.paginationSubject.value;
+    const newPagination = { page: 0, pageSize: currentPagination.pageSize, pageTokens: [] };
+    
+    console.log('[DASHBOARD-STATE] Resetting pagination:', {
+      currentPagination,
+      newPagination
+    });
+    
     this.paginationSubject.next(newPagination);
     this.savePaginationToStorage(newPagination);
     

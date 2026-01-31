@@ -84,7 +84,7 @@ export class SharedFilterService {
   /**
    * Update filters
    */
-  updateFilters(filters: Partial<DashboardFilters>): void {
+  updateFilters(filters: Partial<DashboardFilters>, force: boolean = false): void {
     const currentFilters = this.filtersSubject.value;
     const newFilters = {
       ...currentFilters,
@@ -92,7 +92,8 @@ export class SharedFilterService {
     };
     
     // Check if filters actually changed to avoid unnecessary updates
-    if (this.filtersEqual(currentFilters, newFilters)) {
+    // Skip check if force is true (e.g., when user clicks preset buttons)
+    if (!force && this.filtersEqual(currentFilters, newFilters)) {
       return;
     }
     

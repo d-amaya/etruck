@@ -34,6 +34,8 @@ import { ViewModeSelectorComponent } from '../view-mode-selector/view-mode-selec
 export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   dateRangeError: string | null = null;
+  activePreset: string | null = null;
+  private presetJustSet = false;
 
   maxDate: Date | null = null; // No maximum date - allow future dates
   minDate = new Date();
@@ -83,6 +85,9 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
       endDate: currentFilters.dateRange.endDate
     }, { emitEvent: false });
 
+    // Determine which preset is active on init
+    this.updateActivePreset();
+
     this.filterForm.valueChanges
       .pipe(
         debounceTime(300),
@@ -90,6 +95,7 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
       )
       .subscribe(formValue => {
         if (this.filterForm.valid) {
+          // Always update the shared filter service
           this.sharedFilterService.updateFilters({
             dateRange: {
               startDate: formValue.startDate,
@@ -97,6 +103,12 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
             }
           });
         }
+        
+        // Only update active preset if it wasn't just set by a button click
+        if (!this.presetJustSet) {
+          this.updateActivePreset();
+        }
+        this.presetJustSet = false;
       });
   }
 
@@ -111,7 +123,8 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
-        endDate = today;
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
         break;
       case 'month':
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -131,13 +144,33 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 365);
         startDate.setHours(0, 0, 0, 0);
-        endDate = today;
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
         break;
       default:
         return;
     }
 
-    this.filterForm.patchValue({ startDate, endDate });
+    this.presetJustSet = true;
+    this.activePreset = preset;
+    this.filterForm.patchValue({ startDate, endDate }, { emitEvent: false });
+    
+    // Force update even if dates are similar
+    this.sharedFilterService.updateFilters({
+      dateRange: { startDate, endDate }
+    }, true);
+  }
+
+  private updateActivePreset(): void {
+    const presets = ['month', '30days', 'year', '365days'];
+    this.activePreset = null;
+    
+    for (const preset of presets) {
+      if (this.isPresetActive(preset)) {
+        this.activePreset = preset;
+        break;
+      }
+    }
   }
 
   isPresetActive(preset: string): boolean {
@@ -146,8 +179,14 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     
     if (!startDate || !endDate) return false;
 
+    // Helper to compare dates by day only (ignore time)
+    const isSameDay = (date1: Date, date2: Date): boolean => {
+      return date1.getFullYear() === date2.getFullYear() &&
+             date1.getMonth() === date2.getMonth() &&
+             date1.getDate() === date2.getDate();
+    };
+
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
     let expectedStart: Date;
     let expectedEnd: Date;
 
@@ -155,38 +194,28 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
       case '30days':
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 30);
-        expectedStart.setHours(0, 0, 0, 0);
-        expectedEnd = today;
+        expectedEnd = new Date(today);
         break;
       case 'month':
         expectedStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        expectedStart.setHours(0, 0, 0, 0);
         // Last day of current month
         expectedEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        expectedEnd.setHours(23, 59, 59, 999);
         break;
       case 'year':
         expectedStart = new Date(today.getFullYear(), 0, 1);
-        expectedStart.setHours(0, 0, 0, 0);
         // Last day of current year (December 31)
         expectedEnd = new Date(today.getFullYear(), 11, 31);
-        expectedEnd.setHours(23, 59, 59, 999);
         break;
       case '365days':
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 365);
-        expectedStart.setHours(0, 0, 0, 0);
-        expectedEnd = today;
+        expectedEnd = new Date(today);
         break;
       default:
         return false;
     }
 
-    // Compare both start and end dates to properly detect active preset
-    const startMatches = startDate.toDateString() === expectedStart.toDateString();
-    const endMatches = endDate.toDateString() === expectedEnd.toDateString();
-    
-    return startMatches && endMatches;
+    return isSameDay(startDate, expectedStart) && isSameDay(endDate, expectedEnd);
   }
 
   ngOnDestroy(): void {

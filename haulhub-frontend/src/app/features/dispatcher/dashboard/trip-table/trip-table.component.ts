@@ -138,6 +138,12 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number }> {
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
+    
+    console.log('[TRIP-TABLE] Loading trips with:', {
+      filters,
+      pagination,
+      apiFilters
+    });
 
     return this.tripService.getTrips(apiFilters).pipe(
       map(response => {
@@ -435,9 +441,15 @@ export class TripTableComponent implements OnInit, OnDestroy {
       driverName: formValue.driverName?.trim() || null
     };
     console.log('Filters to apply:', filtersToApply);
+    console.log('Current pagination state:', this.dashboardState['paginationSubject'].value);
     
     this.sharedFilterService.updateFilters(filtersToApply);
     console.log('=== Filters sent to shared service ===');
+    
+    // Log pagination state after filter update
+    setTimeout(() => {
+      console.log('Pagination state after filter update:', this.dashboardState['paginationSubject'].value);
+    }, 150);
   }
 
   /**
