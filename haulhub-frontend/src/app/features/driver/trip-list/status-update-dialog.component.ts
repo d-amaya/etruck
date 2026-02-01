@@ -36,9 +36,9 @@ export interface StatusUpdateDialogResult {
     
     <mat-dialog-content>
       <div class="trip-info">
-        <p><strong>Pickup:</strong> {{ data.trip.pickupLocation }}</p>
-        <p><strong>Dropoff:</strong> {{ data.trip.dropoffLocation }}</p>
-        <p><strong>Current Status:</strong> {{ getStatusLabel(data.trip.status) }}</p>
+        <p><strong>Pickup:</strong> {{ data.trip.pickupCity }}, {{ data.trip.pickupState }}</p>
+        <p><strong>Delivery:</strong> {{ data.trip.deliveryCity }}, {{ data.trip.deliveryState }}</p>
+        <p><strong>Current Status:</strong> {{ getStatusLabel(data.trip.orderStatus) }}</p>
       </div>
 
       <form [formGroup]="statusForm">
@@ -58,7 +58,7 @@ export interface StatusUpdateDialogResult {
 
       <div class="status-info">
         <mat-icon>info</mat-icon>
-        <p>As a driver, you can update the status to Picked Up, In Transit, or Delivered.</p>
+        <p>As a driver, you can update the status to Picked Up, In Transit, or Delivered. Timestamps will be automatically recorded.</p>
       </div>
     </mat-dialog-content>
 
@@ -144,7 +144,7 @@ export class StatusUpdateDialogComponent {
   }
 
   private setDefaultStatus(): void {
-    const currentStatus = this.data.trip.status;
+    const currentStatus = this.data.trip.orderStatus;
     
     // Suggest next logical status
     if (currentStatus === TripStatus.Scheduled) {
@@ -156,20 +156,28 @@ export class StatusUpdateDialogComponent {
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
-    switch (status) {
+  getStatusLabel(status: TripStatus | string): string {
+    // Handle both TripStatus enum and string literals from new schema
+    const statusStr = typeof status === 'string' ? status : status;
+    
+    switch (statusStr) {
       case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'Scheduled';
       case TripStatus.PickedUp:
+      case 'Picked Up':
         return 'Picked Up';
       case TripStatus.InTransit:
+      case 'In Transit':
         return 'In Transit';
       case TripStatus.Delivered:
+      case 'Delivered':
         return 'Delivered';
       case TripStatus.Paid:
+      case 'Paid':
         return 'Paid';
       default:
-        return status;
+        return String(status);
     }
   }
 

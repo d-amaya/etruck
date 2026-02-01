@@ -29,24 +29,31 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class LorriesService {
   private readonly lorriesTableName: string;
+  private readonly trailersTableName: string;
 
   constructor(
     private readonly awsService: AwsService,
     private readonly configService: ConfigService,
   ) {
     this.lorriesTableName = this.configService.lorriesTableName;
+    this.trailersTableName = this.configService.trailersTableName;
   }
 
   /**
-   * Register a new lorry for a lorry owner
-   * PK: LORRY_OWNER#{ownerId}
-   * SK: LORRY#{lorryId}
-   * GSI1PK: LORRY_STATUS#{verificationStatus}
-   * GSI1SK: LORRY#{lorryId}
+   * Register a new truck (formerly lorry) for a truck owner
+   * PK: TRUCK#{truckId}
+   * SK: METADATA
+   * GSI1PK: CARRIER#{carrierId}
+   * GSI1SK: TRUCK#{truckId}
+   * GSI2PK: OWNER#{truckOwnerId}
+   * GSI2SK: TRUCK#{truckId}
+   * 
+   * Task 3.1.1, 3.1.2, 3.1.3: Updated for eTrucky-Trucks schema
    */
   async registerLorry(
     ownerId: string,
     dto: RegisterLorryDto,
+    carrierId?: string,
   ): Promise<Lorry> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
@@ -58,20 +65,25 @@ export class LorriesService {
       );
     }
 
-    // Check if lorry already exists for this owner
-    const existingLorry = await this.getLorryByIdAndOwner(
-      dto.lorryId,
-      ownerId,
-    );
-    if (existingLorry) {
+    // Generate UUID for truck if not provided
+    const truckId = dto.lorryId || uuidv4();
+
+    // Check if truck already exists
+    const existingTruck = await this.getTruckByIdInternal(truckId);
+    if (existingTruck) {
       throw new ConflictException(
-        `Lorry with ID ${dto.lorryId} is already registered for this owner`,
+        `Truck with ID ${truckId} is already registered`,
       );
+    }
+
+    // Task 3.1.6: Validate carrier membership if carrierId provided
+    if (carrierId) {
+      await this.validateCarrierMembership(ownerId, carrierId);
     }
 
     const now = new Date().toISOString();
     const lorry: Lorry = {
-      lorryId: dto.lorryId,
+      lorryId: truckId,
       ownerId,
       make: dto.make,
       model: dto.model,
@@ -82,15 +94,29 @@ export class LorriesService {
       updatedAt: now,
     };
 
-    // Store lorry in DynamoDB
+    // Store truck in DynamoDB with new eTrucky-Trucks schema
+    // Task 3.1.2: Field mappings - lorryId→truckId, make→brand
+    // Task 3.1.3: Add color, truckOwnerId, carrierId fields
     const putCommand = new PutCommand({
       TableName: this.lorriesTableName,
       Item: {
-        PK: `LORRY_OWNER#${ownerId}`,
-        SK: `LORRY#${dto.lorryId}`,
-        GSI1PK: `LORRY_STATUS#${LorryVerificationStatus.Pending}`,
-        GSI1SK: `LORRY#${dto.lorryId}`,
-        ...lorry,
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+        // Task 3.1.4: GSI1 with CARRIER# prefix
+        GSI1PK: carrierId ? `CARRIER#${carrierId}` : undefined,
+        GSI1SK: carrierId ? `TRUCK#${truckId}` : undefined,
+        // Task 3.1.5: GSI2 with OWNER# prefix
+        GSI2PK: `OWNER#${ownerId}`,
+        GSI2SK: `TRUCK#${truckId}`,
+        truckId: truckId,
+        truckOwnerId: ownerId,
+        carrierId: carrierId,
+        plate: dto.lorryId, // Using lorryId as plate for backward compatibility
+        brand: dto.make,
+        year: dto.year,
+        vin: '', // TODO: Add VIN to DTO
+        color: '', // TODO: Add color to DTO
+        isActive: true,
       },
     });
 
@@ -100,18 +126,18 @@ export class LorriesService {
   }
 
   /**
-   * Get all lorries for a specific owner
-   * Query by PK: LORRY_OWNER#{ownerId}
+   * Get all trucks for a specific owner
+   * Task 3.1.5: Query by GSI2 with OWNER# prefix
    */
   async getLorriesByOwner(ownerId: string): Promise<Lorry[]> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
     const queryCommand = new QueryCommand({
       TableName: this.lorriesTableName,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+      IndexName: 'GSI2',
+      KeyConditionExpression: 'GSI2PK = :pk',
       ExpressionAttributeValues: {
-        ':pk': `LORRY_OWNER#${ownerId}`,
-        ':sk': 'LORRY#',
+        ':pk': `OWNER#${ownerId}`,
       },
     });
 
@@ -125,46 +151,314 @@ export class LorriesService {
   }
 
   /**
-   * Get a specific lorry by ID and owner
+   * Get trucks by carrier
+   * Task 3.1.4: Query by GSI1 with CARRIER# prefix
+   * Public method for controller use
+   */
+  async getTrucksByCarrier(carrierId: string): Promise<Lorry[]> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    const queryCommand = new QueryCommand({
+      TableName: this.lorriesTableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': `CARRIER#${carrierId}`,
+      },
+    });
+
+    const result = await dynamodbClient.send(queryCommand);
+
+    if (!result.Items || result.Items.length === 0) {
+      return [];
+    }
+
+    return result.Items.map((item) => this.mapItemToLorry(item));
+  }
+
+  /**
+   * Get a specific truck by ID (internal method)
+   * Uses new PK format: TRUCK#{truckId}
+   */
+  private async getTruckByIdInternal(truckId: string): Promise<any | null> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    const getCommand = new GetCommand({
+      TableName: this.lorriesTableName,
+      Key: {
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+      },
+    });
+
+    const result = await dynamodbClient.send(getCommand);
+    return result.Item || null;
+  }
+
+  /**
+   * Get a specific truck by ID and owner
    * Used for authorization checks
    */
   async getLorryByIdAndOwner(
     lorryId: string,
     ownerId: string,
   ): Promise<Lorry | null> {
+    const truck = await this.getTruckByIdInternal(lorryId);
+
+    if (!truck) {
+      return null;
+    }
+
+    // Verify ownership
+    if (truck.truckOwnerId !== ownerId) {
+      return null;
+    }
+
+    return this.mapItemToLorry(truck);
+  }
+
+  /**
+   * Get a specific truck by ID
+   * Used by admin and for trip validation
+   */
+  async getLorryById(lorryId: string, ownerId: string): Promise<Lorry> {
+    const lorry = await this.getLorryByIdAndOwner(lorryId, ownerId);
+
+    if (!lorry) {
+      throw new NotFoundException(`Truck with ID ${lorryId} not found`);
+    }
+
+    return lorry;
+  }
+
+  /**
+   * Task 3.1.6: Validate carrier membership
+   * Verifies that the truck owner belongs to the specified carrier
+   */
+  private async validateCarrierMembership(
+    ownerId: string,
+    carrierId: string,
+  ): Promise<void> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
+    // Query eTrucky-Users table to verify owner's carrierId
     const getCommand = new GetCommand({
-      TableName: this.lorriesTableName,
+      TableName: this.configService.usersTableName,
       Key: {
-        PK: `LORRY_OWNER#${ownerId}`,
-        SK: `LORRY#${lorryId}`,
+        PK: `USER#${ownerId}`,
+        SK: 'METADATA',
       },
     });
 
     const result = await dynamodbClient.send(getCommand);
 
     if (!result.Item) {
-      return null;
+      throw new NotFoundException(`User with ID ${ownerId} not found`);
     }
 
-    return this.mapItemToLorry(result.Item);
+    if (result.Item.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'Truck owner does not belong to this carrier',
+      );
+    }
   }
 
   /**
-   * Get a specific lorry by ID (for any owner)
-   * Used by admin and for trip validation
-   * Note: This requires scanning or maintaining a separate index
-   * For now, we'll require the ownerId to be passed
+   * Task 3.2: Trailer support methods
    */
-  async getLorryById(lorryId: string, ownerId: string): Promise<Lorry> {
-    const lorry = await this.getLorryByIdAndOwner(lorryId, ownerId);
 
-    if (!lorry) {
-      throw new NotFoundException(`Lorry with ID ${lorryId} not found`);
+  /**
+   * Task 3.2.1: Get trailers by carrier
+   * Query GSI1 with CARRIER# prefix
+   */
+  async getTrailersByCarrier(carrierId: string): Promise<any[]> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    const queryCommand = new QueryCommand({
+      TableName: this.trailersTableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': `CARRIER#${carrierId}`,
+      },
+    });
+
+    const result = await dynamodbClient.send(queryCommand);
+
+    if (!result.Items || result.Items.length === 0) {
+      return [];
     }
 
-    return lorry;
+    return result.Items.map((item) => this.mapItemToTrailer(item));
+  }
+
+  /**
+   * Get all drivers for a carrier
+   * Query eTrucky-Users table by carrierId and role=DRIVER
+   */
+  async getDriversByCarrier(carrierId: string): Promise<any[]> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const usersTableName = this.configService.usersTableName;
+
+    const queryCommand = new QueryCommand({
+      TableName: usersTableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :pk AND begins_with(GSI1SK, :role)',
+      ExpressionAttributeValues: {
+        ':pk': `CARRIER#${carrierId}`,
+        ':role': 'ROLE#DRIVER#',
+      },
+    });
+
+    const result = await dynamodbClient.send(queryCommand);
+
+    if (!result.Items || result.Items.length === 0) {
+      return [];
+    }
+
+    return result.Items.map((item) => ({
+      userId: item.userId,
+      name: item.name,
+      email: item.email,
+      phone: item.phone,
+      corpName: item.corpName,
+      cdlClass: item.cdlClass,
+      cdlState: item.cdlState,
+      nationalId: item.ss, // Driver license number
+      isActive: item.isActive,
+    }));
+  }
+
+  /**
+   * Task 3.2.2: Get trailer by ID
+   */
+  async getTrailerById(trailerId: string): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    const getCommand = new GetCommand({
+      TableName: this.trailersTableName,
+      Key: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+      },
+    });
+
+    const result = await dynamodbClient.send(getCommand);
+
+    if (!result.Item) {
+      throw new NotFoundException(`Trailer with ID ${trailerId} not found`);
+    }
+
+    return this.mapItemToTrailer(result.Item);
+  }
+
+  /**
+   * Task 3.2.3: Create trailer with carrier validation
+   */
+  async createTrailer(trailerData: {
+    carrierId: string;
+    plate: string;
+    brand: string;
+    year: number;
+    vin: string;
+    color: string;
+    reefer?: string | null;
+  }): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Validate year
+    const currentYear = new Date().getFullYear();
+    if (trailerData.year < 1900 || trailerData.year > currentYear + 1) {
+      throw new BadRequestException(
+        `Year must be between 1900 and ${currentYear + 1}`,
+      );
+    }
+
+    // Generate UUID for trailer
+    const trailerId = uuidv4();
+
+    // Task 3.2.6: Store with GSI1 CARRIER# prefix
+    const putCommand = new PutCommand({
+      TableName: this.trailersTableName,
+      Item: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+        GSI1PK: `CARRIER#${trailerData.carrierId}`,
+        GSI1SK: `TRAILER#${trailerId}`,
+        trailerId,
+        carrierId: trailerData.carrierId,
+        plate: trailerData.plate,
+        brand: trailerData.brand,
+        year: trailerData.year,
+        vin: trailerData.vin,
+        color: trailerData.color,
+        reefer: trailerData.reefer || null,
+        isActive: true,
+      },
+    });
+
+    await dynamodbClient.send(putCommand);
+
+    return {
+      trailerId,
+      ...trailerData,
+      isActive: true,
+    };
+  }
+
+  /**
+   * Task 3.2.4: Update trailer
+   */
+  async updateTrailer(
+    trailerId: string,
+    updates: Partial<{
+      plate: string;
+      brand: string;
+      year: number;
+      vin: string;
+      color: string;
+      reefer: string | null;
+      isActive: boolean;
+    }>,
+  ): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify trailer exists
+    await this.getTrailerById(trailerId);
+
+    // Build update expression
+    const updateExpressions: string[] = [];
+    const expressionAttributeValues: any = {};
+    const expressionAttributeNames: any = {};
+
+    Object.entries(updates).forEach(([key, value]) => {
+      updateExpressions.push(`#${key} = :${key}`);
+      expressionAttributeValues[`:${key}`] = value;
+      expressionAttributeNames[`#${key}`] = key;
+    });
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.trailersTableName,
+      Key: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    return this.mapItemToTrailer(result.Attributes);
+  }
+
+  /**
+   * Task 3.2.5: Delete trailer (soft delete)
+   */
+  async deleteTrailer(trailerId: string): Promise<void> {
+    await this.updateTrailer(trailerId, { isActive: false });
   }
 
   /**
@@ -185,10 +479,10 @@ export class LorriesService {
       );
     }
 
-    // Verify lorry exists and user has permission
+    // Verify truck exists and user has permission
     const lorry = await this.getLorryByIdAndOwner(lorryId, ownerId);
     if (!lorry) {
-      throw new NotFoundException(`Lorry with ID ${lorryId} not found`);
+      throw new NotFoundException(`Truck with ID ${lorryId} not found`);
     }
 
     // Generate unique document ID
@@ -229,7 +523,7 @@ export class LorriesService {
     const putCommand = new PutCommand({
       TableName: this.lorriesTableName,
       Item: {
-        PK: `LORRY#${lorryId}`,
+        PK: `TRUCK#${lorryId}`,
         SK: `DOCUMENT#${documentId}`,
         lorryId,
         ownerId,
@@ -240,7 +534,7 @@ export class LorriesService {
 
     await dynamodbClient.send(putCommand);
 
-    // Update lorry's verificationDocuments array
+    // Update truck's verificationDocuments array
     await this.addDocumentToLorry(lorryId, ownerId, documentMetadata);
 
     return {
@@ -266,7 +560,7 @@ export class LorriesService {
     const getCommand = new GetCommand({
       TableName: this.lorriesTableName,
       Key: {
-        PK: `LORRY#${lorryId}`,
+        PK: `TRUCK#${lorryId}`,
         SK: `DOCUMENT#${documentId}`,
       },
     });
@@ -275,7 +569,7 @@ export class LorriesService {
 
     if (!result.Item) {
       throw new NotFoundException(
-        `Document with ID ${documentId} not found for lorry ${lorryId}`,
+        `Document with ID ${documentId} not found for truck ${lorryId}`,
       );
     }
 
@@ -306,7 +600,7 @@ export class LorriesService {
   }
 
   /**
-   * Get all documents for a lorry
+   * Get all documents for a truck
    * Requirements: 15.4
    */
   async getDocuments(
@@ -321,7 +615,7 @@ export class LorriesService {
       TableName: this.lorriesTableName,
       KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
       ExpressionAttributeValues: {
-        ':pk': `LORRY#${lorryId}`,
+        ':pk': `TRUCK#${lorryId}`,
         ':sk': 'DOCUMENT#',
       },
     });
@@ -350,7 +644,7 @@ export class LorriesService {
   }
 
   /**
-   * Add document metadata to lorry's verificationDocuments array
+   * Add document metadata to truck's verificationDocuments array
    */
   private async addDocumentToLorry(
     lorryId: string,
@@ -362,8 +656,8 @@ export class LorriesService {
     const updateCommand = new UpdateCommand({
       TableName: this.lorriesTableName,
       Key: {
-        PK: `LORRY_OWNER#${ownerId}`,
-        SK: `LORRY#${lorryId}`,
+        PK: `TRUCK#${lorryId}`,
+        SK: 'METADATA',
       },
       UpdateExpression:
         'SET verificationDocuments = list_append(if_not_exists(verificationDocuments, :empty_list), :doc), updatedAt = :updatedAt',
@@ -379,19 +673,36 @@ export class LorriesService {
 
   /**
    * Map DynamoDB item to Lorry interface
+   * Task 3.1.2: Handle new field names (truckId, plate, brand)
    */
   private mapItemToLorry(item: any): Lorry {
     return {
-      lorryId: item.lorryId,
-      ownerId: item.ownerId,
-      make: item.make,
-      model: item.model,
+      truckId: item.truckId,
+      truckOwnerId: item.truckOwnerId,
+      carrierId: item.carrierId,
+      plate: item.plate,
+      brand: item.brand,
       year: item.year,
-      verificationStatus: item.verificationStatus,
-      verificationDocuments: item.verificationDocuments || [],
-      rejectionReason: item.rejectionReason,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+      vin: item.vin,
+      color: item.color,
+      isActive: item.isActive,
+    } as any;
+  }
+
+  /**
+   * Map DynamoDB item to Trailer interface
+   */
+  private mapItemToTrailer(item: any): any {
+    return {
+      trailerId: item.trailerId,
+      carrierId: item.carrierId,
+      plate: item.plate,
+      brand: item.brand,
+      year: item.year,
+      vin: item.vin,
+      color: item.color,
+      reefer: item.reefer,
+      isActive: item.isActive,
     };
   }
 }

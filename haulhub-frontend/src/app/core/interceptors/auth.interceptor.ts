@@ -43,7 +43,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         
         // If already refreshing, wait for the refresh to complete (with timeout)
         if (isRefreshing) {
-          console.log('Token refresh already in progress, waiting...');
           return new Observable<HttpEvent<unknown>>(observer => {
             const timeout = setTimeout(() => {
               console.warn('Token refresh wait timeout, resetting and retrying');
@@ -82,7 +81,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         // Start refreshing
         isRefreshing = true;
         refreshTokenSubject.next(null);
-        console.log('Starting token refresh...');
 
         return authService.refreshToken().pipe(
           switchMap(() => {
@@ -97,7 +95,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             // Notify waiting requests
             isRefreshing = false;
             refreshTokenSubject.next(newAccessToken);
-            console.log('Token refresh complete, retrying request');
 
             // Retry the original request with the new token
             const retryReq = req.clone({

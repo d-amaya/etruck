@@ -27,7 +27,7 @@ import {
   PaymentReport,
   DispatcherPaymentReport,
   DriverPaymentReport,
-  LorryOwnerPaymentReport,
+  TruckOwnerPaymentReport,
   TripPaymentDetail,
   TripFilters,
 } from '@haulhub/shared';
@@ -178,52 +178,105 @@ export class TripsService {
     this.validateCreateTripDto(dto);
 
     // Validate scheduled datetime is in the future
-    const scheduledDate = new Date(dto.scheduledPickupDatetime);
+    const scheduledDate = new Date(dto.scheduledTimestamp);
     if (isNaN(scheduledDate.getTime())) {
-      throw new BadRequestException('Invalid scheduledPickupDatetime format');
+      throw new BadRequestException('Invalid scheduledTimestamp format');
     }
 
     // Validate payments are positive numbers
     if (dto.brokerPayment <= 0) {
       throw new BadRequestException('brokerPayment must be a positive number');
     }
-    if (dto.lorryOwnerPayment <= 0) {
-      throw new BadRequestException('lorryOwnerPayment must be a positive number');
+    if (dto.truckOwnerPayment <= 0) {
+      throw new BadRequestException('truckOwnerPayment must be a positive number');
     }
     if (dto.driverPayment <= 0) {
       throw new BadRequestException('driverPayment must be a positive number');
     }
 
-    // Get broker name from broker ID using BrokersService
-    const broker = await this.brokersService.getBrokerById(dto.brokerId);
-    const brokerName = broker.brokerName;
-
     const tripId = uuidv4();
     const now = new Date().toISOString();
 
     const trip: Trip = {
+      // Primary identifiers
       tripId,
+      
+      // Entity relationships
+      carrierId: dto.carrierId,
       dispatcherId,
-      pickupLocation: dto.pickupLocation,
-      dropoffLocation: dto.dropoffLocation,
-      scheduledPickupDatetime: dto.scheduledPickupDatetime,
-      brokerId: dto.brokerId,
-      brokerName,
-      lorryId: dto.lorryId,
       driverId: dto.driverId,
-      driverName: dto.driverName,
+      truckId: dto.truckId,
+      trailerId: dto.trailerId,
+      truckOwnerId: dto.truckOwnerId,
+      brokerId: dto.brokerId,
+      
+      // Order information
+      orderConfirmation: dto.orderConfirmation,
+      orderStatus: 'Scheduled',
+      
+      // Timestamps
+      scheduledTimestamp: dto.scheduledTimestamp,
+      pickupTimestamp: null,
+      deliveryTimestamp: null,
+      
+      // Pickup location details
+      pickupCompany: dto.pickupCompany || '',
+      pickupAddress: dto.pickupAddress || '',
+      pickupCity: dto.pickupCity || '',
+      pickupState: dto.pickupState || '',
+      pickupZip: dto.pickupZip || '',
+      pickupPhone: dto.pickupPhone || '',
+      pickupNotes: dto.pickupNotes || '',
+      
+      // Delivery location details
+      deliveryCompany: dto.deliveryCompany || '',
+      deliveryAddress: dto.deliveryAddress || '',
+      deliveryCity: dto.deliveryCity || '',
+      deliveryState: dto.deliveryState || '',
+      deliveryZip: dto.deliveryZip || '',
+      deliveryPhone: dto.deliveryPhone || '',
+      deliveryNotes: dto.deliveryNotes || '',
+      
+      // Mileage tracking
+      mileageEmpty: dto.mileageEmpty || 0,
+      mileageOrder: dto.mileageOrder || 0,
+      mileageTotal: dto.mileageTotal || 0,
+      
+      // Rates
+      brokerRate: 0,
+      driverRate: 0,
+      truckOwnerRate: 0,
+      dispatcherRate: 0,
+      factoryRate: 0,
+      orderRate: 0,
+      orderAverage: 0,
+      
+      // Payments
       brokerPayment: dto.brokerPayment,
-      lorryOwnerPayment: dto.lorryOwnerPayment,
       driverPayment: dto.driverPayment,
-      status: TripStatus.Scheduled,
-      distance: dto.distance,
-      loadedMiles: dto.loadedMiles,
-      emptyMiles: dto.emptyMiles,
-      totalMiles: dto.totalMiles,
-      fuelAvgCost: dto.fuelAvgCost,
-      fuelAvgGallonsPerMile: dto.fuelAvgGallonsPerMile,
-      lumperFees: dto.lumperFees || 0,
-      detentionFees: dto.detentionFees || 0,
+      truckOwnerPayment: dto.truckOwnerPayment,
+      dispatcherPayment: 0,
+      
+      // Advances
+      brokerAdvance: 0,
+      driverAdvance: 0,
+      factoryAdvance: 0,
+      
+      // Costs and expenses
+      fuelCost: 0,
+      fuelGasAvgCost: 0,
+      fuelGasAvgGallxMil: 0,
+      brokerCost: 0,
+      factoryCost: 0,
+      lumperValue: dto.lumperFees || 0,
+      detentionValue: dto.detentionFees || 0,
+      orderExpenses: 0,
+      orderRevenue: 0,
+      
+      // Additional notes
+      notes: dto.notes || '',
+      
+      // Audit timestamps
       createdAt: now,
       updatedAt: now,
     };
@@ -235,10 +288,10 @@ export class TripsService {
       const gsiAttributes = this.populateGSIAttributes({
         tripId,
         dispatcherId,
-        lorryId: dto.lorryId,
+        truckId: dto.truckId,
         driverId: dto.driverId,
         brokerId: dto.brokerId,
-        scheduledPickupDatetime: dto.scheduledPickupDatetime,
+        scheduledTimestamp: dto.scheduledTimestamp,
       });
 
       // Validate GSI attribute formats
@@ -313,7 +366,10 @@ export class TripsService {
         // In production, add lorry ownership verification here
       }
 
-      return trip;
+      // Enrich trip with asset details for display
+      const enrichedResponse = await this.enrichTripsWithAssetMetadata([trip], userId, userRole);
+      
+      return enrichedResponse.trips[0];
     } catch (error: any) {
       if (error instanceof NotFoundException || error instanceof BadRequestException || error instanceof ForbiddenException) {
         throw error;
@@ -342,7 +398,7 @@ export class TripsService {
     const expressionAttributeNames: Record<string, string> = {};
     const expressionAttributeValues: Record<string, any> = {};
 
-    // Note: scheduledPickupDatetime, lorryId, and driverId are silently ignored
+    // Note: scheduledTimestamp, truckId, and driverId are silently ignored
     // These fields affect GSI sort keys and cannot be updated
     // The UI prevents users from changing them (disabled fields)
 
@@ -368,7 +424,7 @@ export class TripsService {
       
       // Update GSI4SK to maintain consistency with broker index
       // GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
-      const scheduledDate = new Date(existingTrip.scheduledPickupDatetime);
+      const scheduledDate = new Date(existingTrip.scheduledTimestamp);
       const dateOnlyStr = scheduledDate.toISOString().split('T')[0];
       const newGSI4SK = `BROKER#${dto.brokerId}#${dateOnlyStr}#${tripId}`;
       
@@ -392,13 +448,13 @@ export class TripsService {
       expressionAttributeValues[':brokerPayment'] = dto.brokerPayment;
     }
 
-    if (dto.lorryOwnerPayment !== undefined) {
-      if (dto.lorryOwnerPayment <= 0) {
-        throw new BadRequestException('lorryOwnerPayment must be a positive number');
+    if (dto.truckOwnerPayment !== undefined) {
+      if (dto.truckOwnerPayment <= 0) {
+        throw new BadRequestException('truckOwnerPayment must be a positive number');
       }
-      updateExpressions.push('#lorryOwnerPayment = :lorryOwnerPayment');
-      expressionAttributeNames['#lorryOwnerPayment'] = 'lorryOwnerPayment';
-      expressionAttributeValues[':lorryOwnerPayment'] = dto.lorryOwnerPayment;
+      updateExpressions.push('#truckOwnerPayment = :truckOwnerPayment');
+      expressionAttributeNames['#truckOwnerPayment'] = 'truckOwnerPayment';
+      expressionAttributeValues[':truckOwnerPayment'] = dto.truckOwnerPayment;
     }
 
     if (dto.driverPayment !== undefined) {
@@ -410,10 +466,10 @@ export class TripsService {
       expressionAttributeValues[':driverPayment'] = dto.driverPayment;
     }
 
-    if (dto.distance !== undefined) {
-      updateExpressions.push('#distance = :distance');
-      expressionAttributeNames['#distance'] = 'distance';
-      expressionAttributeValues[':distance'] = dto.distance;
+    if (dto.mileageOrder !== undefined) {
+      updateExpressions.push('#mileageOrder = :mileageOrder');
+      expressionAttributeNames['#mileageOrder'] = 'mileageOrder';
+      expressionAttributeValues[':mileageOrder'] = dto.mileageOrder;
     }
 
     // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
@@ -459,6 +515,35 @@ export class TripsService {
       updateExpressions.push('#detentionFees = :detentionFees');
       expressionAttributeNames['#detentionFees'] = 'detentionFees';
       expressionAttributeValues[':detentionFees'] = dto.detentionFees;
+    }
+
+    if (dto.notes !== undefined) {
+      updateExpressions.push('#notes = :notes');
+      expressionAttributeNames['#notes'] = 'notes';
+      expressionAttributeValues[':notes'] = dto.notes;
+    }
+
+    // Handle orderStatus updates (with automatic timestamp management)
+    if (dto.orderStatus !== undefined) {
+      updateExpressions.push('#orderStatus = :orderStatus');
+      expressionAttributeNames['#orderStatus'] = 'orderStatus';
+      expressionAttributeValues[':orderStatus'] = dto.orderStatus;
+
+      // Automatically set pickupTimestamp when status changes to "Picked Up"
+      if (dto.orderStatus === TripStatus.PickedUp && !existingTrip.pickupTimestamp) {
+        const pickupTime = new Date().toISOString();
+        updateExpressions.push('#pickupTimestamp = :pickupTimestamp');
+        expressionAttributeNames['#pickupTimestamp'] = 'pickupTimestamp';
+        expressionAttributeValues[':pickupTimestamp'] = pickupTime;
+      }
+
+      // Automatically set deliveryTimestamp when status changes to "Delivered"
+      if (dto.orderStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp) {
+        const deliveryTime = new Date().toISOString();
+        updateExpressions.push('#deliveryTimestamp = :deliveryTimestamp');
+        expressionAttributeNames['#deliveryTimestamp'] = 'deliveryTimestamp';
+        expressionAttributeValues[':deliveryTimestamp'] = deliveryTime;
+      }
     }
 
     // Always update the updatedAt timestamp
@@ -558,15 +643,15 @@ export class TripsService {
    */
   private validateCreateTripDto(dto: CreateTripDto): void {
     const requiredFields = [
-      'pickupLocation',
-      'dropoffLocation',
-      'scheduledPickupDatetime',
+      'scheduledTimestamp',
       'brokerId',
-      'lorryId',
+      'truckId',
+      'trailerId',
+      'truckOwnerId',
+      'carrierId',
       'driverId',
-      'driverName',
       'brokerPayment',
-      'lorryOwnerPayment',
+      'truckOwnerPayment',
       'driverPayment',
     ];
 
@@ -582,24 +667,28 @@ export class TripsService {
    * Requirements: 3.1
    * 
    * Generates all GSI partition and sort keys for multi-index query optimization:
-   * - GSI1: Default dispatcher index (date-based sorting)
-   * - GSI2: Lorry-optimized index (lorry + date sorting)
-   * - GSI3: Driver-optimized index (driver + date sorting)
-   * - GSI4: Broker-optimized index (broker + date sorting)
+   * - GSI1: Carrier index (carrier + timestamp sorting)
+   * - GSI2: Dispatcher index (dispatcher + timestamp sorting)
+   * - GSI3: Driver index (driver + timestamp sorting)
+   * - GSI4: Truck Owner index (owner + timestamp sorting)
+   * - GSI5: Broker index (broker + timestamp sorting)
    * 
    * Format:
-   * - GSI1SK: {YYYY-MM-DDTHH:mm:ss.sssZ}#{tripId}
-   * - GSI2SK: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
-   * - GSI3SK: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
-   * - GSI4SK: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+   * - GSI1SK: {ISO_TIMESTAMP}#{tripId}
+   * - GSI2SK: {ISO_TIMESTAMP}#{tripId}
+   * - GSI3SK: {ISO_TIMESTAMP}#{tripId}
+   * - GSI4SK: {ISO_TIMESTAMP}#{tripId}
+   * - GSI5SK: {ISO_TIMESTAMP}#{tripId}
    */
   private populateGSIAttributes(params: {
     tripId: string;
     dispatcherId: string;
-    lorryId: string;
+    truckId: string;
     driverId: string;
     brokerId: string;
-    scheduledPickupDatetime: string;
+    scheduledTimestamp: string;
+    carrierId?: string;
+    truckOwnerId?: string;
   }): {
     GSI1PK: string;
     GSI1SK: string;
@@ -609,35 +698,37 @@ export class TripsService {
     GSI3SK: string;
     GSI4PK: string;
     GSI4SK: string;
+    GSI5PK: string;
+    GSI5SK: string;
   } {
-    const { tripId, dispatcherId, lorryId, driverId, brokerId, scheduledPickupDatetime } = params;
+    const { tripId, dispatcherId, truckId, driverId, brokerId, scheduledTimestamp, carrierId, truckOwnerId } = params;
     
     // Parse the scheduled date
-    const scheduledDate = new Date(scheduledPickupDatetime);
+    const scheduledDate = new Date(scheduledTimestamp);
     
-    // Use full ISO timestamp for GSI1SK to enable precise time-based queries
-    const scheduledDateTimeStr = scheduledDate.toISOString();
-    
-    // Use date-only format (YYYY-MM-DD) for GSI2/3/4 sort keys
-    // This groups trips by entity and date, enabling efficient date range queries
-    const dateOnlyStr = scheduledDateTimeStr.split('T')[0]; // Extract YYYY-MM-DD
+    // Use ISO timestamp for all GSI sort keys to enable precise time-based queries
+    const scheduledDateTimeStr = scheduledDate.toISOString().split('.')[0] + 'Z'; // Remove milliseconds
     
     return {
-      // GSI1: Default dispatcher index (existing structure)
-      GSI1PK: `DISPATCHER#${dispatcherId}`,
+      // GSI1: Carrier index
+      GSI1PK: `CARRIER#${carrierId || dispatcherId}`, // Use carrierId if available, fallback to dispatcherId
       GSI1SK: `${scheduledDateTimeStr}#${tripId}`,
       
-      // GSI2: Lorry-optimized index
+      // GSI2: Dispatcher index
       GSI2PK: `DISPATCHER#${dispatcherId}`,
-      GSI2SK: `LORRY#${lorryId}#${dateOnlyStr}#${tripId}`,
+      GSI2SK: `${scheduledDateTimeStr}#${tripId}`,
       
-      // GSI3: Driver-optimized index
-      GSI3PK: `DISPATCHER#${dispatcherId}`,
-      GSI3SK: `DRIVER#${driverId}#${dateOnlyStr}#${tripId}`,
+      // GSI3: Driver index
+      GSI3PK: `DRIVER#${driverId}`,
+      GSI3SK: `${scheduledDateTimeStr}#${tripId}`,
       
-      // GSI4: Broker-optimized index
-      GSI4PK: `DISPATCHER#${dispatcherId}`,
-      GSI4SK: `BROKER#${brokerId}#${dateOnlyStr}#${tripId}`,
+      // GSI4: Truck Owner index
+      GSI4PK: `OWNER#${truckOwnerId || dispatcherId}`, // Use truckOwnerId if available, fallback to dispatcherId
+      GSI4SK: `${scheduledDateTimeStr}#${tripId}`,
+      
+      // GSI5: Broker index
+      GSI5PK: `BROKER#${brokerId}`,
+      GSI5SK: `${scheduledDateTimeStr}#${tripId}`,
     };
   }
 
@@ -646,9 +737,7 @@ export class TripsService {
    * Requirements: 3.1
    * 
    * Ensures all GSI attributes follow the correct format to prevent query issues:
-   * - GSI2SK: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
-   * - GSI3SK: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
-   * - GSI4SK: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
+   * - GSI1SK through GSI5SK: {ISO_TIMESTAMP}#{tripId}
    */
   private validateGSIAttributes(gsiAttributes: {
     GSI1PK: string;
@@ -659,31 +748,33 @@ export class TripsService {
     GSI3SK: string;
     GSI4PK: string;
     GSI4SK: string;
+    GSI5PK: string;
+    GSI5SK: string;
   }): void {
     const errors: string[] = [];
 
-    // Validate GSI1SK format: {ISO-8601-datetime}#{tripId}
-    const gsi1Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z#[a-f0-9-]+$/;
-    if (!gsi1Pattern.test(gsiAttributes.GSI1SK)) {
+    // Validate all GSI SK formats: {ISO-8601-datetime-without-ms}#{tripId}
+    // Format: YYYY-MM-DDTHH:mm:ssZ#uuid
+    const gsiPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z#[a-f0-9-]+$/;
+    
+    if (!gsiPattern.test(gsiAttributes.GSI1SK)) {
       errors.push(`Invalid GSI1SK format: ${gsiAttributes.GSI1SK}`);
     }
-
-    // Validate GSI2SK format: LORRY#{lorryId}#{YYYY-MM-DD}#{tripId}
-    const gsi2Pattern = /^LORRY#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
-    if (!gsi2Pattern.test(gsiAttributes.GSI2SK)) {
+    
+    if (!gsiPattern.test(gsiAttributes.GSI2SK)) {
       errors.push(`Invalid GSI2SK format: ${gsiAttributes.GSI2SK}`);
     }
 
-    // Validate GSI3SK format: DRIVER#{driverId}#{YYYY-MM-DD}#{tripId}
-    const gsi3Pattern = /^DRIVER#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
-    if (!gsi3Pattern.test(gsiAttributes.GSI3SK)) {
+    if (!gsiPattern.test(gsiAttributes.GSI3SK)) {
       errors.push(`Invalid GSI3SK format: ${gsiAttributes.GSI3SK}`);
     }
 
-    // Validate GSI4SK format: BROKER#{brokerId}#{YYYY-MM-DD}#{tripId}
-    const gsi4Pattern = /^BROKER#[^#]+#\d{4}-\d{2}-\d{2}#[a-f0-9-]+$/;
-    if (!gsi4Pattern.test(gsiAttributes.GSI4SK)) {
+    if (!gsiPattern.test(gsiAttributes.GSI4SK)) {
       errors.push(`Invalid GSI4SK format: ${gsiAttributes.GSI4SK}`);
+    }
+    
+    if (!gsiPattern.test(gsiAttributes.GSI5SK)) {
+      errors.push(`Invalid GSI5SK format: ${gsiAttributes.GSI5SK}`);
     }
 
     if (errors.length > 0) {
@@ -721,7 +812,7 @@ export class TripsService {
     }
 
     // Validate status transition (this will throw if invalid)
-    this.validateStatusTransition(existingTrip.status, newStatus, userRole);
+    this.validateStatusTransition(existingTrip.orderStatus as TripStatus, newStatus, userRole);
 
     // Build update expression
     const updateExpressions: string[] = [];
@@ -732,11 +823,18 @@ export class TripsService {
     expressionAttributeNames['#status'] = 'status';
     expressionAttributeValues[':status'] = newStatus;
 
-    // Record deliveredAt timestamp when status changes to Delivered
-    if (newStatus === TripStatus.Delivered && !existingTrip.deliveredAt) {
-      updateExpressions.push('#deliveredAt = :deliveredAt');
-      expressionAttributeNames['#deliveredAt'] = 'deliveredAt';
-      expressionAttributeValues[':deliveredAt'] = new Date().toISOString();
+    // Record deliveryTimestamp when status changes to Delivered
+    if (newStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp) {
+      updateExpressions.push('#deliveryTimestamp = :deliveryTimestamp');
+      expressionAttributeNames['#deliveryTimestamp'] = 'deliveryTimestamp';
+      expressionAttributeValues[':deliveryTimestamp'] = new Date().toISOString().split('.')[0] + 'Z';
+    }
+    
+    // Record pickupTimestamp when status changes to Picked Up
+    if (newStatus === TripStatus.PickedUp && !existingTrip.pickupTimestamp) {
+      updateExpressions.push('#pickupTimestamp = :pickupTimestamp');
+      expressionAttributeNames['#pickupTimestamp'] = 'pickupTimestamp';
+      expressionAttributeValues[':pickupTimestamp'] = new Date().toISOString().split('.')[0] + 'Z';
     }
 
     // Always update the updatedAt timestamp
@@ -791,30 +889,14 @@ export class TripsService {
     try {
       const dynamodbClient = this.awsService.getDynamoDBClient();
 
-      // Get user profile to extract driver license number
-      const getUserCommand = new GetCommand({
-        TableName: this.configService.usersTableName,
-        Key: {
-          PK: `USER#${userId}`,
-          SK: 'PROFILE',
-        },
-      });
-
-      const userResult = await dynamodbClient.send(getUserCommand);
-      
-      if (!userResult.Item || !userResult.Item.driverLicenseNumber) {
-        throw new ForbiddenException('Driver license number not found in profile');
-      }
-
-      const driverLicenseNumber = userResult.Item.driverLicenseNumber;
-
-      // Query GSI3 to find trips for this driver
+      // In eTrucky schema, we use userId directly (not driverLicenseNumber)
+      // Query GSI3 to find trips for this driver using their userId
       const queryCommand = new QueryCommand({
         TableName: this.tripsTableName,
         IndexName: 'GSI3',
         KeyConditionExpression: 'GSI3PK = :gsi3pk',
         ExpressionAttributeValues: {
-          ':gsi3pk': `DRIVER#${driverLicenseNumber}`,
+          ':gsi3pk': `DRIVER#${userId}`,
         },
       });
 
@@ -906,15 +988,30 @@ export class TripsService {
       const dynamodbClient = this.awsService.getDynamoDBClient();
 
       // Role-based query logic
+      let result: { trips: Trip[]; lastEvaluatedKey?: string };
+      
       if (userRole === UserRole.Dispatcher) {
-        return await this.getTripsForDispatcher(userId, filters, dynamodbClient);
+        result = await this.getTripsForDispatcher(userId, filters, dynamodbClient);
+      } else if (userRole === UserRole.Carrier) {
+        result = await this.getTripsForCarrier(userId, filters, dynamodbClient);
       } else if (userRole === UserRole.Driver) {
-        return await this.getTripsForDriver(userId, filters, dynamodbClient);
-      } else if (userRole === UserRole.LorryOwner) {
-        return await this.getTripsForLorryOwner(userId, filters, dynamodbClient);
+        result = await this.getTripsForDriver(userId, filters, dynamodbClient);
+      } else if (userRole === UserRole.LorryOwner || userRole === UserRole.TruckOwner) {
+        result = await this.getTripsForLorryOwner(userId, filters, dynamodbClient);
       } else {
         throw new ForbiddenException('Invalid role for trip queries');
       }
+
+      // Apply role-based filtering to hide sensitive fields
+      const filteredTrips = result.trips.map(trip => this.filterTripByRole(trip, userRole) as Trip);
+
+      // Enrich trips with asset metadata for frontend display
+      const enrichedResponse = await this.enrichTripsWithAssetMetadata(filteredTrips, userId, userRole);
+
+      return {
+        ...enrichedResponse,
+        lastEvaluatedKey: result.lastEvaluatedKey,
+      };
     } catch (error: any) {
       if (
         error instanceof ForbiddenException ||
@@ -940,8 +1037,8 @@ export class TripsService {
    * - GSI4: When brokerId filter is provided (~200 items)
    * - GSI1: Default when only date/status filters (~10,000 items)
    * 
-   * Includes automatic fallback to GSI1 if optimized query fails, ensuring
-   * backward compatibility and high availability.
+   * Includes automatic fallback to GSI2 if optimized query fails, ensuring
+   * high availability.
    * 
    * Comprehensive logging includes:
    * - Index selection decision with filter details and estimated reads
@@ -969,28 +1066,16 @@ export class TripsService {
 
       // Route to appropriate query method based on selected index
       // Requirements: 1.4, 5.1
-      switch (strategy.indexName) {
-        case 'GSI2':
-          return await this.queryByLorryIndex(dispatcherId, filters, dynamodbClient);
-        
-        case 'GSI3':
-          return await this.queryByDriverIndex(dispatcherId, filters, dynamodbClient);
-        
-        case 'GSI4':
-          return await this.queryByBrokerIndex(dispatcherId, filters, dynamodbClient);
-        
-        case 'GSI1':
-        default:
-          return await this.queryByDefaultIndex(dispatcherId, filters, dynamodbClient);
-      }
+      // For now, use default GSI2 for all queries with FilterExpression
+      // TODO: Implement optimized GSI3 (driver) and GSI4 (broker) query methods
+      return await this.queryByDefaultIndex(dispatcherId, filters, dynamodbClient);
     } catch (error: any) {
       // Log error with full context
       // Requirements: 5.2, 3.6, 6.4
       this.logQueryError(error, filters, 'unknown');
 
-      // Fallback to default index (GSI1) to ensure availability
+      // Fallback to default index (GSI2) to ensure availability
       // Requirements: 5.2
-      console.log('Falling back to GSI1 (default index) due to error in optimized query');
       return await this.queryByDefaultIndex(dispatcherId, filters, dynamodbClient);
     }
   }
@@ -1045,27 +1130,24 @@ export class TripsService {
   }
 
   /**
-   * Query trips using GSI1 (Default Dispatcher Index)
-   * Requirements: 3.5, 3.6, 6.4
+   * Query trips using GSI2 (Dispatcher Index) with application-layer filtering
    * 
-   * GSI1 Structure:
-   * - GSI1PK: DISPATCHER#{dispatcherId}
-   * - GSI1SK: {ISO-8601-datetime}#{tripId}
+   * PAGINATION STRATEGY:
+   * - Always query using GSI2 (DISPATCHER#{dispatcherId}) regardless of secondary filters
+   * - Apply ALL secondary filters (broker, status, truck, driver) at application layer
+   * - Never use DynamoDB FilterExpression to avoid pagination issues
+   * - Fetch in batches until requested page size is reached or no more records exist
+   * - lastEvaluatedKey represents the last record SHOWN to user, not last scanned
    * 
-   * This method is the fallback when no selective filters (lorryId, driverId, brokerId) are provided.
-   * It queries all trips for a dispatcher within a date range and applies all filters using FilterExpression.
+   * GSI2 Structure:
+   * - GSI2PK: DISPATCHER#{dispatcherId}
+   * - GSI2SK: {ISO_TIMESTAMP}#{tripId}
    * 
-   * KeyConditionExpression handles: dispatcherId, date range
-   * FilterExpression handles: brokerId, lorryId, driverId, status
-   * Application layer handles: driverName (case-insensitive)
-   * 
-   * Comprehensive logging includes:
-   * - Query start with filter details
-   * - Actual reads after query execution (from DynamoDB response)
-   * - Query errors with full context
+   * KeyConditionExpression handles: dispatcherId, date range (only)
+   * Application layer handles: ALL secondary filters (broker, status, truck, driver, driverName)
    * 
    * @param dispatcherId - Dispatcher ID to query trips for
-   * @param filters - Trip filters (date range, status, broker, lorry, driver)
+   * @param filters - Trip filters (date range, status, broker, truck, driver)
    * @param dynamodbClient - DynamoDB client instance
    * @returns Query result with trips and optional pagination token
    */
@@ -1080,109 +1162,234 @@ export class TripsService {
 
     try {
       // Log query start with filter details
-      // Requirements: 3.6, 6.4
-      this.logQueryStart('GSI1', filters);
+      this.logQueryStart('GSI2', filters);
     
-    // Build key condition expression for GSI1
-    let keyConditionExpression = 'GSI1PK = :gsi1pk';
+      // Build key condition expression for GSI2 (Dispatcher Index)
+      // ONLY use partition key and date range - NO secondary filters in DynamoDB
+      let keyConditionExpression = 'GSI2PK = :gsi2pk';
+      const expressionAttributeValues: Record<string, any> = {
+        ':gsi2pk': `DISPATCHER#${dispatcherId}`,
+      };
+
+      // Add date range filtering if provided (GSI2SK = {ISO_TIMESTAMP}#tripId)
+      if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        
+        const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+        const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+        
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startSk AND :endSk';
+        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
+      } else if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+        keyConditionExpression += ' AND GSI2SK >= :startSk';
+        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+      } else if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+        keyConditionExpression += ' AND GSI2SK <= :endSk';
+        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
+      }
+
+      const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+      const allTrips: Trip[] = [];
+      let dynamoDBLastKey = filters.lastEvaluatedKey;
+      
+      const queryStartTime = Date.now();
+      const maxQueryTimeMs = 10000; // 10 seconds timeout
+      const maxBatches = 10; // Prevent infinite loops
+      let batchCount = 0;
+      
+      // Determine batch size based on filter selectivity estimate
+      const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId || filters.driverId || filters.driverName);
+      const batchSize = hasSecondaryFilters ? 200 : requestedLimit; // Fetch more if filtering
+      
+      // Keep fetching until we have enough filtered results or run out of data
+      while (Date.now() - queryStartTime < maxQueryTimeMs && batchCount < maxBatches) {
+        batchCount++;
+        
+        // Build query params - NO FilterExpression, only KeyConditionExpression
+        const queryParams: any = {
+          TableName: this.tripsTableName,
+          IndexName: 'GSI2',
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeValues: expressionAttributeValues,
+          Limit: batchSize,
+          ScanIndexForward: false, // Newest first
+          ReturnConsumedCapacity: 'TOTAL',
+        };
+
+        if (dynamoDBLastKey) {
+          try {
+            queryParams.ExclusiveStartKey = JSON.parse(
+              Buffer.from(dynamoDBLastKey, 'base64').toString('utf-8'),
+            );
+          } catch (error) {
+            throw new BadRequestException('Invalid lastEvaluatedKey format');
+          }
+        }
+
+        const queryCommand = new QueryCommand(queryParams);
+        const result = await dynamodbClient.send(queryCommand);
+
+        // Track RCU consumption
+        if (result.ConsumedCapacity?.CapacityUnits) {
+          totalRCU += result.ConsumedCapacity.CapacityUnits;
+        }
+
+        const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+        allTrips.push(...batchTrips);
+
+        // Update DynamoDB pagination key
+        if (result.LastEvaluatedKey) {
+          dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+        } else {
+          dynamoDBLastKey = undefined;
+          break; // No more data in DynamoDB
+        }
+
+        // Apply all filters at application layer
+        const filteredSoFar = this.applyAllFilters(allTrips, filters);
+        
+        // Stop if we have enough filtered results
+        if (filteredSoFar.length >= requestedLimit) {
+          break;
+        }
+        
+        // Stop if no more data from DynamoDB
+        if (!dynamoDBLastKey) {
+          break;
+        }
+      }
+
+      // Apply all filters at application layer
+      const filteredTrips = this.applyAllFilters(allTrips, filters);
+
+      // Trim to requested limit
+      const trimmedTrips = filteredTrips.slice(0, requestedLimit);
+      const hasMoreItems = filteredTrips.length > requestedLimit;
+      
+      const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
+        trips: trimmedTrips 
+      };
+
+      // Set lastEvaluatedKey to the last VISIBLE record (not last scanned)
+      if (hasMoreItems && trimmedTrips.length > 0) {
+        const lastTrip = trimmedTrips[trimmedTrips.length - 1];
+        const lastKey = {
+          PK: `TRIP#${lastTrip.tripId}`,
+          SK: 'METADATA',
+          GSI2PK: `DISPATCHER#${dispatcherId}`,
+          GSI2SK: `${lastTrip.scheduledTimestamp}#${lastTrip.tripId}`,
+        };
+        response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+      } else if (dynamoDBLastKey) {
+        // We have more data in DynamoDB but not enough filtered results yet
+        // Return the DynamoDB key so next request can continue
+        response.lastEvaluatedKey = dynamoDBLastKey;
+      }
+
+      // Emit metrics
+      const responseTimeMs = Date.now() - startTime;
+      await this.emitQueryMetrics('GSI2', responseTimeMs, totalRCU, isError);
+
+      // Log completion
+      this.logQueryCompletion('GSI2', filters, totalRCU, trimmedTrips.length, responseTimeMs);
+
+      return response;
+    } catch (error: any) {
+      isError = true;
+      const responseTimeMs = Date.now() - startTime;
+      await this.emitQueryMetrics('GSI2', responseTimeMs, totalRCU, isError);
+      this.logQueryError(error, filters, 'GSI2');
+      throw error;
+    }
+  }
+
+  /**
+   * Get trips for a driver with application-layer filtering
+   * 
+   * PAGINATION STRATEGY:
+   * - Always query using GSI3 (DRIVER#{driverId}) regardless of secondary filters
+   * - Apply ALL secondary filters at application layer
+   * - Never use DynamoDB FilterExpression
+   * - Fetch in batches until requested page size is reached
+   * 
+   * Query GSI3 by GSI3PK: DRIVER#{userId}, GSI3SK: {ISO_TIMESTAMP}#{tripId}
+   */
+  private async getTripsForDriver(
+    userId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    // Build key condition expression for GSI3 (Driver Index)
+    // ONLY partition key and date range - NO secondary filters
+    let keyConditionExpression = 'GSI3PK = :gsi3pk';
     const expressionAttributeValues: Record<string, any> = {
-      ':gsi1pk': `DISPATCHER#${dispatcherId}`,
+      ':gsi3pk': `DRIVER#${userId}`,
     };
 
-    // Add date range filtering if provided (GSI1SK = date#tripId)
-    // GSI1SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
-    // Normalize dates to UTC to avoid timezone issues
+    // Add date range filtering if provided
     if (filters.startDate && filters.endDate) {
       const startDate = new Date(filters.startDate);
       startDate.setUTCHours(0, 0, 0, 0);
       const endDate = new Date(filters.endDate);
       endDate.setUTCHours(23, 59, 59, 999);
       
-      const startDateStr = startDate.toISOString();
-      const endDateStr = endDate.toISOString();
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
       
-      keyConditionExpression += ' AND GSI1SK BETWEEN :startSk AND :endSk';
+      keyConditionExpression += ' AND GSI3SK BETWEEN :startSk AND :endSk';
       expressionAttributeValues[':startSk'] = `${startDateStr}#`;
       expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     } else if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       startDate.setUTCHours(0, 0, 0, 0);
-      const startDateStr = startDate.toISOString();
-      keyConditionExpression += ' AND GSI1SK >= :startSk';
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI3SK >= :startSk';
       expressionAttributeValues[':startSk'] = `${startDateStr}#`;
     } else if (filters.endDate) {
       const endDate = new Date(filters.endDate);
       endDate.setUTCHours(23, 59, 59, 999);
-      const endDateStr = endDate.toISOString();
-      keyConditionExpression += ' AND GSI1SK <= :endSk';
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI3SK <= :endSk';
       expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     }
 
-    // Build filter expression for secondary filters
-    // No exclusions needed for GSI1 since all filters are applied via FilterExpression
-    const { filterExpression, filterAttributeNames, filterAttributeValues } =
-      this.buildFilterExpression(filters, []);
-
     const requestedLimit = filters.limit ? Number(filters.limit) : 50;
-    const trips: Trip[] = [];
-    let lastEvaluatedKey = filters.lastEvaluatedKey;
+    const allTrips: Trip[] = [];
+    let dynamoDBLastKey = filters.lastEvaluatedKey;
     
-    // When using FilterExpression AND application-layer filtering (driver name),
-    // we need to keep fetching until we have enough items that pass ALL filters
-    const fetchLimit = requestedLimit + 1;
-    const queryStartTime = Date.now();
-    const maxQueryTimeMs = 10000; // 10 seconds - balance between completeness and UX
-    let iterations = 0;
-    
-    // Check if we have filters that require more aggressive fetching
-    const hasDriverNameFilter = !!filters.driverName;
-    const hasMultipleFilters = [filters.brokerId, filters.status, filters.lorryId, filters.driverName].filter(f => f).length > 1;
-    
-    // Dynamic batch size based on filter selectivity
-    // No filters: Use page size (dense data, immediate results)
-    // DynamoDB filters only: Moderate batch (200-300)
-    // Application-layer filters: Large batch (500)
-    // Multiple filters: Largest batch (500)
-    const hasDynamoDBFilters = !!(filters.brokerId || filters.status || filters.lorryId);
-    let batchSize: number;
-    
-    if (hasDriverNameFilter || hasMultipleFilters) {
-      // Most sparse: application-layer filtering or multiple filters
-      batchSize = 500;
-    } else if (hasDynamoDBFilters) {
-      // Moderate sparsity: DynamoDB FilterExpression
-      batchSize = 200;
-    } else {
-      // Dense data: no filters, just date range
-      batchSize = Math.max(fetchLimit, 50); // At least 50 for efficiency
-    }
-    
-    while (Date.now() - queryStartTime < maxQueryTimeMs) {
-      iterations++;
+    const maxBatches = 10;
+    let batchCount = 0;
+    const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId);
+    const batchSize = hasSecondaryFilters ? 200 : requestedLimit;
+
+    // Fetch batches until we have enough filtered results
+    while (batchCount < maxBatches) {
+      batchCount++;
       
-      // Build query command for GSI1 on new trips table with dynamic batch size
+      // Build query params - NO FilterExpression
       const queryParams: any = {
         TableName: this.tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI3',
         KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ...filterAttributeValues,
-        },
-        Limit: batchSize, // Dynamic based on filter selectivity
-        ScanIndexForward: false, // Return results in descending order (newest first)
-        ReturnConsumedCapacity: 'TOTAL', // Request RCU consumption data
+        ExpressionAttributeValues: expressionAttributeValues,
+        Limit: batchSize,
+        ScanIndexForward: false,
       };
 
-      if (filterExpression) {
-        queryParams.FilterExpression = filterExpression;
-        queryParams.ExpressionAttributeNames = filterAttributeNames;
-      }
-
-      if (lastEvaluatedKey) {
+      if (dynamoDBLastKey) {
         try {
           queryParams.ExclusiveStartKey = JSON.parse(
-            Buffer.from(lastEvaluatedKey, 'base64').toString('utf-8'),
+            Buffer.from(dynamoDBLastKey, 'base64').toString('utf-8'),
           );
         } catch (error) {
           throw new BadRequestException('Invalid lastEvaluatedKey format');
@@ -1192,348 +1399,300 @@ export class TripsService {
       const queryCommand = new QueryCommand(queryParams);
       const result = await dynamodbClient.send(queryCommand);
 
-      // Track RCU consumption from DynamoDB response
-      if (result.ConsumedCapacity && result.ConsumedCapacity.CapacityUnits) {
-        totalRCU += result.ConsumedCapacity.CapacityUnits;
-      }
-
       const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
-      trips.push(...batchTrips);
+      allTrips.push(...batchTrips);
 
-      // Update lastEvaluatedKey for next iteration or response
       if (result.LastEvaluatedKey) {
-        lastEvaluatedKey = Buffer.from(
-          JSON.stringify(result.LastEvaluatedKey),
-        ).toString('base64');
+        dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
       } else {
-        // No more items available
-        lastEvaluatedKey = undefined;
+        dynamoDBLastKey = undefined;
         break;
       }
-      
-      // Don't stop just because we got 0 results - with FilterExpression, 
-      // matching items might be in the next batch
-      // Only stop if we have enough matching results OR there's no more data
-      
-      // If we have a driver name filter, check if we have enough matches after filtering
-      if (hasDriverNameFilter) {
-        const currentMatches = this.applyDriverNameFilter(trips, filters.driverName);
-        if (currentMatches.length >= fetchLimit) {
-          break;
-        }
-      } else {
-        // No driver name filter, stop when we have enough trips
-        // But if we have multiple filters, keep fetching to ensure we find matches
-        if (trips.length >= fetchLimit && !hasMultipleFilters) {
-          break;
-        }
-        // With multiple filters, be more aggressive and fetch more data
-        if (trips.length >= fetchLimit * 2) {
-          break;
-        }
+
+      // Apply filters and check if we have enough
+      const filteredSoFar = this.applyAllFilters(allTrips, filters);
+      if (filteredSoFar.length >= requestedLimit || !dynamoDBLastKey) {
+        break;
       }
     }
 
-    // Check if we hit the timeout limit
-    const queryTimeMs = Date.now() - queryStartTime;
-    if (queryTimeMs >= maxQueryTimeMs) {
-      console.warn(`[GSI1] Query timeout reached after ${iterations} iterations and ${queryTimeMs}ms. Returning partial results.`, {
-        requestedLimit,
-        itemsFound: trips.length,
-        filters,
-      });
-    }
-
-    // Apply case-insensitive driver name filtering in application layer
-    const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
-
-    // Check if there are more items beyond the requested limit
-    const hasMoreItems = filteredTrips.length > requestedLimit;
-    
-    // Trim to requested limit
+    // Apply all filters at application layer
+    const filteredTrips = this.applyAllFilters(allTrips, filters);
     const trimmedTrips = filteredTrips.slice(0, requestedLimit);
-    
-    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { 
-      trips: trimmedTrips 
-    };
+    const hasMoreItems = filteredTrips.length > requestedLimit;
 
-    // Include lastEvaluatedKey if there are more items
-    // We need to get the key from the last item we're returning
+    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: trimmedTrips };
+
     if (hasMoreItems && trimmedTrips.length > 0) {
       const lastTrip = trimmedTrips[trimmedTrips.length - 1];
-      // Create a lastEvaluatedKey from the last returned trip
       const lastKey = {
         PK: `TRIP#${lastTrip.tripId}`,
         SK: 'METADATA',
-        GSI1PK: `DISPATCHER#${dispatcherId}`,
-        GSI1SK: `${lastTrip.scheduledPickupDatetime}#${lastTrip.tripId}`,
+        GSI3PK: `DRIVER#${userId}`,
+        GSI3SK: `${lastTrip.scheduledTimestamp}#${lastTrip.tripId}`,
       };
-      response.lastEvaluatedKey = Buffer.from(
-        JSON.stringify(lastKey),
-      ).toString('base64');
-    }
-
-    // Emit CloudWatch metrics for query performance
-    // Requirements: 6.1
-    const responseTimeMs = Date.now() - startTime;
-    await this.emitQueryMetrics('GSI1', responseTimeMs, totalRCU, isError);
-    
-    console.log('[DEBUG-GSI1] Final trips with broker info:', trimmedTrips.map(t => ({
-      tripId: t.tripId,
-      status: t.status,
-      brokerId: t.brokerId,
-      brokerName: t.brokerName
-    })));
-
-    // Log actual reads after query execution
-    // Requirements: 3.6, 6.4
-    this.logQueryCompletion('GSI1', filters, totalRCU, trimmedTrips.length, responseTimeMs);
-
-    return response;
-    } catch (error: any) {
-      isError = true;
-      const responseTimeMs = Date.now() - startTime;
-      
-      // Emit error metrics
-      await this.emitQueryMetrics('GSI1', responseTimeMs, totalRCU, isError);
-      
-      // Log error with full context
-      // Requirements: 3.6, 6.4
-      this.logQueryError(error, filters, 'GSI1');
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Get trips for a driver
-   * Query GSI3 by GSI3PK: DRIVER#{driverLicenseNumber}, GSI3SK: date#tripId
-   * Requirements: 8.8
-   * 
-   * Note: userId is the Cognito user ID, but trips are stored with driverLicenseNumber.
-   * We need to get the user profile first to extract their driver license number.
-   */
-  private async getTripsForDriver(
-    userId: string,
-    filters: any,
-    dynamodbClient: any,
-  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
-    // Get user profile to extract driver license number
-    const getUserCommand = new GetCommand({
-      TableName: this.configService.usersTableName,
-      Key: {
-        PK: `USER#${userId}`,
-        SK: 'PROFILE',
-      },
-    });
-
-    const userResult = await dynamodbClient.send(getUserCommand);
-    
-    if (!userResult.Item || !userResult.Item.driverLicenseNumber) {
-      // Driver hasn't set their license number yet, return empty
-      return { trips: [] };
-    }
-
-    const driverLicenseNumber = userResult.Item.driverLicenseNumber;
-
-    // Build key condition expression for GSI3
-    let keyConditionExpression = 'GSI3PK = :gsi3pk';
-    const expressionAttributeValues: Record<string, any> = {
-      ':gsi3pk': `DRIVER#${driverLicenseNumber}`,
-    };
-
-    // Add date range filtering if provided (GSI3SK = date#tripId)
-    // GSI3SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
-    if (filters.startDate && filters.endDate) {
-      const startDateStr = new Date(filters.startDate).toISOString();
-      const endDateStr = new Date(filters.endDate).toISOString();
-      keyConditionExpression += ' AND GSI3SK BETWEEN :startSk AND :endSk';
-      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
-      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
-    } else if (filters.startDate) {
-      const startDateStr = new Date(filters.startDate).toISOString();
-      keyConditionExpression += ' AND GSI3SK >= :startSk';
-      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
-    } else if (filters.endDate) {
-      const endDateStr = new Date(filters.endDate).toISOString();
-      keyConditionExpression += ' AND GSI3SK <= :endSk';
-      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
-    }
-
-    // Build filter expression for secondary filters
-    // Exclude driverId since it's already in KeyConditionExpression
-    const { filterExpression, filterAttributeNames, filterAttributeValues } =
-      this.buildFilterExpression(filters, ['driverId']);
-
-    // Build query command for GSI3 on new trips table
-    const queryParams: any = {
-      TableName: this.tripsTableName,
-      IndexName: 'GSI3',
-      KeyConditionExpression: keyConditionExpression,
-      ExpressionAttributeValues: {
-        ...expressionAttributeValues,
-        ...filterAttributeValues,
-      },
-      Limit: filters.limit || 50,
-      ScanIndexForward: false, // Return results in descending order (newest first)
-    };
-
-    if (filterExpression) {
-      queryParams.FilterExpression = filterExpression;
-      queryParams.ExpressionAttributeNames = filterAttributeNames;
-    }
-
-    if (filters.lastEvaluatedKey) {
-      try {
-        queryParams.ExclusiveStartKey = JSON.parse(
-          Buffer.from(filters.lastEvaluatedKey, 'base64').toString('utf-8'),
-        );
-      } catch (error) {
-        throw new BadRequestException('Invalid lastEvaluatedKey format');
-      }
-    }
-
-    const queryCommand = new QueryCommand(queryParams);
-    const result = await dynamodbClient.send(queryCommand);
-
-    const trips = (result.Items || []).map((item) => this.mapItemToTrip(item));
-
-    // Apply case-insensitive driver name filtering in application layer
-    const filteredTrips = this.applyDriverNameFilter(trips, filters.driverName);
-
-    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: filteredTrips };
-
-    if (result.LastEvaluatedKey) {
-      response.lastEvaluatedKey = Buffer.from(
-        JSON.stringify(result.LastEvaluatedKey),
-      ).toString('base64');
+      response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+    } else if (dynamoDBLastKey) {
+      response.lastEvaluatedKey = dynamoDBLastKey;
     }
 
     return response;
   }
 
   /**
-   * Get trips for a lorry owner
-   * Query GSI2 by GSI2PK: LORRY#{lorryId}, GSI2SK: date#tripId
-   * Requirements: 8.9
+   * Get trips for a truck owner with application-layer filtering
    * 
-   * This queries trips by lorry license plate. The lorry owner must first
-   * get their registered lorries, then query trips for each lorry.
+   * PAGINATION STRATEGY:
+   * - Always query using GSI4 (OWNER#{ownerId}) regardless of secondary filters
+   * - Apply ALL secondary filters at application layer
+   * - Never use DynamoDB FilterExpression
+   * - Fetch in batches until requested page size is reached
+   * 
+   * Query GSI4 by GSI4PK: OWNER#{ownerId}, GSI4SK: {ISO_TIMESTAMP}#{tripId}
    */
   private async getTripsForLorryOwner(
     ownerId: string,
     filters: any,
     dynamodbClient: any,
   ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
-    // First, get all lorries owned by this owner
-    const lorriesQueryCommand = new QueryCommand({
-      TableName: this.lorriesTableName,
-      KeyConditionExpression: 'PK = :pk',
-      ExpressionAttributeValues: {
-        ':pk': `LORRY_OWNER#${ownerId}`,
-      },
-    });
+    // Build key condition expression for GSI4 (Truck Owner Index)
+    // ONLY partition key and date range - NO secondary filters
+    let keyConditionExpression = 'GSI4PK = :gsi4pk';
+    const expressionAttributeValues: Record<string, any> = {
+      ':gsi4pk': `OWNER#${ownerId}`,
+    };
 
-    const lorriesResult = await dynamodbClient.send(lorriesQueryCommand);
-    
-    if (!lorriesResult.Items || lorriesResult.Items.length === 0) {
-      // No lorries registered yet
-      return { trips: [] };
+    // Add date range filtering
+    if (filters.startDate && filters.endDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+      
+      keyConditionExpression += ' AND GSI4SK BETWEEN :startSk AND :endSk';
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
+    } else if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI4SK >= :startSk';
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+    } else if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI4SK <= :endSk';
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     }
 
-    // Extract lorry IDs
-    const lorryIds = lorriesResult.Items
-      .filter(item => item.SK && item.SK.startsWith('LORRY#'))
-      .map(item => item.lorryId);
-
-    if (lorryIds.length === 0) {
-      return { trips: [] };
-    }
-
-    // Query trips for each lorry using GSI2
+    const requestedLimit = filters.limit ? Number(filters.limit) : 50;
     const allTrips: Trip[] = [];
+    let dynamoDBLastKey = filters.lastEvaluatedKey;
     
-    for (const lorryId of lorryIds) {
-      // Skip if filters specify a different lorry
-      if (filters.lorryId && filters.lorryId !== lorryId) {
-        continue;
-      }
+    const maxBatches = 10;
+    let batchCount = 0;
+    const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId);
+    const batchSize = hasSecondaryFilters ? 200 : requestedLimit;
 
-      // Build key condition expression for GSI2
-      let keyConditionExpression = 'GSI2PK = :gsi2pk';
-      const expressionAttributeValues: Record<string, any> = {
-        ':gsi2pk': `LORRY#${lorryId}`,
-      };
-
-      // Add date range filtering if provided (GSI2SK = date#tripId)
-      // GSI2SK is stored as full ISO timestamp (e.g., 2025-12-12T09:00:00Z#trip-123)
-      if (filters.startDate && filters.endDate) {
-        const startDateStr = new Date(filters.startDate).toISOString();
-        const endDateStr = new Date(filters.endDate).toISOString();
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startSk AND :endSk';
-        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
-        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
-      } else if (filters.startDate) {
-        const startDateStr = new Date(filters.startDate).toISOString();
-        keyConditionExpression += ' AND GSI2SK >= :startSk';
-        expressionAttributeValues[':startSk'] = `${startDateStr}#`;
-      } else if (filters.endDate) {
-        const endDateStr = new Date(filters.endDate).toISOString();
-        keyConditionExpression += ' AND GSI2SK <= :endSk';
-        expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
-      }
-
-      // Build filter expression for secondary filters
-      // Exclude lorryId since it's already in KeyConditionExpression
-      const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildFilterExpression(filters, ['lorryId']);
-
-      // Build query command for GSI2 on new trips table
+    // Fetch batches until we have enough filtered results
+    while (batchCount < maxBatches) {
+      batchCount++;
+      
+      // Build query params - NO FilterExpression
       const queryParams: any = {
         TableName: this.tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: 'GSI4',
         KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ...filterAttributeValues,
-        },
-        ScanIndexForward: false, // Return results in descending order (newest first)
+        ExpressionAttributeValues: expressionAttributeValues,
+        ScanIndexForward: false,
+        Limit: batchSize,
       };
 
-      if (filterExpression) {
-        queryParams.FilterExpression = filterExpression;
-        queryParams.ExpressionAttributeNames = filterAttributeNames;
+      if (dynamoDBLastKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(dynamoDBLastKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
       }
 
       const queryCommand = new QueryCommand(queryParams);
       const result = await dynamodbClient.send(queryCommand);
 
-      if (result.Items && result.Items.length > 0) {
-        const trips = result.Items.map((item) => this.mapItemToTrip(item));
-        allTrips.push(...trips);
+      const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+      allTrips.push(...batchTrips);
+
+      if (result.LastEvaluatedKey) {
+        dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+      } else {
+        dynamoDBLastKey = undefined;
+        break;
+      }
+
+      // Apply filters and check if we have enough
+      const filteredSoFar = this.applyAllFilters(allTrips, filters);
+      if (filteredSoFar.length >= requestedLimit || !dynamoDBLastKey) {
+        break;
       }
     }
 
-    // Sort trips by scheduled date (most recent first)
-    allTrips.sort((a, b) => 
-      new Date(b.scheduledPickupDatetime).getTime() - 
-      new Date(a.scheduledPickupDatetime).getTime()
-    );
+    // Apply all filters at application layer
+    const filteredTrips = this.applyAllFilters(allTrips, filters);
+    const trimmedTrips = filteredTrips.slice(0, requestedLimit);
+    const hasMoreItems = filteredTrips.length > requestedLimit;
 
-    // Apply case-insensitive driver name filtering in application layer
-    const filteredTrips = this.applyDriverNameFilter(allTrips, filters.driverName);
+    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: trimmedTrips };
 
-    // Apply limit if specified
-    const limit = filters.limit || 50;
-    const limitedTrips = filteredTrips.slice(0, limit);
+    if (hasMoreItems && trimmedTrips.length > 0) {
+      const lastTrip = trimmedTrips[trimmedTrips.length - 1];
+      const lastKey = {
+        PK: `TRIP#${lastTrip.tripId}`,
+        SK: 'METADATA',
+        GSI4PK: `OWNER#${ownerId}`,
+        GSI4SK: `${lastTrip.scheduledTimestamp}#${lastTrip.tripId}`,
+      };
+      response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+    } else if (dynamoDBLastKey) {
+      response.lastEvaluatedKey = dynamoDBLastKey;
+    }
 
-    return { trips: limitedTrips };
+    return response;
   }
 
+  /**
+   * Get trips for a carrier with application-layer filtering
+   * 
+   * PAGINATION STRATEGY:
+   * - Always query using GSI1 (CARRIER#{carrierId}) regardless of secondary filters
+   * - Apply ALL secondary filters at application layer
+   * - Never use DynamoDB FilterExpression
+   * - Fetch in batches until requested page size is reached
+   * 
+   * Queries GSI1 (Carrier Index) to get all trips for the carrier's organization
+   */
+  private async getTripsForCarrier(
+    carrierId: string,
+    filters: any,
+    dynamodbClient: any,
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    // Build key condition expression for GSI1 (Carrier Index)
+    // ONLY partition key and date range - NO secondary filters
+    let keyConditionExpression = 'GSI1PK = :gsi1pk';
+    const expressionAttributeValues: Record<string, any> = {
+      ':gsi1pk': `CARRIER#${carrierId}`,
+    };
 
+    // Add date range filtering
+    if (filters.startDate && filters.endDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+      
+      keyConditionExpression += ' AND GSI1SK BETWEEN :startSk AND :endSk';
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
+    } else if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const startDateStr = startDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI1SK >= :startSk';
+      expressionAttributeValues[':startSk'] = `${startDateStr}#`;
+    } else if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setUTCHours(23, 59, 59, 999);
+      const endDateStr = endDate.toISOString().split('.')[0] + 'Z';
+      keyConditionExpression += ' AND GSI1SK <= :endSk';
+      expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
+    }
+
+    const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+    const allTrips: Trip[] = [];
+    let dynamoDBLastKey = filters.lastEvaluatedKey;
+    
+    const maxBatches = 10;
+    let batchCount = 0;
+    const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId || filters.driverId);
+    const batchSize = hasSecondaryFilters ? 200 : requestedLimit;
+
+    // Fetch batches until we have enough filtered results
+    while (batchCount < maxBatches) {
+      batchCount++;
+      
+      // Build query params - NO FilterExpression
+      const queryParams: any = {
+        TableName: this.tripsTableName,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ScanIndexForward: false,
+        Limit: batchSize,
+      };
+
+      if (dynamoDBLastKey) {
+        try {
+          queryParams.ExclusiveStartKey = JSON.parse(
+            Buffer.from(dynamoDBLastKey, 'base64').toString('utf-8'),
+          );
+        } catch (error) {
+          throw new BadRequestException('Invalid lastEvaluatedKey format');
+        }
+      }
+
+      const queryCommand = new QueryCommand(queryParams);
+      const result = await dynamodbClient.send(queryCommand);
+
+      const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
+      allTrips.push(...batchTrips);
+
+      if (result.LastEvaluatedKey) {
+        dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+      } else {
+        dynamoDBLastKey = undefined;
+        break;
+      }
+
+      // Apply filters and check if we have enough
+      const filteredSoFar = this.applyAllFilters(allTrips, filters);
+      if (filteredSoFar.length >= requestedLimit || !dynamoDBLastKey) {
+        break;
+      }
+    }
+
+    // Apply all filters at application layer
+    const filteredTrips = this.applyAllFilters(allTrips, filters);
+    const trimmedTrips = filteredTrips.slice(0, requestedLimit);
+    const hasMoreItems = filteredTrips.length > requestedLimit;
+
+    const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: trimmedTrips };
+
+    if (hasMoreItems && trimmedTrips.length > 0) {
+      const lastTrip = trimmedTrips[trimmedTrips.length - 1];
+      const lastKey = {
+        PK: `TRIP#${lastTrip.tripId}`,
+        SK: 'METADATA',
+        GSI1PK: `CARRIER#${carrierId}`,
+        GSI1SK: `${lastTrip.scheduledTimestamp}#${lastTrip.tripId}`,
+      };
+      response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+    } else if (dynamoDBLastKey) {
+      response.lastEvaluatedKey = dynamoDBLastKey;
+    }
+
+    return response;
+  }
 
   /**
-   * Query trips using GSI2 (Lorry Index)
+   * Query trips using GSI3 (Driver Index)
    * Requirements: 1.1, 1.5, 3.2, 3.6, 6.4
    * 
    * GSI2 Structure:
@@ -1614,9 +1773,10 @@ export class TripsService {
 
       // Build FilterExpression for remaining filters (broker, driver, status)
       // Exclude lorryId since it's already in KeyConditionExpression
-      // NOTE: Also exclude status to filter in application layer for consistency
-      const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildFilterExpression(filters, ['lorryId', 'status']);
+      // NOTE: FilterExpression removed - all filtering done at application layer
+      const filterExpression = '';
+      const filterAttributeNames = {};
+      const filterAttributeValues = {};
 
       const requestedLimit = filters.limit ? Number(filters.limit) : 50;
       const trips: Trip[] = [];
@@ -1695,19 +1855,16 @@ export class TripsService {
         
         // Apply status filtering in application layer
         if (filters.status) {
-          filteredBatch = filteredBatch.filter(trip => trip.status === filters.status);
+          filteredBatch = filteredBatch.filter(trip => trip.orderStatus === filters.status);
         }
         
         trips.push(...filteredBatch);
-        
-        console.log('[DEBUG-GSI2-LOOP] Iteration', iterations, 'complete. Total trips:', trips.length, '/ Requested:', requestedLimit);
 
         // Check if we have enough results or no more items
         if (!result.LastEvaluatedKey || trips.length >= requestedLimit) {
           lastEvaluatedKey = result.LastEvaluatedKey 
             ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
             : undefined;
-          console.log('[DEBUG-GSI2-LOOP] Breaking loop. Has more data:', !!result.LastEvaluatedKey);
           break;
         }
 
@@ -1725,9 +1882,6 @@ export class TripsService {
       }
 
       const trimmedTrips = trips.slice(0, requestedLimit);
-      
-      console.log('[DEBUG-GSI2-FINAL] Collected', trips.length, 'trips, trimmed to', trimmedTrips.length);
-      console.log('[DEBUG-GSI2-FINAL] Trip IDs:', trimmedTrips.map(t => t.tripId).join(', '));
 
       // Build response
       const response: { trips: Trip[]; lastEvaluatedKey?: string} = { 
@@ -1738,14 +1892,14 @@ export class TripsService {
       // This ensures no items are lost between pages when application-layer filtering is applied
       if (trips.length > requestedLimit && trimmedTrips.length > 0) {
         const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
-        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
+        const scheduledDate = new Date(lastReturnedTrip.scheduledTimestamp);
         const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
         
         const lastKey = {
           PK: `TRIP#${lastReturnedTrip.tripId}`,
           SK: 'METADATA',
           GSI2PK: `DISPATCHER#${dispatcherId}`,
-          GSI2SK: `LORRY#${lastReturnedTrip.lorryId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+          GSI2SK: `${scheduledDate.toISOString().split('.')[0]}Z#${lastReturnedTrip.tripId}`,
         };
         response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
@@ -1772,7 +1926,6 @@ export class TripsService {
       this.logQueryError(error, filters, 'GSI2');
 
       // If GSI2 query fails, fall back to GSI1 (default index)
-      console.log('Falling back to GSI1 (default index) due to GSI2 query error');
       return this.getTripsForDispatcher(
         dispatcherId,
         filters,
@@ -1854,8 +2007,10 @@ export class TripsService {
 
       // Build FilterExpression for remaining filters (broker, lorry, status)
       // Exclude driverId since it's already in KeyConditionExpression
-      const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildFilterExpression(filters, ['driverId']);
+      // NOTE: FilterExpression removed - all filtering done at application layer
+      const filterExpression = '';
+      const filterAttributeNames = {};
+      const filterAttributeValues = {};
 
       const requestedLimit = filters.limit ? Number(filters.limit) : 50;
       const trips: Trip[] = [];
@@ -1934,7 +2089,7 @@ export class TripsService {
         
         // Apply status filtering in application layer
         if (filters.status) {
-          filteredBatch = filteredBatch.filter(trip => trip.status === filters.status);
+          filteredBatch = filteredBatch.filter(trip => trip.orderStatus === filters.status);
         }
         
         trips.push(...filteredBatch);
@@ -1971,14 +2126,13 @@ export class TripsService {
       // This ensures no items are lost between pages when application-layer filtering is applied
       if (trips.length > requestedLimit && trimmedTrips.length > 0) {
         const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
-        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
-        const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const scheduledDate = new Date(lastReturnedTrip.scheduledTimestamp);
         
         const lastKey = {
           PK: `TRIP#${lastReturnedTrip.tripId}`,
           SK: 'METADATA',
-          GSI3PK: `DISPATCHER#${dispatcherId}`,
-          GSI3SK: `DRIVER#${lastReturnedTrip.driverId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+          GSI3PK: `DRIVER#${lastReturnedTrip.driverId}`,
+          GSI3SK: `${scheduledDate.toISOString().split('.')[0]}Z#${lastReturnedTrip.tripId}`,
         };
         response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
@@ -2004,7 +2158,6 @@ export class TripsService {
       });
 
       // If GSI3 query fails, fall back to GSI1 (default index)
-      console.log('Falling back to GSI1 (default index) due to GSI3 query error');
       return this.getTripsForDispatcher(
         dispatcherId,
         filters,
@@ -2085,8 +2238,10 @@ export class TripsService {
       }
 
       // Build FilterExpression
-      const { filterExpression, filterAttributeNames, filterAttributeValues } =
-        this.buildFilterExpression(filters, ['brokerId']);
+      // NOTE: FilterExpression removed - all filtering done at application layer
+      const filterExpression = '';
+      const filterAttributeNames = {};
+      const filterAttributeValues = {};
 
       const requestedLimit = filters.limit ? Number(filters.limit) : 50;
       const trips: Trip[] = [];
@@ -2191,14 +2346,13 @@ export class TripsService {
       // This ensures no items are lost between pages when application-layer filtering is applied
       if (trips.length > requestedLimit && trimmedTrips.length > 0) {
         const lastReturnedTrip = trimmedTrips[trimmedTrips.length - 1];
-        const scheduledDate = new Date(lastReturnedTrip.scheduledPickupDatetime);
-        const dateOnlyStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const scheduledDate = new Date(lastReturnedTrip.scheduledTimestamp);
         
         const lastKey = {
           PK: `TRIP#${lastReturnedTrip.tripId}`,
           SK: 'METADATA',
-          GSI4PK: `DISPATCHER#${dispatcherId}`,
-          GSI4SK: `BROKER#${lastReturnedTrip.brokerId}#${dateOnlyStr}#${lastReturnedTrip.tripId}`,
+          GSI5PK: `BROKER#${lastReturnedTrip.brokerId}`,
+          GSI5SK: `${scheduledDate.toISOString().split('.')[0]}Z#${lastReturnedTrip.tripId}`,
         };
         response.lastEvaluatedKey = Buffer.from(JSON.stringify(lastKey)).toString('base64');
       }
@@ -2213,100 +2367,76 @@ export class TripsService {
       const responseTimeMs = Date.now() - startTime;
       await this.emitQueryMetrics('GSI4', responseTimeMs, totalRCU, isError);
       this.logQueryError(error, filters, 'GSI4');
-      console.log('Falling back to GSI1 (default index) due to GSI4 query error');
       return this.getTripsForDispatcher(dispatcherId, filters, dynamodbClient);
     }
   }
 
   /**
-   * Build FilterExpression with attribute exclusion support
-   * Requirements: 1.4
+   * Apply all secondary filters at application layer
    * 
-   * This is a shared utility that generates DynamoDB FilterExpression, ExpressionAttributeNames,
-   * and ExpressionAttributeValues from a filters object, excluding specified attributes.
+   * This method applies ALL filters (broker, status, truck, driver, driverName) 
+   * at the application layer after fetching from DynamoDB.
    * 
-   * Used across all GSI query methods to avoid duplication and ensure consistent filtering logic.
+   * This ensures:
+   * - Predictable pagination (no skipped records)
+   * - Consistent page sizes
+   * - Simple pagination logic
    * 
-   * @param filters - Object containing filter criteria (brokerId, status, lorryId, driverId, etc.)
-   * @param excludeAttributes - Array of attribute names to exclude from FilterExpression
-   *                           (these are typically handled in KeyConditionExpression)
-   * @returns Object containing filterExpression, filterAttributeNames, and filterAttributeValues
-   * 
-   * @example
-   * // When querying GSI2 (Lorry Index), lorryId is in KeyConditionExpression
-   * const result = buildFilterExpression(filters, ['lorryId']);
-   * // Result will include brokerId, driverId, status in FilterExpression, but not lorryId
+   * @param trips - Array of trips to filter
+   * @param filters - Filter criteria
+   * @returns Filtered array of trips
    */
-  private buildFilterExpression(
-    filters: any,
-    excludeAttributes: string[] = []
-  ): {
-    filterExpression: string;
-    filterAttributeNames: Record<string, string>;
-    filterAttributeValues: Record<string, any>;
-  } {
-    const filterExpressions: string[] = [];
-    const filterAttributeNames: Record<string, string> = {};
-    const filterAttributeValues: Record<string, any> = {};
+  private applyAllFilters(trips: Trip[], filters: any): Trip[] {
+    let filtered = trips;
 
-    // Define all possible filter attributes and their mappings
-    const filterableAttributes = [
-      { key: 'brokerId', attributeName: 'brokerId' },
-      { key: 'status', attributeName: 'status' },
-      { key: 'lorryId', attributeName: 'lorryId' },
-      { key: 'driverId', attributeName: 'driverId' },
-    ];
-
-    // Build filter expressions for each attribute that:
-    // 1. Exists in the filters object
-    // 2. Is not in the excludeAttributes list
-    for (const { key, attributeName } of filterableAttributes) {
-      if (filters[key] && !excludeAttributes.includes(key)) {
-        filterExpressions.push(`#${key} = :${key}`);
-        filterAttributeNames[`#${key}`] = attributeName;
-        filterAttributeValues[`:${key}`] = filters[key];
-      }
+    // Filter by broker
+    if (filters.brokerId) {
+      filtered = filtered.filter(trip => trip.brokerId === filters.brokerId);
     }
 
-    // Note: driverName filtering is done in application layer for case-insensitive matching
-    // DynamoDB's contains() is case-sensitive, so we filter after query
+    // Filter by status
+    if (filters.orderStatus) {
+      filtered = filtered.filter(trip => trip.orderStatus === filters.orderStatus);
+    }
 
-    return {
-      filterExpression: filterExpressions.join(' AND '),
-      filterAttributeNames,
-      filterAttributeValues,
-    };
-  }
+    // Filter by truck
+    if (filters.truckId) {
+      filtered = filtered.filter(trip => trip.truckId === filters.truckId);
+    }
 
-  /**
-   * Build secondary filter expressions for broker, status, lorry, driver
-   * These are applied after the key condition query
-   * Note: driverName is NOT included here - it's filtered in application layer for case-insensitive matching
-   * 
-   * @deprecated Use buildFilterExpression instead for better flexibility
-   */
-  private buildSecondaryFilters(filters: any): {
-    filterExpression: string;
-    filterAttributeNames: Record<string, string>;
-    filterAttributeValues: Record<string, any>;
-  } {
-    // Delegate to the new buildFilterExpression method with no exclusions
-    return this.buildFilterExpression(filters, []);
+    // Filter by driver
+    if (filters.driverId) {
+      filtered = filtered.filter(trip => trip.driverId === filters.driverId);
+    }
+
+    // Filter by driver name (case-insensitive)
+    if (filters.driverName) {
+      filtered = this.applyDriverNameFilter(filtered, filters.driverName);
+    }
+
+    return filtered;
   }
 
   /**
    * Apply case-insensitive driver name filtering in application layer
-   * DynamoDB's contains() is case-sensitive, so we need to filter after query
+   * 
+   * NOTE: Driver name filtering is not supported in the current schema.
+   * The Trip table only stores driverId. To filter by driver name, you would need to:
+   * 1. Fetch all driver records from Users table
+   * 2. Filter by name
+   * 3. Get their userIds
+   * 4. Filter trips by those userIds
+   * 
+   * For now, this method returns all trips if driverName filter is provided.
    */
   private applyDriverNameFilter(trips: Trip[], driverName: string | undefined): Trip[] {
     if (!driverName) {
       return trips;
     }
 
-    const searchTerm = driverName.toLowerCase();
-    return trips.filter(trip => 
-      trip.driverName && trip.driverName.toLowerCase().includes(searchTerm)
-    );
+    // TODO: Implement driver name filtering by fetching driver records from Users table
+    console.warn('Driver name filtering is not yet implemented. Returning all trips.');
+    return trips;
   }
 
   /**
@@ -2314,29 +2444,85 @@ export class TripsService {
    */
   private mapItemToTrip(item: any): Trip {
     return {
+      // Primary identifiers
       tripId: item.tripId,
+      
+      // Entity relationships
+      carrierId: item.carrierId || item.dispatcherId, // Fallback for old data
       dispatcherId: item.dispatcherId,
-      pickupLocation: item.pickupLocation,
-      dropoffLocation: item.dropoffLocation,
-      scheduledPickupDatetime: item.scheduledPickupDatetime,
-      brokerId: item.brokerId,
-      brokerName: item.brokerName,
-      lorryId: item.lorryId,
       driverId: item.driverId,
-      driverName: item.driverName,
-      brokerPayment: item.brokerPayment,
-      lorryOwnerPayment: item.lorryOwnerPayment,
-      driverPayment: item.driverPayment,
-      status: item.status,
-      distance: item.distance,
-      loadedMiles: item.loadedMiles,
-      emptyMiles: item.emptyMiles,
-      totalMiles: item.totalMiles,
-      fuelAvgCost: item.fuelAvgCost,
-      fuelAvgGallonsPerMile: item.fuelAvgGallonsPerMile,
-      lumperFees: item.lumperFees,
-      detentionFees: item.detentionFees,
-      deliveredAt: item.deliveredAt,
+      truckId: item.truckId,
+      trailerId: item.trailerId || '',
+      truckOwnerId: item.truckOwnerId || '',
+      brokerId: item.brokerId,
+      
+      // Order information
+      orderConfirmation: item.orderConfirmation || '',
+      orderStatus: item.orderStatus || item.status || 'Scheduled',
+      
+      // Timestamps
+      scheduledTimestamp: item.scheduledTimestamp,
+      pickupTimestamp: item.pickupTimestamp || null,
+      deliveryTimestamp: item.deliveryTimestamp || null,
+      
+      // Pickup location details
+      pickupCompany: item.pickupCompany || '',
+      pickupAddress: item.pickupAddress || '',
+      pickupCity: item.pickupCity || '',
+      pickupState: item.pickupState || '',
+      pickupZip: item.pickupZip || '',
+      pickupPhone: item.pickupPhone || '',
+      pickupNotes: item.pickupNotes || '',
+      
+      // Delivery location details
+      deliveryCompany: item.deliveryCompany || '',
+      deliveryAddress: item.deliveryAddress || '',
+      deliveryCity: item.deliveryCity || '',
+      deliveryState: item.deliveryState || '',
+      deliveryZip: item.deliveryZip || '',
+      deliveryPhone: item.deliveryPhone || '',
+      deliveryNotes: item.deliveryNotes || '',
+      
+      // Mileage tracking
+      mileageEmpty: item.mileageEmpty || 0,
+      mileageOrder: item.mileageOrder || 0,
+      mileageTotal: item.mileageTotal || 0,
+      
+      // Rates
+      brokerRate: item.brokerRate || 0,
+      driverRate: item.driverRate || 0,
+      truckOwnerRate: item.truckOwnerRate || 0,
+      dispatcherRate: item.dispatcherRate || 0,
+      factoryRate: item.factoryRate || 0,
+      orderRate: item.orderRate || 0,
+      orderAverage: item.orderAverage || 0,
+      
+      // Payments
+      brokerPayment: item.brokerPayment || 0,
+      driverPayment: item.driverPayment || 0,
+      truckOwnerPayment: item.truckOwnerPayment || 0,
+      dispatcherPayment: item.dispatcherPayment || 0,
+      
+      // Advances
+      brokerAdvance: item.brokerAdvance || 0,
+      driverAdvance: item.driverAdvance || 0,
+      factoryAdvance: item.factoryAdvance || 0,
+      
+      // Costs and expenses
+      fuelCost: item.fuelCost || 0,
+      fuelGasAvgCost: item.fuelGasAvgCost || 0,
+      fuelGasAvgGallxMil: item.fuelGasAvgGallxMil || 0,
+      brokerCost: item.brokerCost || 0,
+      factoryCost: item.factoryCost || 0,
+      lumperValue: item.lumperValue || 0,
+      detentionValue: item.detentionValue || 0,
+      orderExpenses: item.orderExpenses || 0,
+      orderRevenue: item.orderRevenue || 0,
+      
+      // Additional notes
+      notes: item.notes || '',
+      
+      // Audit timestamps
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };
@@ -2356,7 +2542,7 @@ export class TripsService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       brokerId: filters.brokerId,
-      lorryId: filters.lorryId,
+      truckId: filters.truckId,
       driverId: filters.driverId,
     };
 
@@ -2368,21 +2554,22 @@ export class TripsService {
     const tripPaymentDetails: TripPaymentDetail[] = trips.map((trip) => ({
       tripId: trip.tripId,
       dispatcherId: trip.dispatcherId,
-      scheduledPickupDatetime: trip.scheduledPickupDatetime,
-      pickupLocation: trip.pickupLocation,
-      dropoffLocation: trip.dropoffLocation,
+      scheduledTimestamp: trip.scheduledTimestamp,
+      pickupLocation: `${trip.pickupCity}, ${trip.pickupState}`, // Construct from new fields
+      dropoffLocation: `${trip.deliveryCity}, ${trip.deliveryState}`, // Construct from new fields
       brokerId: trip.brokerId,
-      brokerName: trip.brokerName,
-      lorryId: trip.lorryId,
+      brokerName: '', // Will be fetched separately if needed
+      truckId: trip.truckId,
       driverId: trip.driverId,
-      driverName: trip.driverName,
+      driverName: '', // Will be fetched separately if needed
       brokerPayment: trip.brokerPayment,
-      lorryOwnerPayment: trip.lorryOwnerPayment,
+      truckOwnerPayment: trip.truckOwnerPayment,
       driverPayment: trip.driverPayment,
-      distance: trip.distance,
-      lumperFees: trip.lumperFees,
-      detentionFees: trip.detentionFees,
-      status: trip.status,
+      mileageOrder: trip.mileageOrder,
+      lumperFees: trip.lumperValue, // Map from new field name
+      detentionFees: trip.detentionValue, // Map from new field name
+      status: trip.orderStatus, // Use orderStatus as the source
+      orderStatus: trip.orderStatus,
     }));
 
     // Generate role-specific report
@@ -2392,7 +2579,8 @@ export class TripsService {
       case UserRole.Driver:
         return this.generateDriverReport(tripPaymentDetails, filters.groupBy);
       case UserRole.LorryOwner:
-        return this.generateLorryOwnerReport(tripPaymentDetails, filters.groupBy);
+      case UserRole.TruckOwner:
+        return this.generateTruckOwnerReport(tripPaymentDetails, filters.groupBy);
       default:
         throw new ForbiddenException('Invalid role for payment reports');
     }
@@ -2408,7 +2596,7 @@ export class TripsService {
   ): DispatcherPaymentReport {
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
-    const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
+    const totalTruckOwnerPayments = trips.reduce((sum, trip) => sum + trip.truckOwnerPayment, 0);
     
     // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
     const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
@@ -2416,22 +2604,22 @@ export class TripsService {
     const totalAdditionalFees = totalLumperFees + totalDetentionFees;
     
     // Profit calculation includes additional fees as expenses (Requirement 7.2)
-    const profit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalAdditionalFees;
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalAdditionalFees;
 
     const report: DispatcherPaymentReport = {
       totalBrokerPayments,
       totalDriverPayments,
-      totalLorryOwnerPayments,
+      totalTruckOwnerPayments,
       totalLumperFees,
       totalDetentionFees,
       totalAdditionalFees,
-      profit,
+      profit: totalProfit,
       tripCount: trips.length,
       trips,
       // Always include all grouped data for frontend flexibility
       groupedByBroker: this.groupByBroker(trips),
       groupedByDriver: this.groupByDriver(trips),
-      groupedByLorry: this.groupByLorry(trips),
+      groupedByTruck: this.groupByTruck(trips),
     };
 
     return report;
@@ -2446,7 +2634,7 @@ export class TripsService {
     groupBy?: string,
   ): DriverPaymentReport {
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
-    const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+    const totalDistance = trips.reduce((sum, trip) => sum + (trip.mileageOrder || 0), 0);
 
     const report: DriverPaymentReport = {
       totalDriverPayments,
@@ -2464,26 +2652,26 @@ export class TripsService {
   }
 
   /**
-   * Generate lorry owner payment report
+   * Generate truck owner payment report
    * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
    */
-  private generateLorryOwnerReport(
+  private generateTruckOwnerReport(
     trips: TripPaymentDetail[],
     groupBy?: string,
-  ): LorryOwnerPaymentReport {
-    const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
+  ): TruckOwnerPaymentReport {
+    const totalTruckOwnerPayments = trips.reduce((sum, trip) => sum + trip.truckOwnerPayment, 0);
 
-    const report: LorryOwnerPaymentReport = {
-      totalLorryOwnerPayments,
+    const report: TruckOwnerPaymentReport = {
+      totalTruckOwnerPayments,
       tripCount: trips.length,
       trips,
     };
 
     // Add grouping if requested
-    if (groupBy === 'lorry') {
-      report.groupedByLorry = this.groupByLorry(trips);
+    if (groupBy === 'truck') {
+      report.groupedByTruck = this.groupByTruck(trips);
     } else if (groupBy === 'dispatcher') {
-      report.groupedByDispatcher = this.groupByDispatcherForLorryOwner(trips);
+      report.groupedByDispatcher = this.groupByDispatcherForTruckOwner(trips);
     }
 
     return report;
@@ -2506,7 +2694,7 @@ export class TripsService {
     for (const trip of trips) {
       if (!grouped[trip.brokerId]) {
         grouped[trip.brokerId] = {
-          brokerName: trip.brokerName,
+          brokerName: trip.brokerId, // Use ID as placeholder, frontend can fetch name
           totalPayment: 0,
           tripCount: 0,
         };
@@ -2535,7 +2723,7 @@ export class TripsService {
     for (const trip of trips) {
       if (!grouped[trip.driverId]) {
         grouped[trip.driverId] = {
-          driverName: trip.driverName,
+          driverName: trip.driverId, // Use ID as placeholder, frontend can fetch name
           totalPayment: 0,
           tripCount: 0,
         };
@@ -2548,9 +2736,9 @@ export class TripsService {
   }
 
   /**
-   * Group trips by lorry
+   * Group trips by truck
    */
-  private groupByLorry(trips: TripPaymentDetail[]): Record<string, {
+  private groupByTruck(trips: TripPaymentDetail[]): Record<string, {
     totalPayment: number;
     tripCount: number;
   }> {
@@ -2560,14 +2748,14 @@ export class TripsService {
     }> = {};
 
     for (const trip of trips) {
-      if (!grouped[trip.lorryId]) {
-        grouped[trip.lorryId] = {
+      if (!grouped[trip.truckId]) {
+        grouped[trip.truckId] = {
           totalPayment: 0,
           tripCount: 0,
         };
       }
-      grouped[trip.lorryId].totalPayment += trip.lorryOwnerPayment;
-      grouped[trip.lorryId].tripCount += 1;
+      grouped[trip.truckId].totalPayment += trip.truckOwnerPayment;
+      grouped[trip.truckId].tripCount += 1;
     }
 
     return grouped;
@@ -2604,10 +2792,10 @@ export class TripsService {
   }
 
   /**
-   * Group trips by dispatcher for lorry owner reports
-   * Sum lorry owner payments by dispatcher
+   * Group trips by dispatcher for truck owner reports
+   * Sum truck owner payments by dispatcher
    */
-  private groupByDispatcherForLorryOwner(trips: TripPaymentDetail[]): Record<string, {
+  private groupByDispatcherForTruckOwner(trips: TripPaymentDetail[]): Record<string, {
     totalPayment: number;
     tripCount: number;
   }> {
@@ -2626,7 +2814,7 @@ export class TripsService {
         };
       }
       
-      grouped[dispatcherId].totalPayment += trip.lorryOwnerPayment;
+      grouped[dispatcherId].totalPayment += trip.truckOwnerPayment;
       grouped[dispatcherId].tripCount += 1;
     }
 
@@ -2693,7 +2881,7 @@ export class TripsService {
 
     // Count trips by status
     for (const trip of trips) {
-      summary[trip.status] = (summary[trip.status] || 0) + 1;
+      summary[trip.orderStatus] = (summary[trip.orderStatus] || 0) + 1;
     }
 
     return summary as Record<TripStatus, number>;
@@ -2711,7 +2899,7 @@ export class TripsService {
   ): Promise<{
     totalBrokerPayments: number;
     totalDriverPayments: number;
-    totalLorryOwnerPayments: number;
+    totalTruckOwnerPayments: number;
     totalLumperFees: number;
     totalDetentionFees: number;
     totalAdditionalFees: number;
@@ -2724,12 +2912,12 @@ export class TripsService {
     // Calculate totals
     const totalBrokerPayments = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
     const totalDriverPayments = trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
-    const totalLorryOwnerPayments = trips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
+    const totalTruckOwnerPayments = trips.reduce((sum, trip) => sum + trip.truckOwnerPayment, 0);
     
     // Calculate fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
     const totalFuelCosts = trips.reduce((sum, trip) => {
       if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        const totalMiles = (trip.loadedMiles || trip.mileageOrder || 0) + (trip.emptyMiles || 0);
         return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
       }
       return sum;
@@ -2741,12 +2929,12 @@ export class TripsService {
     const totalAdditionalFees = totalLumperFees + totalDetentionFees;
     
     // Profit calculation includes fuel costs and additional fees as expenses (Requirements 6.2, 7.2)
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalLorryOwnerPayments - totalFuelCosts - totalAdditionalFees;
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalFuelCosts - totalAdditionalFees;
 
     return {
       totalBrokerPayments,
       totalDriverPayments,
-      totalLorryOwnerPayments,
+      totalTruckOwnerPayments,
       totalLumperFees,
       totalDetentionFees,
       totalAdditionalFees,
@@ -2767,7 +2955,7 @@ export class TripsService {
     labels: string[];
     brokerPayments: number[];
     driverPayments: number[];
-    lorryOwnerPayments: number[];
+    truckOwnerPayments: number[];
     profit: number[];
   }> {
     // Get ALL trips for the dispatcher with filters (no pagination limit for aggregation)
@@ -2777,21 +2965,21 @@ export class TripsService {
     const monthlyData: Record<string, {
       brokerPayments: number;
       driverPayments: number;
-      lorryOwnerPayments: number;
+      truckOwnerPayments: number;
       fuelCosts: number;
       additionalFees: number;
     }> = {};
 
     for (const trip of trips) {
       // Extract year-month from scheduled date (YYYY-MM)
-      const date = new Date(trip.scheduledPickupDatetime);
+      const date = new Date(trip.scheduledTimestamp);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = {
           brokerPayments: 0,
           driverPayments: 0,
-          lorryOwnerPayments: 0,
+          truckOwnerPayments: 0,
           fuelCosts: 0,
           additionalFees: 0,
         };
@@ -2799,11 +2987,11 @@ export class TripsService {
 
       monthlyData[monthKey].brokerPayments += trip.brokerPayment;
       monthlyData[monthKey].driverPayments += trip.driverPayment;
-      monthlyData[monthKey].lorryOwnerPayments += trip.lorryOwnerPayment;
+      monthlyData[monthKey].truckOwnerPayments += trip.truckOwnerPayment;
       
       // Add fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
       if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
+        const totalMiles = (trip.loadedMiles || trip.mileageOrder || 0) + (trip.emptyMiles || 0);
         monthlyData[monthKey].fuelCosts += totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
       }
       
@@ -2818,7 +3006,7 @@ export class TripsService {
     const labels: string[] = [];
     const brokerPayments: number[] = [];
     const driverPayments: number[] = [];
-    const lorryOwnerPayments: number[] = [];
+    const truckOwnerPayments: number[] = [];
     const profit: number[] = [];
 
     for (const month of sortedMonths) {
@@ -2830,11 +3018,11 @@ export class TripsService {
       labels.push(label);
       brokerPayments.push(monthlyData[month].brokerPayments);
       driverPayments.push(monthlyData[month].driverPayments);
-      lorryOwnerPayments.push(monthlyData[month].lorryOwnerPayments);
+      truckOwnerPayments.push(monthlyData[month].truckOwnerPayments);
       profit.push(
         monthlyData[month].brokerPayments -
         monthlyData[month].driverPayments -
-        monthlyData[month].lorryOwnerPayments -
+        monthlyData[month].truckOwnerPayments -
         monthlyData[month].fuelCosts -
         monthlyData[month].additionalFees
       );
@@ -2844,7 +3032,7 @@ export class TripsService {
       labels,
       brokerPayments,
       driverPayments,
-      lorryOwnerPayments,
+      truckOwnerPayments,
       profit,
     };
   }
@@ -2979,5 +3167,321 @@ export class TripsService {
       JSON.stringify(logData, null, 2),
     );
     */
+  }
+
+  /**
+   * Enrich trips with asset metadata for frontend display
+   * Fetches related entities (brokers, trucks, trailers, drivers) and includes them in response
+   */
+  private async enrichTripsWithAssetMetadata(
+    trips: Trip[],
+    userId: string,
+    userRole: UserRole,
+  ): Promise<{ trips: Trip[]; assets: any }> {
+    
+    // Collect unique IDs from all trips
+    const brokerIds = new Set<string>();
+    const truckIds = new Set<string>();
+    const trailerIds = new Set<string>();
+    const driverIds = new Set<string>();
+
+    trips.forEach(trip => {
+      if (trip.brokerId) brokerIds.add(trip.brokerId);
+      if (trip.truckId) truckIds.add(trip.truckId);
+      if (trip.trailerId) trailerIds.add(trip.trailerId);
+      if (trip.driverId) driverIds.add(trip.driverId);
+    });
+
+    // Fetch all related entities in parallel
+    const [brokers, trucks, trailers, drivers] = await Promise.all([
+      this.fetchBrokersByIds(Array.from(brokerIds)),
+      this.fetchTrucksByIds(Array.from(truckIds)),
+      this.fetchTrailersByIds(Array.from(trailerIds)),
+      this.fetchDriversByIds(Array.from(driverIds)),
+    ]);
+
+    // Build lookup maps
+    const brokerMap = new Map(brokers.map(b => [b.brokerId, b]));
+    const truckMap = new Map(trucks.map(t => [t.truckId, t]));
+    const trailerMap = new Map(trailers.map(t => [t.trailerId, t]));
+    const driverMap = new Map(drivers.map(d => [d.userId, d]));
+
+    // Enrich trips with names
+    const enrichedTrips = trips.map(trip => {
+      const enriched = { ...trip };
+      
+      // Add broker name
+      if (trip.brokerId && brokerMap.has(trip.brokerId)) {
+        enriched.brokerName = brokerMap.get(trip.brokerId)!.brokerName;
+      }
+      
+      // Add driver name and license
+      if (trip.driverId && driverMap.has(trip.driverId)) {
+        const driver = driverMap.get(trip.driverId)!;
+        enriched.driverName = driver.name;
+        enriched.driverLicense = driver.nationalId; // Add driver license for table display
+      }
+      
+      // Ensure legacy location fields are populated
+      if (!enriched.pickupLocation && trip.pickupCity && trip.pickupState) {
+        enriched.pickupLocation = `${trip.pickupCity}, ${trip.pickupState}`;
+      }
+      if (!enriched.dropoffLocation && trip.deliveryCity && trip.deliveryState) {
+        enriched.dropoffLocation = `${trip.deliveryCity}, ${trip.deliveryState}`;
+      }
+      
+      // Ensure legacy status field is populated
+      if (!enriched.status && trip.orderStatus) {
+        enriched.status = trip.orderStatus as any;
+      }
+      
+      return enriched;
+    });
+
+    // Return enriched trips and asset metadata
+    return {
+      trips: enrichedTrips,
+      assets: {
+        brokers: brokers.map(b => ({ brokerId: b.brokerId, brokerName: b.brokerName })),
+        trucks: trucks.map(t => ({ truckId: t.truckId, plate: t.plate, brand: t.brand, year: t.year })),
+        trailers: trailers.map(t => ({ trailerId: t.trailerId, plate: t.plate, brand: t.brand, year: t.year })),
+        drivers: drivers.map(d => ({ userId: d.userId, name: d.name, email: d.email })),
+      },
+    };
+  }
+
+  /**
+   * Fetch brokers by IDs
+   */
+  private async fetchBrokersByIds(brokerIds: string[]): Promise<any[]> {
+    if (brokerIds.length === 0) return [];
+    
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const brokersTableName = this.configService.brokersTableName;
+    
+    const brokers = await Promise.all(
+      brokerIds.map(async (brokerId) => {
+        try {
+          const result = await dynamodbClient.send(
+            new GetCommand({
+              TableName: brokersTableName,
+              Key: { PK: `BROKER#${brokerId}`, SK: 'METADATA' },
+            }),
+          );
+          return result.Item ? { brokerId: result.Item.brokerId, brokerName: result.Item.brokerName } : null;
+        } catch (error) {
+          console.error(`Error fetching broker ${brokerId}:`, error);
+          return null;
+        }
+      }),
+    );
+    
+    return brokers.filter(b => b !== null);
+  }
+
+  /**
+   * Fetch trucks by IDs
+   */
+  private async fetchTrucksByIds(truckIds: string[]): Promise<any[]> {
+    if (truckIds.length === 0) return [];
+    
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const trucksTableName = this.configService.lorriesTableName;
+    
+    const trucks = await Promise.all(
+      truckIds.map(async (truckId) => {
+        try {
+          const result = await dynamodbClient.send(
+            new GetCommand({
+              TableName: trucksTableName,
+              Key: { PK: `TRUCK#${truckId}`, SK: 'METADATA' },
+            }),
+          );
+          return result.Item ? {
+            truckId: result.Item.truckId,
+            plate: result.Item.plate,
+            brand: result.Item.brand,
+            year: result.Item.year,
+          } : null;
+        } catch (error) {
+          console.error(`Error fetching truck ${truckId}:`, error);
+          return null;
+        }
+      }),
+    );
+    
+    return trucks.filter(t => t !== null);
+  }
+
+  /**
+   * Fetch trailers by IDs
+   */
+  private async fetchTrailersByIds(trailerIds: string[]): Promise<any[]> {
+    if (trailerIds.length === 0) return [];
+    
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const trailersTableName = this.configService.trailersTableName;
+    
+    const trailers = await Promise.all(
+      trailerIds.map(async (trailerId) => {
+        try {
+          const result = await dynamodbClient.send(
+            new GetCommand({
+              TableName: trailersTableName,
+              Key: { PK: `TRAILER#${trailerId}`, SK: 'METADATA' },
+            }),
+          );
+          return result.Item ? {
+            trailerId: result.Item.trailerId,
+            plate: result.Item.plate,
+            brand: result.Item.brand,
+            year: result.Item.year,
+          } : null;
+        } catch (error) {
+          console.error(`Error fetching trailer ${trailerId}:`, error);
+          return null;
+        }
+      }),
+    );
+    
+    return trailers.filter(t => t !== null);
+  }
+
+  /**
+   * Fetch drivers by IDs
+   */
+  private async fetchDriversByIds(driverIds: string[]): Promise<any[]> {
+    if (driverIds.length === 0) return [];
+    
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const usersTableName = this.configService.usersTableName;
+    
+    const drivers = await Promise.all(
+      driverIds.map(async (driverId) => {
+        try {
+          const result = await dynamodbClient.send(
+            new GetCommand({
+              TableName: usersTableName,
+              Key: { PK: `USER#${driverId}`, SK: 'METADATA' },
+            }),
+          );
+          return result.Item ? {
+            userId: result.Item.userId,
+            name: result.Item.name,
+            email: result.Item.email,
+            nationalId: result.Item.ss, // Driver license
+          } : null;
+        } catch (error) {
+          console.error(`Error fetching driver ${driverId}:`, error);
+          return null;
+        }
+      }),
+    );
+    
+    return drivers.filter(d => d !== null);
+  }
+
+  /**
+   * Filter trip data based on user role
+   * Requirements: 1.12, 1.13, 1.20
+   */
+  private filterTripByRole(trip: Trip, role: UserRole): Partial<Trip> | Trip {
+    switch (role) {
+      case UserRole.Driver:
+        return this.filterTripForDriver(trip);
+      
+      case UserRole.LorryOwner:
+      case UserRole.TruckOwner:
+        return this.filterTripForTruckOwner(trip);
+      
+      case UserRole.Dispatcher:
+      case UserRole.Carrier:
+      case UserRole.Admin:
+        // Full access - return all fields
+        return trip;
+      
+      default:
+        // For unknown roles, apply driver filtering (most restrictive)
+        return this.filterTripForDriver(trip);
+    }
+  }
+
+  /**
+   * Filter trip for driver view - hide sensitive financial fields
+   * Requirements: 1.12
+   */
+  private filterTripForDriver(trip: Trip): Partial<Trip> {
+    return {
+      // Basic trip info
+      tripId: trip.tripId,
+      orderConfirmation: trip.orderConfirmation,
+      orderStatus: trip.orderStatus,
+      
+      // Timestamps
+      scheduledTimestamp: trip.scheduledTimestamp,
+      pickupTimestamp: trip.pickupTimestamp,
+      deliveryTimestamp: trip.deliveryTimestamp,
+      
+      // Locations
+      pickupCity: trip.pickupCity,
+      pickupState: trip.pickupState,
+      deliveryCity: trip.deliveryCity,
+      deliveryState: trip.deliveryState,
+      
+      // Mileage
+      mileageOrder: trip.mileageOrder,
+      mileageTotal: trip.mileageTotal,
+      
+      // Driver payment info (visible to driver)
+      driverPayment: trip.driverPayment,
+      driverRate: trip.driverRate,
+      driverAdvance: trip.driverAdvance,
+      driverId: trip.driverId,
+      
+      // Vehicle info
+      truckId: trip.truckId,
+      trailerId: trip.trailerId,
+      
+      // Notes
+      notes: trip.notes,
+    };
+  }
+
+  /**
+   * Filter trip for truck owner view - hide sensitive financial fields
+   * Requirements: 1.13
+   */
+  private filterTripForTruckOwner(trip: Trip): Partial<Trip> {
+    return {
+      // Basic trip info
+      tripId: trip.tripId,
+      orderConfirmation: trip.orderConfirmation,
+      orderStatus: trip.orderStatus,
+      
+      // Timestamps
+      scheduledTimestamp: trip.scheduledTimestamp,
+      pickupTimestamp: trip.pickupTimestamp,
+      deliveryTimestamp: trip.deliveryTimestamp,
+      
+      // Locations
+      pickupCity: trip.pickupCity,
+      pickupState: trip.pickupState,
+      deliveryCity: trip.deliveryCity,
+      deliveryState: trip.deliveryState,
+      
+      // Mileage
+      mileageOrder: trip.mileageOrder,
+      mileageTotal: trip.mileageTotal,
+      
+      // Truck owner payment info (visible to truck owner)
+      truckOwnerPayment: trip.truckOwnerPayment,
+      truckOwnerId: trip.truckOwnerId,
+      
+      // Vehicle info
+      truckId: trip.truckId,
+      
+      // Notes
+      notes: trip.notes,
+    };
   }
 }

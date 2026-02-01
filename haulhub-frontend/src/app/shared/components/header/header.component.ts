@@ -37,15 +37,12 @@ export class HeaderComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    console.log('HeaderComponent ngOnInit called');
     
     this.authService.currentUser$.subscribe(user => {
-      console.log('HeaderComponent user subscription:', user);
       if (user) {
         this.isAuthenticated = true;
         this.userName = user.fullName;
         this.userRole = this.formatRole(user.role);
-        console.log('HeaderComponent authenticated, navigation items:', this.getNavigationItems());
       } else {
         this.isAuthenticated = false;
         this.userName = '';
@@ -59,7 +56,6 @@ export class HeaderComponent implements OnInit {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event) => {
         if (event instanceof NavigationEnd) {
-          console.log('HeaderComponent route changed:', event.url);
           this.currentRoute = event.url;
           this.cdr.markForCheck();
         }
@@ -67,7 +63,6 @@ export class HeaderComponent implements OnInit {
     
     // Set initial route
     this.currentRoute = this.router.url;
-    console.log('HeaderComponent initial route:', this.currentRoute);
   }
 
   private formatRole(role: UserRole): string {
@@ -126,8 +121,6 @@ export class HeaderComponent implements OnInit {
   }
 
   navigateTo(route: string): void {
-    console.log('navigateTo called with route:', route);
-    console.log('Current route:', this.currentRoute);
     this.ngZone.run(() => {
       this.router.navigate([route]).then(
         success => console.log('Navigation success:', success),

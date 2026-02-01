@@ -55,7 +55,7 @@ export class TripsController {
    * or the driver assigned to the trip, or the lorry owner, or admin
    */
   @Get(':id')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
   async getTripById(
     @CurrentUser() user: CurrentUserData,
     @Param('id') tripId: string,
@@ -102,7 +102,7 @@ export class TripsController {
       tripId,
       user.userId,
       user.role as UserRole,
-      dto.status,
+      dto.orderStatus,
     );
   }
 
@@ -113,23 +113,23 @@ export class TripsController {
    * 
    * For dispatchers: Returns their trips
    * For drivers: Returns assigned trips
-   * For lorry owners: Returns trips for their approved lorries
+   * For truck owners: Returns trips for their approved trucks
    * 
    * Supports filtering by:
    * - Date range (startDate, endDate)
    * - Broker (brokerId)
-   * - Lorry (lorryId)
+   * - Truck (truckId)
    * - Driver (driverId)
    * - Status (status)
    * 
    * Supports pagination with limit and lastEvaluatedKey
    */
   @Get()
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner)
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Carrier)
   async getTrips(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: TripFilters,
-  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+  ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string; assets?: any }> {
     return this.tripsService.getTrips(
       user.userId,
       user.role as UserRole,
@@ -143,24 +143,24 @@ export class TripsController {
    * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 8.1, 8.2, 8.3, 8.4, 8.5, 11.1, 11.2, 11.3, 11.4, 11.5
    * 
    * For dispatchers: Aggregate broker payments (income), driver payments (expense), 
-   *                  lorry owner payments (expense), calculate profit
+   *                  truck owner payments (expense), calculate profit
    * For drivers: Aggregate driver payments, sum distance traveled
-   * For lorry owners: Aggregate lorry owner payments across all lorries
+   * For truck owners: Aggregate truck owner payments across all trucks
    * 
    * Supports filtering by:
    * - Date range (startDate, endDate)
    * - Broker (brokerId)
-   * - Lorry (lorryId)
+   * - Truck (truckId)
    * - Driver (driverId)
    * 
    * Supports grouping by:
    * - broker (dispatcher only)
    * - driver (dispatcher only)
-   * - lorry (dispatcher and lorry owner)
-   * - dispatcher (driver and lorry owner)
+   * - truck (dispatcher and truck owner)
+   * - dispatcher (driver and truck owner)
    */
   @Get('reports/payments')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner)
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner)
   async getPaymentReport(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: any,
@@ -203,7 +203,7 @@ export class TripsController {
   ): Promise<{
     totalBrokerPayments: number;
     totalDriverPayments: number;
-    totalLorryOwnerPayments: number;
+    totalTruckOwnerPayments: number;
     totalLumperFees: number;
     totalDetentionFees: number;
     totalAdditionalFees: number;
@@ -228,7 +228,7 @@ export class TripsController {
     labels: string[];
     brokerPayments: number[];
     driverPayments: number[];
-    lorryOwnerPayments: number[];
+    truckOwnerPayments: number[];
     profit: number[];
   }> {
     return this.tripsService.getPaymentsTimeline(user.userId, filters);

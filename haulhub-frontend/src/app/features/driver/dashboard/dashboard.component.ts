@@ -92,36 +92,52 @@ export class DashboardComponent implements OnInit {
     this.router.navigate(['/driver/trips', trip.tripId]);
   }
 
-  getStatusClass(status: TripStatus): string {
-    switch (status) {
+  getStatusClass(status: TripStatus | string): string {
+    // Handle both TripStatus enum and string literals from new schema
+    const statusStr = typeof status === 'string' ? status : status;
+    
+    switch (statusStr) {
       case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'status-scheduled';
       case TripStatus.PickedUp:
+      case 'Picked Up':
       case TripStatus.InTransit:
+      case 'In Transit':
         return 'status-in-progress';
       case TripStatus.Delivered:
+      case 'Delivered':
         return 'status-delivered';
       case TripStatus.Paid:
+      case 'Paid':
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
-    switch (status) {
+  getStatusLabel(status: TripStatus | string): string {
+    // Handle both TripStatus enum and string literals from new schema
+    const statusStr = typeof status === 'string' ? status : status;
+    
+    switch (statusStr) {
       case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'Scheduled';
       case TripStatus.PickedUp:
+      case 'Picked Up':
         return 'Picked Up';
       case TripStatus.InTransit:
+      case 'In Transit':
         return 'In Transit';
       case TripStatus.Delivered:
+      case 'Delivered':
         return 'Delivered';
       case TripStatus.Paid:
+      case 'Paid':
         return 'Paid';
       default:
-        return status;
+        return String(status);
     }
   }
 

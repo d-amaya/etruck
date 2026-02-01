@@ -101,18 +101,18 @@
                 <mat-icon>arrow_forward</mat-icon>
                 <span class="location">{{ trip.dropoffLocation }}</span>
               </div>
-              <mat-chip [class]="getStatusClass(trip.status)">
-                {{ getStatusLabel(trip.status) }}
+              <mat-chip [class]="getStatusClass(trip.orderStatus || 'Scheduled')">
+                {{ getStatusLabel(trip.orderStatus || 'Scheduled') }}
               </mat-chip>
             </div>
             <div class="trip-details">
               <div class="detail-item">
                 <mat-icon>event</mat-icon>
-                <span>{{ formatDate(trip.scheduledPickupDatetime) }}</span>
+                <span>{{ formatDate(trip.scheduledTimestamp) }}</span>
               </div>
               <div class="detail-item">
                 <mat-icon>local_shipping</mat-icon>
-                <span>{{ trip.lorryId }}</span>
+                <span>{{ trip.truckId }}</span>
               </div>
               <div class="detail-item">
                 <mat-icon>business</mat-icon>

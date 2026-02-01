@@ -33,7 +33,7 @@ import { Truck, VehicleVerificationStatus } from '@haulhub/shared';
 export class TruckListComponent implements OnInit {
   trucks: Truck[] = [];
   loading = false;
-  displayedColumns: string[] = ['name', 'licensePlate', 'brand', 'year', 'verificationStatus', 'isActive', 'actions'];
+  displayedColumns: string[] = ['plate', 'brand', 'year', 'color', 'verificationStatus', 'isActive', 'actions'];
 
   constructor(
     private router: Router,

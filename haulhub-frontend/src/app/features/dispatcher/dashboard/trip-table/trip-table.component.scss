@@ -1106,3 +1106,9 @@
     }
   }
 }
+
+// Error hint styling
+::ng-deep .error-hint {
+  color: #f44336;
+  font-size: 12px;
+}

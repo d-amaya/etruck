@@ -35,7 +35,7 @@ export class LorriesController {
    * Requirements: 6.1, 6.2, 6.3
    */
   @Post()
-  @Roles(UserRole.LorryOwner)
+  @Roles(UserRole.LorryOwner, UserRole.TruckOwner)
   async registerLorry(
     @CurrentUser() user: CurrentUserData,
     @Body() dto: RegisterLorryDto,
@@ -45,13 +45,51 @@ export class LorriesController {
 
   /**
    * GET /lorries
-   * Get all lorries for the current owner
+   * Get all lorries for the current owner or carrier
    * Requirements: 6.4
+   * 
+   * - Truck owners see only their trucks (filtered by truckOwnerId)
+   * - Dispatchers see all trucks in their carrier (filtered by carrierId)
    */
   @Get()
-  @Roles(UserRole.LorryOwner)
+  @Roles(UserRole.TruckOwner, UserRole.LorryOwner, UserRole.Dispatcher)
   async getLorries(@CurrentUser() user: CurrentUserData): Promise<Lorry[]> {
-    return this.lorriesService.getLorriesByOwner(user.userId);
+    // Truck owners query by their userId
+    if (user.role === UserRole.TruckOwner || user.role === UserRole.LorryOwner) {
+      return this.lorriesService.getLorriesByOwner(user.userId);
+    }
+    
+    // Dispatchers query by their carrierId
+    if (user.role === UserRole.Dispatcher) {
+      return this.lorriesService.getTrucksByCarrier(user.carrierId);
+    }
+    
+    return [];
+  }
+
+  /**
+   * GET /lorries/trailers
+   * Get all trailers for the current carrier
+   * Requirements: 3.2.1
+   * 
+   * - Dispatchers see all trailers in their carrier (filtered by carrierId)
+   */
+  @Get('trailers')
+  @Roles(UserRole.Dispatcher, UserRole.Carrier)
+  async getTrailers(@CurrentUser() user: CurrentUserData): Promise<any[]> {
+    return this.lorriesService.getTrailersByCarrier(user.carrierId);
+  }
+
+  /**
+   * GET /lorries/drivers
+   * Get all drivers for the current carrier
+   * 
+   * - Dispatchers see all drivers in their carrier (filtered by carrierId)
+   */
+  @Get('drivers')
+  @Roles(UserRole.Dispatcher, UserRole.Carrier)
+  async getDrivers(@CurrentUser() user: CurrentUserData): Promise<any[]> {
+    return this.lorriesService.getDriversByCarrier(user.carrierId);
   }
 
   /**
@@ -60,13 +98,13 @@ export class LorriesController {
    * Requirements: 6.4, 19.2
    */
   @Get(':id')
-  @Roles(UserRole.LorryOwner, UserRole.Admin)
+  @Roles(UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
   async getLorryById(
     @CurrentUser() user: CurrentUserData,
     @Param('id') lorryId: string,
   ): Promise<Lorry> {
-    // For lorry owners, verify they own the lorry
-    if (user.role === UserRole.LorryOwner) {
+    // For lorry/truck owners, verify they own the lorry
+    if (user.role === UserRole.LorryOwner || user.role === UserRole.TruckOwner) {
       const lorry = await this.lorriesService.getLorryByIdAndOwner(
         lorryId,
         user.userId,
@@ -95,7 +133,7 @@ export class LorriesController {
    * Requirements: 6.5, 15.1, 15.2
    */
   @Post(':id/documents')
-  @Roles(UserRole.LorryOwner)
+  @Roles(UserRole.LorryOwner, UserRole.TruckOwner)
   async uploadDocument(
     @CurrentUser() user: CurrentUserData,
     @Param('id') lorryId: string,
@@ -115,7 +153,7 @@ export class LorriesController {
    * Requirements: 15.4
    */
   @Get(':id/documents')
-  @Roles(UserRole.LorryOwner, UserRole.Admin)
+  @Roles(UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
   async getDocuments(
     @CurrentUser() user: CurrentUserData,
     @Param('id') lorryId: string,
@@ -133,7 +171,7 @@ export class LorriesController {
    * Requirements: 15.3, 15.4
    */
   @Get(':id/documents/:docId')
-  @Roles(UserRole.LorryOwner, UserRole.Admin)
+  @Roles(UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
   async viewDocument(
     @CurrentUser() user: CurrentUserData,
     @Param('id') lorryId: string,

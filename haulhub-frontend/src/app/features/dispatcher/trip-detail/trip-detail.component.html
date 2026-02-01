@@ -26,12 +26,12 @@
             <h1>Trip Details</h1>
           </mat-card-title>
           <div class="status-and-timestamps">
-            <mat-chip [ngClass]="getStatusClass(trip.status)">
-              {{ getStatusLabel(trip.status) }}
+            <mat-chip [ngClass]="getStatusClass(trip.orderStatus || 'Scheduled')">
+              {{ getStatusLabel(trip.orderStatus || 'Scheduled') }}
             </mat-chip>
             <div class="timestamp-info">
               <span class="timestamp-label">Last Updated:</span>
-              <span class="timestamp-value">{{ formatDate(trip.updatedAt) }}</span>
+              <span class="timestamp-value">{{ formatDate(getLastUpdatedTimestamp()) }}</span>
             </div>
           </div>
         </div>
@@ -57,12 +57,16 @@
         </mat-card-header>
         <mat-card-content>
           <div class="detail-row">
-            <span class="detail-label">Trip ID:</span>
-            <span class="detail-value">{{ trip.tripId }}</span>
-          </div>
-          <div class="detail-row">
             <span class="detail-label">Scheduled Pickup:</span>
-            <span class="detail-value">{{ formatDate(trip.scheduledPickupDatetime) }}</span>
+            <span class="detail-value">{{ formatDate(trip.scheduledTimestamp) }}</span>
+          </div>
+          <div class="detail-row" *ngIf="trip.pickupTimestamp">
+            <span class="detail-label">Actual Pickup:</span>
+            <span class="detail-value">{{ formatDate(trip.pickupTimestamp) }}</span>
+          </div>
+          <div class="detail-row" *ngIf="trip.deliveryTimestamp">
+            <span class="detail-label">Actual Delivery:</span>
+            <span class="detail-value">{{ formatDate(trip.deliveryTimestamp) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Pickup Location:</span>
@@ -83,32 +87,74 @@
         <mat-card-content>
           <div class="detail-row">
             <span class="detail-label">Broker Name:</span>
-            <span class="detail-value">{{ trip.brokerName }}</span>
+            <span class="detail-value">{{ trip.brokerName || 'N/A' }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Broker ID:</span>
             <span class="detail-value">{{ trip.brokerId }}</span>
           </div>
+          <div class="detail-row" *ngIf="trip.orderConfirmation">
+            <span class="detail-label">Order Confirmation:</span>
+            <span class="detail-value">{{ trip.orderConfirmation }}</span>
+          </div>
         </mat-card-content>
       </mat-card>
 
-      <!-- Vehicle & Driver Card -->
+      <!-- Driver Information Card -->
       <mat-card class="detail-card">
         <mat-card-header>
-          <mat-card-title>Vehicle & Driver</mat-card-title>
+          <mat-card-title>
+            <mat-icon>person</mat-icon>
+            Driver Information
+          </mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <div class="detail-row">
-            <span class="detail-label">Truck ID:</span>
-            <span class="detail-value">{{ trip.lorryId }}</span>
+            <span class="detail-label">Name:</span>
+            <span class="detail-value">{{ getDriverName() }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Driver Name:</span>
-            <span class="detail-value">{{ trip.driverName }}</span>
+            <span class="detail-label">License:</span>
+            <span class="detail-value">{{ getDriverLicense() }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Driver ID:</span>
-            <span class="detail-value">{{ trip.driverId }}</span>
+            <span class="detail-label">Email:</span>
+            <span class="detail-value">{{ getDriverEmail() }}</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Truck & Trailer Information Card -->
+      <mat-card class="detail-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>local_shipping</mat-icon>
+            Truck & Trailer
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="subsection">
+            <h4>Truck</h4>
+            <div class="detail-row">
+              <span class="detail-label">Plate:</span>
+              <span class="detail-value">{{ getTruckPlate() }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Brand & Year:</span>
+              <span class="detail-value">{{ getTruckBrandYear() }}</span>
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+          <div class="subsection">
+            <h4>Trailer</h4>
+            <div class="detail-row">
+              <span class="detail-label">Plate:</span>
+              <span class="detail-value">{{ getTrailerPlate() }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Brand & Year:</span>
+              <span class="detail-value">{{ getTrailerBrandYear() }}</span>
+            </div>
           </div>
         </mat-card-content>
       </mat-card>
@@ -121,11 +167,11 @@
         <mat-card-content>
           <div class="detail-row">
             <span class="detail-label">Loaded Miles:</span>
-            <span class="detail-value">{{ trip.loadedMiles || trip.distance || 0 | number:'1.1-1' }} mi</span>
+            <span class="detail-value">{{ trip.mileageOrder || 0 | number:'1.1-1' }} mi</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Empty Miles:</span>
-            <span class="detail-value">{{ trip.emptyMiles || 0 | number:'1.1-1' }} mi</span>
+            <span class="detail-value">{{ trip.mileageEmpty || 0 | number:'1.1-1' }} mi</span>
           </div>
           <mat-divider></mat-divider>
           <div class="detail-row">
@@ -143,11 +189,11 @@
         <mat-card-content>
           <div class="detail-row">
             <span class="detail-label">Avg Fuel Cost:</span>
-            <span class="detail-value">{{ formatCurrency(trip.fuelAvgCost || 0) }}/gal</span>
+            <span class="detail-value">{{ formatCurrency(trip.fuelGasAvgCost || 0) }}/gal</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Fuel Efficiency:</span>
-            <span class="detail-value">{{ trip.fuelAvgGallonsPerMile || 0 | number:'1.3-3' }} gal/mi</span>
+            <span class="detail-value">{{ trip.fuelGasAvgGallxMil || 0 | number:'1.3-3' }} gal/mi</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Est. Fuel Consumption:</span>
@@ -164,43 +210,77 @@
       <!-- Payment Information Card -->
       <mat-card class="detail-card payment-card">
         <mat-card-header>
-          <mat-card-title>Payment Information</mat-card-title>
+          <mat-card-title>Payment Breakdown</mat-card-title>
         </mat-card-header>
         <mat-card-content>
-          <div class="detail-row">
-            <span class="detail-label">Broker Payment:</span>
-            <span class="detail-value payment-positive">{{ formatCurrency(trip.brokerPayment) }}</span>
+          <!-- Column 1: Revenue -->
+          <div class="payment-column">
+            <h4 class="section-title">Revenue</h4>
+            <div class="detail-row">
+              <span class="detail-label">Broker Payment:</span>
+              <span class="detail-value payment-positive">{{ formatCurrency(trip.brokerPayment) }}</span>
+            </div>
+            <div class="detail-row indent" *ngIf="trip.brokerAdvance && trip.brokerAdvance > 0">
+              <span class="detail-label">Advance Received:</span>
+              <span class="detail-value payment-info">{{ formatCurrency(trip.brokerAdvance) }}</span>
+            </div>
+            <div class="detail-row indent" *ngIf="trip.brokerAdvance && trip.brokerAdvance > 0">
+              <span class="detail-label">Balance Due:</span>
+              <span class="detail-value payment-info">{{ formatCurrency(trip.brokerPayment - trip.brokerAdvance) }}</span>
+            </div>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Truck Owner Payment:</span>
-            <span class="detail-value payment-negative">{{ formatCurrency(trip.lorryOwnerPayment) }}</span>
+          
+          <!-- Column 2: Expenses -->
+          <div class="payment-column">
+            <h4 class="section-title">Expenses</h4>
+            <div class="detail-row">
+              <span class="detail-label">Truck Owner:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.truckOwnerPayment) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Driver Payment:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.driverPayment) }}</span>
+            </div>
+            <div class="detail-row indent" *ngIf="trip.driverAdvance && trip.driverAdvance > 0">
+              <span class="detail-label">Advance Paid:</span>
+              <span class="detail-value payment-info">{{ formatCurrency(trip.driverAdvance) }}</span>
+            </div>
+            <div class="detail-row indent" *ngIf="trip.driverAdvance && trip.driverAdvance > 0">
+              <span class="detail-label">Balance Due:</span>
+              <span class="detail-value payment-info">{{ formatCurrency(trip.driverPayment - trip.driverAdvance) }}</span>
+            </div>
+            <div class="detail-row" *ngIf="calculateFuelCost() > 0">
+              <span class="detail-label">Fuel Cost:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(calculateFuelCost()) }}</span>
+            </div>
+            <div class="detail-row" *ngIf="trip.lumperValue && trip.lumperValue > 0">
+              <span class="detail-label">Lumper Fees:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.lumperValue) }}</span>
+            </div>
+            <div class="detail-row" *ngIf="trip.detentionValue && trip.detentionValue > 0">
+              <span class="detail-label">Detention Fees:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.detentionValue) }}</span>
+            </div>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Driver Payment:</span>
-            <span class="detail-value payment-negative">{{ formatCurrency(trip.driverPayment) }}</span>
-          </div>
-          <div class="detail-row" *ngIf="hasFuelData()">
-            <span class="detail-label">Fuel Cost:</span>
-            <span class="detail-value payment-negative">{{ formatCurrency(calculateFuelCost()) }}</span>
-          </div>
-          <div class="detail-row" *ngIf="trip.lumperFees && trip.lumperFees > 0">
-            <span class="detail-label">Lumper Fees:</span>
-            <span class="detail-value payment-negative">{{ formatCurrency(trip.lumperFees) }}</span>
-          </div>
-          <div class="detail-row" *ngIf="trip.detentionFees && trip.detentionFees > 0">
-            <span class="detail-label">Detention Fees:</span>
-            <span class="detail-value payment-negative">{{ formatCurrency(trip.detentionFees) }}</span>
-          </div>
-          <mat-divider></mat-divider>
-          <div class="detail-row profit-row">
-            <span class="detail-label">{{ calculateProfit() >= 0 ? 'Profit:' : 'Loss:' }}</span>
-            <span class="detail-value" [ngClass]="calculateProfit() >= 0 ? 'payment-positive' : 'payment-negative'">
-              {{ formatCurrency(Math.abs(calculateProfit())) }}
-            </span>
+          
+          <!-- Column 3: Summary -->
+          <div class="payment-column">
+            <h4 class="section-title">Summary</h4>
+            
+            <div class="detail-row total-row">
+              <span class="detail-label"><strong>Total Expenses:</strong></span>
+              <span class="detail-value payment-negative"><strong>{{ formatCurrency(calculateTotalExpenses()) }}</strong></span>
+            </div>
+            
+            <div class="detail-row profit-row" style="margin-top: 12px;">
+              <span class="detail-label"><strong>{{ calculateProfit() >= 0 ? 'Net Profit:' : 'Net Loss:' }}</strong></span>
+              <span class="detail-value" [ngClass]="calculateProfit() >= 0 ? 'payment-positive' : 'payment-negative'">
+                <strong>{{ formatCurrency(getAbsoluteProfit()) }}</strong>
+              </span>
+            </div>
           </div>
         </mat-card-content>
       </mat-card>
-
 
     </div>
   </div>

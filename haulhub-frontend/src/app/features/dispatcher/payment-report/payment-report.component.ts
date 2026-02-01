@@ -54,7 +54,15 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   // Table columns
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
-  lorryColumns: string[] = ['lorryId', 'totalPayment', 'tripCount'];
+  truckColumns: string[] = ['truckName', 'totalPayment', 'tripCount'];
+  
+  // Enriched data for display
+  enrichedDriverData: any[] = [];
+  enrichedTruckData: any[] = [];
+  
+  // Asset maps
+  private truckMap = new Map<string, any>();
+  private driverMap = new Map<string, any>();
 
   constructor(
     private fb: FormBuilder,
@@ -71,6 +79,9 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Load asset maps for enrichment
+    this.loadAssetMaps();
+    
     // Subscribe to shared filter changes
     this.sharedFilterService.filters$
       .pipe(takeUntil(this.destroy$))
@@ -86,9 +97,60 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Load asset maps from API for enrichment
+   */
+  private loadAssetMaps(): void {
+    this.tripService.getTrucksByCarrier().subscribe({
+      next: (trucks) => {
+        trucks.forEach(truck => this.truckMap.set(truck.truckId, truck));
+      },
+      error: (error) => console.error('Error loading trucks:', error)
+    });
+    
+    this.tripService.getDriversByCarrier().subscribe({
+      next: (drivers) => {
+        drivers.forEach(driver => this.driverMap.set(driver.userId, driver));
+      },
+      error: (error) => console.error('Error loading drivers:', error)
+    });
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /**
+   * Enrich grouped data with human-readable names
+   */
+  private enrichGroupedData(): void {
+    if (!this.report) return;
+    
+    // Enrich driver data
+    if (this.report.groupedByDriver) {
+      this.enrichedDriverData = Object.entries(this.report.groupedByDriver).map(([driverId, data]) => {
+        const driver = this.driverMap.get(driverId);
+        return {
+          driverName: driver?.name || data.driverName || driverId.substring(0, 8),
+          totalPayment: data.totalPayment,
+          tripCount: data.tripCount
+        };
+      });
+    }
+    
+    // Enrich truck data
+    if (this.report.groupedByTruck) {
+      this.enrichedTruckData = Object.entries(this.report.groupedByTruck).map(([truckId, data]) => {
+        const truck = this.truckMap.get(truckId);
+        const truckName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : truckId.substring(0, 8);
+        return {
+          truckName,
+          totalPayment: data.totalPayment,
+          tripCount: data.tripCount
+        };
+      });
+    }
   }
 
   loadReport(): void {
@@ -122,6 +184,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     this.tripService.getPaymentReport(filters).subscribe({
       next: (report) => {
         this.report = report as DispatcherPaymentReport;
+        this.enrichGroupedData();
         this.loading = false;
         // Always complete loading (trip-table does this too)
         this.dashboardStateService.setLoadingState(false);
@@ -162,6 +225,14 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     // Don't reload - just switch the view of existing data
   }
 
+  getDriverGroupedData(): any[] {
+    return this.enrichedDriverData;
+  }
+
+  getTruckGroupedData(): any[] {
+    return this.enrichedTruckData;
+  }
+
   formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -191,32 +262,6 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       tripCount: data.tripCount
     }));
   }
-
-  getDriverGroupedData(): Array<{ driverId: string; driverName: string; totalPayment: number; tripCount: number }> {
-    if (!this.report?.groupedByDriver) {
-      return [];
-    }
-    
-    return Object.entries(this.report.groupedByDriver).map(([driverId, data]) => ({
-      driverId,
-      driverName: data.driverName,
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
-    }));
-  }
-
-  getLorryGroupedData(): Array<{ lorryId: string; totalPayment: number; tripCount: number }> {
-    if (!this.report?.groupedByLorry) {
-      return [];
-    }
-    
-    return Object.entries(this.report.groupedByLorry).map(([lorryId, data]) => ({
-      lorryId,
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
-    }));
-  }
-
   getTotalExpenses(): number {
     if (!this.report) {
       return 0;

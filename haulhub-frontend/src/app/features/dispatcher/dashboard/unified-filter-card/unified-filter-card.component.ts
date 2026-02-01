@@ -119,30 +119,24 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     let endDate: Date;
 
     switch (preset) {
-      case '30days':
+      case 'week':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        // Last Month: 30 days ago to today
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(today);
         endDate.setHours(23, 59, 59, 999);
         break;
-      case 'month':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        // Set end date to last day of current month
-        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
       case 'year':
-        startDate = new Date(today.getFullYear(), 0, 1);
-        startDate.setHours(0, 0, 0, 0);
-        // Set end date to last day of current year (December 31)
-        endDate = new Date(today.getFullYear(), 11, 31);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-      case '365days':
         startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 365);
+        startDate.setFullYear(startDate.getFullYear() - 1);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(today);
         endDate.setHours(23, 59, 59, 999);
@@ -162,7 +156,7 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   }
 
   private updateActivePreset(): void {
-    const presets = ['month', '30days', 'year', '365days'];
+    const presets = ['week', 'month', 'year'];
     this.activePreset = null;
     
     for (const preset of presets) {
@@ -191,24 +185,20 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     let expectedEnd: Date;
 
     switch (preset) {
-      case '30days':
+      case 'week':
+        expectedStart = new Date(today);
+        expectedStart.setDate(expectedStart.getDate() - 7);
+        expectedEnd = new Date(today);
+        break;
+      case 'month':
+        // Last Month: 30 days ago to today
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 30);
         expectedEnd = new Date(today);
         break;
-      case 'month':
-        expectedStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        // Last day of current month
-        expectedEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        break;
       case 'year':
-        expectedStart = new Date(today.getFullYear(), 0, 1);
-        // Last day of current year (December 31)
-        expectedEnd = new Date(today.getFullYear(), 11, 31);
-        break;
-      case '365days':
         expectedStart = new Date(today);
-        expectedStart.setDate(expectedStart.getDate() - 365);
+        expectedStart.setFullYear(expectedStart.getFullYear() - 1);
         expectedEnd = new Date(today);
         break;
       default:

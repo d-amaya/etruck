@@ -15,7 +15,21 @@ Angular 17+ frontend application for the HaulHub Transportation Management Syste
 
 ## Overview
 
-HaulHub Frontend is a modern Angular application built with standalone components, lazy-loaded modules, and Angular Material UI. The application provides role-specific dashboards and features for Dispatchers, Lorry Owners, Drivers, and Administrators.
+HaulHub Frontend is a modern Angular application built with standalone components, lazy-loaded modules, and Angular Material UI. The application provides role-specific dashboards and features for Dispatchers, Truck Owners, Drivers, and Administrators.
+
+### eTrucky Migration (January 2026)
+
+The frontend has been migrated to the new **eTrucky carrier-centric architecture**. Key changes include:
+
+- **New Field Names**: `truckId` (was `lorryId`), `trailerId` (new), `truckOwnerId` (new), `carrierId` (new)
+- **ISO 8601 Timestamps**: `scheduledTimestamp`, `pickupTimestamp`, `deliveryTimestamp` (consolidated from separate date/time fields)
+- **Asset Dropdowns**: Drivers, trucks, trailers, and brokers selected from dropdowns (no free-text input)
+- **Role-Based Filtering**: Drivers and truck owners see limited financial data
+- **Truck Owner Features**: Renamed from "Lorry Owner" throughout the application
+
+**Migration Status:** ✅ Complete (All dashboards updated, tests passing)
+
+See [Migration Notes](#migration-notes) section below for detailed changes.
 
 ## Technology Stack
 
@@ -744,6 +758,196 @@ The following features will be implemented in subsequent tasks:
 - Task 36: Admin user verification UI
 - Task 37: Admin broker management UI
 - ✅ Task 38: Error handling and user feedback (COMPLETED)
+
+## Migration Notes
+
+### eTrucky Migration Details
+
+#### Field Name Changes
+
+**Trip Fields:**
+| Old Field | New Field | Type | Notes |
+|-----------|-----------|------|-------|
+| `lorryId` | `truckId` | UUID | References eTrucky-Trucks |
+| N/A | `trailerId` | UUID | New field, references eTrucky-Trailers |
+| N/A | `truckOwnerId` | UUID | New field, references userId |
+| N/A | `carrierId` | UUID | New field, references userId |
+| `pickupDate` + `pickupTime` | `scheduledTimestamp` | ISO 8601 | Consolidated |
+| N/A | `pickupTimestamp` | ISO 8601 | Actual pickup time |
+| `deliveryDate` + `deliveryTime` | `deliveryTimestamp` | ISO 8601 | Actual delivery time |
+| `distance` | `mileageOrder` | number | Loaded miles |
+| N/A | `mileageEmpty` | number | Empty miles |
+| N/A | `mileageTotal` | number | Total miles |
+| `lorryOwnerPayment` | `truckOwnerPayment` | number | Renamed |
+| `status` | `orderStatus` | string | Values: "Scheduled", "Picked Up", "In Transit", "Delivered", "Paid" |
+
+**Truck Fields:**
+| Old Field | New Field | Notes |
+|-----------|-----------|-------|
+| `lorryId` | `truckId` | UUID |
+| `licensePlate` | `plate` | Shortened |
+| `make` | `brand` | Renamed |
+| N/A | `color` | New field |
+| N/A | `truckOwnerId` | Owner link |
+| N/A | `carrierId` | Carrier link |
+
+#### Component Updates
+
+**Dispatcher Dashboard:**
+- ✅ Trip table displays `truckId` and `trailerId` columns
+- ✅ Trip creation form uses dropdowns for driver, truck, trailer, broker selection
+- ✅ Single datetime picker for `scheduledTimestamp`
+- ✅ All financial fields visible (no filtering)
+- ✅ Filters use dropdowns (no free-text input)
+
+**Driver Dashboard:**
+- ✅ Trip list displays limited fields (hides sensitive financial data)
+- ✅ Status update dialog sets `pickupTimestamp` and `deliveryTimestamp`
+- ✅ Only `driverPayment` visible (other payments hidden)
+- ✅ Timestamps formatted for display
+
+**Truck Owner Dashboard:**
+- ✅ Renamed from "Lorry Owner" throughout
+- ✅ Trip list displays limited fields (hides sensitive financial data)
+- ✅ Only `truckOwnerPayment` visible (other payments hidden)
+- ✅ "My Trucks" section displays owned trucks
+- ✅ Timestamps formatted for display
+
+#### Role-Based Data Filtering
+
+**Driver View** - Hidden fields:
+- `brokerPayment`, `truckOwnerPayment`, `orderRevenue`
+- `brokerRate`, `dispatcherPayment`, `dispatcherRate`
+- `factoryRate`, `factoryCost`, `brokerCost`
+- `brokerAdvance`, `factoryAdvance`
+
+**Truck Owner View** - Hidden fields:
+- `brokerPayment`, `driverPayment`, `orderRevenue`
+- `brokerRate`, `driverRate`, `dispatcherPayment`, `dispatcherRate`
+
+**Dispatcher/Carrier View** - All fields visible
+
+#### Timestamp Handling
+
+**ISO 8601 Format:**
+```typescript
+// Backend stores: "2025-01-15T14:30:00Z"
+// Frontend displays: "01/15/2025 2:30 PM"
+
+// Parsing
+const date = new Date(trip.scheduledTimestamp);
+
+// Formatting for display
+const formatted = date.toLocaleString('en-US', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true
+});
+```
+
+**Trip Lifecycle:**
+1. **Created**: `scheduledTimestamp` set, others null
+2. **Picked Up**: Driver updates status → `pickupTimestamp` set
+3. **Delivered**: Driver updates status → `deliveryTimestamp` set
+4. **Paid**: All timestamps set, payment processed
+
+#### Testing Migration Changes
+
+```bash
+# Run all frontend tests
+npm test
+
+# Run specific component tests
+npm test -- --include='**/dispatcher/**/*.spec.ts'
+npm test -- --include='**/driver/**/*.spec.ts'
+npm test -- --include='**/truck-owner/**/*.spec.ts'
+
+# Run with coverage
+npm run test:coverage
+```
+
+**Test Coverage:**
+- ✅ Dispatcher dashboard (trip table, create form, filters)
+- ✅ Driver dashboard (trip list, status updates, payment reports)
+- ✅ Truck owner dashboard (trip list, vehicle list, filtering)
+- ✅ Trip service (API calls with new schema)
+- ✅ Timestamp formatting utilities
+
+#### Breaking Changes for Frontend
+
+**1. Trip Service API Calls**
+
+Old:
+```typescript
+createTrip({
+  lorryId: 'lorry-001',
+  pickupDate: '2025-01-15',
+  pickupTime: '14:30',
+  distance: 250
+})
+```
+
+New:
+```typescript
+createTrip({
+  truckId: '550e8400-e29b-41d4-a716-446655440000',
+  trailerId: '660e8400-e29b-41d4-a716-446655440001',
+  truckOwnerId: '770e8400-e29b-41d4-a716-446655440002',
+  carrierId: '880e8400-e29b-41d4-a716-446655440003',
+  scheduledTimestamp: '2025-01-15T14:30:00Z',
+  mileageOrder: 250,
+  mileageEmpty: 50,
+  mileageTotal: 300
+})
+```
+
+**2. Trip Display**
+
+Old template:
+```html
+<td>{{ trip.lorryId }}</td>
+<td>{{ trip.pickupDate }} {{ trip.pickupTime }}</td>
+<td>{{ trip.status }}</td>
+```
+
+New template:
+```html
+<td>{{ trip.truckId }}</td>
+<td>{{ formatTimestamp(trip.scheduledTimestamp) }}</td>
+<td>{{ trip.orderStatus }}</td>
+```
+
+**3. Asset Selection**
+
+Old (free-text input):
+```html
+<input matInput [(ngModel)]="trip.driverId" placeholder="Driver ID">
+<input matInput [(ngModel)]="trip.lorryId" placeholder="Lorry ID">
+```
+
+New (dropdowns):
+```html
+<mat-select [(ngModel)]="trip.driverId" placeholder="Select Driver">
+  <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+    {{ driver.name }}
+  </mat-option>
+</mat-select>
+
+<mat-select [(ngModel)]="trip.truckId" placeholder="Select Truck">
+  <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
+    {{ truck.plate }} - {{ truck.brand }}
+  </mat-option>
+</mat-select>
+```
+
+#### Additional Resources
+
+- **Backend Migration**: See `haulhub-backend/README.md` for API changes
+- **Migration Guide**: See `ETRUCKY-MIGRATION.md` in project root
+- **Integration Tests**: See `haulhub-backend/test/integration/INTEGRATION-TEST-RESULTS.md`
 
 ## Development Guidelines
 

@@ -19,8 +19,8 @@ import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { JwtValidatorService } from './jwt-validator.service';
-import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
-import { AuthResponse, RefreshAuthResponse } from './interfaces/auth-response.interface';
+import { RegisterDto, LoginDto, RefreshTokenDto, AuthResponse } from '@haulhub/shared';
+import { RefreshAuthResponse } from './interfaces/auth-response.interface';
 import { UserRole } from '@haulhub/shared';
 
 @Injectable()
@@ -122,7 +122,7 @@ export class AuthService {
 
       const { AccessToken, RefreshToken, ExpiresIn } = authResponse.AuthenticationResult;
 
-      // Get user details from Cognito
+      // Get user details from Cognito (includes custom attributes)
       const userDetails = await this.getUserDetails(email);
 
       return {
@@ -133,6 +133,8 @@ export class AuthService {
         role: userDetails.role,
         email: userDetails.email,
         fullName: userDetails.fullName,
+        carrierId: userDetails.carrierId,  // Include in login response for frontend
+        nationalId: userDetails.nationalId,
       };
     } catch (error: any) {
       this.handleCognitoError(error, 'login');
@@ -205,6 +207,69 @@ export class AuthService {
   }
 
   /**
+   * Extract carrierId from JWT token
+   * @param user - Decoded JWT token payload
+   * @returns carrierId from custom:carrierId attribute
+   */
+  getCarrierId(user: any): string | null {
+    return user['custom:carrierId'] || null;
+  }
+
+  /**
+   * Extract nationalId from JWT token
+   * @param user - Decoded JWT token payload
+   * @returns nationalId from custom:nationalId attribute
+   */
+  getNationalId(user: any): string | null {
+    return user['custom:nationalId'] || null;
+  }
+
+  /**
+   * Extract role from JWT token
+   * @param user - Decoded JWT token payload
+   * @returns role from cognito:groups attribute (first group)
+   */
+  getRole(user: any): UserRole | null {
+    const groups = user['cognito:groups'];
+    if (Array.isArray(groups) && groups.length > 0) {
+      return groups[0] as UserRole;
+    }
+    return null;
+  }
+
+  /**
+   * Validate that a user belongs to a specific carrier
+   * @param userId - The user's ID to validate
+   * @param expectedCarrierId - The carrier ID the user should belong to
+   * @returns true if user belongs to carrier, false otherwise
+   * @throws InternalServerErrorException if query fails
+   */
+  async validateCarrierMembership(userId: string, expectedCarrierId: string): Promise<boolean> {
+    try {
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const getCommand = new GetCommand({
+        TableName: this.configService.usersTableName,
+        Key: {
+          PK: `USER#${userId}`,
+          SK: 'METADATA',
+        },
+      });
+
+      const result = await this.awsService.getDynamoDBClient().send(getCommand);
+
+      if (!result.Item) {
+        return false;
+      }
+
+      return result.Item.carrierId === expectedCarrierId;
+    } catch (error: any) {
+      console.error('Error validating carrier membership:', error);
+      throw new InternalServerErrorException('Failed to validate carrier membership');
+    }
+  }
+
+  /**
    * Add user to Cognito group based on role
    */
   private async addUserToGroup(username: string, role: UserRole): Promise<void> {
@@ -216,7 +281,6 @@ export class AuthService {
       });
 
       await this.awsService.getCognitoClient().send(addToGroupCommand);
-      console.log(`Successfully added user ${username} to group ${role}`);
     } catch (error: any) {
       // Log error but don't fail registration - group can be added later by admin
       console.error('Error adding user to group (non-fatal):', error);
@@ -269,13 +333,29 @@ export class AuthService {
   }
 
   /**
-   * Get user details from Cognito
+   * Get user details from Cognito (public method for JWT guard)
+   */
+  async getUserDetailsByUsername(username: string): Promise<{
+    userId: string;
+    email: string;
+    fullName: string;
+    role: UserRole;
+    carrierId?: string;
+    nationalId?: string;
+  }> {
+    return this.getUserDetails(username);
+  }
+
+  /**
+   * Get user details from Cognito (private implementation)
    */
   private async getUserDetails(username: string): Promise<{
     userId: string;
     email: string;
     fullName: string;
     role: UserRole;
+    carrierId?: string;
+    nationalId?: string;
   }> {
     try {
       const getUserCommand = new AdminGetUserCommand({
@@ -301,11 +381,21 @@ export class AuthService {
       // Get the first group as the role (users should only be in one role group)
       const role = groups.length > 0 ? (groups[0].GroupName as UserRole) : ('' as UserRole);
 
+      let carrierId = getAttributeValue('custom:carrierId') || undefined;
+      
+      // Special case: For carriers, carrierId should equal userId (self-reference)
+      // If it's a placeholder value, use userId instead
+      if (role === UserRole.Carrier && (!carrierId || carrierId === 'TEMP' || carrierId === 'SELF')) {
+        carrierId = getAttributeValue('sub');
+      }
+
       return {
         userId: getAttributeValue('sub'),
         email: getAttributeValue('email'),
         fullName: getAttributeValue('name'),
         role,
+        carrierId,
+        nationalId: getAttributeValue('custom:nationalId') || undefined,
       };
     } catch (error: any) {
       console.error('Error getting user details:', error);

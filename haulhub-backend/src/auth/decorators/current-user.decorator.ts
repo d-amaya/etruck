@@ -9,6 +9,8 @@ export interface CurrentUserData {
   email: string;
   role: string;
   username: string;
+  carrierId?: string;
+  nationalId?: string;
 }
 
 /**

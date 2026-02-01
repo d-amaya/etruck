@@ -9,6 +9,16 @@
     "haulhub-infrastructure",
     "haulhub-shared"
   ],
+  "devDependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.700.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "uuid": "^9.0.1"
+  },
 
   "scripts": {
     "install:all": "npm install && npm install --workspace=haulhub-shared && npm install --workspace=haulhub-frontend && npm install --workspace=haulhub-backend && npm install --workspace=haulhub-infrastructure",
@@ -22,6 +32,7 @@
     "test:infrastructure": "npm test --workspace=haulhub-infrastructure",
     "test:all": "npm run test:backend && npm run test:infrastructure && npm run test:frontend",
     "build:test": "npm run build:all && npm run test:all",
+    "seed:etrucky": "USER_POOL_ID=us-east-1_yoiMUn0Q8 AWS_PROFILE=haul-hub ts-node scripts/seed-etrucky-clean.ts",
     "clean": "rm -rf node_modules package-lock.json haulhub-backend/node_modules haulhub-backend/package-lock.json haulhub-backend/dist haulhub-frontend/node_modules haulhub-frontend/package-lock.json haulhub-frontend/dist haulhub-frontend/.angular haulhub-shared/node_modules haulhub-shared/package-lock.json haulhub-shared/dist haulhub-infrastructure/node_modules haulhub-infrastructure/package-lock.json haulhub-infrastructure/dist haulhub-infrastructure/cdk.out node_modules/@haulhub",
     "clean:deps": "rm -rf node_modules haulhub-backend/node_modules haulhub-frontend/node_modules haulhub-shared/node_modules haulhub-infrastructure/node_modules",
     "clean:locks": "rm -rf package-lock.json haulhub-backend/package-lock.json haulhub-frontend/package-lock.json haulhub-shared/package-lock.json haulhub-infrastructure/package-lock.json",

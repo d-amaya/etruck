@@ -11,6 +11,7 @@ describe('JwtAuthGuard', () => {
 
   const mockAuthService = {
     validateToken: jest.fn(),
+    getUserDetailsByUsername: jest.fn(),
   };
 
   const mockReflector = {
@@ -96,6 +97,11 @@ describe('JwtAuthGuard', () => {
         'cognito:username': 'testuser',
       };
       mockAuthService.validateToken.mockResolvedValue(mockPayload);
+      mockAuthService.getUserDetailsByUsername.mockResolvedValue({
+        email: 'test@example.com',
+        carrierId: 'carrier-123',
+        nationalId: 'NAT-123',
+      });
 
       const context = createMockExecutionContext('Bearer valid-token');
       const request = context.switchToHttp().getRequest();
@@ -104,11 +110,14 @@ describe('JwtAuthGuard', () => {
 
       expect(result).toBe(true);
       expect(mockAuthService.validateToken).toHaveBeenCalledWith('valid-token');
+      expect(mockAuthService.getUserDetailsByUsername).toHaveBeenCalledWith('user-123');
       expect(request.user).toEqual({
         userId: 'user-123',
         email: 'test@example.com',
         role: 'Dispatcher',
         username: 'testuser',
+        carrierId: 'carrier-123',
+        nationalId: 'NAT-123',
       });
     });
 

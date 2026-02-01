@@ -209,9 +209,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       }
     }
 
-    console.log('[Analytics] Loading all analytics data...');
-    console.log('[Analytics] Date range:', this.startDate, 'to', this.endDate);
-
     // Load trip analytics with date filter
     this.loadTripAnalytics();
   }
@@ -221,7 +218,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
-          console.log('[Analytics] Trip analytics data received:', data);
           this.processTripAnalytics(data);
           this.loadFleetUtilizationData();
           this.loadBrokerAnalyticsData();
@@ -278,7 +274,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
-          console.log('[Analytics] Broker analytics data received:', data);
           this.brokerAnalyticsData = data;
         },
         error: (error) => {
@@ -290,9 +285,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
 
   private createFuelCostChart(): void {
-    console.log('[Analytics] createFuelCostChart called');
-    console.log('[Analytics] fuelCostChartRef:', !!this.fuelCostChartRef);
-    console.log('[Analytics] fuelCostTrendData:', !!this.fuelCostTrendData);
 
     if (!this.fuelCostChartRef || !this.fuelCostTrendData) {
       console.warn('[Analytics] Cannot create fuel cost chart - missing ref or data');
@@ -309,8 +301,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       console.error('[Analytics] Cannot get 2d context from fuel canvas');
       return;
     }
-
-    console.log('[Analytics] Creating fuel cost chart with', this.fuelCostTrendData.labels.length, 'data points');
 
     const config: ChartConfiguration = {
       type: 'line',
@@ -356,7 +346,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     };
 
     this.fuelCostChart = new Chart(ctx, config);
-    console.log('[Analytics] Fuel cost chart created successfully');
   }
 
   private processTripAnalytics(data: any): void {
@@ -422,12 +411,10 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   }
 
   onTabChange(index: number): void {
-    console.log('[Analytics] Tab changed to index:', index);
     this.selectedTabIndex = index;
     
     // If Fuel Efficiency tab (index 3) is selected and we have fuel chart data
     if (index === 3 && this.fuelCostTrendData) {
-      console.log('[Analytics] Fuel Efficiency tab activated, creating fuel chart...');
       setTimeout(() => {
         this.createFuelCostChart();
         this.fuelChartCreated = true;
@@ -475,8 +462,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
-          console.log('[Analytics] Fuel analytics data received:', data);
-          console.log('[Analytics] Monthly fuel data:', data.monthlyFuelData);
           
           if (data.totalTripsWithFuelData > 0) {
             this.fuelCostChartData = {
@@ -516,12 +501,9 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
                 ]
               };
               
-              console.log('[Analytics] Fuel chart data prepared');
-              
               // If we're already on the Fuel Efficiency tab, create chart now
               if (this.selectedTabIndex === 3) {
                 setTimeout(() => {
-                  console.log('[Analytics] Creating fuel chart (already on Fuel Efficiency tab)...');
                   this.createFuelCostChart();
                   this.fuelChartCreated = true;
                 }, 300);

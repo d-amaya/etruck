@@ -13,7 +13,7 @@ export interface DashboardFilters {
   };
   status: TripStatus | null;
   brokerId: string | null;
-  lorryId: string | null;
+  truckId: string | null;
   driverId: string | null;
   driverName: string | null;
 }
@@ -21,7 +21,7 @@ export interface DashboardFilters {
 export interface PaymentSummary {
   totalBrokerPayments: number;
   totalDriverPayments: number;
-  totalLorryOwnerPayments: number;
+  totalTruckOwnerPayments: number;
   totalProfit: number;
 }
 
@@ -120,23 +120,12 @@ export class DashboardStateService {
     const currentFilters = this.filtersSubject.value;
     const newFilters = { ...currentFilters, ...filters };
     
-    console.log('[DASHBOARD-STATE] updateFilters called:', {
-      currentFilters,
-      partialFilters: filters,
-      newFilters
-    });
-    
     this.filtersSubject.next(newFilters);
     this.saveFiltersToStorage(newFilters);
     
     // Reset to page 0 and clear pagination tokens when filters change
     const currentPagination = this.paginationSubject.value;
     const newPagination = { page: 0, pageSize: currentPagination.pageSize, pageTokens: [] };
-    
-    console.log('[DASHBOARD-STATE] Resetting pagination:', {
-      currentPagination,
-      newPagination
-    });
     
     this.paginationSubject.next(newPagination);
     this.savePaginationToStorage(newPagination);
@@ -184,7 +173,7 @@ export class DashboardStateService {
     if (filters.dateRange.startDate || filters.dateRange.endDate) count++;
     if (filters.status) count++;
     if (filters.brokerId) count++;
-    if (filters.lorryId) count++;
+    if (filters.truckId) count++;
     if (filters.driverId || filters.driverName) count++;
     return count;
   }
@@ -209,22 +198,22 @@ export class DashboardStateService {
   }
 
   private getDefaultFilters(): DashboardFilters {
-    // Set default date range to current month (first to last day)
+    // Set default date range to last 30 days (1 month ago)
     const today = new Date();
+    today.setHours(23, 59, 59, 999);
     
-    // First day of current month
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 30);
     startDate.setHours(0, 0, 0, 0);
     
-    // Last day of current month
-    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const endDate = new Date(today);
     endDate.setHours(23, 59, 59, 999);
     
     return {
       dateRange: { startDate, endDate },
       status: null,
       brokerId: null,
-      lorryId: null,
+      truckId: null,
       driverId: null,
       driverName: null
     };
@@ -287,13 +276,10 @@ export class DashboardStateService {
   }
 
   private loadBrokers(): void {
-    console.log('Loading brokers from API...');
     this.tripService.getBrokers().subscribe({
       next: (brokers) => {
-        console.log('Brokers loaded from API:', brokers);
         this.brokersCache = brokers.filter(b => b.isActive);
         this.brokersSubject.next(this.brokersCache);
-        console.log('Active brokers cached:', this.brokersCache);
       },
       error: (error) => {
         console.error('Failed to load brokers:', error);

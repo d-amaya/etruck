@@ -5,9 +5,7 @@ import { InvoicePayment } from './trip.interface';
 export interface EnhancedTrip {
   tripId: string;
   dispatcherId: string;
-  pickupLocation: string;
-  dropoffLocation: string;
-  scheduledPickupDatetime: string;
+  scheduledTimestamp: string;
   brokerId: string;
   brokerName: string;
   
@@ -20,7 +18,7 @@ export interface EnhancedTrip {
   
   // Enhanced financial tracking
   brokerPayment: number;
-  lorryOwnerPayment: number;
+  truckOwnerPayment: number;
   driverPayment: number;
   
   // Invoice management (Requirements 5.1, 5.2, 5.3, 5.4, 5.5)
@@ -35,18 +33,17 @@ export interface EnhancedTrip {
   invoiceStatus?: 'unpaid' | 'partial' | 'paid' | 'overdue';
   
   // Enhanced mileage tracking
-  loadedMiles: number;
-  emptyMiles: number;
-  totalMiles: number;
+  mileageOrder: number;
+  mileageEmpty: number;
+  mileageTotal: number;
   
   // Fuel cost management
-  fuelAvgCost: number;
-  fuelAvgGallonsPerMile: number;
-  fuelTotalCost: number;
+  fuelGasAvgCost: number;
+  fuelGasAvgGallxMil: number;
+  fuelCost: number;
   
   // Enhanced status tracking
-  status: TripStatus;
-  orderStatus?: string;
+  orderStatus: 'Scheduled' | 'Picked Up' | 'In Transit' | 'Delivered' | 'Paid';
   orderDate?: string;
   orderConfirmation?: string;
   
@@ -76,8 +73,6 @@ export interface EnhancedTrip {
   documents: EnhancedDocumentMetadata[];
   
   // Additional fields
-  distance?: number;
-  deliveredAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

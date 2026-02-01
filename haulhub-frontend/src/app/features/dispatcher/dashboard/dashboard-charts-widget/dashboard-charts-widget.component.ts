@@ -55,8 +55,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   ) {}
 
   ngOnInit(): void {
-    console.log('[Charts Widget] Initializing...');
-    
     // Track previous date range to detect changes
     let previousDateRange: { startDate: Date | null; endDate: Date | null } | null = null;
     
@@ -65,8 +63,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       .pipe(
         takeUntil(this.destroy$),
         switchMap(filters => {
-          console.log('[Charts Widget] Filters changed');
-          
           // Check if date range actually changed
           const dateRangeChanged = !previousDateRange ||
             filters.dateRange.startDate?.getTime() !== previousDateRange.startDate?.getTime() ||
@@ -76,15 +72,12 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
           previousDateRange = { ...filters.dateRange };
           
           if (!dateRangeChanged && this.trips.length > 0) {
-            console.log('[Charts Widget] Date range unchanged, skipping reload');
             return []; // Return empty observable to skip
           }
           
-          console.log('[Charts Widget] Date range changed, reloading trips');
           this.loading = true;
           // Build API filters with ONLY date range (ignore other filters)
           const apiFilters = this.buildApiFiltersForCharts(filters);
-          console.log('[Charts Widget] API filters:', apiFilters);
           return this.tripService.getTrips(apiFilters);
         })
       )
@@ -92,11 +85,9 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         next: (response) => {
           if (!response || !response.trips) return; // Skip if empty response
           
-          console.log('[Charts Widget] Received trips:', response.trips?.length);
           this.trips = response.trips || [];
           this.loading = false;
           this.calculateChartData();
-          console.log('[Charts Widget] Chart data calculated');
           // Render charts after a delay to ensure view is ready
           setTimeout(() => this.tryRenderCharts(), 200);
         },
@@ -111,7 +102,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       .pipe(
         takeUntil(this.destroy$),
         switchMap(() => {
-          console.log('[Charts Widget] Payment summary refresh triggered (trip added/deleted), reloading trips');
           this.loading = true;
           const currentFilters = this.dashboardState.getCurrentFilters();
           const apiFilters = this.buildApiFiltersForCharts(currentFilters);
@@ -120,11 +110,9 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       )
       .subscribe({
         next: (response) => {
-          console.log('[Charts Widget] Received trips after refresh:', response.trips?.length);
           this.trips = response.trips || [];
           this.loading = false;
           this.calculateChartData();
-          console.log('[Charts Widget] Chart data calculated after refresh');
           // Render charts after a delay to ensure view is ready
           setTimeout(() => this.tryRenderCharts(), 200);
         },
@@ -163,7 +151,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     });
     // Initial render if data is already available
     if (this.trips.length > 0) {
-      console.log('[Charts Widget] Data available, rendering charts');
       setTimeout(() => this.renderCharts(), 100);
     }
   }
@@ -175,7 +162,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         this.statusChartRef && 
         this.topPerformersChartRef && 
         this.expenseChartRef) {
-      console.log('[Charts Widget] All conditions met, rendering charts');
       this.renderCharts();
     } else {
       console.log('[Charts Widget] Not ready to render:', {
@@ -213,18 +199,18 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       totalExpenses += expenses;
 
       driverPay += trip.driverPayment || 0;
-      ownerPay += trip.lorryOwnerPayment || 0;
+      ownerPay += trip.truckOwnerPayment || 0;
       
       // Calculate fuel cost
-      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        fuelCost += totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
+      if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
+        const totalMiles = (trip.mileageOrder || 0) + (trip.mileageEmpty || 0);
+        fuelCost += totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost;
       }
       
-      fees += (trip.lumperFees || 0) + (trip.detentionFees || 0);
+      fees += (trip.lumperValue || 0) + (trip.detentionValue || 0);
 
       // Status counts
-      const status = trip.status || TripStatus.Scheduled;
+      const status = trip.orderStatus || 'Scheduled';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
 
       // Broker performance
@@ -243,10 +229,10 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       }
 
       // Truck performance
-      if (trip.lorryId) {
-        const truck = truckMap.get(trip.lorryId) || { trips: 0 };
+      if (trip.truckId) {
+        const truck = truckMap.get(trip.truckId) || { trips: 0 };
         truck.trips += 1;
-        truckMap.set(trip.lorryId, truck);
+        truckMap.set(trip.truckId, truck);
       }
     });
 
@@ -285,13 +271,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   }
 
   private renderCharts(): void {
-    console.log('[Charts Widget] renderCharts called, trips count:', this.trips.length);
-    console.log('[Charts Widget] Canvas refs available:', {
-      revenue: !!this.revenueChartRef,
-      status: !!this.statusChartRef,
-      topPerformers: !!this.topPerformersChartRef,
-      expense: !!this.expenseChartRef
-    });
     
     // Destroy existing charts
     this.charts.forEach(chart => chart.destroy());
@@ -302,12 +281,10 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       return;
     }
 
-    console.log('[Charts Widget] Rendering all charts...');
     this.renderRevenueChart();
     this.renderStatusChart();
     this.renderTopPerformersChart();
     this.renderExpenseChart();
-    console.log('[Charts Widget] All charts rendered, total charts:', this.charts.length);
   }
 
   private renderRevenueChart(): void {

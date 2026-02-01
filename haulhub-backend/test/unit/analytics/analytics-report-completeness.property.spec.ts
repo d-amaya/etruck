@@ -24,8 +24,8 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
     dispatcherId: fc.uuid(),
     driverId: fc.uuid(),
     driverName: fc.string({ minLength: 3, maxLength: 50 }),
-    lorryId: fc.uuid(),
-    status: fc.constantFrom(
+    truckId: fc.uuid(),
+    orderStatus: fc.constantFrom(
       TripStatus.Scheduled,
       TripStatus.PickedUp,
       TripStatus.InTransit,
@@ -34,18 +34,18 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
     ),
     brokerPayment: fc.integer({ min: 100, max: 10000 }),
     driverPayment: fc.integer({ min: 50, max: 5000 }),
-    lorryOwnerPayment: fc.integer({ min: 50, max: 3000 }),
-    distance: fc.integer({ min: 10, max: 3000 }),
-    lumperFees: fc.integer({ min: 0, max: 500 }),
-    detentionFees: fc.integer({ min: 0, max: 500 }),
-    scheduledPickupDatetime: fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
-      .map(timestamp => new Date(timestamp).toISOString()),
-    pickupLocation: fc.string({ minLength: 5, maxLength: 100 }),
-    dropoffLocation: fc.string({ minLength: 5, maxLength: 100 }),
+    truckOwnerPayment: fc.integer({ min: 50, max: 3000 }),
+    mileageOrder: fc.integer({ min: 10, max: 3000 }),
+    lumperValue: fc.integer({ min: 0, max: 500 }),
+    detentionValue: fc.integer({ min: 0, max: 500 }),
+    scheduledTimestamp: fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
+      .map(timestamp => new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z')),
+    pickupCity: fc.string({ minLength: 3, maxLength: 50 }),
+    deliveryCity: fc.string({ minLength: 3, maxLength: 50 }),
     brokerId: fc.uuid(),
     brokerName: fc.string({ minLength: 3, maxLength: 50 }),
-    deliveredAt: fc.option(fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
-      .map(timestamp => new Date(timestamp).toISOString())),
+    deliveryTimestamp: fc.option(fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
+      .map(timestamp => new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z'))),
     createdAt: fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
       .map(timestamp => new Date(timestamp).toISOString()),
     updatedAt: fc.integer({ min: Date.parse('2024-01-01'), max: Date.parse('2024-12-31') })
@@ -57,6 +57,13 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
       getDynamoDBClient: jest.fn(),
     },
     tripsTableName: 'test-trips-table',
+    configService: {
+      eTruckyUsersTableName: 'eTrucky-Users',
+      eTruckyTrucksTableName: 'eTrucky-Trucks',
+      eTruckyTripsTableName: 'eTrucky-Trips',
+      eTruckyTrailersTableName: 'eTrucky-Trailers',
+      eTruckyBrokersTableName: 'eTrucky-Brokers',
+    },
     mapItemToTrip: jest.fn((item) => item),
   };
 
@@ -211,7 +218,7 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
             }
 
             // Verify calculation accuracy: averageDistance = totalDistance / totalTrips
-            const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+            const totalDistance = trips.reduce((sum, trip) => sum + (trip.mileageOrder || 0), 0);
             if (report.totalTrips > 0) {
               const expectedAvgDistance = totalDistance / report.totalTrips;
               expect(report.averageDistance).toBeCloseTo(expectedAvgDistance, 2);
@@ -509,7 +516,7 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
             expect(driverPerformance.length).toBeLessThanOrEqual(uniqueDrivers.size);
 
             // Verify vehicle count consistency
-            const uniqueVehicles = new Set(trips.map(t => t.lorryId));
+            const uniqueVehicles = new Set(trips.map(t => t.truckId));
             expect(fleetOverview.vehicles.total).toBe(uniqueVehicles.size);
             expect(vehicleUtilization.length).toBeLessThanOrEqual(uniqueVehicles.size);
 

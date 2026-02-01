@@ -1,7 +1,7 @@
 export enum TripStatus {
   Scheduled = 'Scheduled',
-  PickedUp = 'PickedUp',
-  InTransit = 'InTransit',
+  PickedUp = 'Picked Up',
+  InTransit = 'In Transit',
   Delivered = 'Delivered',
   Paid = 'Paid',
   Canceled = 'Canceled'

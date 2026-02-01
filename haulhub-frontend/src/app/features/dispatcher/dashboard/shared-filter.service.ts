@@ -10,7 +10,7 @@ export interface DashboardFilters {
   };
   status: TripStatus | null;
   brokerId: string | null;
-  lorryId: string | null;
+  truckId: string | null;
   driverName: string | null;
   driverId: string | null;
 }
@@ -32,7 +32,7 @@ export class SharedFilterService {
     },
     status: null,
     brokerId: null,
-    lorryId: null,
+    truckId: null,
     driverName: null,
     driverId: null
   };
@@ -55,23 +55,23 @@ export class SharedFilterService {
   }
 
   /**
-   * Get default start date (first day of current month)
+   * Get default start date (30 days ago)
    */
   private getDefaultStartDate(): Date {
-    const date = new Date();
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-    firstDay.setHours(0, 0, 0, 0);
-    return firstDay;
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+    return startDate;
   }
 
   /**
-   * Get default end date (last day of current month)
+   * Get default end date (today)
    */
   private getDefaultEndDate(): Date {
-    const date = new Date();
-    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    lastDay.setHours(23, 59, 59, 999);
-    return lastDay;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return today;
   }
 
   /**
@@ -105,7 +105,7 @@ export class SharedFilterService {
         dateRange: filters.dateRange || currentFilters.dateRange,
         status: filters.status !== undefined ? filters.status : currentFilters.status,
         brokerId: filters.brokerId !== undefined ? filters.brokerId : currentFilters.brokerId,
-        lorryId: filters.lorryId !== undefined ? filters.lorryId : currentFilters.lorryId,
+        truckId: filters.truckId !== undefined ? filters.truckId : currentFilters.truckId,
         driverName: filters.driverName !== undefined ? filters.driverName : currentFilters.driverName,
         driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId
       });
@@ -129,7 +129,7 @@ export class SharedFilterService {
     // Compare other filters
     return filters1.status === filters2.status &&
            filters1.brokerId === filters2.brokerId &&
-           filters1.lorryId === filters2.lorryId &&
+           filters1.truckId === filters2.truckId &&
            filters1.driverName === filters2.driverName &&
            filters1.driverId === filters2.driverId;
   }
@@ -162,7 +162,7 @@ export class SharedFilterService {
 
     if (filters.status) count++;
     if (filters.brokerId) count++;
-    if (filters.lorryId) count++;
+    if (filters.truckId) count++;
     if (filters.driverName) count++;
     if (filters.driverId) count++;
 

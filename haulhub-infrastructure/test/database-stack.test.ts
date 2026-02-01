@@ -348,8 +348,8 @@ describe('DatabaseStack', () => {
   });
 
   describe('Resource Count', () => {
-    test('should create four DynamoDB tables (Trips, Brokers, Lorries, Users)', () => {
-      template.resourceCountIs('AWS::DynamoDB::Table', 4);
+    test('should create nine DynamoDB tables (4 HaulHub + 5 eTrucky tables)', () => {
+      template.resourceCountIs('AWS::DynamoDB::Table', 9);
     });
   });
 

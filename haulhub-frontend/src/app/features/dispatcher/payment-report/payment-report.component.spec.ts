@@ -18,25 +18,26 @@ describe('PaymentReportComponent', () => {
   const mockReport: DispatcherPaymentReport = {
     totalBrokerPayments: 10000,
     totalDriverPayments: 3000,
-    totalLorryOwnerPayments: 4000,
+    totalTruckOwnerPayments: 4000,
     profit: 3000,
     tripCount: 5,
     trips: [
       {
         tripId: 'trip1',
         dispatcherId: 'dispatcher1',
-        scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-        pickupLocation: 'City A',
-        dropoffLocation: 'City B',
+        scheduledTimestamp: '2024-01-15T10:00:00Z',
+        pickupLocation: 'City A, State A',
+        dropoffLocation: 'City B, State B',
         brokerId: 'broker1',
         brokerName: 'Broker One',
-        lorryId: 'ABC-123',
+        truckId: 'ABC-123',
         driverId: 'driver1',
         driverName: 'John Doe',
         brokerPayment: 2000,
-        lorryOwnerPayment: 800,
+        truckOwnerPayment: 800,
         driverPayment: 600,
-        status: 'Delivered'
+        orderStatus: 'Delivered',
+        mileageOrder: 100
       }
     ],
     groupedByBroker: {
@@ -53,7 +54,7 @@ describe('PaymentReportComponent', () => {
         tripCount: 5
       }
     },
-    groupedByLorry: {
+    groupedByTruck: {
       'ABC-123': {
         totalPayment: 4000,
         tripCount: 5
@@ -62,11 +63,24 @@ describe('PaymentReportComponent', () => {
   };
 
   beforeEach(async () => {
-    const tripServiceSpy = jasmine.createSpyObj('TripService', ['getPaymentReport', 'getBrokers']);
+    const tripServiceSpy = jasmine.createSpyObj('TripService', [
+      'getPaymentReport', 
+      'getBrokers',
+      'getTrucksByCarrier',
+      'getDriversByCarrier'
+    ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
     // Mock getBrokers to return empty array (needed by DashboardStateService)
     tripServiceSpy.getBrokers.and.returnValue(of([]));
+    
+    // Mock asset loading methods
+    tripServiceSpy.getTrucksByCarrier.and.returnValue(of([
+      { truckId: 'ABC-123', plate: 'ABC-123', brand: 'Volvo', year: 2020 }
+    ]));
+    tripServiceSpy.getDriversByCarrier.and.returnValue(of([
+      { userId: 'driver1', name: 'John Doe', email: 'john@example.com' }
+    ]));
 
     await TestBed.configureTestingModule({
       imports: [
@@ -140,7 +154,9 @@ describe('PaymentReportComponent', () => {
   });
 
   it('should get driver grouped data', () => {
-    component.report = mockReport;
+    tripService.getPaymentReport.and.returnValue(of(mockReport));
+    component.ngOnInit();
+    fixture.detectChanges();
     
     const driverData = component.getDriverGroupedData();
     
@@ -149,14 +165,16 @@ describe('PaymentReportComponent', () => {
     expect(driverData[0].totalPayment).toBe(3000);
   });
 
-  it('should get lorry grouped data', () => {
-    component.report = mockReport;
+  it('should get truck grouped data', () => {
+    tripService.getPaymentReport.and.returnValue(of(mockReport));
+    component.ngOnInit();
+    fixture.detectChanges();
     
-    const lorryData = component.getLorryGroupedData();
+    const truckData = component.getTruckGroupedData();
     
-    expect(lorryData.length).toBe(1);
-    expect(lorryData[0].lorryId).toBe('ABC-123');
-    expect(lorryData[0].totalPayment).toBe(4000);
+    expect(truckData.length).toBe(1);
+    expect(truckData[0].truckName).toContain('ABC-123');
+    expect(truckData[0].totalPayment).toBe(4000);
   });
 
   it('should reload report when filter is submitted', () => {
@@ -188,12 +206,12 @@ describe('PaymentReportComponent', () => {
       ...mockReport,
       groupedByBroker: undefined,
       groupedByDriver: undefined,
-      groupedByLorry: undefined
+      groupedByTruck: undefined
     };
     
     expect(component.getBrokerGroupedData()).toEqual([]);
     expect(component.getDriverGroupedData()).toEqual([]);
-    expect(component.getLorryGroupedData()).toEqual([]);
+    expect(component.getTruckGroupedData()).toEqual([]);
   });
 
   it('should initialize activeTabIndex to 0', () => {

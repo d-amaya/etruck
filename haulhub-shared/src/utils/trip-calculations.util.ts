@@ -11,25 +11,21 @@ import { Trip } from '../interfaces/trip.interface';
  * Calculates the total expenses for a trip including all cost components
  * 
  * @param trip - The trip object containing payment and cost information
- * @returns Total expenses including driver payment, lorry owner payment, fuel costs, and additional fees
+ * @returns Total expenses including driver payment, truck owner payment, fuel costs, and additional fees
  */
 export function calculateTripExpenses(trip: Trip): number {
   let totalExpenses = 0;
 
   // Base payments
-  totalExpenses += trip.lorryOwnerPayment || 0;
+  totalExpenses += trip.truckOwnerPayment || 0;
   totalExpenses += trip.driverPayment || 0;
 
-  // Fuel costs (calculated from fuel data if available)
-  if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-    const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-    const fuelCost = totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
-    totalExpenses += fuelCost;
-  }
+  // Fuel costs (calculate if needed)
+  totalExpenses += calculateFuelCost(trip);
 
   // Additional fees
-  totalExpenses += trip.lumperFees || 0;
-  totalExpenses += trip.detentionFees || 0;
+  totalExpenses += trip.lumperValue || 0;
+  totalExpenses += trip.detentionValue || 0;
 
   return totalExpenses;
 }
@@ -51,24 +47,33 @@ export function calculateTripProfit(trip: Trip): number {
 /**
  * Calculates fuel cost for a trip based on mileage and fuel data
  * 
+ * Formula: Total Miles × Gallons Per Mile × Cost Per Gallon
+ * Falls back to stored fuelCost if calculation data is not available
+ * 
  * @param trip - The trip object containing fuel and mileage information
- * @returns Calculated fuel cost, or 0 if fuel data is incomplete
+ * @returns Calculated fuel cost or stored fuelCost value
  */
 export function calculateFuelCost(trip: Trip): number {
-  if (!trip.fuelAvgCost || !trip.fuelAvgGallonsPerMile) {
-    return 0;
+  // If we have the data to calculate, do the calculation
+  if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil && (trip.mileageTotal || trip.mileageOrder)) {
+    const totalMiles = trip.mileageTotal || trip.mileageOrder || 0;
+    return totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost;
   }
-
-  const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-  return totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
+  
+  // Otherwise return stored value
+  return trip.fuelCost || 0;
 }
 
 /**
- * Checks if a trip has sufficient fuel data for cost calculation
+ * Checks if a trip has fuel cost data
  * 
  * @param trip - The trip object to check
- * @returns True if trip has fuel cost and gallons per mile data
+ * @returns True if trip has fuel cost data (either stored or calculable)
  */
 export function hasFuelData(trip: Trip): boolean {
-  return !!(trip.fuelAvgCost && trip.fuelAvgGallonsPerMile);
+  // Has stored fuel cost
+  if (trip.fuelCost && trip.fuelCost > 0) return true;
+  
+  // Has data to calculate fuel cost
+  return !!(trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil && (trip.mileageTotal || trip.mileageOrder));
 }

@@ -40,14 +40,14 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 })
 export class VehicleTripListComponent implements OnInit {
   displayedColumns: string[] = [
-    'scheduledPickupDatetime',
-    'pickupLocation',
-    'dropoffLocation',
-    'vehicleInfo',
+    'scheduledTimestamp',
+    'pickupCity',
+    'deliveryCity',
+    'truckId',
     'dispatcherId',
     'brokerName',
-    'status',
-    'ownerPayment'
+    'orderStatus',
+    'truckOwnerPayment'
   ];
 
   trips: Trip[] = [];
@@ -65,7 +65,7 @@ export class VehicleTripListComponent implements OnInit {
   lastEvaluatedKey?: string;
   paginationKeys: Map<number, string> = new Map();
 
-  statusOptions = Object.values(TripStatus);
+  statusOptions = ['Scheduled', 'Picked Up', 'In Transit', 'Delivered', 'Paid'];
   TripStatus = TripStatus;
 
   constructor(
@@ -137,8 +137,8 @@ export class VehicleTripListComponent implements OnInit {
     };
 
     if (formValue.vehicleId) {
-      // Filter by specific vehicle (using lorryId for both trucks and trailers)
-      filters.lorryId = formValue.vehicleId;
+      // Filter by specific vehicle (using truckId)
+      filters.truckId = formValue.vehicleId;
     }
 
     if (formValue.startDate) {
@@ -158,7 +158,7 @@ export class VehicleTripListComponent implements OnInit {
     }
 
     if (formValue.status) {
-      filters.status = formValue.status;
+      filters.orderStatus = formValue.status as any;
     }
 
     if (this.lastEvaluatedKey) {
@@ -211,41 +211,31 @@ export class VehicleTripListComponent implements OnInit {
     this.loadTrips();
   }
 
-  getStatusClass(status: TripStatus): string {
+  getStatusClass(status: string): string {
     switch (status) {
-      case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'status-scheduled';
-      case TripStatus.PickedUp:
+      case 'Picked Up':
         return 'status-picked-up';
-      case TripStatus.InTransit:
+      case 'In Transit':
         return 'status-in-transit';
-      case TripStatus.Delivered:
+      case 'Delivered':
         return 'status-delivered';
-      case TripStatus.Paid:
+      case 'Paid':
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
-    switch (status) {
-      case TripStatus.Scheduled:
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-        return 'Picked Up';
-      case TripStatus.InTransit:
-        return 'In Transit';
-      case TripStatus.Delivered:
-        return 'Delivered';
-      case TripStatus.Paid:
-        return 'Paid';
-      default:
-        return status;
-    }
+  getStatusLabel(status: string): string {
+    // Status is already in the correct format (e.g., "Picked Up", "In Transit")
+    return status;
   }
 
-  formatDate(dateString: string): string {
+  formatDate(dateString: string | null): string {
+    if (!dateString) return 'N/A';
+    
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',

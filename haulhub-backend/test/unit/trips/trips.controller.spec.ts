@@ -43,17 +43,17 @@ describe('TripsController', () => {
     dispatcherId: 'dispatcher-123',
     pickupLocation: '123 Main St, Los Angeles, CA',
     dropoffLocation: '456 Oak Ave, San Francisco, CA',
-    scheduledPickupDatetime: '2024-02-15T08:00:00.000Z',
+    scheduledTimestamp: '2024-02-15T08:00:00Z',
     brokerId: 'broker-123',
     brokerName: 'TQL (Total Quality Logistics)',
-    lorryId: 'ABC-1234',
+    truckId: 'ABC-1234',
     driverId: 'DRV-001',
     driverName: 'John Doe',
     brokerPayment: 2500.0,
-    lorryOwnerPayment: 1500.0,
+    truckOwnerPayment: 1500.0,
     driverPayment: 800.0,
-    status: TripStatus.Scheduled,
-    distance: 380,
+    orderStatus: TripStatus.Scheduled,
+    mileageOrder: 380,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
   };
@@ -84,17 +84,55 @@ describe('TripsController', () => {
 
   describe('createTrip', () => {
     const createTripDto = {
-      pickupLocation: '123 Main St, Los Angeles, CA',
-      dropoffLocation: '456 Oak Ave, San Francisco, CA',
-      scheduledPickupDatetime: '2024-02-15T08:00:00.000Z',
+      orderConfirmation: 'ORDER-123',
+      scheduledTimestamp: '2024-02-15T08:00:00Z',
+      pickupCompany: 'Acme Corp',
+      pickupAddress: '123 Main St',
+      pickupCity: 'Los Angeles',
+      pickupState: 'CA',
+      pickupZip: '90001',
+      pickupPhone: '555-0100',
+      pickupNotes: '',
+      deliveryCompany: 'Beta Inc',
+      deliveryAddress: '456 Oak Ave',
+      deliveryCity: 'San Francisco',
+      deliveryState: 'CA',
+      deliveryZip: '94102',
+      deliveryPhone: '555-0200',
+      deliveryNotes: '',
       brokerId: 'broker-123',
-      lorryId: 'ABC-1234',
+      truckId: 'ABC-1234',
+      trailerId: 'TRL-001',
       driverId: 'DRV-001',
-      driverName: 'John Doe',
+      carrierId: 'carrier-001',
+      truckOwnerId: 'owner-001',
+      mileageEmpty: 50,
+      mileageOrder: 380,
+      mileageTotal: 430,
+      brokerRate: 6.5,
+      driverRate: 2.1,
+      truckOwnerRate: 3.9,
+      dispatcherRate: 0.5,
+      factoryRate: 0,
+      orderRate: 6.5,
+      orderAverage: 6.5,
       brokerPayment: 2500.0,
-      lorryOwnerPayment: 1500.0,
       driverPayment: 800.0,
-      distance: 380,
+      truckOwnerPayment: 1500.0,
+      dispatcherPayment: 200.0,
+      brokerAdvance: 0,
+      driverAdvance: 0,
+      factoryAdvance: 0,
+      fuelCost: 150.0,
+      fuelGasAvgCost: 3.5,
+      fuelGasAvgGallxMil: 0.15,
+      brokerCost: 0,
+      factoryCost: 0,
+      lumperValue: 0,
+      detentionValue: 0,
+      orderExpenses: 2650.0,
+      orderRevenue: 2500.0,
+      notes: '',
     };
 
     it('should create a trip successfully', async () => {
@@ -176,11 +214,11 @@ describe('TripsController', () => {
 
   describe('updateTripStatus', () => {
     const updateStatusDto = {
-      status: TripStatus.PickedUp,
+      orderStatus: TripStatus.PickedUp,
     };
 
     it('should update trip status for dispatcher', async () => {
-      const updatedTrip = { ...mockTrip, status: TripStatus.PickedUp };
+      const updatedTrip = { ...mockTrip, orderStatus: TripStatus.PickedUp };
       mockTripsService.updateTripStatus.mockResolvedValue(updatedTrip);
 
       const result = await controller.updateTripStatus(
@@ -206,7 +244,7 @@ describe('TripsController', () => {
         username: 'driver',
       };
 
-      const updatedTrip = { ...mockTrip, status: TripStatus.PickedUp };
+      const updatedTrip = { ...mockTrip, orderStatus: TripStatus.PickedUp };
       mockTripsService.updateTripStatus.mockResolvedValue(updatedTrip);
 
       const result = await controller.updateTripStatus(driverUser, 'trip-123', updateStatusDto);
@@ -221,8 +259,8 @@ describe('TripsController', () => {
     });
 
     it('should pass correct status to service', async () => {
-      const deliveredStatusDto = { status: TripStatus.Delivered };
-      const updatedTrip = { ...mockTrip, status: TripStatus.Delivered };
+      const deliveredStatusDto = { orderStatus: TripStatus.Delivered };
+      const updatedTrip = { ...mockTrip, orderStatus: TripStatus.Delivered };
       mockTripsService.updateTripStatus.mockResolvedValue(updatedTrip);
 
       await controller.updateTripStatus(mockDispatcherUser, 'trip-123', deliveredStatusDto);
@@ -236,8 +274,8 @@ describe('TripsController', () => {
     });
 
     it('should handle Paid status update', async () => {
-      const paidStatusDto = { status: TripStatus.Paid };
-      const updatedTrip = { ...mockTrip, status: TripStatus.Paid };
+      const paidStatusDto = { orderStatus: TripStatus.Paid };
+      const updatedTrip = { ...mockTrip, orderStatus: TripStatus.Paid };
       mockTripsService.updateTripStatus.mockResolvedValue(updatedTrip);
 
       const result = await controller.updateTripStatus(
@@ -246,7 +284,7 @@ describe('TripsController', () => {
         paidStatusDto,
       );
 
-      expect(result.status).toBe(TripStatus.Paid);
+      expect(result.orderStatus).toBe(TripStatus.Paid);
       expect(service.updateTripStatus).toHaveBeenCalledWith(
         'trip-123',
         'dispatcher-123',
@@ -262,7 +300,7 @@ describe('TripsController', () => {
       {
         ...mockTrip,
         tripId: 'trip-456',
-        scheduledPickupDatetime: '2024-02-16T09:00:00.000Z',
+        scheduledTimestamp: '2024-02-16T09:00:00Z',
       },
     ];
 
@@ -346,7 +384,7 @@ describe('TripsController', () => {
 
     it('should pass status filter to service', async () => {
       const filters = {
-        status: TripStatus.Delivered,
+        orderStatus: TripStatus.Delivered,
       };
 
       mockTripsService.getTrips.mockResolvedValue({ trips: [mockTrip] });
@@ -360,9 +398,9 @@ describe('TripsController', () => {
       );
     });
 
-    it('should pass lorry filter to service', async () => {
+    it('should pass truck filter to service', async () => {
       const filters = {
-        lorryId: 'ABC-1234',
+        truckId: 'ABC-1234',
       };
 
       mockTripsService.getTrips.mockResolvedValue({ trips: [mockTrip] });
@@ -418,7 +456,7 @@ describe('TripsController', () => {
         startDate: '2024-02-01',
         endDate: '2024-02-28',
         brokerId: 'broker-123',
-        status: TripStatus.Delivered,
+        orderStatus: TripStatus.Delivered,
         limit: 50,
       };
 
@@ -446,26 +484,26 @@ describe('TripsController', () => {
     const mockDispatcherReport = {
       totalBrokerPayments: 5500,
       totalDriverPayments: 1700,
-      totalLorryOwnerPayments: 3300,
+      totalTruckOwnerPayments: 3300,
       profit: 500,
       tripCount: 2,
       trips: [
         {
           tripId: 'trip-1',
           dispatcherId: 'dispatcher-123',
-          scheduledPickupDatetime: '2024-02-15T08:00:00.000Z',
+          scheduledTimestamp: '2024-02-15T08:00:00Z',
           pickupLocation: '123 Main St',
           dropoffLocation: '456 Oak Ave',
           brokerId: 'broker-1',
           brokerName: 'TQL',
-          lorryId: 'ABC-1234',
+          truckId: 'ABC-1234',
           driverId: 'driver-1',
           driverName: 'John Doe',
           brokerPayment: 2500,
-          lorryOwnerPayment: 1500,
+          truckOwnerPayment: 1500,
           driverPayment: 800,
-          distance: 380,
-          status: TripStatus.Delivered,
+          mileageOrder: 380,
+          orderStatus: TripStatus.Delivered,
         },
       ],
     };
@@ -478,43 +516,43 @@ describe('TripsController', () => {
         {
           tripId: 'trip-1',
           dispatcherId: 'dispatcher-123',
-          scheduledPickupDatetime: '2024-02-15T08:00:00.000Z',
+          scheduledTimestamp: '2024-02-15T08:00:00Z',
           pickupLocation: '123 Main St',
           dropoffLocation: '456 Oak Ave',
           brokerId: 'broker-1',
           brokerName: 'TQL',
-          lorryId: 'ABC-1234',
+          truckId: 'ABC-1234',
           driverId: 'driver-1',
           driverName: 'John Doe',
           brokerPayment: 2500,
-          lorryOwnerPayment: 1500,
+          truckOwnerPayment: 1500,
           driverPayment: 800,
-          distance: 380,
-          status: TripStatus.Delivered,
+          mileageOrder: 380,
+          orderStatus: TripStatus.Delivered,
         },
       ],
     };
 
     const mockLorryOwnerReport = {
-      totalLorryOwnerPayments: 1500,
+      totalTruckOwnerPayments: 1500,
       tripCount: 1,
       trips: [
         {
           tripId: 'trip-1',
           dispatcherId: 'dispatcher-123',
-          scheduledPickupDatetime: '2024-02-15T08:00:00.000Z',
+          scheduledTimestamp: '2024-02-15T08:00:00Z',
           pickupLocation: '123 Main St',
           dropoffLocation: '456 Oak Ave',
           brokerId: 'broker-1',
           brokerName: 'TQL',
-          lorryId: 'ABC-1234',
+          truckId: 'ABC-1234',
           driverId: 'driver-1',
           driverName: 'John Doe',
           brokerPayment: 2500,
-          lorryOwnerPayment: 1500,
+          truckOwnerPayment: 1500,
           driverPayment: 800,
-          distance: 380,
-          status: TripStatus.Delivered,
+          mileageOrder: 380,
+          orderStatus: TripStatus.Delivered,
         },
       ],
     };

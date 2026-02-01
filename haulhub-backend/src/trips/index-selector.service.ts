@@ -53,27 +53,17 @@ export class IndexSelectorService {
    * 
    * Requirements: 1.4, 2.4, 3.2, 3.3, 3.4, 3.5
    * 
-   * Priority: lorryId > driverId > brokerId > default
+   * Priority: driverId > brokerId > default (dispatcher)
    * 
-   * @param filters - Trip filters including optional lorryId, driverId, brokerId
+   * @param filters - Trip filters including optional truckId, driverId, brokerId
    * @returns IndexSelectionStrategy with selected index, estimated reads, and rationale
    */
   selectOptimalIndex(filters: TripFilters): IndexSelectionStrategy {
     let strategy: IndexSelectionStrategy;
 
-    // Priority 1: Lorry filter (highest selectivity)
-    // Requirements: 3.2
-    if (filters.lorryId) {
-      strategy = {
-        indexName: 'GSI2',
-        estimatedReads: this.ESTIMATED_TRIPS_PER_LORRY,
-        filterExpressionAttributes: this.getFilterExpressionAttributes(filters, ['lorryId']),
-        rationale: `Selected GSI2 index due to lorryId filter. Highest selectivity (~${this.ESTIMATED_TRIPS_PER_LORRY} items per lorry).`,
-      };
-    }
-    // Priority 2: Driver filter (high selectivity)
+    // Priority 1: Driver filter (high selectivity)
     // Requirements: 3.3
-    else if (filters.driverId) {
+    if (filters.driverId) {
       strategy = {
         indexName: 'GSI3',
         estimatedReads: this.ESTIMATED_TRIPS_PER_DRIVER,
@@ -81,7 +71,7 @@ export class IndexSelectorService {
         rationale: `Selected GSI3 index due to driverId filter. High selectivity (~${this.ESTIMATED_TRIPS_PER_DRIVER} items per driver).`,
       };
     }
-    // Priority 3: Broker filter (medium selectivity)
+    // Priority 2: Broker filter (medium selectivity)
     // Requirements: 3.4
     else if (filters.brokerId) {
       strategy = {

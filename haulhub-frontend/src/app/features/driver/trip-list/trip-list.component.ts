@@ -50,15 +50,15 @@ import { StatusUpdateDialogComponent, StatusUpdateDialogResult } from './status-
 })
 export class TripListComponent implements OnInit {
   displayedColumns: string[] = [
-    'scheduledPickupDatetime',
-    'pickupLocation',
-    'dropoffLocation',
-    'lorryId',
+    'scheduledTimestamp',
+    'pickupCity',
+    'deliveryCity',
+    'truckId',
     'dispatcherName',
     'brokerName',
     'status',
     'driverPayment',
-    'distance',
+    'mileageOrder',
     'actions'
   ];
 
@@ -87,7 +87,7 @@ export class TripListComponent implements OnInit {
     this.filterForm = this.fb.group({
       startDate: [null],
       endDate: [null],
-      lorryId: [''],
+      truckId: [''],
       dispatcherId: [''],
       status: ['']
     });
@@ -141,8 +141,8 @@ export class TripListComponent implements OnInit {
       filters.endDate = new Date(formValue.endDate).toISOString();
     }
 
-    if (formValue.lorryId) {
-      filters.lorryId = formValue.lorryId.trim();
+    if (formValue.truckId) {
+      filters.truckId = formValue.truckId.trim();
     }
 
     if (formValue.dispatcherId) {
@@ -150,7 +150,7 @@ export class TripListComponent implements OnInit {
     }
 
     if (formValue.status) {
-      filters.status = formValue.status;
+      filters.orderStatus = formValue.status as any;
     }
 
     if (this.lastEvaluatedKey) {
@@ -171,7 +171,7 @@ export class TripListComponent implements OnInit {
     this.filterForm.reset({
       startDate: null,
       endDate: null,
-      lorryId: '',
+      truckId: '',
       dispatcherId: '',
       status: ''
     });
@@ -221,7 +221,7 @@ export class TripListComponent implements OnInit {
   }
 
   private updateTripStatus(tripId: string, status: TripStatus): void {
-    const statusDto: UpdateTripStatusDto = { status };
+    const statusDto: UpdateTripStatusDto = { orderStatus: status };
     
     this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: (updatedTrip) => {
@@ -252,8 +252,8 @@ export class TripListComponent implements OnInit {
 
   canUpdateStatus(trip: Trip): boolean {
     // Driver can only update status for trips that are not yet delivered or paid
-    return trip.status !== TripStatus.Delivered && 
-           trip.status !== TripStatus.Paid;
+    return trip.orderStatus !== TripStatus.Delivered && 
+           trip.orderStatus !== TripStatus.Paid;
   }
 
   getStatusClass(status: TripStatus): string {
@@ -291,6 +291,7 @@ export class TripListComponent implements OnInit {
   }
 
   formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -320,14 +321,14 @@ export class TripListComponent implements OnInit {
     return !!(
       formValue.startDate ||
       formValue.endDate ||
-      formValue.lorryId ||
+      formValue.truckId ||
       formValue.dispatcherId ||
       formValue.status
     );
   }
 
   getTotalDistance(): number {
-    return this.trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+    return this.trips.reduce((sum, trip) => sum + (trip.mileageOrder || 0), 0);
   }
 
   getTotalEarnings(): number {

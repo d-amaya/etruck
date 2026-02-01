@@ -8,6 +8,8 @@ export interface AuthResponse {
   role: UserRole;
   email: string;
   fullName: string;
+  carrierId?: string;
+  nationalId?: string;
 }
 
 export interface RefreshAuthResponse extends Omit<AuthResponse, 'refreshToken'> {}

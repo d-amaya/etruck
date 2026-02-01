@@ -243,4 +243,156 @@ describe('AuthService', () => {
       await expect(service.logout('invalid-token')).rejects.toThrow(UnauthorizedException);
     });
   });
+
+  describe('getCarrierId', () => {
+    it('should extract carrierId from JWT token payload', () => {
+      const user = {
+        'custom:carrierId': 'carrier-123',
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getCarrierId(user);
+
+      expect(result).toBe('carrier-123');
+    });
+
+    it('should return null when carrierId is not present', () => {
+      const user = {
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getCarrierId(user);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getNationalId', () => {
+    it('should extract nationalId from JWT token payload', () => {
+      const user = {
+        'custom:nationalId': 'DL123456',
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getNationalId(user);
+
+      expect(result).toBe('DL123456');
+    });
+
+    it('should return null when nationalId is not present', () => {
+      const user = {
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getNationalId(user);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getRole', () => {
+    it('should extract role from cognito:groups', () => {
+      const user = {
+        'cognito:groups': [UserRole.Dispatcher, UserRole.Driver],
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getRole(user);
+
+      expect(result).toBe(UserRole.Dispatcher);
+    });
+
+    it('should return null when cognito:groups is not present', () => {
+      const user = {
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getRole(user);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when cognito:groups is empty', () => {
+      const user = {
+        'cognito:groups': [],
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getRole(user);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when cognito:groups is not an array', () => {
+      const user = {
+        'cognito:groups': 'Dispatcher',
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.getRole(user);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('validateCarrierMembership', () => {
+    it('should return true when user belongs to the carrier', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#user-123',
+          SK: 'METADATA',
+          userId: 'user-123',
+          carrierId: 'carrier-123',
+          role: UserRole.Dispatcher,
+        },
+      });
+
+      const result = await service.validateCarrierMembership('user-123', 'carrier-123');
+
+      expect(result).toBe(true);
+      expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return false when user belongs to a different carrier', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#user-123',
+          SK: 'METADATA',
+          userId: 'user-123',
+          carrierId: 'carrier-456',
+          role: UserRole.Dispatcher,
+        },
+      });
+
+      const result = await service.validateCarrierMembership('user-123', 'carrier-123');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when user is not found', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Item: undefined,
+      });
+
+      const result = await service.validateCarrierMembership('user-123', 'carrier-123');
+
+      expect(result).toBe(false);
+    });
+
+    it('should throw InternalServerErrorException on DynamoDB error', async () => {
+      mockDynamoDBClient.send.mockRejectedValueOnce(new Error('DynamoDB error'));
+
+      await expect(
+        service.validateCarrierMembership('user-123', 'carrier-123')
+      ).rejects.toThrow('Failed to validate carrier membership');
+    });
+  });
 });

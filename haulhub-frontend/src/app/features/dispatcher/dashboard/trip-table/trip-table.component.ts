@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, combineLatest, Observable, of } from 'rxjs';
-import { switchMap, takeUntil, map, catchError, tap, finalize } from 'rxjs/operators';
+import { switchMap, takeUntil, map, catchError, tap, finalize, startWith } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent, MatPaginator } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,7 +15,9 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { TripService } from '../../../../core/services';
+import { AuthService } from '../../../../core/services';
 import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData, calculateTripExpenses } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
@@ -41,6 +43,7 @@ import { DashboardChartsWidgetComponent } from '../dashboard-charts-widget/dashb
     MatFormFieldModule,
     MatSelectModule,
     MatInputModule,
+    MatAutocompleteModule,
     DashboardChartsWidgetComponent
   ],
   templateUrl: './trip-table.component.html',
@@ -50,11 +53,13 @@ export class TripTableComponent implements OnInit, OnDestroy {
   @ViewChild(MatPaginator) paginator?: MatPaginator;
   
   displayedColumns = [
-    'scheduledPickupDatetime',
+    'scheduledTimestamp',
+    'scheduledTime',
     'pickupLocation',
     'dropoffLocation',
     'brokerName',
-    'lorryId',
+    'truckId',
+    'trailerId',
     'driverName',
     'status',
     'revenue',
@@ -74,12 +79,33 @@ export class TripTableComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   statusOptions = Object.values(TripStatus);
   brokers: Broker[] = [];
+  
+  // Asset lookup maps for filter validation and conversion
+  private truckPlateToIdMap = new Map<string, string>(); // plate -> truckId
+  private trailerPlateToIdMap = new Map<string, string>(); // plate -> trailerId
+  private driverLicenseToIdMap = new Map<string, string>(); // license -> driverId
+  private truckMap = new Map<string, any>(); // truckId -> truck (for display)
+  private trailerMap = new Map<string, any>(); // trailerId -> trailer (for display)
+  private driverMap = new Map<string, any>(); // driverId -> driver (for display)
+  private brokerMap = new Map<string, any>(); // brokerId -> broker (for display)
+  
+  // Autocomplete suggestions
+  truckPlates: string[] = [];
+  trailerPlates: string[] = [];
+  driverLicenses: string[] = [];
+  filteredTruckPlates!: Observable<string[]>;
+  filteredDriverLicenses!: Observable<string[]>;
+  
+  // Validation errors
+  truckPlateError: string = '';
+  driverLicenseError: string = '';
 
   private destroy$ = new Subject<void>();
 
   constructor(
     private fb: FormBuilder,
     private tripService: TripService,
+    private authService: AuthService,
     private dashboardState: DashboardStateService,
     private sharedFilterService: SharedFilterService,
     private pdfExportService: PdfExportService,
@@ -91,32 +117,46 @@ export class TripTableComponent implements OnInit, OnDestroy {
     this.filterForm = this.fb.group({
       status: [null],
       brokerId: [null],
-      lorryId: [''],
-      driverName: ['']
+      truckPlate: [''],
+      driverLicense: ['']
     });
   }
 
   ngOnInit(): void {
-    // Load brokers
+    // Load all carrier assets for filter validation and autocomplete
+    this.loadAllCarrierAssets();
+    
+    // Setup autocomplete filtering
+    this.filteredTruckPlates = this.filterForm.get('truckPlate')!.valueChanges.pipe(
+      startWith(''),
+      map(value => this._filterTruckPlates(value || ''))
+    );
+    
+    this.filteredDriverLicenses = this.filterForm.get('driverLicense')!.valueChanges.pipe(
+      startWith(''),
+      map(value => this._filterDriverLicenses(value || ''))
+    );
+    
+    // Load brokers for filter dropdown
     this.dashboardState.brokers$
       .pipe(takeUntil(this.destroy$))
       .subscribe(brokers => {
         this.brokers = brokers;
+        // Build broker lookup map
+        this.brokerMap.clear();
+        brokers.forEach(broker => {
+          this.brokerMap.set(broker.brokerId, broker);
+        });
       });
 
     // Initialize filter form with current filter values
     const currentFilters = this.sharedFilterService.getCurrentFilters();
-    console.log('Initializing form with filters:', currentFilters);
     this.filterForm.patchValue({
       status: currentFilters.status,
       brokerId: currentFilters.brokerId,
-      lorryId: currentFilters.lorryId || '',
-      driverName: currentFilters.driverName || ''
+      truckPlate: '',
+      driverLicense: ''
     }, { emitEvent: false });
-    console.log('Form initialized with values:', this.filterForm.value);
-
-    // Note: Dropdown changes are handled by (selectionChange) events in the template
-    // Text inputs (lorryId, driverName) are handled by blur/Enter events
 
     // Subscribe to the combined filters and pagination observable
     this.dashboardState.filtersAndPagination$.pipe(
@@ -130,20 +170,270 @@ export class TripTableComponent implements OnInit, OnDestroy {
     ).subscribe(result => {
       this.trips = result.trips;
       this.totalTrips = result.total;
+      
+      // Build lookup maps from backend-enriched trip data for table display
+      if (result.assets) {
+        result.assets.trucks.forEach((truck: any) => this.truckMap.set(truck.truckId, truck));
+        result.assets.trailers.forEach((trailer: any) => this.trailerMap.set(trailer.trailerId, trailer));
+        result.assets.drivers.forEach((driver: any) => {
+          this.driverMap.set(driver.userId, driver);
+        });
+      }
+      
       // Update the dashboard state with the filtered trips for payment summary calculation
-      this.dashboardState.updateFilteredTrips(result.trips);
+      this.dashboardState.updateFilteredTrips(this.trips);
     });
   }
 
-  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number }> {
+  /**
+   * Load all carrier assets for filter validation and autocomplete
+   * Builds lookup maps: plate -> truckId, plate -> trailerId, license -> driverId
+   */
+  private loadAllCarrierAssets(): void {
+    // Load all trucks for this carrier (backend uses carrierId from JWT)
+    this.tripService.getTrucksByCarrier().subscribe({
+      next: (trucks) => {
+        this.truckPlateToIdMap.clear();
+        this.truckPlates = [];
+        
+        trucks.filter(t => t.isActive).forEach(truck => {
+          const plateUpper = truck.plate.toUpperCase();
+          this.truckPlateToIdMap.set(plateUpper, truck.truckId);
+          this.truckPlates.push(truck.plate);
+        });
+        
+        // Store in localStorage for persistence
+        localStorage.setItem('carrier_truck_map', JSON.stringify(Array.from(this.truckPlateToIdMap.entries())));
+        
+      },
+      error: (error) => {
+        console.error('Error loading trucks for filters:', error);
+        // Try to load from localStorage as fallback
+        const stored = localStorage.getItem('carrier_truck_map');
+        if (stored) {
+          this.truckPlateToIdMap = new Map(JSON.parse(stored));
+          this.truckPlates = Array.from(this.truckPlateToIdMap.keys());
+        }
+      }
+    });
+
+    // Load all trailers for this carrier
+    this.tripService.getTrailersByCarrier().subscribe({
+      next: (trailers) => {
+        this.trailerPlateToIdMap.clear();
+        this.trailerPlates = [];
+        
+        trailers.filter(t => t.isActive).forEach(trailer => {
+          const plateUpper = trailer.plate.toUpperCase();
+          this.trailerPlateToIdMap.set(plateUpper, trailer.trailerId);
+          this.trailerPlates.push(trailer.plate);
+        });
+        
+        // Store in localStorage for persistence
+        localStorage.setItem('carrier_trailer_map', JSON.stringify(Array.from(this.trailerPlateToIdMap.entries())));
+        
+      },
+      error: (error) => {
+        console.error('Error loading trailers for filters:', error);
+        const stored = localStorage.getItem('carrier_trailer_map');
+        if (stored) {
+          this.trailerPlateToIdMap = new Map(JSON.parse(stored));
+          this.trailerPlates = Array.from(this.trailerPlateToIdMap.keys());
+        }
+      }
+    });
+
+    // Load all drivers for this carrier
+    this.tripService.getDriversByCarrier().subscribe({
+      next: (drivers) => {
+        this.driverLicenseToIdMap.clear();
+        this.driverLicenses = [];
+        
+        drivers.filter(d => d.isActive).forEach(driver => {
+          // Use nationalId (driver license) as the searchable identifier
+          if (driver.nationalId) {
+            const licenseUpper = driver.nationalId.toUpperCase();
+            this.driverLicenseToIdMap.set(licenseUpper, driver.userId);
+            this.driverLicenses.push(driver.nationalId);
+          }
+        });
+        
+        // Store in localStorage for persistence
+        localStorage.setItem('carrier_driver_map', JSON.stringify(Array.from(this.driverLicenseToIdMap.entries())));
+        
+      },
+      error: (error) => {
+        console.error('Error loading drivers for filters:', error);
+        // Try to load from localStorage as fallback
+        const stored = localStorage.getItem('carrier_driver_map');
+        if (stored) {
+          this.driverLicenseToIdMap = new Map(JSON.parse(stored));
+          this.driverLicenses = Array.from(this.driverLicenseToIdMap.keys());
+        }
+      }
+    });
+  }
+
+  /**
+   * Load all assets (trucks, trailers, drivers) for enrichment
+   */
+  private loadAssets(): void {
+    const carrierId = this.authService.carrierId;
+    if (!carrierId) {
+      console.warn('No carrierId available for loading assets');
+      return;
+    }
+
+    // Load trucks
+    this.tripService.getTrucksByCarrier(carrierId).subscribe({
+      next: (trucks) => {
+        this.truckMap.clear();
+        trucks.forEach(truck => {
+          this.truckMap.set(truck.truckId, truck);
+        });
+      },
+      error: (error) => console.error('Error loading trucks:', error)
+    });
+
+    // Load trailers
+    this.tripService.getTrailersByCarrier(carrierId).subscribe({
+      next: (trailers) => {
+        this.trailerMap.clear();
+        trailers.forEach(trailer => {
+          this.trailerMap.set(trailer.trailerId, trailer);
+        });
+      },
+      error: (error) => console.error('Error loading trailers:', error)
+    });
+
+    // Load drivers
+    this.tripService.getDriversByCarrier(carrierId).subscribe({
+      next: (drivers) => {
+        this.driverMap.clear();
+        drivers.forEach(driver => {
+          this.driverMap.set(driver.userId, driver);
+        });
+      },
+      error: (error) => console.error('Error loading drivers:', error)
+    });
+  }
+
+  /**
+   * Enrich trips with human-readable names from lookup maps
+   */
+  private enrichTripsWithNames(trips: Trip[]): Trip[] {
+    return trips.map(trip => {
+      const enrichedTrip = { ...trip };
+      
+      // Enrich broker name
+      if (trip.brokerId && this.brokerMap.has(trip.brokerId)) {
+        enrichedTrip.brokerName = this.brokerMap.get(trip.brokerId)!.brokerName;
+      }
+      
+      // Enrich driver name
+      if (trip.driverId && this.driverMap.has(trip.driverId)) {
+        enrichedTrip.driverName = this.driverMap.get(trip.driverId)!.name;
+      }
+      
+      // Ensure pickupLocation and dropoffLocation are set
+      if (!enrichedTrip.pickupLocation && trip.pickupCity && trip.pickupState) {
+        enrichedTrip.pickupLocation = `${trip.pickupCity}, ${trip.pickupState}`;
+      }
+      if (!enrichedTrip.dropoffLocation && trip.deliveryCity && trip.deliveryState) {
+        enrichedTrip.dropoffLocation = `${trip.deliveryCity}, ${trip.deliveryState}`;
+      }
+      
+      // Ensure status is set
+      if (!enrichedTrip.status && trip.orderStatus) {
+        enrichedTrip.status = trip.orderStatus as any;
+      }
+      
+      return enrichedTrip;
+    });
+  }
+
+  /**
+   * Get truck display name (plate)
+   */
+  getTruckDisplay(truckId: string): string {
+    if (!truckId) return 'N/A';
+    const truck = this.truckMap.get(truckId);
+    return truck ? truck.plate : truckId.substring(0, 8);
+  }
+
+  /**
+   * Get trailer display name (plate)
+   */
+  getTrailerDisplay(trailerId: string): string {
+    if (!trailerId) return 'N/A';
+    const trailer = this.trailerMap.get(trailerId);
+    return trailer ? trailer.plate : trailerId.substring(0, 8);
+  }
+
+  /**
+   * Get driver display name
+   */
+  getDriverDisplay(driverId: string): string {
+    if (!driverId) return 'N/A';
+    const driver = this.driverMap.get(driverId);
+    return driver ? driver.name : driverId.substring(0, 8);
+  }
+
+  /**
+   * Filter truck plates for autocomplete
+   */
+  private _filterTruckPlates(value: string): string[] {
+    const filterValue = value.toLowerCase();
+    return this.truckPlates.filter(plate => plate.toLowerCase().includes(filterValue));
+  }
+
+  /**
+   * Filter driver licenses for autocomplete
+   */
+  private _filterDriverLicenses(value: string): string[] {
+    const filterValue = value.toLowerCase();
+    return this.driverLicenses.filter(license => license.toLowerCase().includes(filterValue));
+  }
+
+  /**
+   * Validate truck plate on blur
+   */
+  validateTruckPlate(): void {
+    const plate = this.filterForm.get('truckPlate')?.value?.trim();
+    if (!plate) {
+      this.truckPlateError = '';
+      return;
+    }
+    
+    const plateUpper = plate.toUpperCase();
+    if (!this.truckPlateToIdMap.has(plateUpper)) {
+      this.truckPlateError = `Truck plate "${plate}" not found in your fleet`;
+    } else {
+      this.truckPlateError = '';
+    }
+  }
+
+  /**
+   * Validate driver license on blur
+   */
+  validateDriverLicense(): void {
+    const license = this.filterForm.get('driverLicense')?.value?.trim();
+    if (!license) {
+      this.driverLicenseError = '';
+      return;
+    }
+    
+    const licenseUpper = license.toUpperCase();
+    if (!this.driverLicenseToIdMap.has(licenseUpper)) {
+      this.driverLicenseError = `Driver license "${license}" not found in your team`;
+    } else {
+      this.driverLicenseError = '';
+    }
+  }
+
+  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number, assets?: any }> {
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
-    
-    console.log('[TRIP-TABLE] Loading trips with:', {
-      filters,
-      pagination,
-      apiFilters
-    });
 
     return this.tripService.getTrips(apiFilters).pipe(
       map(response => {
@@ -152,8 +442,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
         
         // Backend handles all filtering - just sort the results
         const sortedTrips = trips.sort((a, b) => {
-          const dateA = new Date(a.scheduledPickupDatetime).getTime();
-          const dateB = new Date(b.scheduledPickupDatetime).getTime();
+          const dateA = new Date(a.scheduledTimestamp).getTime();
+          const dateB = new Date(b.scheduledTimestamp).getTime();
           return dateB - dateA; // Descending order
         });
         
@@ -184,7 +474,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
           total = itemsBeforeCurrentPage + currentPageItems;
         }
         
-        return { trips: sortedTrips, total };
+        return { trips: sortedTrips, total, assets: response.assets };
       }),
       catchError(error => {
         this.loading = false;
@@ -223,16 +513,16 @@ export class TripTableComponent implements OnInit, OnDestroy {
       apiFilters.endDate = filters.dateRange.endDate.toISOString();
     }
     if (filters.status) {
-      apiFilters.status = filters.status;
+      apiFilters.orderStatus = filters.status;
     }
     if (filters.brokerId) {
       apiFilters.brokerId = filters.brokerId;
     }
-    if (filters.lorryId) {
-      apiFilters.lorryId = filters.lorryId;
+    if (filters.truckId) {
+      apiFilters.truckId = filters.truckId;
     }
-    if (filters.driverName) {
-      apiFilters.driverName = filters.driverName;
+    if (filters.driverId) {
+      apiFilters.driverId = filters.driverId;
     }
 
     return apiFilters;
@@ -328,11 +618,40 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   formatDate(dateString: string): string {
+    if (!dateString) return '';
     const date = new Date(dateString);
     const month = date.getMonth() + 1;
     const day = date.getDate();
     const year = date.getFullYear();
     return `${month}/${day}/${year}`;
+  }
+
+  formatTime(dateString: string): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
+  formatDateTime(isoTimestamp: string | null): string {
+    if (!isoTimestamp) return 'N/A';
+    
+    const date = new Date(isoTimestamp);
+    
+    // Display date: "01/15/2025"
+    const dateStr = date.toLocaleDateString('en-US');
+    
+    // Display time: "2:30 PM"
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    
+    return `${dateStr} at ${timeStr}`;
   }
 
   formatCurrency(amount: number): string {
@@ -355,43 +674,66 @@ export class TripTableComponent implements OnInit, OnDestroy {
     return calculateFuelCost(trip);
   }
 
-  getStatusClass(status: TripStatus): string {
-    switch (status) {
+  getStatusClass(status: TripStatus | string): string {
+    if (!status) return '';
+    // Handle both TripStatus enum and string literals
+    const statusStr = typeof status === 'string' ? status : status;
+    
+    switch (statusStr) {
       case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'status-scheduled';
       case TripStatus.PickedUp:
+      case 'Picked Up':
         return 'status-picked-up';
       case TripStatus.InTransit:
+      case 'In Transit':
         return 'status-in-transit';
       case TripStatus.Delivered:
+      case 'Delivered':
         return 'status-delivered';
       case TripStatus.Paid:
+      case 'Paid':
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
+  getStatusLabel(status: TripStatus | string): string {
     if (!status) return '';
-    switch (status) {
+    // Handle both TripStatus enum and string literals
+    const statusStr = typeof status === 'string' ? status : status;
+    
+    switch (statusStr) {
       case TripStatus.Scheduled:
+      case 'Scheduled':
         return 'Scheduled';
       case TripStatus.PickedUp:
+      case 'Picked Up':
         return 'Picked Up';
       case TripStatus.InTransit:
+      case 'In Transit':
         return 'In Transit';
       case TripStatus.Delivered:
+      case 'Delivered':
         return 'Delivered';
       case TripStatus.Paid:
+      case 'Paid':
         return 'Paid';
       default:
-        return status;
+        return String(status);
     }
   }
 
   clearField(fieldName: string): void {
     this.filterForm.patchValue({ [fieldName]: '' });
+    // Clear validation errors
+    if (fieldName === 'truckPlate') {
+      this.truckPlateError = '';
+    } else if (fieldName === 'driverLicense') {
+      this.driverLicenseError = '';
+    }
   }
 
   clearAllFilters(): void {
@@ -403,17 +745,17 @@ export class TripTableComponent implements OnInit, OnDestroy {
       dateRange: currentFilters.dateRange, // Preserve date range
       status: null,
       brokerId: null,
-      lorryId: null,
-      driverName: null,
-      driverId: null
+      truckId: null,
+      driverId: null,
+      driverName: null
     });
     
     // Also clear the form fields visually
     this.filterForm.patchValue({
       status: null,
       brokerId: null,
-      lorryId: '',
-      driverName: ''
+      truckPlate: '',
+      driverLicense: ''
     });
     
     // Manually reset the paginator UI to page 0
@@ -428,23 +770,46 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   /**
    * Apply filters to shared filter service
+   * Converts human-readable inputs (plate, license) to UUIDs before sending to backend
    */
   private applyFilters(): void {
-    console.log('=== Trip-table applyFilters called ===');
     const formValue = this.filterForm.value;
-    console.log('Current form value:', formValue);
+    
+    // Validate and convert truck plate to truckId
+    let truckId: string | null = null;
+    if (formValue.truckPlate?.trim()) {
+      const plateUpper = formValue.truckPlate.trim().toUpperCase();
+      truckId = this.truckPlateToIdMap.get(plateUpper) || null;
+      
+      if (!truckId) {
+        this.truckPlateError = `Truck plate "${formValue.truckPlate}" not found in your fleet`;
+        return; // Don't apply filter if invalid
+      }
+      this.truckPlateError = '';
+    }
+    
+    // Validate and convert driver license to driverId
+    let driverId: string | null = null;
+    if (formValue.driverLicense?.trim()) {
+      const licenseUpper = formValue.driverLicense.trim().toUpperCase();
+      driverId = this.driverLicenseToIdMap.get(licenseUpper) || null;
+      
+      if (!driverId) {
+        this.driverLicenseError = `Driver license "${formValue.driverLicense}" not found in your team`;
+        return; // Don't apply filter if invalid
+      }
+      this.driverLicenseError = '';
+    }
     
     const filtersToApply = {
       status: formValue.status,
       brokerId: formValue.brokerId,
-      lorryId: formValue.lorryId?.trim() || null,
-      driverName: formValue.driverName?.trim() || null
+      truckId: truckId,
+      driverId: driverId,
+      driverName: null
     };
-    console.log('Filters to apply:', filtersToApply);
-    console.log('Current pagination state:', this.dashboardState['paginationSubject'].value);
     
     this.sharedFilterService.updateFilters(filtersToApply);
-    console.log('=== Filters sent to shared service ===');
     
     // Log pagination state after filter update
     setTimeout(() => {

@@ -833,6 +833,243 @@ const mockAwsService = {
 ```
 
 
+## eTrucky Migration (January 2026)
+
+### Migration Overview
+
+The HaulHub backend has been migrated to the new **eTrucky carrier-centric architecture**. This migration introduces a hierarchical organizational structure where Carriers own and manage all assets (Users, Trucks, Trailers, Trips).
+
+**Key Changes:**
+- **5 New DynamoDB Tables**: eTrucky-Users, eTrucky-Trucks, eTrucky-Trailers, eTrucky-Trips, eTrucky-Brokers
+- **Unified User Model**: All users (including carriers) stored in single eTrucky-Users table
+- **UserId-Based Relationships**: Trips use userId references for all actors (dispatcher, driver, truck owner)
+- **ISO 8601 Timestamps**: Consistent timestamp format throughout (scheduledTimestamp, pickupTimestamp, deliveryTimestamp)
+- **Enhanced GSI Patterns**: 5 GSIs per trip for efficient querying by role
+
+**Migration Status:** ✅ Complete (All modules updated, tests passing)
+
+### Field Name Mappings (Old → New)
+
+#### Trips
+| Old Field | New Field | Notes |
+|-----------|-----------|-------|
+| `lorryId` | `truckId` | Now UUID, references eTrucky-Trucks |
+| N/A | `trailerId` | New field, references eTrucky-Trailers |
+| N/A | `truckOwnerId` | New field, references userId in eTrucky-Users |
+| N/A | `carrierId` | New field, references userId in eTrucky-Users |
+| `pickupDate` + `pickupTime` | `scheduledTimestamp` | Consolidated to ISO 8601 |
+| N/A | `pickupTimestamp` | Actual pickup time (set when status = "Picked Up") |
+| `deliveryDate` + `deliveryTime` | `deliveryTimestamp` | Actual delivery time (set when status = "Delivered") |
+| `distance` | `mileageOrder` | Loaded miles |
+| N/A | `mileageEmpty` | Empty miles (new) |
+| N/A | `mileageTotal` | Total miles (new) |
+| `lorryOwnerPayment` | `truckOwnerPayment` | Renamed |
+| `status` | `orderStatus` | Values: "Scheduled", "Picked Up", "In Transit", "Delivered", "Paid" |
+
+#### Trucks (formerly Lorries)
+| Old Field | New Field | Notes |
+|-----------|-----------|-------|
+| `lorryId` | `truckId` | Now UUID |
+| `licensePlate` | `plate` | Shortened |
+| `make` | `brand` | Renamed |
+| N/A | `color` | New field |
+| N/A | `truckOwnerId` | Owner link (new) |
+| N/A | `carrierId` | Carrier link (new) |
+
+#### Users
+| Old Field | New Field | Notes |
+|-----------|-----------|-------|
+| Separate tables | Single `eTrucky-Users` | Unified table for all user types |
+| Various ID fields | `userId` | Single unified ID field (UUID) |
+| N/A | `carrierId` | Carrier link (self-reference for carriers) |
+| N/A | `role` | User role: CARRIER, DISPATCHER, DRIVER, TRUCK_OWNER |
+
+### New Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# eTrucky Tables (5 tables)
+ETRUCKY_USERS_TABLE=eTrucky-Users
+ETRUCKY_TRUCKS_TABLE=eTrucky-Trucks
+ETRUCKY_TRAILERS_TABLE=eTrucky-Trailers
+ETRUCKY_TRIPS_TABLE=eTrucky-Trips
+ETRUCKY_BROKERS_TABLE=eTrucky-Brokers
+
+# Legacy table names (for reference, not used in new code)
+# TRIPS_TABLE_NAME=HaulHub-TripsTable-dev
+# LORRIES_TABLE_NAME=HaulHub-LorriesTable-dev
+# USERS_TABLE_NAME=HaulHub-UsersTable-dev
+# BROKERS_TABLE_NAME=HaulHub-BrokersTable-dev
+```
+
+**Note:** The new code uses only eTrucky tables. Old HaulHub tables remain in AWS for the currently deployed app but are not referenced in the migrated code.
+
+### Breaking Changes
+
+#### API Request/Response Changes
+
+**1. Trip Creation (POST /trips)**
+
+Old format:
+```json
+{
+  "lorryId": "lorry-001",
+  "pickupDate": "2025-01-15",
+  "pickupTime": "14:30",
+  "deliveryDate": "2025-01-16",
+  "deliveryTime": "10:00",
+  "distance": 250
+}
+```
+
+New format:
+```json
+{
+  "truckId": "550e8400-e29b-41d4-a716-446655440000",
+  "trailerId": "660e8400-e29b-41d4-a716-446655440001",
+  "truckOwnerId": "770e8400-e29b-41d4-a716-446655440002",
+  "carrierId": "880e8400-e29b-41d4-a716-446655440003",
+  "scheduledTimestamp": "2025-01-15T14:30:00Z",
+  "mileageOrder": 250,
+  "mileageEmpty": 50,
+  "mileageTotal": 300
+}
+```
+
+**2. Trip Response**
+
+Old format:
+```json
+{
+  "tripId": "trip-001",
+  "lorryId": "lorry-001",
+  "pickupDate": "2025-01-15",
+  "pickupTime": "14:30",
+  "status": "InTransit"
+}
+```
+
+New format:
+```json
+{
+  "tripId": "990e8400-e29b-41d4-a716-446655440004",
+  "truckId": "550e8400-e29b-41d4-a716-446655440000",
+  "trailerId": "660e8400-e29b-41d4-a716-446655440001",
+  "truckOwnerId": "770e8400-e29b-41d4-a716-446655440002",
+  "carrierId": "880e8400-e29b-41d4-a716-446655440003",
+  "scheduledTimestamp": "2025-01-15T14:30:00Z",
+  "pickupTimestamp": "2025-01-15T14:45:00Z",
+  "deliveryTimestamp": null,
+  "orderStatus": "In Transit"
+}
+```
+
+**3. Truck Registration (POST /lorries → POST /trucks)**
+
+Old format:
+```json
+{
+  "licensePlate": "ABC123",
+  "make": "Freightliner",
+  "model": "Cascadia"
+}
+```
+
+New format:
+```json
+{
+  "plate": "ABC123",
+  "brand": "Freightliner",
+  "model": "Cascadia",
+  "color": "White",
+  "truckOwnerId": "770e8400-e29b-41d4-a716-446655440002",
+  "carrierId": "880e8400-e29b-41d4-a716-446655440003"
+}
+```
+
+#### Role-Based Data Filtering
+
+**Driver View** - Sensitive fields are excluded:
+```json
+{
+  "tripId": "...",
+  "orderStatus": "In Transit",
+  "driverPayment": 500,
+  "driverRate": 0.50,
+  // Hidden: brokerPayment, truckOwnerPayment, orderRevenue, 
+  // brokerRate, dispatcherPayment, factoryRate, etc.
+}
+```
+
+**Truck Owner View** - Sensitive fields are excluded:
+```json
+{
+  "tripId": "...",
+  "orderStatus": "Delivered",
+  "truckOwnerPayment": 800,
+  // Hidden: brokerPayment, driverPayment, orderRevenue,
+  // brokerRate, driverRate, dispatcherPayment, etc.
+}
+```
+
+**Dispatcher/Carrier View** - All fields visible:
+```json
+{
+  "tripId": "...",
+  "orderStatus": "Delivered",
+  "brokerPayment": 2000,
+  "driverPayment": 500,
+  "truckOwnerPayment": 800,
+  "dispatcherPayment": 100,
+  "orderRevenue": 600
+  // All financial fields visible
+}
+```
+
+### Migration Testing
+
+**Integration Tests:**
+```bash
+# Run integration test suite
+cd haulhub-backend/test/integration
+./etrucky-migration-integration.test.sh
+```
+
+**Unit Tests:**
+```bash
+# Run all backend tests
+npm test
+
+# Run specific migration tests
+npm test -- trips.service.spec
+npm test -- role-based-filtering.property.spec
+npm test -- timestamp-format.property.spec
+```
+
+**Test Coverage:**
+- ✅ Field mapping validation (100 iterations)
+- ✅ Timestamp format validation (100 iterations)
+- ✅ Role-based filtering (100 iterations per role)
+- ✅ GSI query patterns (100 iterations)
+- ✅ Carrier membership validation
+- ✅ Trip lifecycle (status transitions)
+
+### Rollback Plan
+
+If issues are discovered after deployment:
+
+1. **Code Rollback**: Revert to previous commit (pre-migration)
+2. **Table Rollback**: Old HaulHub tables remain untouched in AWS
+3. **Environment Variables**: Switch back to old table names in `.env`
+4. **No Data Loss**: Both table sets exist independently
+
+### Additional Resources
+
+- **Migration Guide**: See `ETRUCKY-MIGRATION.md` in project root
+- **Integration Test Results**: See `haulhub-backend/test/integration/INTEGRATION-TEST-RESULTS.md`
+- **Manual Testing Guide**: See `haulhub-backend/test/integration/MANUAL-TESTING-GUIDE.md`
+
 ## Building & Deployment
 
 ### Complete Deployment Architecture

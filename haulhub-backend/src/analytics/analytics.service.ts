@@ -63,6 +63,19 @@ export class AnalyticsService {
     private readonly tripsService: TripsService,
   ) {}
 
+  /**
+   * Helper to format date for GSI query without mutating original
+   */
+  private formatDateForGSI(date: Date, isStart: boolean): string {
+    const dateCopy = new Date(date);
+    if (isStart) {
+      dateCopy.setHours(0, 0, 0, 0);
+    } else {
+      dateCopy.setHours(23, 59, 59, 999);
+    }
+    return dateCopy.toISOString().split('.')[0] + 'Z#' + (isStart ? '' : 'ZZZZ');
+  }
+
   async getFleetOverview(dispatcherId: string): Promise<FleetOverview> {
     // Note: This is a simplified implementation that queries trips
     // In a production system, you'd want to cache these metrics or use a separate analytics table
@@ -78,8 +91,8 @@ export class AnalyticsService {
       // Query GSI1 for all trips for this dispatcher
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
-        KeyConditionExpression: 'GSI1PK = :dispatcherPK',
+        IndexName: 'GSI2',
+        KeyConditionExpression: 'GSI2PK = :dispatcherPK',
         ExpressionAttributeValues: {
           ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
         },
@@ -90,26 +103,26 @@ export class AnalyticsService {
       
       // Calculate trip metrics
       const totalTrips = trips.length;
-      const completedTrips = trips.filter(t => t.status === TripStatus.Delivered || t.status === TripStatus.Paid).length;
-      const inProgressTrips = trips.filter(t => t.status === TripStatus.PickedUp || t.status === TripStatus.InTransit).length;
-      const plannedTrips = trips.filter(t => t.status === TripStatus.Scheduled).length;
+      const completedTrips = trips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+      const inProgressTrips = trips.filter(t => t.orderStatus === 'Picked Up' || t.orderStatus === 'In Transit').length;
+      const plannedTrips = trips.filter(t => t.orderStatus === 'Scheduled').length;
       
       // Calculate unique drivers and vehicles
       const uniqueDrivers = new Set(trips.map(t => t.driverId));
-      const uniqueVehicles = new Set(trips.map(t => t.lorryId));
+      const uniqueVehicles = new Set(trips.map(t => t.truckId));
       
       // Calculate drivers on trip (currently in PickedUp or InTransit status)
       const driversOnTrip = new Set(
         trips
-          .filter(t => t.status === TripStatus.PickedUp || t.status === TripStatus.InTransit)
+          .filter(t => t.orderStatus === 'Picked Up' || t.orderStatus === 'In Transit')
           .map(t => t.driverId)
       );
       
       // Calculate vehicles in use
       const vehiclesInUse = new Set(
         trips
-          .filter(t => t.status === TripStatus.PickedUp || t.status === TripStatus.InTransit)
-          .map(t => t.lorryId)
+          .filter(t => t.orderStatus === 'Picked Up' || t.orderStatus === 'In Transit')
+          .map(t => t.truckId)
       );
       
       const totalDrivers = uniqueDrivers.size;
@@ -167,34 +180,42 @@ export class AnalyticsService {
 
   async getTripAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
     try {
-      // Get all trips for this dispatcher within date range using GSI1
+      // Get all trips for this dispatcher within date range using GSI2 (Dispatcher index)
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~'; // ~ sorts after all trip IDs
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -204,28 +225,28 @@ export class AnalyticsService {
       
       // Calculate analytics
       const totalTrips = trips.length;
-      const completedTrips = trips.filter(t => t.status === TripStatus.Delivered || t.status === TripStatus.Paid).length;
+      const completedTrips = trips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
       
       const totalRevenue = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
       
-      // Calculate fuel costs from trip data
+      // Calculate total fuel costs from trip data
       const totalFuelCost = trips.reduce((sum, trip) => {
-        if (trip.fuelTotalCost) {
-          return sum + trip.fuelTotalCost;
-        } else if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-          const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-          return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
+        if (trip.fuelCost) {
+          return sum + trip.fuelCost;
+        } else if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
+          const totalMiles = trip.mileageOrder + trip.mileageEmpty;
+          return sum + (totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost);
         }
         return sum;
       }, 0);
       
       const totalExpenses = trips.reduce((sum, trip) => 
-        sum + trip.driverPayment + trip.lorryOwnerPayment + (trip.lumperFees || 0) + (trip.detentionFees || 0), 0
+        sum + trip.driverPayment + trip.truckOwnerPayment + trip.lumperValue + trip.detentionValue, 0
       ) + totalFuelCost;
       
       const totalProfit = totalRevenue - totalExpenses;
       
-      const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+      const totalDistance = trips.reduce((sum, trip) => sum + trip.mileageOrder, 0);
       const averageDistance = totalTrips > 0 ? totalDistance / totalTrips : 0;
       const averageRevenue = totalTrips > 0 ? totalRevenue / totalTrips : 0;
       
@@ -234,9 +255,9 @@ export class AnalyticsService {
       const onTimeDeliveryRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
       
       // Calculate average fuel efficiency (gallons per mile)
-      const tripsWithFuelData = trips.filter(t => t.fuelAvgGallonsPerMile);
+      const tripsWithFuelData = trips.filter(t => t.fuelGasAvgGallxMil);
       const avgFuelEfficiency = tripsWithFuelData.length > 0
-        ? tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgGallonsPerMile || 0), 0) / tripsWithFuelData.length
+        ? tripsWithFuelData.reduce((sum, t) => sum + (t.fuelGasAvgGallxMil || 0), 0) / tripsWithFuelData.length
         : 0;
       
       return {
@@ -275,27 +296,35 @@ export class AnalyticsService {
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -305,14 +334,12 @@ export class AnalyticsService {
       
       // Group trips by driver
       const driverMap = new Map<string, {
-        driverName: string;
         trips: Trip[];
       }>();
       
       for (const trip of trips) {
         if (!driverMap.has(trip.driverId)) {
           driverMap.set(trip.driverId, {
-            driverName: trip.driverName,
             trips: [],
           });
         }
@@ -322,22 +349,48 @@ export class AnalyticsService {
       // Calculate performance metrics for each driver
       const performance: DriverPerformance[] = [];
       
+      // Fetch driver details for all drivers
+      const driverIds = Array.from(driverMap.keys());
+      const usersTableName = this.tripsService['configService'].usersTableName;
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const driverDetailsMap = new Map<string, any>();
+      await Promise.all(
+        driverIds.map(async (driverId) => {
+          try {
+            const result = await dynamodbClient.send(new GetCommand({
+              TableName: usersTableName,
+              Key: { PK: `USER#${driverId}`, SK: 'METADATA' },
+            }));
+            if (result.Item) {
+              driverDetailsMap.set(driverId, result.Item);
+            }
+          } catch (error) {
+            console.error(`Error fetching driver ${driverId}:`, error);
+          }
+        })
+      );
+      
       for (const [driverId, data] of driverMap.entries()) {
         const totalTrips = data.trips.length;
         const completedTrips = data.trips.filter(t => 
-          t.status === TripStatus.Delivered || t.status === TripStatus.Paid
+          t.orderStatus === 'Delivered' || t.orderStatus === 'Paid'
         ).length;
         
-        const totalDistance = data.trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+        const totalDistance = data.trips.reduce((sum, trip) => sum + trip.mileageOrder, 0);
         const totalRevenue = data.trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
         const averageRevenue = totalTrips > 0 ? totalRevenue / totalTrips : 0;
         
         // On-time delivery rate (completed vs total)
         const onTimeDeliveryRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
         
+        // Get driver details
+        const driver = driverDetailsMap.get(driverId);
+        const driverName = driver ? driver.name : driverId.substring(0, 8);
+        
         performance.push({
           driverId,
-          driverName: data.driverName,
+          driverName,
           totalTrips,
           completedTrips,
           totalDistance,
@@ -366,27 +419,35 @@ export class AnalyticsService {
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -398,14 +459,36 @@ export class AnalyticsService {
       const vehicleMap = new Map<string, Trip[]>();
       
       for (const trip of trips) {
-        if (!vehicleMap.has(trip.lorryId)) {
-          vehicleMap.set(trip.lorryId, []);
+        if (!vehicleMap.has(trip.truckId)) {
+          vehicleMap.set(trip.truckId, []);
         }
-        vehicleMap.get(trip.lorryId)!.push(trip);
+        vehicleMap.get(trip.truckId)!.push(trip);
       }
       
       // Calculate utilization metrics for each vehicle
       const utilization: VehicleUtilization[] = [];
+      
+      // Fetch truck details for all vehicles
+      const truckIds = Array.from(vehicleMap.keys());
+      const trucksTableName = this.tripsService['configService'].lorriesTableName;
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const truckDetailsMap = new Map<string, any>();
+      await Promise.all(
+        truckIds.map(async (truckId) => {
+          try {
+            const result = await dynamodbClient.send(new GetCommand({
+              TableName: trucksTableName,
+              Key: { PK: `TRUCK#${truckId}`, SK: 'METADATA' },
+            }));
+            if (result.Item) {
+              truckDetailsMap.set(truckId, result.Item);
+            }
+          } catch (error) {
+            console.error(`Error fetching truck ${truckId}:`, error);
+          }
+        })
+      );
       
       // Calculate total days in the date range for utilization rate
       const totalDays = startDate && endDate 
@@ -414,20 +497,24 @@ export class AnalyticsService {
       
       for (const [vehicleId, vehicleTrips] of vehicleMap.entries()) {
         const totalTrips = vehicleTrips.length;
-        const totalDistance = vehicleTrips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
-        const totalRevenue = vehicleTrips.reduce((sum, trip) => sum + trip.lorryOwnerPayment, 0);
+        const totalDistance = vehicleTrips.reduce((sum, trip) => sum + trip.mileageOrder, 0);
+        const totalRevenue = vehicleTrips.reduce((sum, trip) => sum + trip.truckOwnerPayment, 0);
         
         // Calculate utilization rate (days with trips / total days)
         const uniqueDays = new Set(
-          vehicleTrips.map(trip => trip.scheduledPickupDatetime.split('T')[0])
+          vehicleTrips.map(trip => trip.scheduledTimestamp.split('T')[0])
         );
         const utilizationRate = totalDays > 0 ? (uniqueDays.size / totalDays) * 100 : 0;
         
         const averageRevenuePerTrip = totalTrips > 0 ? totalRevenue / totalTrips : 0;
         
+        // Get truck details
+        const truck = truckDetailsMap.get(vehicleId);
+        const vehicleName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : vehicleId.substring(0, 8);
+        
         utilization.push({
           vehicleId,
-          vehicleName: vehicleId, // Using ID as name since we don't have vehicle names yet
+          vehicleName,
           totalTrips,
           totalDistance,
           totalRevenue,
@@ -455,27 +542,35 @@ export class AnalyticsService {
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -491,7 +586,7 @@ export class AnalyticsService {
       }>();
       
       for (const trip of trips) {
-        const date = new Date(trip.scheduledPickupDatetime);
+        const date = new Date(trip.scheduledTimestamp);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         
         if (!monthlyMap.has(monthKey)) {
@@ -504,7 +599,7 @@ export class AnalyticsService {
         
         const monthData = monthlyMap.get(monthKey)!;
         monthData.revenue += trip.brokerPayment;
-        monthData.expenses += trip.driverPayment + trip.lorryOwnerPayment + (trip.lumperFees || 0) + (trip.detentionFees || 0);
+        monthData.expenses += trip.driverPayment + trip.truckOwnerPayment + trip.lumperValue + trip.detentionValue;
         monthData.profit = monthData.revenue - monthData.expenses;
       }
       
@@ -529,7 +624,7 @@ export class AnalyticsService {
       // Calculate totals
       const totalRevenue = trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
       const totalExpenses = trips.reduce((sum, trip) => 
-        sum + trip.driverPayment + trip.lorryOwnerPayment + (trip.lumperFees || 0) + (trip.detentionFees || 0), 0
+        sum + trip.driverPayment + trip.truckOwnerPayment + trip.lumperValue + trip.detentionValue, 0
       );
       const totalProfit = totalRevenue - totalExpenses;
       const averageMonthlyRevenue = monthlyData.length > 0 ? totalRevenue / monthlyData.length : 0;
@@ -563,8 +658,8 @@ export class AnalyticsService {
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
-        KeyConditionExpression: 'GSI1PK = :dispatcherPK',
+        IndexName: 'GSI2',
+        KeyConditionExpression: 'GSI2PK = :dispatcherPK',
         ExpressionAttributeValues: {
           ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
         },
@@ -581,19 +676,19 @@ export class AnalyticsService {
       }>();
       
       for (const trip of trips) {
-        if (!vehicleUsage.has(trip.lorryId)) {
-          vehicleUsage.set(trip.lorryId, {
+        if (!vehicleUsage.has(trip.truckId)) {
+          vehicleUsage.set(trip.truckId, {
             totalDistance: 0,
             tripCount: 0,
-            lastTripDate: new Date(trip.scheduledPickupDatetime),
+            lastTripDate: new Date(trip.scheduledTimestamp),
           });
         }
         
-        const usage = vehicleUsage.get(trip.lorryId)!;
-        usage.totalDistance += trip.distance || 0;
+        const usage = vehicleUsage.get(trip.truckId)!;
+        usage.totalDistance += trip.mileageOrder;
         usage.tripCount += 1;
         
-        const tripDate = new Date(trip.scheduledPickupDatetime);
+        const tripDate = new Date(trip.scheduledTimestamp);
         if (tripDate > usage.lastTripDate) {
           usage.lastTripDate = tripDate;
         }
@@ -630,22 +725,20 @@ export class AnalyticsService {
       const driverUsage = new Map<string, {
         tripCount: number;
         lastTripDate: Date;
-        driverName: string;
       }>();
       
       for (const trip of trips) {
         if (!driverUsage.has(trip.driverId)) {
           driverUsage.set(trip.driverId, {
             tripCount: 0,
-            lastTripDate: new Date(trip.scheduledPickupDatetime),
-            driverName: trip.driverName,
+            lastTripDate: new Date(trip.scheduledTimestamp),
           });
         }
         
         const usage = driverUsage.get(trip.driverId)!;
         usage.tripCount += 1;
         
-        const tripDate = new Date(trip.scheduledPickupDatetime);
+        const tripDate = new Date(trip.scheduledTimestamp);
         if (tripDate > usage.lastTripDate) {
           usage.lastTripDate = tripDate;
         }
@@ -660,9 +753,9 @@ export class AnalyticsService {
         if (daysSinceLastTrip > 30) {
           driverAlerts.push({
             driverId,
-            driverName: usage.driverName,
+            driverName: `Driver ${driverId}`, // Using ID as name
             alertType: 'inactive',
-            message: `Driver ${usage.driverName} has been inactive for ${daysSinceLastTrip} days`,
+            message: `Driver ${driverId} has been inactive for ${daysSinceLastTrip} days`,
             severity: 'info',
           });
         }
@@ -690,27 +783,35 @@ export class AnalyticsService {
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -719,7 +820,7 @@ export class AnalyticsService {
       const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
       
       // Filter trips with fuel data
-      const tripsWithFuelData = trips.filter(t => t.fuelAvgCost && t.fuelAvgGallonsPerMile);
+      const tripsWithFuelData = trips.filter(t => t.fuelGasAvgCost && t.fuelGasAvgGallxMil);
       
       if (tripsWithFuelData.length === 0) {
         return {
@@ -735,23 +836,23 @@ export class AnalyticsService {
       
       // Calculate total fuel costs
       const totalFuelCost = tripsWithFuelData.reduce((sum, trip) => {
-        if (trip.fuelTotalCost) {
-          return sum + trip.fuelTotalCost;
+        if (trip.fuelCost) {
+          return sum + trip.fuelCost;
         }
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        return sum + (totalMiles * trip.fuelAvgGallonsPerMile! * trip.fuelAvgCost!);
+        const totalMiles = trip.mileageOrder + trip.mileageEmpty;
+        return sum + (totalMiles * trip.fuelGasAvgGallxMil! * trip.fuelGasAvgCost!);
       }, 0);
       
       // Calculate average fuel price
-      const avgFuelPrice = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgCost || 0), 0) / tripsWithFuelData.length;
+      const avgFuelPrice = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelGasAvgCost || 0), 0) / tripsWithFuelData.length;
       
       // Calculate average gallons per mile
-      const avgGallonsPerMile = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelAvgGallonsPerMile || 0), 0) / tripsWithFuelData.length;
+      const avgGallonsPerMile = tripsWithFuelData.reduce((sum, t) => sum + (t.fuelGasAvgGallxMil || 0), 0) / tripsWithFuelData.length;
       
       // Calculate total gallons used
       const totalGallonsUsed = tripsWithFuelData.reduce((sum, trip) => {
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        return sum + (totalMiles * (trip.fuelAvgGallonsPerMile || 0));
+        const totalMiles = trip.mileageOrder + trip.mileageEmpty;
+        return sum + (totalMiles * (trip.fuelGasAvgGallxMil || 0));
       }, 0);
       
       // Group by vehicle for efficiency comparison
@@ -763,8 +864,8 @@ export class AnalyticsService {
       }>();
       
       for (const trip of tripsWithFuelData) {
-        if (!vehicleMap.has(trip.lorryId)) {
-          vehicleMap.set(trip.lorryId, {
+        if (!vehicleMap.has(trip.truckId)) {
+          vehicleMap.set(trip.truckId, {
             tripCount: 0,
             totalMiles: 0,
             totalGallons: 0,
@@ -772,10 +873,10 @@ export class AnalyticsService {
           });
         }
         
-        const vehicleData = vehicleMap.get(trip.lorryId)!;
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        const gallons = totalMiles * (trip.fuelAvgGallonsPerMile || 0);
-        const cost = trip.fuelTotalCost || (gallons * (trip.fuelAvgCost || 0));
+        const vehicleData = vehicleMap.get(trip.truckId)!;
+        const totalMiles = trip.mileageOrder + trip.mileageEmpty;
+        const gallons = totalMiles * (trip.fuelGasAvgGallxMil || 0);
+        const cost = trip.fuelCost || (gallons * (trip.fuelGasAvgCost || 0));
         
         vehicleData.tripCount += 1;
         vehicleData.totalMiles += totalMiles;
@@ -784,15 +885,42 @@ export class AnalyticsService {
       }
       
       // Build vehicle efficiency array
-      const vehicleFuelEfficiency = Array.from(vehicleMap.entries()).map(([vehicleId, data]) => ({
-        vehicleId,
-        tripCount: data.tripCount,
-        totalMiles: data.totalMiles,
-        totalGallons: data.totalGallons,
-        totalCost: data.totalCost,
-        averageGallonsPerMile: data.totalMiles > 0 ? data.totalGallons / data.totalMiles : 0,
-        averageMPG: data.totalGallons > 0 ? data.totalMiles / data.totalGallons : 0,
-      }));
+      // Fetch truck details for enrichment
+      const vehicleIds = Array.from(vehicleMap.keys());
+      const trucksTableName = this.tripsService['configService'].lorriesTableName;
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const truckDetailsMap = new Map<string, any>();
+      await Promise.all(
+        vehicleIds.map(async (truckId) => {
+          try {
+            const result = await dynamodbClient.send(new GetCommand({
+              TableName: trucksTableName,
+              Key: { PK: `TRUCK#${truckId}`, SK: 'METADATA' },
+            }));
+            if (result.Item) {
+              truckDetailsMap.set(truckId, result.Item);
+            }
+          } catch (error) {
+            console.error(`Error fetching truck ${truckId}:`, error);
+          }
+        })
+      );
+      
+      const vehicleFuelEfficiency = Array.from(vehicleMap.entries()).map(([vehicleId, data]) => {
+        const truck = truckDetailsMap.get(vehicleId);
+        const vehicleName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : vehicleId.substring(0, 8);
+        
+        return {
+          vehicleId: vehicleName, // Use plate as display name
+          tripCount: data.tripCount,
+          totalMiles: data.totalMiles,
+          totalGallons: data.totalGallons,
+          totalCost: data.totalCost,
+          averageGallonsPerMile: data.totalMiles > 0 ? data.totalGallons / data.totalMiles : 0,
+          averageMPG: data.totalGallons > 0 ? data.totalMiles / data.totalGallons : 0,
+        };
+      });
       
       // Sort by efficiency (MPG descending)
       vehicleFuelEfficiency.sort((a, b) => b.averageMPG - a.averageMPG);
@@ -805,7 +933,7 @@ export class AnalyticsService {
       }>();
       
       for (const trip of tripsWithFuelData) {
-        const date = new Date(trip.scheduledPickupDatetime);
+        const date = new Date(trip.scheduledTimestamp);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         
         if (!monthlyFuelMap.has(monthKey)) {
@@ -817,9 +945,9 @@ export class AnalyticsService {
         }
         
         const monthData = monthlyFuelMap.get(monthKey)!;
-        const totalMiles = (trip.loadedMiles || trip.distance || 0) + (trip.emptyMiles || 0);
-        const gallons = totalMiles * (trip.fuelAvgGallonsPerMile || 0);
-        const cost = trip.fuelTotalCost || (gallons * (trip.fuelAvgCost || 0));
+        const totalMiles = trip.mileageOrder + trip.mileageEmpty;
+        const gallons = totalMiles * (trip.fuelGasAvgGallxMil || 0);
+        const cost = trip.fuelCost || (gallons * (trip.fuelGasAvgCost || 0));
         
         monthData.fuelCost += cost;
         monthData.gallonsUsed += gallons;
@@ -878,27 +1006,35 @@ export class AnalyticsService {
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI1PK = :dispatcherPK';
+      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
       const expressionAttributeValues: any = {
         ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
       };
       
       // Add date range to KeyConditionExpression (not FilterExpression)
+      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
+      // For date range queries, we need to use full ISO 8601 timestamps
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
+        // Start of day for startDate
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        // End of day for endDate
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI1SK >= :startDate';
-        expressionAttributeValues[':startDate'] = startDate.toISOString().split('T')[0];
+        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI1SK <= :endDate';
-        expressionAttributeValues[':endDate'] = endDate.toISOString().split('T')[0] + '~';
+        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI1',
+        IndexName: 'GSI2',
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -915,8 +1051,8 @@ export class AnalyticsService {
       }>();
       
       for (const trip of trips) {
-        if (!brokerMap.has(trip.brokerName)) {
-          brokerMap.set(trip.brokerName, {
+        if (!brokerMap.has(trip.brokerId)) {
+          brokerMap.set(trip.brokerId, {
             tripCount: 0,
             totalRevenue: 0,
             totalDistance: 0,
@@ -924,19 +1060,19 @@ export class AnalyticsService {
           });
         }
         
-        const brokerData = brokerMap.get(trip.brokerName)!;
+        const brokerData = brokerMap.get(trip.brokerId)!;
         brokerData.tripCount += 1;
         brokerData.totalRevenue += trip.brokerPayment;
-        brokerData.totalDistance += trip.distance || 0;
+        brokerData.totalDistance += trip.mileageOrder;
         
-        if (trip.status === TripStatus.Delivered || trip.status === TripStatus.Paid) {
+        if (trip.orderStatus === 'Delivered' || trip.orderStatus === 'Paid') {
           brokerData.completedTrips += 1;
         }
       }
       
       // Build broker analytics array
-      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerName, data]) => ({
-        brokerName,
+      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerId, data]) => ({
+        brokerName: brokerId, // Using ID as name since brokerName is not in Trip interface
         tripCount: data.tripCount,
         totalRevenue: data.totalRevenue,
         averageRevenue: data.tripCount > 0 ? data.totalRevenue / data.tripCount : 0,

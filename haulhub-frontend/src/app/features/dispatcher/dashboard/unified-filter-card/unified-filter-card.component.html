@@ -39,21 +39,17 @@
             </mat-form-field>
 
             <div class="date-presets">
+              <button mat-button type="button" (click)="setDatePreset('week')"
+                      [class.active]="activePreset === 'week'">
+                Last Week
+              </button>
               <button mat-button type="button" (click)="setDatePreset('month')"
                       [class.active]="activePreset === 'month'">
-                This Month
-              </button>
-              <button mat-button type="button" (click)="setDatePreset('30days')"
-                      [class.active]="activePreset === '30days'">
-                Last 30 Days
+                Last Month
               </button>
               <button mat-button type="button" (click)="setDatePreset('year')"
                       [class.active]="activePreset === 'year'">
-                This Year
-              </button>
-              <button mat-button type="button" (click)="setDatePreset('365days')"
-                      [class.active]="activePreset === '365days'">
-                Last 365 Days
+                Last Year
               </button>
             </div>
           </div>

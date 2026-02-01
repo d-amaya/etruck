@@ -61,7 +61,7 @@ describe('AuthStack', () => {
         AutoVerifiedAttributes: ['email'],
         VerificationMessageTemplate: {
           DefaultEmailOption: 'CONFIRM_WITH_LINK',
-          EmailSubjectByLink: 'Verify your email for HaulHub',
+          EmailSubjectByLink: 'Verify your email for eTrucky',
           EmailMessageByLink: Match.stringLikeRegexp('verify your email'),
         },
       });
@@ -144,7 +144,7 @@ describe('AuthStack', () => {
       template.hasResourceProperties('AWS::Cognito::UserPoolGroup', {
         GroupName: 'Dispatcher',
         Description: Match.stringLikeRegexp('Dispatchers'),
-        Precedence: 1,
+        Precedence: 2,
       });
     });
 
@@ -152,7 +152,7 @@ describe('AuthStack', () => {
       template.hasResourceProperties('AWS::Cognito::UserPoolGroup', {
         GroupName: 'LorryOwner',
         Description: Match.stringLikeRegexp('Lorry owners'),
-        Precedence: 2,
+        Precedence: 3,
       });
     });
 
@@ -160,7 +160,7 @@ describe('AuthStack', () => {
       template.hasResourceProperties('AWS::Cognito::UserPoolGroup', {
         GroupName: 'Driver',
         Description: Match.stringLikeRegexp('Drivers'),
-        Precedence: 3,
+        Precedence: 4,
       });
     });
 
@@ -172,8 +172,24 @@ describe('AuthStack', () => {
       });
     });
 
-    test('should create all four user groups', () => {
-      template.resourceCountIs('AWS::Cognito::UserPoolGroup', 4);
+    test('should create Carrier group', () => {
+      template.hasResourceProperties('AWS::Cognito::UserPoolGroup', {
+        GroupName: 'Carrier',
+        Description: Match.stringLikeRegexp('Logistics company'),
+        Precedence: 1,
+      });
+    });
+
+    test('should create TruckOwner group', () => {
+      template.hasResourceProperties('AWS::Cognito::UserPoolGroup', {
+        GroupName: 'TruckOwner',
+        Description: Match.stringLikeRegexp('Truck owners'),
+        Precedence: 3,
+      });
+    });
+
+    test('should create all six user groups (Admin, Carrier, Dispatcher, TruckOwner, LorryOwner, Driver)', () => {
+      template.resourceCountIs('AWS::Cognito::UserPoolGroup', 6);
     });
   });
 

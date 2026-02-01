@@ -53,6 +53,13 @@ export class AuthStack extends cdk.Stack {
         role: new cognito.StringAttribute({ 
           mutable: false,
         }),
+        // New eTrucky attributes (backward compatible - optional)
+        carrierId: new cognito.StringAttribute({
+          mutable: false, // Set once during user creation
+        }),
+        nationalId: new cognito.StringAttribute({
+          mutable: false, // Driving License or SSN
+        }),
       },
       
       // Password policy
@@ -78,13 +85,13 @@ export class AuthStack extends cdk.Stack {
       
       // User invitation
       userInvitation: {
-        emailSubject: 'Welcome to HaulHub!',
+        emailSubject: 'Welcome to eTrucky!',
         emailBody: 'Hello {username}, your temporary password is {####}',
       },
       
       // User verification
       userVerification: {
-        emailSubject: 'Verify your email for HaulHub',
+        emailSubject: 'Verify your email for eTrucky',
         emailBody: 'Hello, please verify your email by clicking this link: {##Verify Email##}',
         emailStyle: cognito.VerificationEmailStyle.LINK,
       },
@@ -141,7 +148,7 @@ export class AuthStack extends cdk.Stack {
           phoneNumberVerified: true,
           fullname: true,
         })
-        .withCustomAttributes('role'),
+        .withCustomAttributes('role', 'carrierId', 'nationalId'),
       
       writeAttributes: new cognito.ClientAttributes()
         .withStandardAttributes({
@@ -152,32 +159,50 @@ export class AuthStack extends cdk.Stack {
     });
 
     // Create User Groups for role-based access control
+    // Precedence hierarchy: Admin (0) > Carrier (1) > Dispatcher (2) > TruckOwner (3) > Driver (4)
+    // Lower number = Higher priority when user belongs to multiple groups
+    
+    const adminGroup = new cognito.CfnUserPoolGroup(this, 'AdminGroup', {
+      userPoolId: this.userPool.userPoolId,
+      groupName: 'Admin',
+      description: 'System administrators who manage verifications and broker lists',
+      precedence: 0, // Highest priority
+    });
+
+    const carrierGroup = new cognito.CfnUserPoolGroup(this, 'CarrierGroup', {
+      userPoolId: this.userPool.userPoolId,
+      groupName: 'Carrier',
+      description: 'Logistics company users who manage assets (trucks, trailers, dispatchers, drivers)',
+      precedence: 1, // Second highest
+    });
+
     const dispatcherGroup = new cognito.CfnUserPoolGroup(this, 'DispatcherGroup', {
       userPoolId: this.userPool.userPoolId,
       groupName: 'Dispatcher',
-      description: 'Dispatchers who manage transportation deals and coordinate lorries and drivers',
-      precedence: 1,
+      description: 'Dispatchers who manage transportation deals and coordinate trucks and drivers',
+      precedence: 2,
     });
 
+    const truckOwnerGroup = new cognito.CfnUserPoolGroup(this, 'TruckOwnerGroup', {
+      userPoolId: this.userPool.userPoolId,
+      groupName: 'TruckOwner',
+      description: 'Truck owners who provide vehicles for transportation services',
+      precedence: 3,
+    });
+
+    // Legacy group (backward compatibility)
     const lorryOwnerGroup = new cognito.CfnUserPoolGroup(this, 'LorryOwnerGroup', {
       userPoolId: this.userPool.userPoolId,
       groupName: 'LorryOwner',
-      description: 'Lorry owners who provide vehicles for transportation services',
-      precedence: 2,
+      description: 'Lorry owners who provide vehicles for transportation services (legacy)',
+      precedence: 3, // Same as TruckOwner
     });
 
     const driverGroup = new cognito.CfnUserPoolGroup(this, 'DriverGroup', {
       userPoolId: this.userPool.userPoolId,
       groupName: 'Driver',
-      description: 'Drivers who operate lorries to complete transportation trips',
-      precedence: 3,
-    });
-
-    const adminGroup = new cognito.CfnUserPoolGroup(this, 'AdminGroup', {
-      userPoolId: this.userPool.userPoolId,
-      groupName: 'Admin',
-      description: 'System administrators who manage verifications and broker lists',
-      precedence: 0,
+      description: 'Drivers who operate trucks to complete transportation trips',
+      precedence: 4, // Lowest priority
     });
 
     // CloudFormation Outputs

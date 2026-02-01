@@ -42,14 +42,14 @@ export class PaymentReportComponent implements OnInit {
   report: DriverPaymentReport | null = null;
   
   displayedColumns: string[] = [
-    'scheduledPickupDatetime',
-    'pickupLocation',
-    'dropoffLocation',
-    'lorryId',
+    'scheduledTimestamp',
+    'pickupCity',
+    'deliveryCity',
+    'truckId',
     'brokerName',
     'driverPayment',
-    'distance',
-    'status'
+    'mileageOrder',
+    'orderStatus'
   ];
 
   constructor(
@@ -133,6 +133,7 @@ export class PaymentReportComponent implements OnInit {
   }
 
   formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',

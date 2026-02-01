@@ -43,15 +43,15 @@ import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit } from '@hau
 })
 export class TripListComponent implements OnInit {
   displayedColumns: string[] = [
-    'scheduledPickupDatetime',
+    'scheduledTimestamp',
     'pickupLocation',
     'dropoffLocation',
     'brokerName',
-    'lorryId',
+    'truckId',
     'driverName',
     'status',
     'brokerPayment',
-    'lorryOwnerPayment',
+    'truckOwnerPayment',
     'driverPayment',
     'actions'
   ];
@@ -113,9 +113,6 @@ export class TripListComponent implements OnInit {
     this.loading = true;
     const filters = this.buildFilters();
     
-    console.log('Loading trips with filters:', filters);
-    console.log('Current pageIndex:', this.pageIndex);
-    
     this.tripService.getTrips(filters).subscribe({
       next: (response) => {
         console.log('Received response:', {
@@ -129,7 +126,6 @@ export class TripListComponent implements OnInit {
         // Store the key for navigating to the NEXT page
         if (response.lastEvaluatedKey) {
           this.paginationKeys.set(this.pageIndex + 1, response.lastEvaluatedKey);
-          console.log('Stored key for next page:', this.pageIndex + 1);
         }
         
         // Update lastEvaluatedKey for display purposes
@@ -141,11 +137,9 @@ export class TripListComponent implements OnInit {
           // Set total to at least one more page than current
           // This ensures the "next" button stays enabled
           this.totalTrips = (this.pageIndex + 2) * this.pageSize;
-          console.log('Has more pages - set totalTrips to:', this.totalTrips);
         } else {
           // No more pages - set exact total
           this.totalTrips = (this.pageIndex * this.pageSize) + response.trips.length;
-          console.log('Last page - set totalTrips to:', this.totalTrips);
         }
         
         // Safety check: ensure totalTrips is at least the number of trips we have
@@ -181,8 +175,8 @@ export class TripListComponent implements OnInit {
       filters.brokerId = formValue.brokerId;
     }
 
-    if (formValue.lorryId) {
-      filters.lorryId = formValue.lorryId.trim();
+    if (formValue.truckId) {
+      filters.truckId = formValue.truckId.trim();
     }
 
     if (formValue.driverId) {
@@ -193,14 +187,13 @@ export class TripListComponent implements OnInit {
       filters.driverName = formValue.driverName.trim();
     }
 
-    if (formValue.status) {
-      filters.status = formValue.status;
+    if (formValue.orderStatus) {
+      filters.orderStatus = formValue.orderStatus;
     }
 
     // Include lastEvaluatedKey if available (for pagination)
     if (this.lastEvaluatedKey) {
       filters.lastEvaluatedKey = this.lastEvaluatedKey;
-      console.log('Including lastEvaluatedKey in filters:', this.lastEvaluatedKey.substring(0, 50) + '...');
     }
 
     return filters;
@@ -230,7 +223,6 @@ export class TripListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    console.log('Page change event:', event);
     
     const oldPageSize = this.pageSize;
     this.pageSize = event.pageSize;
@@ -249,8 +241,6 @@ export class TripListComponent implements OnInit {
     
     // Get the pagination key for this page (undefined for page 0)
     this.lastEvaluatedKey = this.paginationKeys.get(event.pageIndex);
-    
-    console.log('Navigating to page', event.pageIndex, 'with key:', this.lastEvaluatedKey ? 'present' : 'none');
     
     this.loadTrips();
   }

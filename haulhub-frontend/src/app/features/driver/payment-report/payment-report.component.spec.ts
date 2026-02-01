@@ -19,36 +19,36 @@ describe('PaymentReportComponent', () => {
       {
         tripId: 'trip-1',
         dispatcherId: 'dispatcher-1',
-        scheduledPickupDatetime: '2024-01-15T08:00:00Z',
+        scheduledTimestamp: '2024-01-15T08:00:00Z',
         pickupLocation: 'New York, NY',
         dropoffLocation: 'Boston, MA',
         brokerId: 'broker-1',
         brokerName: 'Broker A',
-        lorryId: 'ABC-123',
+        truckId: 'ABC-123',
         driverId: 'driver-1',
         driverName: 'John Doe',
         brokerPayment: 1000,
-        lorryOwnerPayment: 300,
+        truckOwnerPayment: 300,
         driverPayment: 500,
-        distance: 215.5,
-        status: 'Delivered'
+        mileageOrder: 215.5,
+        orderStatus: 'Delivered'
       },
       {
         tripId: 'trip-2',
         dispatcherId: 'dispatcher-2',
-        scheduledPickupDatetime: '2024-01-20T10:00:00Z',
+        scheduledTimestamp: '2024-01-20T10:00:00Z',
         pickupLocation: 'Chicago, IL',
         dropoffLocation: 'Detroit, MI',
         brokerId: 'broker-2',
         brokerName: 'Broker B',
-        lorryId: 'XYZ-789',
+        truckId: 'XYZ-789',
         driverId: 'driver-1',
         driverName: 'John Doe',
         brokerPayment: 800,
-        lorryOwnerPayment: 250,
+        truckOwnerPayment: 250,
         driverPayment: 450,
-        distance: 280,
-        status: 'Paid'
+        mileageOrder: 280,
+        orderStatus: 'Paid'
       }
     ],
     groupedByDispatcher: {

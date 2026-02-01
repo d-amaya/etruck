@@ -1,50 +1,102 @@
 import { TripStatus } from '../enums/trip-status.enum';
 
 export interface Trip {
+  // Primary identifiers
   tripId: string;
-  dispatcherId: string;
-  pickupLocation: string;
-  dropoffLocation: string;
-  scheduledPickupDatetime: string;
-  brokerId: string;
-  brokerName: string;
-  lorryId: string;
-  driverId: string;
-  driverName: string;
-  brokerPayment: number;
-  lorryOwnerPayment: number;
-  driverPayment: number;
-  status: TripStatus;
-  distance?: number;
-  deliveredAt?: string;
   
-  // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
+  // Entity relationships (userId-based)
+  carrierId: string;
+  dispatcherId: string;
+  driverId: string;
+  truckId: string;
+  trailerId: string;
+  truckOwnerId: string;
+  brokerId: string;
+  
+  // Order information
+  orderConfirmation: string;
+  orderStatus: 'Scheduled' | 'Picked Up' | 'In Transit' | 'Delivered' | 'Paid';
+  
+  // Timestamps (ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ)
+  scheduledTimestamp: string;
+  pickupTimestamp: string | null;
+  deliveryTimestamp: string | null;
+  
+  // Pickup location details
+  pickupCompany: string;
+  pickupAddress: string;
+  pickupCity: string;
+  pickupState: string;
+  pickupZip: string;
+  pickupPhone: string;
+  pickupNotes: string;
+  
+  // Delivery location details
+  deliveryCompany: string;
+  deliveryAddress: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryZip: string;
+  deliveryPhone: string;
+  deliveryNotes: string;
+  
+  // Mileage tracking
+  mileageEmpty: number;
+  mileageOrder: number;
+  mileageTotal: number;
+  
+  // Rates (per mile or per trip)
+  brokerRate: number;
+  driverRate: number;
+  truckOwnerRate: number;
+  dispatcherRate: number;
+  factoryRate: number;
+  orderRate: number;
+  orderAverage: number;
+  
+  // Payments
+  brokerPayment: number;
+  driverPayment: number;
+  truckOwnerPayment: number;
+  dispatcherPayment: number;
+  
+  // Advances
+  brokerAdvance: number;
+  driverAdvance: number;
+  factoryAdvance: number;
+  
+  // Costs and expenses
+  fuelCost: number;
+  fuelGasAvgCost: number;
+  fuelGasAvgGallxMil: number;
+  brokerCost: number;
+  factoryCost: number;
+  lumperValue: number;
+  detentionValue: number;
+  orderExpenses: number;
+  orderRevenue: number;
+  
+  // Additional notes
+  notes: string;
+  
+  // Audit timestamps
+  createdAt?: string;
+  updatedAt?: string;
+  
+  // Legacy fields (backward compatibility - optional)
+  driverName?: string;
+  driverLicense?: string;
+  brokerName?: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  status?: TripStatus;
   loadedMiles?: number;
   emptyMiles?: number;
   totalMiles?: number;
-  
-  // Fuel Management (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
   fuelAvgCost?: number;
   fuelAvgGallonsPerMile?: number;
-  fuelTotalCost?: number;
-  
-  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
   lumperFees?: number;
   detentionFees?: number;
-  
-  // Invoice management (Requirements 5.1, 5.2, 5.3, 5.4, 5.5)
-  invoiceNumber?: string;
-  invoiceDate?: string;
-  invoiceDueDate?: string;
-  invoiceTerms?: number; // Payment terms in days
-  invoiceSubtotal?: number;
-  invoiceTax?: number;
-  invoiceTotal?: number;
-  invoicePayments?: InvoicePayment[];
-  invoiceStatus?: 'unpaid' | 'partial' | 'paid' | 'overdue';
-  
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface InvoicePayment {

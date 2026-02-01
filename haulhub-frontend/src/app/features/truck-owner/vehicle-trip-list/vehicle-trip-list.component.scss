@@ -1,0 +1,103 @@
+.filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: flex-start;
+
+  mat-form-field {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  text-align: center;
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: rgba(0, 0, 0, 0.26);
+    margin-bottom: 16px;
+  }
+
+  p {
+    font-size: 18px;
+    margin: 8px 0;
+    color: rgba(0, 0, 0, 0.54);
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.38);
+  }
+}
+
+.trips-table {
+  width: 100%;
+  margin-top: 16px;
+
+  .trip-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  mat-chip {
+    font-size: 12px;
+    min-height: 24px;
+    padding: 4px 8px;
+  }
+
+  .status-scheduled {
+    background-color: #2196F3;
+    color: white;
+  }
+
+  .status-picked-up {
+    background-color: #FF9800;
+    color: white;
+  }
+
+  .status-in-transit {
+    background-color: #9C27B0;
+    color: white;
+  }
+
+  .status-delivered {
+    background-color: #4CAF50;
+    color: white;
+  }
+
+  .status-paid {
+    background-color: #00BCD4;
+    color: white;
+  }
+}
+
+mat-paginator {
+  margin-top: 16px;
+}

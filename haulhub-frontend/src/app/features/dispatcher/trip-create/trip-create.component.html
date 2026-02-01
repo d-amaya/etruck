@@ -14,6 +14,15 @@
         <div class="form-section">
           <h3>Basic Information</h3>
           <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Order Confirmation Number</mat-label>
+              <input matInput formControlName="orderConfirmation" placeholder="Enter order confirmation number">
+              <mat-hint>Unique identifier for this trip</mat-hint>
+              <mat-error>{{ getErrorMessage('orderConfirmation') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Pickup Location</mat-label>
               <input matInput formControlName="pickupLocation" placeholder="Enter pickup address">
@@ -28,19 +37,12 @@
           </div>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Pickup Date</mat-label>
-              <input matInput [matDatepicker]="picker" formControlName="scheduledPickupDatetime" 
-                     [min]="minDate" placeholder="Select date">
-              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-              <mat-datepicker #picker></mat-datepicker>
-              <mat-error>{{ getErrorMessage('scheduledPickupDatetime') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Pickup Time</mat-label>
-              <input matInput type="time" formControlName="scheduledPickupTime" placeholder="HH:MM">
-              <mat-error>{{ getErrorMessage('scheduledPickupTime') }}</mat-error>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Scheduled Pickup Date & Time</mat-label>
+              <input matInput type="datetime-local" formControlName="scheduledTimestamp" 
+                     placeholder="Select date and time">
+              <mat-hint>Select when the pickup is scheduled</mat-hint>
+              <mat-error>{{ getErrorMessage('scheduledTimestamp') }}</mat-error>
             </mat-form-field>
           </div>
         </div>
@@ -66,15 +68,26 @@
         <div class="form-section">
           <h3>Vehicle Assignment</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Truck (License Plate)</mat-label>
-              <mat-select formControlName="truckId" [disabled]="loadingVehicles">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Truck</mat-label>
+              <mat-select formControlName="truckId" [disabled]="loadingAssets">
                 <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
-                  {{ truck.name }} - {{ truck.licensePlate }}
+                  {{ truck.brand }} {{ truck.year }} - {{ truck.plate }}
                 </mat-option>
               </mat-select>
-              <mat-hint *ngIf="loadingVehicles">Loading trucks...</mat-hint>
+              <mat-hint *ngIf="loadingAssets">Loading trucks...</mat-hint>
               <mat-error>{{ getErrorMessage('truckId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Trailer</mat-label>
+              <mat-select formControlName="trailerId" [disabled]="loadingAssets">
+                <mat-option *ngFor="let trailer of trailers" [value]="trailer.trailerId">
+                  {{ trailer.brand }} {{ trailer.year }} - {{ trailer.plate }}
+                </mat-option>
+              </mat-select>
+              <mat-hint *ngIf="loadingAssets">Loading trailers...</mat-hint>
+              <mat-error>{{ getErrorMessage('trailerId') }}</mat-error>
             </mat-form-field>
           </div>
         </div>
@@ -83,16 +96,15 @@
         <div class="form-section">
           <h3>Driver Assignment</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Driver ID</mat-label>
-              <input matInput formControlName="driverId" placeholder="Driver identifier">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Driver</mat-label>
+              <mat-select formControlName="driverId" [disabled]="loadingAssets">
+                <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+                  {{ driver.name }} - {{ driver.email }}
+                </mat-option>
+              </mat-select>
+              <mat-hint *ngIf="loadingAssets">Loading drivers...</mat-hint>
               <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Driver Name</mat-label>
-              <input matInput formControlName="driverName" placeholder="Full name">
-              <mat-error>{{ getErrorMessage('driverName') }}</mat-error>
             </mat-form-field>
           </div>
         </div>
@@ -149,10 +161,10 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Lorry Owner Payment ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="lorryOwnerPayment" placeholder="0.00">
-              <mat-hint>Amount to pay lorry owner</mat-hint>
-              <mat-error>{{ getErrorMessage('lorryOwnerPayment') }}</mat-error>
+              <mat-label>Truck Owner Payment ($)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="truckOwnerPayment" placeholder="0.00">
+              <mat-hint>Amount to pay truck owner</mat-hint>
+              <mat-error>{{ getErrorMessage('truckOwnerPayment') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
@@ -276,17 +288,11 @@
           </div>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Delivery Date</mat-label>
-              <input matInput [matDatepicker]="deliveryPicker" formControlName="deliveryDate" 
-                     [min]="minDate" placeholder="Select date">
-              <mat-datepicker-toggle matSuffix [for]="deliveryPicker"></mat-datepicker-toggle>
-              <mat-datepicker #deliveryPicker></mat-datepicker>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Delivery Time</mat-label>
-              <input matInput type="time" formControlName="deliveryTime" placeholder="HH:MM">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Delivery Date & Time</mat-label>
+              <input matInput type="datetime-local" formControlName="deliveryDatetime" 
+                     placeholder="Select date and time">
+              <mat-hint>Optional - when delivery is expected</mat-hint>
             </mat-form-field>
           </div>
 
@@ -317,7 +323,7 @@
             Cancel
           </button>
           <button mat-raised-button color="primary" type="submit" 
-                  [disabled]="loading || loadingBrokers || loadingVehicles">
+                  [disabled]="loading || loadingBrokers || loadingAssets">
             <mat-spinner *ngIf="loading" diameter="20" class="button-spinner"></mat-spinner>
             <span *ngIf="!loading">Create Trip</span>
           </button>

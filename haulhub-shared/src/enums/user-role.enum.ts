@@ -1,6 +1,8 @@
 export enum UserRole {
   Dispatcher = 'Dispatcher',
-  LorryOwner = 'LorryOwner',
+  TruckOwner = 'TruckOwner',
+  LorryOwner = 'LorryOwner', // Legacy - kept for backward compatibility
   Driver = 'Driver',
-  Admin = 'Admin'
+  Admin = 'Admin',
+  Carrier = 'Carrier'
 }

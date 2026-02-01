@@ -5,6 +5,7 @@ A serverless web application for managing transportation logistics between Dispa
 ## Table of Contents
 
 - [Overview](#overview)
+- [eTrucky Migration (January 2026)](#etrucky-migration-january-2026)
 - [Project Structure](#project-structure)
 - [Technology Stack](#technology-stack)
 - [Configuration Files](#configuration-files)
@@ -29,6 +30,147 @@ eTrucky is a transportation management system designed for the US logistics indu
 - **Admins**: Verify users, approve lorry registrations, manage broker lists
 
 The application is built using AWS serverless architecture to minimize operational overhead while maintaining scalability.
+
+---
+
+## eTrucky Migration (January 2026)
+
+### Migration Overview
+
+The HaulHub application has been successfully migrated to the new **eTrucky carrier-centric architecture**. This migration introduces a hierarchical organizational structure where Carriers own and manage all assets (Users, Trucks, Trailers, Trips).
+
+**Migration Status:** ✅ **COMPLETE** (All modules updated, all tests passing)
+
+### Key Changes
+
+#### 1. New Data Model
+- **5 DynamoDB Tables**: eTrucky-Users, eTrucky-Trucks, eTrucky-Trailers, eTrucky-Trips, eTrucky-Brokers
+- **Unified User Model**: All users (including carriers) stored in single eTrucky-Users table
+- **UserId-Based Relationships**: Trips use userId references for all actors (dispatcher, driver, truck owner)
+- **Carrier Hierarchy**: Carriers own and manage all assets within their organization
+
+#### 2. Field Name Changes
+
+**Trips:**
+- `lorryId` → `truckId` (UUID)
+- Added: `trailerId`, `truckOwnerId`, `carrierId`
+- `pickupDate` + `pickupTime` → `scheduledTimestamp` (ISO 8601)
+- Added: `pickupTimestamp`, `deliveryTimestamp` (ISO 8601)
+- `distance` → `mileageOrder`
+- Added: `mileageEmpty`, `mileageTotal`
+- `lorryOwnerPayment` → `truckOwnerPayment`
+- `status` → `orderStatus`
+
+**Trucks (formerly Lorries):**
+- `lorryId` → `truckId` (UUID)
+- `licensePlate` → `plate`
+- `make` → `brand`
+- Added: `color`, `truckOwnerId`, `carrierId`
+
+**Users:**
+- Unified table for all user types (Carrier, Dispatcher, Driver, Truck Owner)
+- Added: `carrierId`, `role` fields
+- Carriers have self-reference: `carrierId = userId`
+
+#### 3. Enhanced Features
+
+**Backend:**
+- ✅ Role-based data filtering (drivers and truck owners see limited financial data)
+- ✅ Carrier membership validation (all assets must belong to same carrier)
+- ✅ ISO 8601 timestamp handling throughout
+- ✅ 5 GSI patterns for efficient querying by role
+- ✅ Automatic timestamp setting on status changes
+
+**Frontend:**
+- ✅ Asset dropdowns (drivers, trucks, trailers, brokers) - no free-text input
+- ✅ Single datetime picker for trip scheduling
+- ✅ Role-based UI filtering (sensitive fields hidden by role)
+- ✅ "Truck Owner" terminology (renamed from "Lorry Owner")
+- ✅ Timestamp formatting for user-friendly display
+
+#### 4. Testing & Verification
+
+**Test Coverage:**
+- ✅ 100+ unit tests (all passing)
+- ✅ Property-based tests (field mapping, timestamps, filtering, GSI patterns)
+- ✅ Integration tests (trip lifecycle, role-based access, carrier validation)
+- ✅ Frontend component tests (all dashboards updated)
+
+**Test Data:**
+- 1 Carrier (Swift Logistics)
+- 13 Users (2 dispatchers, 8 drivers, 3 truck owners)
+- 15 Trucks (5 per owner)
+- 18 Trailers
+- 300 Trips (Jan 2025 - Feb 2026, various statuses)
+
+### Migration Resources
+
+- **Backend Migration**: See `haulhub-backend/README.md` for API changes and field mappings
+- **Frontend Migration**: See `haulhub-frontend/README.md` for component updates
+- **Detailed Guide**: See `ETRUCKY-MIGRATION.md` for complete migration documentation
+- **Integration Tests**: See `haulhub-backend/test/integration/INTEGRATION-TEST-RESULTS.md`
+- **Manual Testing**: See `haulhub-backend/test/integration/MANUAL-TESTING-GUIDE.md`
+
+### Breaking Changes
+
+**API Changes:**
+- All trip endpoints use new field names (see backend README)
+- Timestamps in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ)
+- UUIDs for all entity IDs (no more sequential IDs)
+- Role-based response filtering (drivers/truck owners get filtered data)
+
+**Environment Variables:**
+```bash
+# New eTrucky tables (add to .env)
+ETRUCKY_USERS_TABLE=eTrucky-Users
+ETRUCKY_TRUCKS_TABLE=eTrucky-Trucks
+ETRUCKY_TRAILERS_TABLE=eTrucky-Trailers
+ETRUCKY_TRIPS_TABLE=eTrucky-Trips
+ETRUCKY_BROKERS_TABLE=eTrucky-Brokers
+```
+
+**No Backward Compatibility:**
+- Old HaulHub tables remain in AWS (for currently deployed app)
+- New code uses only eTrucky schema (no compatibility layer)
+- Clean migration strategy - no deprecated field handling
+
+### Rollback Plan
+
+If issues are discovered:
+1. Revert to previous commit (pre-migration)
+2. Old HaulHub tables remain untouched in AWS
+3. Switch environment variables back to old table names
+4. No data loss - both table sets exist independently
+
+### Quick Start After Migration
+
+```bash
+# 1. Update environment variables
+cp haulhub-backend/.env.example haulhub-backend/.env
+# Edit .env with eTrucky table names
+
+# 2. Build shared package
+cd haulhub-shared && npm run build
+
+# 3. Run tests to verify
+cd ../haulhub-backend && npm test
+cd ../haulhub-frontend && npm test
+
+# 4. Start development servers
+./scripts/dev-backend.sh   # Terminal 1
+./scripts/dev-frontend.sh  # Terminal 2
+```
+
+### Test Credentials
+
+All test users have password: `TempPass123!`
+
+- **Carrier**: `carrier@swiftlogistics.com`
+- **Dispatchers**: `dispatcher1@swiftlogistics.com`, `dispatcher2@swiftlogistics.com`
+- **Drivers**: `driver1@swiftlogistics.com` through `driver8@swiftlogistics.com`
+- **Truck Owners**: `owner1@swiftlogistics.com` through `owner3@swiftlogistics.com`
+
+---
 
 ---
 

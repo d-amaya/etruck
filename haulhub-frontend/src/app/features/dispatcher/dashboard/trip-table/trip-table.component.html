@@ -26,23 +26,37 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck ID</mat-label>
-        <input matInput formControlName="lorryId" placeholder="License plate" 
-               (blur)="onTextInputBlur()" 
+        <mat-label>Truck Plate</mat-label>
+        <input matInput formControlName="truckPlate" placeholder="Enter truck plate" 
+               [matAutocomplete]="autoTruck"
+               (blur)="validateTruckPlate(); onTextInputBlur()" 
                (keydown)="onTextInputKeydown($event)">
-        <button mat-icon-button matSuffix *ngIf="filterForm.get('lorryId')?.value" 
-                (click)="clearField('lorryId')" type="button" tabindex="-1">
+        <mat-autocomplete #autoTruck="matAutocomplete">
+          <mat-option *ngFor="let plate of filteredTruckPlates | async" [value]="plate">
+            {{ plate }}
+          </mat-option>
+        </mat-autocomplete>
+        <mat-hint *ngIf="truckPlateError" class="error-hint">{{ truckPlateError }}</mat-hint>
+        <button mat-icon-button matSuffix *ngIf="filterForm.get('truckPlate')?.value" 
+                (click)="clearField('truckPlate')" type="button" tabindex="-1">
           <mat-icon>clear</mat-icon>
         </button>
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Driver Name</mat-label>
-        <input matInput formControlName="driverName" placeholder="Driver name" 
-               (blur)="onTextInputBlur()" 
+        <mat-label>Driver License</mat-label>
+        <input matInput formControlName="driverLicense" placeholder="Enter driver license" 
+               [matAutocomplete]="autoDriver"
+               (blur)="validateDriverLicense(); onTextInputBlur()" 
                (keydown)="onTextInputKeydown($event)">
-        <button mat-icon-button matSuffix *ngIf="filterForm.get('driverName')?.value" 
-                (click)="clearField('driverName')" type="button" tabindex="-1">
+        <mat-autocomplete #autoDriver="matAutocomplete">
+          <mat-option *ngFor="let license of filteredDriverLicenses | async" [value]="license">
+            {{ license }}
+          </mat-option>
+        </mat-autocomplete>
+        <mat-hint *ngIf="driverLicenseError" class="error-hint">{{ driverLicenseError }}</mat-hint>
+        <button mat-icon-button matSuffix *ngIf="filterForm.get('driverLicense')?.value" 
+                (click)="clearField('driverLicense')" type="button" tabindex="-1">
           <mat-icon>clear</mat-icon>
         </button>
       </mat-form-field>
@@ -75,11 +89,20 @@
     <table mat-table [dataSource]="trips" class="trip-table" 
            role="table" [attr.aria-label]="'Trip list with ' + totalTrips + ' total trips'">
       <!-- Date Column -->
-      <ng-container matColumnDef="scheduledPickupDatetime">
+      <ng-container matColumnDef="scheduledTimestamp">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Date</th>
         <td mat-cell *matCellDef="let trip" role="gridcell" 
-            [attr.aria-label]="'Scheduled for ' + formatDate(trip.scheduledPickupDatetime)">
-          {{ formatDate(trip.scheduledPickupDatetime) }}
+            [attr.aria-label]="'Scheduled for ' + formatDate(trip.scheduledTimestamp)">
+          {{ formatDate(trip.scheduledTimestamp) }}
+        </td>
+      </ng-container>
+
+      <!-- Time Column -->
+      <ng-container matColumnDef="scheduledTime">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Time</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell" 
+            [attr.aria-label]="'Scheduled at ' + formatTime(trip.scheduledTimestamp)">
+          {{ formatTime(trip.scheduledTimestamp) }}
         </td>
       </ng-container>
 
@@ -87,9 +110,10 @@
       <ng-container matColumnDef="pickupLocation">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Pickup</th>
         <td mat-cell *matCellDef="let trip" class="location-cell" role="gridcell"
-            [attr.aria-label]="'Pickup location: ' + trip.pickupLocation">
-          <span [matTooltip]="trip.pickupLocation" [attr.aria-label]="trip.pickupLocation">
-            {{ trip.pickupLocation }}
+            [attr.aria-label]="'Pickup location: ' + (trip.pickupLocation || (trip.pickupCity + ', ' + trip.pickupState))">
+          <span [matTooltip]="trip.pickupLocation || (trip.pickupCity + ', ' + trip.pickupState)" 
+                [attr.aria-label]="trip.pickupLocation || (trip.pickupCity + ', ' + trip.pickupState)">
+            {{ trip.pickupLocation || (trip.pickupCity + ', ' + trip.pickupState) }}
           </span>
         </td>
       </ng-container>
@@ -98,9 +122,10 @@
       <ng-container matColumnDef="dropoffLocation">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Dropoff</th>
         <td mat-cell *matCellDef="let trip" class="location-cell" role="gridcell"
-            [attr.aria-label]="'Dropoff location: ' + trip.dropoffLocation">
-          <span [matTooltip]="trip.dropoffLocation" [attr.aria-label]="trip.dropoffLocation">
-            {{ trip.dropoffLocation }}
+            [attr.aria-label]="'Dropoff location: ' + (trip.dropoffLocation || (trip.deliveryCity + ', ' + trip.deliveryState))">
+          <span [matTooltip]="trip.dropoffLocation || (trip.deliveryCity + ', ' + trip.deliveryState)" 
+                [attr.aria-label]="trip.dropoffLocation || (trip.deliveryCity + ', ' + trip.deliveryState)">
+            {{ trip.dropoffLocation || (trip.deliveryCity + ', ' + trip.deliveryState) }}
           </span>
         </td>
       </ng-container>
@@ -109,26 +134,35 @@
       <ng-container matColumnDef="brokerName">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Broker</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Broker: ' + trip.brokerName">
-          {{ trip.brokerName }}
+            [attr.aria-label]="'Broker: ' + (trip.brokerName || trip.brokerId)">
+          {{ trip.brokerName || trip.brokerId }}
         </td>
       </ng-container>
 
       <!-- Truck Column -->
-      <ng-container matColumnDef="lorryId">
+      <ng-container matColumnDef="truckId">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Truck</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Truck ID: ' + trip.lorryId">
-          {{ trip.lorryId }}
+            [attr.aria-label]="'Truck ID: ' + trip.truckId">
+          {{ getTruckDisplay(trip.truckId) }}
+        </td>
+      </ng-container>
+
+      <!-- Trailer Column -->
+      <ng-container matColumnDef="trailerId">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Trailer</th>
+        <td mat-cell *matCellDef="let trip" role="gridcell"
+            [attr.aria-label]="'Trailer ID: ' + trip.trailerId">
+          {{ getTrailerDisplay(trip.trailerId) }}
         </td>
       </ng-container>
 
       <!-- Driver Column -->
       <ng-container matColumnDef="driverName">
-        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Driver</th>
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Driver License</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Driver: ' + trip.driverName">
-          {{ trip.driverName }}
+            [attr.aria-label]="'Driver license: ' + (trip.driverLicense || trip.driverId)">
+          {{ trip.driverLicense || getDriverDisplay(trip.driverId) }}
         </td>
       </ng-container>
 
@@ -136,10 +170,10 @@
       <ng-container matColumnDef="status">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Status</th>
         <td mat-cell *matCellDef="let trip" role="gridcell">
-          <mat-chip [class]="getStatusClass(trip.status)"
-                    [attr.aria-label]="getStatusAriaLabel(trip.status)"
+          <mat-chip [class]="getStatusClass(trip.orderStatus || trip.status || 'Scheduled')"
+                    [attr.aria-label]="getStatusAriaLabel(trip.orderStatus || trip.status || 'Scheduled')"
                     role="status">
-            {{ getStatusLabel(trip.status) }}
+            {{ getStatusLabel(trip.orderStatus || trip.status || 'Scheduled') }}
           </mat-chip>
         </td>
       </ng-container>
@@ -210,7 +244,7 @@
           class="trip-row"
           role="row"
           [attr.aria-rowindex]="i + 2"
-          [attr.aria-label]="'Trip from ' + row.pickupLocation + ' to ' + row.dropoffLocation + ' on ' + formatDate(row.scheduledPickupDatetime)"></tr>
+          [attr.aria-label]="'Trip from ' + row.pickupLocation + ' to ' + row.dropoffLocation + ' on ' + formatDate(row.scheduledTimestamp)"></tr>
     </table>
 
     <!-- Pagination -->

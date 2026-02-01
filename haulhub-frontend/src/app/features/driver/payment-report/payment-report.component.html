@@ -136,27 +136,27 @@
         <div class="table-container">
           <table mat-table [dataSource]="report.trips" class="trips-table">
             <!-- Date Column -->
-            <ng-container matColumnDef="scheduledPickupDatetime">
+            <ng-container matColumnDef="scheduledTimestamp">
               <th mat-header-cell *matHeaderCellDef>Date</th>
-              <td mat-cell *matCellDef="let trip">{{ formatDate(trip.scheduledPickupDatetime) }}</td>
+              <td mat-cell *matCellDef="let trip">{{ formatDate(trip.scheduledTimestamp) }}</td>
             </ng-container>
 
             <!-- Pickup Column -->
-            <ng-container matColumnDef="pickupLocation">
+            <ng-container matColumnDef="pickupCity">
               <th mat-header-cell *matHeaderCellDef>Pickup</th>
-              <td mat-cell *matCellDef="let trip">{{ trip.pickupLocation }}</td>
+              <td mat-cell *matCellDef="let trip">{{ trip.pickupCity }}, {{ trip.pickupState }}</td>
             </ng-container>
 
-            <!-- Dropoff Column -->
-            <ng-container matColumnDef="dropoffLocation">
-              <th mat-header-cell *matHeaderCellDef>Dropoff</th>
-              <td mat-cell *matCellDef="let trip">{{ trip.dropoffLocation }}</td>
+            <!-- Delivery Column -->
+            <ng-container matColumnDef="deliveryCity">
+              <th mat-header-cell *matHeaderCellDef>Delivery</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.deliveryCity }}, {{ trip.deliveryState }}</td>
             </ng-container>
 
-            <!-- Lorry Column -->
-            <ng-container matColumnDef="lorryId">
-              <th mat-header-cell *matHeaderCellDef>Lorry</th>
-              <td mat-cell *matCellDef="let trip">{{ trip.lorryId }}</td>
+            <!-- Truck Column -->
+            <ng-container matColumnDef="truckId">
+              <th mat-header-cell *matHeaderCellDef>Truck</th>
+              <td mat-cell *matCellDef="let trip">{{ trip.truckId }}</td>
             </ng-container>
 
             <!-- Broker Column -->
@@ -174,16 +174,16 @@
             </ng-container>
 
             <!-- Distance Column -->
-            <ng-container matColumnDef="distance">
+            <ng-container matColumnDef="mileageOrder">
               <th mat-header-cell *matHeaderCellDef>Distance</th>
-              <td mat-cell *matCellDef="let trip">{{ formatDistance(trip.distance) }}</td>
+              <td mat-cell *matCellDef="let trip">{{ formatDistance(trip.mileageOrder) }}</td>
             </ng-container>
 
             <!-- Status Column -->
-            <ng-container matColumnDef="status">
+            <ng-container matColumnDef="orderStatus">
               <th mat-header-cell *matHeaderCellDef>Status</th>
               <td mat-cell *matCellDef="let trip">
-                <span class="status-badge">{{ getStatusLabel(trip.status) }}</span>
+                <span class="status-badge">{{ getStatusLabel(trip.orderStatus) }}</span>
               </td>
             </ng-container>
 

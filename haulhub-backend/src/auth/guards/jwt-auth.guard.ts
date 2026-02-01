@@ -50,12 +50,19 @@ export class JwtAuthGuard implements CanActivate {
       const groups = payload['cognito:groups'] || [];
       const role = groups.length > 0 ? groups[0] : null;
 
+      // Get additional user details from Cognito using the sub (userId)
+      // This ensures we have carrierId and nationalId on every request
+      // For carriers, carrierId will be set to userId (self-reference) if it's a placeholder
+      const userDetails = await this.authService.getUserDetailsByUsername(payload.sub);
+
       // Attach user information to request object
       request.user = {
         userId: payload.sub,
-        email: payload.email,
+        email: userDetails.email,
         role: role,
-        username: payload.username || payload['cognito:username'],
+        username: payload.username || payload['cognito:username'] || userDetails.email,
+        carrierId: userDetails.carrierId,
+        nationalId: userDetails.nationalId,
       };
 
       return true;

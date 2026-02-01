@@ -305,3 +305,77 @@
     }
   }
 }
+
+// Subsection styling for truck/trailer
+.subsection {
+  margin: 8px 0;
+  
+  h4 {
+    margin: 8px 0 12px 0;
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+}
+
+// ID display styling
+.detail-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: #999;
+}
+
+// Section titles in payment card
+.section-title {
+  margin: 12px 0 8px 0;
+  color: #666;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.total-row {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+// Indented rows for sub-items (advances, balances)
+.indent {
+  padding-left: 20px;
+  
+  .detail-label {
+    font-size: 13px;
+    color: #777;
+  }
+}
+
+// Payment info styling (for advances/balances)
+.payment-info {
+  color: #1976d2;
+  font-weight: 500;
+}
+
+// Payment card spans full width
+.payment-card {
+  grid-column: 1 / -1; // Span all columns
+  
+  mat-card-content {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    
+    > div {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+}
+
+// Payment column styling
+.payment-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

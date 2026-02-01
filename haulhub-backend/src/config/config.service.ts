@@ -15,19 +15,23 @@ export class ConfigService {
   }
 
   get tripsTableName(): string {
-    return process.env.TRIPS_TABLE_NAME || 'haulhub-trips-table-dev';
+    return process.env.TRIPS_TABLE_NAME || 'eTrucky-Trips';
   }
 
   get brokersTableName(): string {
-    return process.env.BROKERS_TABLE_NAME || 'haulhub-brokers-table-dev';
+    return process.env.BROKERS_TABLE_NAME || 'eTrucky-Brokers';
   }
 
   get lorriesTableName(): string {
-    return process.env.LORRIES_TABLE_NAME || 'haulhub-lorries-table-dev';
+    return process.env.LORRIES_TABLE_NAME || 'eTrucky-Trucks';
   }
 
   get usersTableName(): string {
-    return process.env.USERS_TABLE_NAME || 'haulhub-users-table-dev';
+    return process.env.USERS_TABLE_NAME || 'eTrucky-Users';
+  }
+
+  get trailersTableName(): string {
+    return process.env.TRAILERS_TABLE_NAME || 'eTrucky-Trailers';
   }
 
   get s3DocumentsBucketName(): string {

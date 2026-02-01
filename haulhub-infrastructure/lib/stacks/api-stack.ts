@@ -24,14 +24,17 @@ export interface ApiStackProps extends HaulHubStackProps {
   userPoolId: string;
   userPoolArn: string;
   userPoolClientId: string;
-  tripsTableName: string;
-  tripsTableArn: string;
-  brokersTableName: string;
-  brokersTableArn: string;
-  lorriesTableName: string;
-  lorriesTableArn: string;
-  usersTableName: string;
-  usersTableArn: string;
+  // eTrucky tables (new architecture)
+  eTruckyBrokersTableName: string;
+  eTruckyBrokersTableArn: string;
+  eTruckyUsersTableName: string;
+  eTruckyUsersTableArn: string;
+  eTruckyTrucksTableName: string;
+  eTruckyTrucksTableArn: string;
+  eTruckyTrailersTableName: string;
+  eTruckyTrailersTableArn: string;
+  eTruckyTripsTableName: string;
+  eTruckyTripsTableArn: string;
   documentsBucketName: string;
   documentsBucketArn: string;
   allowedOrigins?: string;
@@ -54,7 +57,7 @@ export class ApiStack extends cdk.Stack {
       ],
     });
 
-    // Grant DynamoDB permissions for dedicated tables
+    // Grant DynamoDB permissions for eTrucky tables
     lambdaRole.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
@@ -68,12 +71,15 @@ export class ApiStack extends cdk.Stack {
         'dynamodb:BatchWriteItem',
       ],
       resources: [
-        props.tripsTableArn,
-        `${props.tripsTableArn}/index/*`,
-        props.brokersTableArn,
-        props.lorriesTableArn,
-        `${props.lorriesTableArn}/index/*`,
-        props.usersTableArn,
+        props.eTruckyBrokersTableArn,
+        props.eTruckyUsersTableArn,
+        `${props.eTruckyUsersTableArn}/index/*`,
+        props.eTruckyTrucksTableArn,
+        `${props.eTruckyTrucksTableArn}/index/*`,
+        props.eTruckyTrailersTableArn,
+        `${props.eTruckyTrailersTableArn}/index/*`,
+        props.eTruckyTripsTableArn,
+        `${props.eTruckyTripsTableArn}/index/*`,
       ],
     }));
 
@@ -130,15 +136,18 @@ export class ApiStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(props.config.lambdaTimeout),
       environment: {
         NODE_ENV: props.environment,
-        TRIPS_TABLE_NAME: props.tripsTableName,
-        BROKERS_TABLE_NAME: props.brokersTableName,
-        LORRIES_TABLE_NAME: props.lorriesTableName,
-        USERS_TABLE_NAME: props.usersTableName,
+        // Table names (pointing to eTrucky tables)
+        TRIPS_TABLE_NAME: props.eTruckyTripsTableName,
+        BROKERS_TABLE_NAME: props.eTruckyBrokersTableName,
+        LORRIES_TABLE_NAME: props.eTruckyTrucksTableName,
+        TRAILERS_TABLE_NAME: props.eTruckyTrailersTableName,
+        USERS_TABLE_NAME: props.eTruckyUsersTableName,
+        // AWS Services
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         DOCUMENTS_BUCKET_NAME: props.documentsBucketName,
         ALLOWED_ORIGINS: this.getAllowedOrigins(props).join(','),
-        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1', // Improve performance
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       },
       description: 'HaulHub Backend API (NestJS)',
       logGroup: logGroup,

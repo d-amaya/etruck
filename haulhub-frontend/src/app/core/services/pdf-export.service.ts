@@ -195,17 +195,19 @@ export class PdfExportService {
 
       const tripTableData = trips.map(trip => {
         const profit = this.calculateProfit(trip);
+        const pickupLocation = trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '';
+        const dropoffLocation = trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '';
         return [
-          this.formatDate(trip.scheduledPickupDatetime),
-          this.truncateText(trip.pickupLocation, 20),
-          this.truncateText(trip.dropoffLocation, 20),
-          this.truncateText(trip.brokerName, 18),
-          trip.lorryId,
-          this.truncateText(trip.driverName, 18),
-          this.getStatusLabel(trip.status),
+          this.formatDate(trip.scheduledTimestamp),
+          this.truncateText(pickupLocation, 20),
+          this.truncateText(dropoffLocation, 20),
+          this.truncateText(trip.brokerName || 'N/A', 18),
+          trip.truckId,
+          this.truncateText(trip.driverName || 'N/A', 18),
+          this.getStatusLabel(trip.orderStatus as any),
           this.formatCurrency(trip.brokerPayment),
           this.formatCurrency(trip.driverPayment),
-          this.formatCurrency(trip.lorryOwnerPayment),
+          this.formatCurrency(trip.truckOwnerPayment),
           this.formatCurrency(profit)
         ];
       });
@@ -353,8 +355,8 @@ export class PdfExportService {
       }
     }
 
-    if (filters.lorryId) {
-      parts.push(`Lorry: ${filters.lorryId}`);
+    if (filters.truckId) {
+      parts.push(`Truck: ${filters.truckId}`);
     }
 
     if (filters.driverName) {
@@ -387,13 +389,13 @@ export class PdfExportService {
       apiFilters.endDate = filters.dateRange.endDate.toISOString();
     }
     if (filters.status) {
-      apiFilters.status = filters.status;
+      apiFilters.orderStatus = filters.status as any;
     }
     if (filters.brokerId) {
       apiFilters.brokerId = filters.brokerId;
     }
-    if (filters.lorryId) {
-      apiFilters.lorryId = filters.lorryId;
+    if (filters.truckId) {
+      apiFilters.truckId = filters.truckId;
     }
     if (filters.driverName) {
       apiFilters.driverName = filters.driverName;

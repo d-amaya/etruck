@@ -82,7 +82,7 @@
                   </thead>
                   <tbody>
                     <tr *ngFor="let vehicle of vehicleUtilizationData">
-                      <td>{{ vehicle.vehicleId }}</td>
+                      <td>{{ vehicle.vehicleName }}</td>
                       <td>{{ vehicle.totalTrips }}</td>
                       <td>{{ vehicle.totalDistance | number:'1.0-0' }} mi</td>
                       <td>{{ formatCurrency(vehicle.totalRevenue) }}</td>

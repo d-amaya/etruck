@@ -2,37 +2,38 @@ export interface PaymentReportFilters {
   startDate?: string;
   endDate?: string;
   brokerId?: string;
-  lorryId?: string;
+  truckId?: string;
+  lorryId?: string; // Legacy - maps to truckId
   driverId?: string;
   dispatcherId?: string;
-  groupBy?: 'broker' | 'driver' | 'lorry' | 'dispatcher';
+  groupBy?: 'broker' | 'driver' | 'truck' | 'dispatcher';
 }
 
 export interface TripPaymentDetail {
   tripId: string;
   dispatcherId: string;
-  scheduledPickupDatetime: string;
+  scheduledTimestamp: string;
   pickupLocation: string;
   dropoffLocation: string;
   brokerId: string;
   brokerName: string;
-  lorryId: string;
+  truckId: string;
   driverId: string;
   driverName: string;
   brokerPayment: number;
-  lorryOwnerPayment: number;
+  truckOwnerPayment: number;
   driverPayment: number;
-  distance?: number;
+  mileageOrder?: number;
   // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
   lumperFees?: number;
   detentionFees?: number;
-  status: string;
+  orderStatus: string;
 }
 
 export interface DispatcherPaymentReport {
   totalBrokerPayments: number;
   totalDriverPayments: number;
-  totalLorryOwnerPayments: number;
+  totalTruckOwnerPayments: number;
   // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
   totalLumperFees?: number;
   totalDetentionFees?: number;
@@ -50,7 +51,7 @@ export interface DispatcherPaymentReport {
     totalPayment: number;
     tripCount: number;
   }>;
-  groupedByLorry?: Record<string, {
+  groupedByTruck?: Record<string, {
     totalPayment: number;
     tripCount: number;
   }>;
@@ -67,11 +68,11 @@ export interface DriverPaymentReport {
   }>;
 }
 
-export interface LorryOwnerPaymentReport {
-  totalLorryOwnerPayments: number;
+export interface TruckOwnerPaymentReport {
+  totalTruckOwnerPayments: number;
   tripCount: number;
   trips: TripPaymentDetail[];
-  groupedByLorry?: Record<string, {
+  groupedByTruck?: Record<string, {
     totalPayment: number;
     tripCount: number;
   }>;
@@ -81,4 +82,4 @@ export interface LorryOwnerPaymentReport {
   }>;
 }
 
-export type PaymentReport = DispatcherPaymentReport | DriverPaymentReport | LorryOwnerPaymentReport;
+export type PaymentReport = DispatcherPaymentReport | DriverPaymentReport | TruckOwnerPaymentReport;

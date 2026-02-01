@@ -26,4 +26,6 @@ export class AuthResponse {
   role!: UserRole;
   email!: string;
   fullName!: string;
+  carrierId?: string;
+  nationalId?: string;
 }

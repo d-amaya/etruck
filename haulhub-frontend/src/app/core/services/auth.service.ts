@@ -12,6 +12,8 @@ interface UserData {
   role: UserRole;
   email: string;
   fullName: string;
+  carrierId?: string;
+  nationalId?: string;
 }
 
 @Injectable({
@@ -30,7 +32,7 @@ export class AuthService {
     private http: HttpClient,
     private router: Router
   ) {
-    console.log('AuthService initializing...');
+    
     // Initialize the subject with stored user data
     let storedUser: UserData | null = null;
     try {
@@ -104,6 +106,13 @@ export class AuthService {
    */
   get userRole(): UserRole | null {
     return this.currentUserValue?.role || null;
+  }
+
+  /**
+   * Get the current user's carrier ID
+   */
+  get carrierId(): string | null {
+    return this.currentUserValue?.carrierId || null;
   }
 
   /**
@@ -227,11 +236,11 @@ export class AuthService {
       userId: response.userId,
       role: response.role,
       email: response.email,
-      fullName: response.fullName
+      fullName: response.fullName,
+      carrierId: response.carrierId,
+      nationalId: response.nationalId
     };
-
-    console.log('Storing auth data:', { userId: userData.userId, role: userData.role });
-
+    
     // Store user data and tokens in localStorage
     this.storeUserData(userData);
     if (response.accessToken) {

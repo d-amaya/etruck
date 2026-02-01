@@ -4,31 +4,18 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { FormBuilder } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Trip, TripStatus } from '@haulhub/shared';
+import { createMockTrip } from '../../../testing/mock-trip.helper';
 
 describe('StatusUpdateDialogComponent', () => {
   let component: StatusUpdateDialogComponent;
   let fixture: ComponentFixture<StatusUpdateDialogComponent>;
   let mockDialogRef: jasmine.SpyObj<MatDialogRef<StatusUpdateDialogComponent>>;
 
-  const mockTrip: Trip = {
+  const mockTrip: Trip = createMockTrip({
     tripId: 'trip-1',
-    dispatcherId: 'dispatcher-1',
-    pickupLocation: 'New York',
-    dropoffLocation: 'Boston',
-    scheduledPickupDatetime: '2024-01-15T10:00:00Z',
-    brokerId: 'broker-1',
-    brokerName: 'Test Broker',
-    lorryId: 'ABC123',
-    driverId: 'driver-1',
-    driverName: 'John Doe',
-    brokerPayment: 1000,
-    lorryOwnerPayment: 400,
-    driverPayment: 300,
-    status: TripStatus.Scheduled,
-    distance: 215,
-    createdAt: '2024-01-10T10:00:00Z',
-    updatedAt: '2024-01-10T10:00:00Z'
-  };
+    truckId: 'ABC123',
+    orderStatus: TripStatus.Scheduled
+  });
 
   beforeEach(async () => {
     mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
@@ -68,7 +55,7 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should set default status to InTransit when current status is PickedUp', () => {
-    const pickedUpTrip = { ...mockTrip, status: TripStatus.PickedUp };
+    const pickedUpTrip = createMockTrip({ orderStatus: TripStatus.PickedUp });
     const newComponent = new StatusUpdateDialogComponent(
       new FormBuilder(),
       mockDialogRef,
@@ -78,7 +65,7 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should set default status to Delivered when current status is InTransit', () => {
-    const inTransitTrip = { ...mockTrip, status: TripStatus.InTransit };
+    const inTransitTrip = createMockTrip({ orderStatus: TripStatus.InTransit });
     const newComponent = new StatusUpdateDialogComponent(
       new FormBuilder(),
       mockDialogRef,
