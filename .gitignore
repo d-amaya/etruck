@@ -43,6 +43,7 @@ scripts/fix-broker-names.py
 scripts/check-sensitive-data.sh
 scripts/TEST-DATA-GUIDE.md
 scripts/README.md
+scripts/etrucky-backend-api-integration-test.sh
 
 # Logs
 logs/
