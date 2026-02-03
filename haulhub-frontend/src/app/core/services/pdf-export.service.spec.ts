@@ -83,9 +83,14 @@ describe('PdfExportService', () => {
   const mockPaymentSummary = {
     totalBrokerPayments: 50000,
     totalDriverPayments: 20000,
-    totalLorryOwnerPayments: 15000,
+    totalTruckOwnerPayments: 15000,
     totalProfit: 15000
   };
+
+  const mockTrucks = [
+    { truckId: 'truck-1', plate: 'ABC-1234', brand: 'Volvo', year: 2020, isActive: true },
+    { truckId: 'truck-2', plate: 'XYZ-5678', brand: 'Freightliner', year: 2021, isActive: true }
+  ];
 
   const mockFilters = {
     dateRange: { startDate: null, endDate: null },
@@ -100,7 +105,8 @@ describe('PdfExportService', () => {
     const tripSpy = jasmine.createSpyObj('TripService', [
       'getTrips',
       'getTripSummaryByStatus',
-      'getPaymentSummary'
+      'getPaymentSummary',
+      'getTrucksByCarrier'
     ]);
     const dashboardSpy = jasmine.createSpyObj('DashboardStateService', ['getBrokers']);
 
@@ -110,6 +116,7 @@ describe('PdfExportService', () => {
     tripSpy.getTrips.and.returnValue(of({ trips: [mockTrip], lastEvaluatedKey: undefined }));
     tripSpy.getTripSummaryByStatus.and.returnValue(of(mockSummaryByStatus));
     tripSpy.getPaymentSummary.and.returnValue(of(mockPaymentSummary));
+    tripSpy.getTrucksByCarrier.and.returnValue(of(mockTrucks));
     dashboardSpy.getBrokers.and.returnValue([
       { brokerId: 'broker-1', brokerName: 'Test Broker', isActive: true }
     ]);
@@ -139,6 +146,7 @@ describe('PdfExportService', () => {
     expect(tripServiceSpy.getTrips).toHaveBeenCalled();
     expect(tripServiceSpy.getTripSummaryByStatus).toHaveBeenCalled();
     expect(tripServiceSpy.getPaymentSummary).toHaveBeenCalled();
+    expect(tripServiceSpy.getTrucksByCarrier).toHaveBeenCalled();
   });
 
   it('should handle export error gracefully', () => {
@@ -279,5 +287,23 @@ describe('PdfExportService', () => {
     expect(apiFilters.truckId).toBe('ABC123');
     expect(apiFilters.driverName).toBe('John Doe');
     expect(apiFilters.driverId).toBeUndefined();
+  });
+
+  it('should get truck display with valid truckId', () => {
+    // Populate the truck map
+    (service as any).truckMap.set('truck-1', mockTrucks[0]);
+    
+    const display = (service as any).getTruckDisplay('truck-1');
+    expect(display).toBe('ABC-1234');
+  });
+
+  it('should return N/A for invalid truckId', () => {
+    const display = (service as any).getTruckDisplay('invalid-truck');
+    expect(display).toBe('N/A');
+  });
+
+  it('should return N/A for null truckId', () => {
+    const display = (service as any).getTruckDisplay(null);
+    expect(display).toBe('N/A');
   });
 });
