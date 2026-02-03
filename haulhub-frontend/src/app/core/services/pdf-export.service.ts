@@ -11,6 +11,8 @@ import { switchMap } from 'rxjs/operators';
   providedIn: 'root'
 })
 export class PdfExportService {
+  private truckMap = new Map<string, any>();
+
   constructor(
     private tripService: TripService,
     private dashboardState: DashboardStateService
@@ -23,9 +25,16 @@ export class PdfExportService {
     forkJoin({
       trips: this.fetchAllTrips(this.buildApiFilters(filters)),
       summaryByStatus: this.tripService.getTripSummaryByStatus(this.buildApiFilters(filters)),
-      paymentSummary: this.tripService.getPaymentSummary(this.buildApiFilters(filters))
+      paymentSummary: this.tripService.getPaymentSummary(this.buildApiFilters(filters)),
+      trucks: this.tripService.getTrucksByCarrier()
     }).subscribe({
       next: (data) => {
+        // Populate truck map for plate lookups
+        this.truckMap.clear();
+        data.trucks.forEach(truck => {
+          this.truckMap.set(truck.truckId, truck);
+        });
+        
         this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, filters);
       },
       error: (error) => {
@@ -131,7 +140,7 @@ export class PdfExportService {
 
     // Card 3: Total Expenses
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,
-      'Total Expenses', this.formatCurrency(paymentSummary.totalDriverPayments + paymentSummary.totalLorryOwnerPayments), lossRed);
+      'Total Expenses', this.formatCurrency(paymentSummary.totalDriverPayments + paymentSummary.totalTruckOwnerPayments), lossRed);
 
     // Card 4: Net Profit
     const isProfit = paymentSummary.totalProfit >= 0;
@@ -202,7 +211,7 @@ export class PdfExportService {
           this.truncateText(pickupLocation, 20),
           this.truncateText(dropoffLocation, 20),
           this.truncateText(trip.brokerName || 'N/A', 18),
-          trip.truckId,
+          this.getTruckDisplay(trip.truckId),
           this.truncateText(trip.driverName || 'N/A', 18),
           this.getStatusLabel(trip.orderStatus as any),
           this.formatCurrency(trip.brokerPayment),
@@ -435,6 +444,15 @@ export class PdfExportService {
 
   private calculateProfit(trip: Trip): number {
     return calculateTripProfit(trip);
+  }
+
+  /**
+   * Get truck display name (plate)
+   */
+  private getTruckDisplay(truckId: string): string {
+    if (!truckId) return 'N/A';
+    const truck = this.truckMap.get(truckId);
+    return truck ? truck.plate : 'N/A';
   }
 
   /**
