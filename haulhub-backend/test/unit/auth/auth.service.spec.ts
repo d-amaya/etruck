@@ -39,7 +39,7 @@ describe('AuthService', () => {
             awsRegion: 'us-east-1',
             cognitoUserPoolId: 'us-east-1_test',
             cognitoClientId: 'test-client-id',
-            usersTableName: 'haulhub-users-table-dev',
+            usersTableName: 'eTrucky-Users',
           },
         },
         {

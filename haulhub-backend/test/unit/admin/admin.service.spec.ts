@@ -54,8 +54,8 @@ describe('AdminService', () => {
         {
           provide: ConfigService,
           useValue: {
-            usersTableName: 'haulhub-users-table-dev',
-            lorriesTableName: 'haulhub-lorries-table-dev',
+            usersTableName: 'eTrucky-Users',
+            lorriesTableName: 'eTrucky-Trucks',
           },
         },
       ],
