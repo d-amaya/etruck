@@ -46,12 +46,24 @@ export interface TopDriver {
   completedTrips: number;
 }
 
+export interface ChartAggregates {
+  totalRevenue: number;
+  totalExpenses: number;
+  statusBreakdown: { [key: string]: number };
+  topBrokers: Array<{ name: string; revenue: number; count: number }>;
+  topDispatchers: Array<{ name: string; profit: number; count: number }>;
+  topDrivers: Array<{ name: string; trips: number }>;
+  totalTripsInRange: number;
+}
+
 export interface DashboardResponse {
   metrics: DashboardMetrics;
   financialSummary: FinancialSummary;
   topBrokers: TopBroker[];
   topDrivers: TopDriver[];
-  recentActivity: any[]; // Trip[]
+  recentActivity: any[];
+  chartAggregates: ChartAggregates; // Pre-calculated aggregates
+  trips: any[]; // First page of trips only
 }
 
 export interface User {

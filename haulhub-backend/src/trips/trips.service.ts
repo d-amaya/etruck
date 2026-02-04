@@ -1672,18 +1672,28 @@ export class TripsService {
       expressionAttributeValues[':endSk'] = `${endDateStr}#ZZZZZZZZ`;
     }
 
-    const requestedLimit = filters.limit ? Number(filters.limit) : 50;
+    const requestedLimit = filters.limit ? Number(filters.limit) : 999999; // No limit = fetch all
     const allTrips: Trip[] = [];
     let dynamoDBLastKey = filters.lastEvaluatedKey;
     
-    const maxBatches = 10;
+    const maxBatches = 50; // Increased to ensure we can fetch all trips
     let batchCount = 0;
     const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId || filters.driverId || filters.dispatcherId);
-    const batchSize = hasSecondaryFilters ? 200 : requestedLimit;
+    
+    // Progressive batch sizing: start with 50, increase by 50 each iteration
+    let currentBatchSize = 50;
+    const fetchingAll = !filters.limit || filters.limit >= 999999;
 
-    // Fetch batches until we have enough filtered results
+    console.log(`[getTripsForCarrier] Starting fetch: requestedLimit=${requestedLimit}, fetchingAll=${fetchingAll}`);
+
+    // Fetch batches until we have all trips or enough filtered results
     while (batchCount < maxBatches) {
       batchCount++;
+      
+      // Progressive batch sizing: increase by 50 each iteration
+      const batchSize = hasSecondaryFilters || fetchingAll ? currentBatchSize : requestedLimit;
+      
+      console.log(`[getTripsForCarrier] Batch ${batchCount}: requesting ${batchSize} items`);
       
       // Build query params - NO FilterExpression
       const queryParams: any = {
@@ -1711,7 +1721,8 @@ export class TripsService {
       const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
       allTrips.push(...batchTrips);
       
-      console.log(`[getTripsForCarrier] Batch ${batchCount}: fetched ${batchTrips.length} trips`);
+      console.log(`[getTripsForCarrier] Batch ${batchCount}: fetched ${batchTrips.length} trips (total so far: ${allTrips.length})`);
+      
       if (filters.brokerId) {
         const brokerMatches = batchTrips.filter(t => t.brokerId === filters.brokerId);
         console.log(`[getTripsForCarrier] Batch ${batchCount}: ${brokerMatches.length} trips match broker ${filters.brokerId}`);
@@ -1724,14 +1735,26 @@ export class TripsService {
 
       if (result.LastEvaluatedKey) {
         dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+        // Increase batch size for next iteration if we got a full batch
+        if (batchTrips.length === batchSize) {
+          currentBatchSize += 50;
+          console.log(`[getTripsForCarrier] Full batch received, increasing next batch size to ${currentBatchSize}`);
+        }
       } else {
         dynamoDBLastKey = undefined;
+        console.log(`[getTripsForCarrier] No more items to fetch`);
         break;
+      }
+
+      // If fetching all, continue until no more items
+      if (fetchingAll) {
+        continue;
       }
 
       // Apply filters and check if we have enough
       const filteredSoFar = this.applyAllFilters(allTrips, filters);
       if (filteredSoFar.length >= requestedLimit || !dynamoDBLastKey) {
+        console.log(`[getTripsForCarrier] Stopping: filtered=${filteredSoFar.length}, requested=${requestedLimit}, hasMore=${!!dynamoDBLastKey}`);
         break;
       }
     }

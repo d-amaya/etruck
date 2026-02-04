@@ -1,12 +1,11 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject } from 'rxjs';
-import { takeUntil, switchMap } from 'rxjs/operators';
+import { takeUntil, switchMap, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { DashboardStateService, DashboardFilters } from '../../../dispatcher/dashboard/dashboard-state.service';
-import { SharedFilterService } from '../../../dispatcher/dashboard/shared-filter.service';
+import { CarrierFilterService } from '../../shared/carrier-filter.service';
 import { TripService } from '../../../../core/services';
 import { CarrierService, User } from '../../../../core/services/carrier.service';
 import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateTripExpenses } from '@haulhub/shared';
@@ -38,21 +37,22 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   trips: Trip[] = [];
   loading = true;
   dispatchers: User[] = [];
-  private dispatcherMap = new Map<string, string>(); // dispatcherId -> name
+  private dispatcherMap = new Map<string, string>();
+  private dataLoaded = false; // Track if data has been loaded
 
   // Math utility for template
   Math = Math;
 
-  // Chart data
+  // Chart data - will be populated from backend aggregates
   revenueData = { revenue: 0, expenses: 0, profit: 0 };
   statusData: { [key: string]: number } = {};
   topBrokers: TopPerformer[] = [];
   topDispatchers: TopPerformer[] = [];
   topDrivers: TopPerformer[] = [];
+  totalTripsInRange = 0;
 
   constructor(
-    private dashboardState: DashboardStateService,
-    private sharedFilterService: SharedFilterService,
+    private carrierFilterService: CarrierFilterService,
     private tripService: TripService,
     private carrierService: CarrierService
   ) {}
@@ -61,61 +61,64 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     // Load dispatchers first
     this.loadDispatchers();
     
-    let previousDateRange: { startDate: Date | null; endDate: Date | null } | null = null;
-    
-    this.sharedFilterService.filters$
+    this.carrierFilterService.dateFilter$
       .pipe(
+        debounceTime(50), // Wait 50ms for both dates to be set
+        distinctUntilChanged((prev, curr) => 
+          prev.startDate?.getTime() === curr.startDate?.getTime() &&
+          prev.endDate?.getTime() === curr.endDate?.getTime()
+        ),
         takeUntil(this.destroy$),
-        switchMap(filters => {
-          const dateRangeChanged = !previousDateRange ||
-            filters.dateRange.startDate?.getTime() !== previousDateRange.startDate?.getTime() ||
-            filters.dateRange.endDate?.getTime() !== previousDateRange.endDate?.getTime();
-          
-          previousDateRange = { ...filters.dateRange };
-          
-          if (!dateRangeChanged && this.trips.length > 0) {
-            return [];
-          }
-          
+        switchMap(dateFilter => {
+          console.log('[Carrier Charts Widget] Loading data for date range:', dateFilter);
           this.loading = true;
-          const apiFilters = this.buildApiFiltersForCharts(filters);
-          return this.tripService.getTrips(apiFilters);
+          this.dataLoaded = false;
+          // Use dashboard endpoint to get ALL trips for accurate aggregation
+          return this.carrierService.getDashboardMetrics(dateFilter.startDate, dateFilter.endDate);
         })
       )
       .subscribe({
         next: (response) => {
-          if (!response || !response.trips) return;
+          if (!response) return;
           
-          this.trips = response.trips || [];
+          // Use pre-calculated aggregates from backend
+          const agg = response.chartAggregates;
+          this.totalTripsInRange = agg.totalTripsInRange;
+          
+          this.revenueData = {
+            revenue: agg.totalRevenue,
+            expenses: agg.totalExpenses,
+            profit: agg.totalRevenue - agg.totalExpenses
+          };
+          
+          this.statusData = agg.statusBreakdown;
+          
+          this.topBrokers = agg.topBrokers.map(b => ({
+            name: b.name,
+            value: b.revenue,
+            count: b.count
+          }));
+          
+          this.topDispatchers = agg.topDispatchers.map(d => ({
+            name: d.name,
+            value: d.profit,
+            count: d.count
+          }));
+          
+          this.topDrivers = agg.topDrivers.map(d => ({
+            name: d.name,
+            value: d.trips,
+            count: d.trips
+          }));
+          
+          console.log(`[Carrier Charts Widget] Loaded aggregates from ${this.totalTripsInRange} trips`);
+          
+          this.dataLoaded = true;
           this.loading = false;
-          this.calculateChartData();
           setTimeout(() => this.tryRenderCharts(), 200);
         },
         error: (error) => {
-          console.error('[Carrier Charts Widget] Error loading trips:', error);
-          this.loading = false;
-        }
-      });
-    
-    this.dashboardState.refreshPaymentSummary$
-      .pipe(
-        takeUntil(this.destroy$),
-        switchMap(() => {
-          this.loading = true;
-          const currentFilters = this.dashboardState.getCurrentFilters();
-          const apiFilters = this.buildApiFiltersForCharts(currentFilters);
-          return this.tripService.getTrips(apiFilters);
-        })
-      )
-      .subscribe({
-        next: (response) => {
-          this.trips = response.trips || [];
-          this.loading = false;
-          this.calculateChartData();
-          setTimeout(() => this.tryRenderCharts(), 200);
-        },
-        error: (error) => {
-          console.error('[Carrier Charts Widget] Error loading trips after refresh:', error);
+          console.error('[Carrier Charts Widget] Error loading dashboard:', error);
           this.loading = false;
         }
       });
@@ -134,29 +137,12 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     });
   }
 
-  private buildApiFiltersForCharts(filters: DashboardFilters): TripFilters {
-    const apiFilters: TripFilters = {
-      limit: 1000
-    };
-
-    if (filters.dateRange.startDate) {
-      apiFilters.startDate = filters.dateRange.startDate.toISOString();
-    }
-    if (filters.dateRange.endDate) {
-      apiFilters.endDate = filters.dateRange.endDate.toISOString();
-    }
-
-    return apiFilters;
-  }
-
   ngAfterViewInit(): void {
-    if (this.trips.length > 0) {
-      setTimeout(() => this.renderCharts(), 100);
-    }
+    // Charts will render when data is loaded
   }
 
   private tryRenderCharts(): void {
-    if (this.trips.length > 0 && 
+    if (this.totalTripsInRange > 0 && 
         this.revenueChartRef && 
         this.statusChartRef && 
         this.topBrokersChartRef &&
@@ -165,105 +151,19 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     }
   }
 
-  private calculateChartData(): void {
-    if (!this.trips || this.trips.length === 0) {
-      return;
-    }
-
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-    let driverPay = 0;
-    let ownerPay = 0;
-    let dispatcherPay = 0;
-    let fuelCost = 0;
-    let fees = 0;
-
-    const statusCounts: { [key: string]: number } = {};
-    const brokerMap = new Map<string, { revenue: number; count: number }>();
-    const dispatcherMap = new Map<string, { profit: number; count: number; name: string }>();
-    const driverMap = new Map<string, { trips: number }>();
-
-    this.trips.forEach(trip => {
-      totalRevenue += trip.brokerPayment || 0;
-      const expenses = calculateTripExpenses(trip);
-      totalExpenses += expenses;
-
-      driverPay += trip.driverPayment || 0;
-      ownerPay += trip.truckOwnerPayment || 0;
-      dispatcherPay += trip.dispatcherPayment || 0;
-      
-      if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
-        const totalMiles = (trip.mileageOrder || 0) + (trip.mileageEmpty || 0);
-        fuelCost += totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost;
-      }
-      
-      fees += (trip.lumperValue || 0) + (trip.detentionValue || 0);
-
-      const status = trip.orderStatus || 'Scheduled';
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-
-      // Broker performance
-      if (trip.brokerName) {
-        const broker = brokerMap.get(trip.brokerName) || { revenue: 0, count: 0 };
-        broker.revenue += trip.brokerPayment || 0;
-        broker.count += 1;
-        brokerMap.set(trip.brokerName, broker);
-      }
-
-      // Dispatcher performance by profit
-      if (trip.dispatcherId) {
-        const dispatcherKey = trip.dispatcherId;
-        const dispatcherName = this.dispatcherMap.get(trip.dispatcherId) || `Dispatcher ${trip.dispatcherId.substring(0, 8)}`;
-        const dispatcher = dispatcherMap.get(dispatcherKey) || { 
-          profit: 0, 
-          count: 0,
-          name: dispatcherName
-        };
-        dispatcher.profit += calculateTripProfit(trip);
-        dispatcher.count += 1;
-        dispatcherMap.set(dispatcherKey, dispatcher);
-      }
-
-      // Driver performance
-      if (trip.driverName) {
-        const driver = driverMap.get(trip.driverName) || { trips: 0 };
-        driver.trips += 1;
-        driverMap.set(trip.driverName, driver);
-      }
-    });
-
-    this.revenueData = {
-      revenue: totalRevenue,
-      expenses: totalExpenses,
-      profit: totalRevenue - totalExpenses
-    };
-
-    this.statusData = statusCounts;
-
-    // Top 5 brokers by revenue
-    this.topBrokers = Array.from(brokerMap.entries())
-      .map(([name, data]) => ({ name, value: data.revenue, count: data.count }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
-    // Top 5 dispatchers by profit
-    this.topDispatchers = Array.from(dispatcherMap.entries())
-      .map(([id, data]) => ({ name: data.name, value: data.profit, count: data.count }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
-    // Top 5 drivers by trip count
-    this.topDrivers = Array.from(driverMap.entries())
-      .map(([name, data]) => ({ name, value: data.trips, count: data.trips }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }
-
   private renderCharts(): void {
     this.charts.forEach(chart => chart.destroy());
     this.charts = [];
 
-    if (this.trips.length === 0) {
+    console.log('[Carrier Charts Widget] Rendering charts with data:', {
+      revenueData: this.revenueData,
+      statusDataKeys: Object.keys(this.statusData),
+      topBrokersCount: this.topBrokers.length,
+      topDispatchersCount: this.topDispatchers.length
+    });
+
+    if (this.totalTripsInRange === 0) {
+      console.log('[Carrier Charts Widget] No trips to render');
       return;
     }
 
@@ -443,13 +343,33 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   }
 
   private getStatusColor(status: string): string {
+    // Handle both camelCase keys from backend and display strings
     switch (status) {
-      case TripStatus.Scheduled: return '#2196f3';
-      case TripStatus.PickedUp: return '#ff9800';
-      case TripStatus.InTransit: return '#9c27b0';
-      case TripStatus.Delivered: return '#4caf50';
-      case TripStatus.Paid: return '#009688';
-      default: return '#757575';
+      case 'scheduled':
+      case 'Scheduled':
+      case TripStatus.Scheduled:
+        return '#2196f3';
+      case 'pickedUp':
+      case 'PickedUp':
+      case 'Picked Up':
+      case TripStatus.PickedUp:
+        return '#ff9800';
+      case 'inTransit':
+      case 'InTransit':
+      case 'In Transit':
+      case TripStatus.InTransit:
+        return '#9c27b0';
+      case 'delivered':
+      case 'Delivered':
+      case TripStatus.Delivered:
+        return '#4caf50';
+      case 'paid':
+      case 'Paid':
+      case TripStatus.Paid:
+        return '#009688';
+      default:
+        console.warn('[Carrier Charts Widget] Unknown status for color:', status);
+        return '#757575';
     }
   }
 

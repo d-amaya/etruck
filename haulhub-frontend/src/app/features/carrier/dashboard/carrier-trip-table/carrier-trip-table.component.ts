@@ -219,17 +219,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       (filters as any).driverId = formValue.driverId;
     }
     if (formValue.truckPlate) {
-      // Convert plate to truckId by looking it up in the truck map
-      const plateInput = formValue.truckPlate.trim().toUpperCase();
-      const truck = this.trucks.find(t => t.plate.toUpperCase() === plateInput);
-      if (truck) {
-        (filters as any).truckId = truck.truckId;
-        console.log('[buildFilters] Converted plate', plateInput, 'to truckId:', truck.truckId);
-      } else {
-        console.log('[buildFilters] No truck found with plate:', plateInput);
-        // Send the plate anyway - backend might support plate filtering
-        (filters as any).truckId = formValue.truckPlate.trim();
-      }
+      // truckPlate now contains the truckId directly from the dropdown
+      (filters as any).truckId = formValue.truckPlate;
+      console.log('[buildFilters] Including truckId:', formValue.truckPlate);
     }
 
     console.log('[buildFilters] Final filters:', filters);

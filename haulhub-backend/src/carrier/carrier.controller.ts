@@ -277,6 +277,76 @@ export class CarrierController {
           };
         });
 
+      // Calculate broker performance (for charts)
+      const brokerPerformance = new Map<string, { revenue: number; count: number; name: string }>();
+      allTrips.forEach(trip => {
+        if (trip.brokerId) {
+          const broker = brokers.find(b => b.brokerId === trip.brokerId);
+          const brokerName = broker?.brokerName || 'Unknown Broker';
+          const existing = brokerPerformance.get(trip.brokerId);
+          if (existing) {
+            existing.revenue += trip.brokerPayment || 0;
+            existing.count++;
+          } else {
+            brokerPerformance.set(trip.brokerId, {
+              revenue: trip.brokerPayment || 0,
+              count: 1,
+              name: brokerName
+            });
+          }
+        }
+      });
+
+      const topBrokersByRevenue = Array.from(brokerPerformance.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5)
+        .map(b => ({ name: b.name, revenue: b.revenue, count: b.count }));
+
+      // Calculate dispatcher performance (for charts)
+      const dispatcherPerformance = new Map<string, { profit: number; count: number; name: string }>();
+      allTrips.forEach(trip => {
+        if (trip.dispatcherId) {
+          const dispatcher = users.find(u => u.userId === trip.dispatcherId);
+          const dispatcherName = dispatcher?.name || 'Unknown Dispatcher';
+          const profit = (trip.brokerPayment || 0) - 
+                        (trip.driverPayment || 0) - 
+                        (trip.truckOwnerPayment || 0) - 
+                        (trip.dispatcherPayment || 0) - 
+                        (trip.fuelCost || 0);
+          const existing = dispatcherPerformance.get(trip.dispatcherId);
+          if (existing) {
+            existing.profit += profit;
+            existing.count++;
+          } else {
+            dispatcherPerformance.set(trip.dispatcherId, {
+              profit,
+              count: 1,
+              name: dispatcherName
+            });
+          }
+        }
+      });
+
+      const topDispatchersByProfit = Array.from(dispatcherPerformance.values())
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 5)
+        .map(d => ({ name: d.name, profit: d.profit, count: d.count }));
+
+      // Calculate aggregated chart data
+      const chartAggregates = {
+        totalRevenue: allTrips.reduce((sum, t) => sum + (t.brokerPayment || 0), 0),
+        totalExpenses: allTrips.reduce((sum, t) => sum + (t.driverPayment || 0) + (t.truckOwnerPayment || 0) + (t.fuelCost || 0), 0),
+        statusBreakdown: tripStatusBreakdown,
+        topBrokers: topBrokersByRevenue,
+        topDispatchers: topDispatchersByProfit,
+        topDrivers: topDrivers.slice(0, 5).map(d => ({ name: d.driverName, trips: d.completedTrips })),
+        totalTripsInRange: allTrips.length
+      };
+
+      // Return only first page of trips (25 by default)
+      const pageSize = 25;
+      const paginatedTrips = allTrips.slice(0, pageSize);
+
       return {
         metrics: {
           activeTrips,
@@ -300,6 +370,8 @@ export class CarrierController {
         topBrokers,
         topDrivers,
         recentActivity,
+        chartAggregates, // Pre-calculated aggregates for charts
+        trips: paginatedTrips, // Only first page of trips
       };
     } catch (error: any) {
       console.error('Error getting dashboard metrics:', error);

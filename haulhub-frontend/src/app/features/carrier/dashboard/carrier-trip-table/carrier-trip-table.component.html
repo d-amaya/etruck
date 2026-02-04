@@ -46,14 +46,13 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck Plate</mat-label>
-        <input matInput formControlName="truckPlate" placeholder="Enter truck plate"
-               (blur)="onTextInputBlur()" 
-               (keydown)="onTextInputKeydown($event)">
-        <button mat-icon-button matSuffix *ngIf="filterForm.get('truckPlate')?.value" 
-                (click)="clearField('truckPlate')" type="button">
-          <mat-icon>clear</mat-icon>
-        </button>
+        <mat-label>Truck</mat-label>
+        <mat-select formControlName="truckPlate" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Trucks</mat-option>
+          <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
+            {{ truck.plate }}
+          </mat-option>
+        </mat-select>
       </mat-form-field>
 
       <div class="spacer"></div>
