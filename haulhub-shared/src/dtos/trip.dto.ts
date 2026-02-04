@@ -497,6 +497,10 @@ export class TripFilters {
 
   @IsOptional()
   @IsString()
+  dispatcherId?: string;
+
+  @IsOptional()
+  @IsString()
   truckId?: string;
 
   @IsOptional()
