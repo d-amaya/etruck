@@ -1,0 +1,75 @@
+.dashboard-container {
+  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  background-color: #fafafa;
+  min-height: calc(100vh - 64px);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  gap: 16px;
+
+  .loading-text {
+    color: #666;
+    font-size: 14px;
+  }
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.content-wrapper {
+  position: relative;
+}
+
+.loaded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+// Table View Layout
+.table-view {
+  width: 100%;
+
+  .table-section {
+    width: 100%;
+  }
+}
+
+// Analytics View Layout
+.analytics-view {
+  width: 100%;
+}
+
+// Payments View Layout
+.payments-view {
+  width: 100%;
+}
+
+// Responsive design
+@media (max-width: 1200px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 8px;
+  }
+}

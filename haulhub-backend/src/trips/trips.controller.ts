@@ -51,11 +51,11 @@ export class TripsController {
    * Get a specific trip by ID
    * Requirements: 4.4, 19.2
    * 
-   * Authorization: User must be the dispatcher who created the trip,
+   * Authorization: User must be the carrier, dispatcher who created the trip,
    * or the driver assigned to the trip, or the lorry owner, or admin
    */
   @Get(':id')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
+  @Roles(UserRole.Carrier, UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
   async getTripById(
     @CurrentUser() user: CurrentUserData,
     @Param('id') tripId: string,

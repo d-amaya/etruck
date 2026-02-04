@@ -50,17 +50,18 @@ export class LorriesController {
    * 
    * - Truck owners see only their trucks (filtered by truckOwnerId)
    * - Dispatchers see all trucks in their carrier (filtered by carrierId)
+   * - Carriers see all trucks in their organization (filtered by carrierId)
    */
   @Get()
-  @Roles(UserRole.TruckOwner, UserRole.LorryOwner, UserRole.Dispatcher)
+  @Roles(UserRole.TruckOwner, UserRole.LorryOwner, UserRole.Dispatcher, UserRole.Carrier)
   async getLorries(@CurrentUser() user: CurrentUserData): Promise<Lorry[]> {
     // Truck owners query by their userId
     if (user.role === UserRole.TruckOwner || user.role === UserRole.LorryOwner) {
       return this.lorriesService.getLorriesByOwner(user.userId);
     }
     
-    // Dispatchers query by their carrierId
-    if (user.role === UserRole.Dispatcher) {
+    // Dispatchers and Carriers query by their carrierId
+    if (user.role === UserRole.Dispatcher || user.role === UserRole.Carrier) {
       return this.lorriesService.getTrucksByCarrier(user.carrierId);
     }
     

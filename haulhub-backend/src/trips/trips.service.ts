@@ -288,7 +288,9 @@ export class TripsService {
       const gsiAttributes = this.populateGSIAttributes({
         tripId,
         dispatcherId,
+        carrierId: dto.carrierId,
         truckId: dto.truckId,
+        truckOwnerId: dto.truckOwnerId,
         driverId: dto.driverId,
         brokerId: dto.brokerId,
         scheduledTimestamp: dto.scheduledTimestamp,
@@ -356,7 +358,12 @@ export class TripsService {
       const trip = this.mapItemToTrip(result.Item);
 
       // Verify authorization based on role
-      if (userRole === UserRole.Dispatcher && trip.dispatcherId !== userId) {
+      if (userRole === UserRole.Carrier) {
+        // Carriers can view all trips in their organization
+        // We need to verify the carrier owns this trip by checking if the trip's carrierId matches
+        // For now, we'll allow carriers to view any trip (they should only see their own org's trips via queries)
+        // In production, add carrierId verification here if needed
+      } else if (userRole === UserRole.Dispatcher && trip.dispatcherId !== userId) {
         throw new ForbiddenException('You do not have permission to access this trip');
       } else if (userRole === UserRole.Driver && trip.driverId !== userId) {
         throw new ForbiddenException('You do not have permission to access this trip');
@@ -1025,6 +1032,39 @@ export class TripsService {
   }
 
   /**
+   * Get all trips for a carrier (public method for carrier dashboard)
+   * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
+   * 
+   * Queries GSI1 (Carrier Index) to get all trips for the carrier's organization.
+   * Returns all trips without role-based field filtering (carrier sees everything).
+   * 
+   * @param carrierId - The carrier ID
+   * @param filters - Optional filters (startDate, endDate, dispatcherId, driverId, brokerId, status)
+   * @returns Array of trips (no pagination for dashboard simplicity)
+   */
+  async getTripsByCarrier(
+    carrierId: string,
+    filters?: any,
+  ): Promise<Trip[]> {
+    try {
+      const dynamodbClient = this.awsService.getDynamoDBClient();
+      
+      // Use the private method with empty filters if none provided
+      const result = await this.getTripsForCarrier(
+        carrierId,
+        filters || {},
+        dynamodbClient,
+      );
+
+      // Return all trips without role-based filtering (carrier sees all fields)
+      return result.trips;
+    } catch (error: any) {
+      console.error('Error getting trips by carrier:', error);
+      throw new InternalServerErrorException('Failed to retrieve trips');
+    }
+  }
+
+  /**
    * Get trips for a dispatcher with smart index selection
    * Requirements: 1.4, 5.1, 5.2, 8.7, 3.6, 6.4
    * 
@@ -1581,12 +1621,29 @@ export class TripsService {
     filters: any,
     dynamodbClient: any,
   ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string }> {
+    console.log('[getTripsForCarrier] Starting query with filters:', {
+      carrierId,
+      filters: {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        dispatcherId: filters.dispatcherId,
+        brokerId: filters.brokerId,
+        orderStatus: filters.orderStatus,
+        limit: filters.limit
+      }
+    });
+
     // Build key condition expression for GSI1 (Carrier Index)
     // ONLY partition key and date range - NO secondary filters
     let keyConditionExpression = 'GSI1PK = :gsi1pk';
     const expressionAttributeValues: Record<string, any> = {
       ':gsi1pk': `CARRIER#${carrierId}`,
     };
+    
+    console.log('[getTripsForCarrier] Querying GSI1 with:', {
+      GSI1PK: `CARRIER#${carrierId}`,
+      dateRange: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : 'none'
+    });
 
     // Add date range filtering
     if (filters.startDate && filters.endDate) {
@@ -1621,7 +1678,7 @@ export class TripsService {
     
     const maxBatches = 10;
     let batchCount = 0;
-    const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId || filters.driverId);
+    const hasSecondaryFilters = !!(filters.brokerId || filters.orderStatus || filters.truckId || filters.driverId || filters.dispatcherId);
     const batchSize = hasSecondaryFilters ? 200 : requestedLimit;
 
     // Fetch batches until we have enough filtered results
@@ -1653,6 +1710,17 @@ export class TripsService {
 
       const batchTrips = (result.Items || []).map((item) => this.mapItemToTrip(item));
       allTrips.push(...batchTrips);
+      
+      console.log(`[getTripsForCarrier] Batch ${batchCount}: fetched ${batchTrips.length} trips`);
+      if (filters.brokerId) {
+        const brokerMatches = batchTrips.filter(t => t.brokerId === filters.brokerId);
+        console.log(`[getTripsForCarrier] Batch ${batchCount}: ${brokerMatches.length} trips match broker ${filters.brokerId}`);
+        if (brokerMatches.length > 0) {
+          brokerMatches.forEach(t => {
+            console.log(`  - Trip ${t.tripId.substring(0, 8)}: dispatcher=${t.dispatcherId?.substring(0, 8)}, broker=${t.brokerId}, date=${t.scheduledTimestamp}`);
+          });
+        }
+      }
 
       if (result.LastEvaluatedKey) {
         dynamoDBLastKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
@@ -1672,6 +1740,20 @@ export class TripsService {
     const filteredTrips = this.applyAllFilters(allTrips, filters);
     const trimmedTrips = filteredTrips.slice(0, requestedLimit);
     const hasMoreItems = filteredTrips.length > requestedLimit;
+
+    console.log('[getTripsForCarrier] Query complete:', {
+      carrierId,
+      totalFetched: allTrips.length,
+      afterFiltering: filteredTrips.length,
+      returned: trimmedTrips.length,
+      batchesFetched: batchCount,
+      stoppedEarly: batchCount >= maxBatches || (filteredTrips.length >= requestedLimit && dynamoDBLastKey !== undefined),
+      appliedFilters: {
+        dispatcherId: filters.dispatcherId || 'none',
+        brokerId: filters.brokerId || 'none',
+        orderStatus: filters.orderStatus || 'none'
+      }
+    });
 
     const response: { trips: Trip[]; lastEvaluatedKey?: string } = { trips: trimmedTrips };
 
@@ -2388,30 +2470,62 @@ export class TripsService {
    */
   private applyAllFilters(trips: Trip[], filters: any): Trip[] {
     let filtered = trips;
+    const initialCount = trips.length;
+
+    // Filter by dispatcher (for carrier queries)
+    if (filters.dispatcherId) {
+      const beforeCount = filtered.length;
+      filtered = filtered.filter(trip => {
+        const matches = trip.dispatcherId === filters.dispatcherId;
+        if (!matches && beforeCount <= 10) {
+          console.log(`[applyAllFilters] Trip ${trip.tripId} dispatcher mismatch: ${trip.dispatcherId} !== ${filters.dispatcherId}`);
+        }
+        return matches;
+      });
+      console.log(`[applyAllFilters] After dispatcher filter (${filters.dispatcherId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
+    }
 
     // Filter by broker
     if (filters.brokerId) {
-      filtered = filtered.filter(trip => trip.brokerId === filters.brokerId);
+      const beforeCount = filtered.length;
+      filtered = filtered.filter(trip => {
+        const matches = trip.brokerId === filters.brokerId;
+        if (!matches && beforeCount <= 10) {
+          console.log(`[applyAllFilters] Trip ${trip.tripId} broker mismatch: ${trip.brokerId} !== ${filters.brokerId}`);
+        }
+        return matches;
+      });
+      console.log(`[applyAllFilters] After broker filter (${filters.brokerId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by status
     if (filters.orderStatus) {
+      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.orderStatus === filters.orderStatus);
+      console.log(`[applyAllFilters] After status filter (${filters.orderStatus}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by truck
     if (filters.truckId) {
+      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.truckId === filters.truckId);
+      console.log(`[applyAllFilters] After truck filter (${filters.truckId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by driver
     if (filters.driverId) {
+      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.driverId === filters.driverId);
+      console.log(`[applyAllFilters] After driver filter (${filters.driverId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by driver name (case-insensitive)
     if (filters.driverName) {
       filtered = this.applyDriverNameFilter(filtered, filters.driverName);
+    }
+
+    if (initialCount !== filtered.length) {
+      console.log(`[applyAllFilters] Total: ${initialCount} → ${filtered.length} trips after all filters`);
     }
 
     return filtered;

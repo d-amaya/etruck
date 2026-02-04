@@ -8,7 +8,31 @@ export interface TruckDocumentMetadata {
   uploadedAt: string;
 }
 
+/**
+ * Truck interface for eTrucky schema
+ * Stored in eTrucky-Trucks table
+ */
 export interface Truck {
+  truckId: string;
+  carrierId: string;
+  truckOwnerId: string;
+  plate: string;
+  brand: string;
+  year: number;
+  vin: string;
+  color: string;
+  isActive: boolean;
+  verificationStatus?: VehicleVerificationStatus;
+  verificationDocuments?: TruckDocumentMetadata[];
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Legacy truck interface (for backward compatibility)
+ */
+export interface LegacyTruck {
   truckId: string;
   ownerId: string;
   name: string;

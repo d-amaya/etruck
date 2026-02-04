@@ -8,7 +8,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { TripService } from '../../../core/services';
-import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
+import { AuthService } from '../../../core/services/auth.service';
+import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-detail',
@@ -39,10 +40,14 @@ export class TripDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private tripService: TripService
+    private tripService: TripService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    console.log('[TripDetail] Current user role:', this.authService.userRole);
+    console.log('[TripDetail] Can edit trip:', this.canEditTrip());
+    
     // Load asset maps from localStorage
     this.loadAssetMapsFromStorage();
     
@@ -119,13 +124,24 @@ export class TripDetailComponent implements OnInit {
   }
 
   onBackToTrips(): void {
-    this.router.navigate(['/dispatcher/dashboard']);
+    // Navigate back based on user role
+    const role = this.authService.userRole;
+    if (role === UserRole.Carrier) {
+      this.router.navigate(['/carrier/dashboard']);
+    } else {
+      this.router.navigate(['/dispatcher/dashboard']);
+    }
   }
 
   onEditTrip(): void {
     if (this.trip) {
       this.router.navigate(['/dispatcher/trips', this.trip.tripId, 'edit']);
     }
+  }
+
+  canEditTrip(): boolean {
+    // Only dispatchers can edit trips
+    return this.authService.userRole === UserRole.Dispatcher;
   }
 
   getStatusClass(status: TripStatus | string): string {

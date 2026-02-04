@@ -1,0 +1,205 @@
+<div class="trip-list-container">
+  <!-- Unified Filter Card -->
+  <app-carrier-unified-filter-card></app-carrier-unified-filter-card>
+  
+  <div class="trip-table-container">
+    <!-- Table Filters (no date fields - those are in unified card) -->
+    <div class="table-filters" *ngIf="!loading">
+      <form [formGroup]="filterForm" class="filter-row">
+        <mat-form-field appearance="fill" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status" (selectionChange)="onApplyFilters()">
+            <mat-option value="">All Statuses</mat-option>
+            <mat-option *ngFor="let status of statusOptions" [value]="status">
+              {{ getStatusLabel(status) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="filter-field">
+          <mat-label>Dispatcher</mat-label>
+          <mat-select formControlName="dispatcherId" (selectionChange)="onApplyFilters()">
+            <mat-option value="">All Dispatchers</mat-option>
+            <mat-option *ngFor="let dispatcher of dispatchers" [value]="dispatcher.userId">
+              {{ dispatcher.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="filter-field">
+          <mat-label>Driver</mat-label>
+          <mat-select formControlName="driverId" (selectionChange)="onApplyFilters()">
+            <mat-option value="">All Drivers</mat-option>
+            <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+              {{ driver.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="filter-field">
+          <mat-label>Broker</mat-label>
+          <mat-select formControlName="brokerId" (selectionChange)="onApplyFilters()">
+            <mat-option value="">All Brokers</mat-option>
+            <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+              {{ broker.brokerName }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="filter-field">
+          <mat-label>Truck Plate</mat-label>
+          <input matInput formControlName="truckId" placeholder="Enter truck plate">
+          <button mat-icon-button matSuffix *ngIf="filterForm.get('truckId')?.value" 
+                  (click)="clearField('truckId')" type="button">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <div class="spacer"></div>
+
+        <div class="action-buttons-group">
+          <button mat-icon-button (click)="onClearFilters()" type="button"
+                  [matTooltip]="'Clear all filters'"
+                  class="action-btn clear-btn">
+            <mat-icon>filter_alt_off</mat-icon>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="table-wrapper" *ngIf="!loading && trips.length > 0">
+      <table mat-table [dataSource]="trips" class="trips-table">
+        <!-- Scheduled Date Column -->
+        <ng-container matColumnDef="scheduledTimestamp">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let trip">
+            {{ formatDate(trip.scheduledTimestamp) }}
+          </td>
+        </ng-container>
+
+        <!-- Pickup Location Column -->
+        <ng-container matColumnDef="pickupLocation">
+          <th mat-header-cell *matHeaderCellDef>Pickup</th>
+          <td mat-cell *matCellDef="let trip" class="location-cell">
+            {{ trip.pickupCity }}, {{ trip.pickupState }}
+          </td>
+        </ng-container>
+
+        <!-- Dropoff Location Column -->
+        <ng-container matColumnDef="dropoffLocation">
+          <th mat-header-cell *matHeaderCellDef>Dropoff</th>
+          <td mat-cell *matCellDef="let trip" class="location-cell">
+            {{ trip.deliveryCity }}, {{ trip.deliveryState }}
+          </td>
+        </ng-container>
+
+        <!-- Dispatcher Column -->
+        <ng-container matColumnDef="dispatcherName">
+          <th mat-header-cell *matHeaderCellDef>Dispatcher</th>
+          <td mat-cell *matCellDef="let trip">
+            {{ getDispatcherName(trip.dispatcherId) }}
+          </td>
+        </ng-container>
+
+        <!-- Driver Column -->
+        <ng-container matColumnDef="driverName">
+          <th mat-header-cell *matHeaderCellDef>Driver</th>
+          <td mat-cell *matCellDef="let trip">
+            {{ getDriverName(trip.driverId) }}
+          </td>
+        </ng-container>
+
+        <!-- Broker Column -->
+        <ng-container matColumnDef="brokerName">
+          <th mat-header-cell *matHeaderCellDef>Broker</th>
+          <td mat-cell *matCellDef="let trip">
+            {{ getBrokerName(trip.brokerId) }}
+          </td>
+        </ng-container>
+
+        <!-- Truck Column -->
+        <ng-container matColumnDef="truckId">
+          <th mat-header-cell *matHeaderCellDef>Truck</th>
+          <td mat-cell *matCellDef="let trip">{{ trip.truckId }}</td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let trip">
+            <mat-chip [class]="getStatusClass(trip.orderStatus)">
+              {{ getStatusLabel(trip.orderStatus) }}
+            </mat-chip>
+          </td>
+        </ng-container>
+
+        <!-- Revenue Column -->
+        <ng-container matColumnDef="revenue">
+          <th mat-header-cell *matHeaderCellDef class="numeric">Revenue</th>
+          <td mat-cell *matCellDef="let trip" class="numeric">
+            {{ formatCurrency(trip.brokerPayment) }}
+          </td>
+        </ng-container>
+
+        <!-- Expenses Column -->
+        <ng-container matColumnDef="expenses">
+          <th mat-header-cell *matHeaderCellDef class="numeric">Expenses</th>
+          <td mat-cell *matCellDef="let trip" class="numeric">
+            {{ formatCurrency(calculateExpenses(trip)) }}
+          </td>
+        </ng-container>
+
+        <!-- Profit Column -->
+        <ng-container matColumnDef="profitLoss">
+          <th mat-header-cell *matHeaderCellDef class="numeric">Profit/Loss</th>
+          <td mat-cell *matCellDef="let trip" class="numeric">
+            <span [class.positive-profit]="calculateProfit(trip) >= 0" 
+                  [class.negative-profit]="calculateProfit(trip) < 0">
+              {{ formatCurrency(calculateProfit(trip)) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let trip">
+            <div class="action-buttons">
+              <button mat-icon-button class="action-btn view-btn" 
+                      (click)="onViewDetails(trip)"
+                      [matTooltip]="'View trip details'">
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="trip-row"></tr>
+      </table>
+
+      <mat-paginator
+        [length]="totalTrips"
+        [pageSize]="pageSize"
+        [pageSizeOptions]="[10, 25, 50, 100]"
+        [pageIndex]="pageIndex"
+        (page)="onPageChange($event)"
+        showFirstLastButtons>
+      </mat-paginator>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="!loading && trips.length === 0">
+      <mat-icon>inbox</mat-icon>
+      <h3>No trips found</h3>
+      <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all trips.</p>
+      <p *ngIf="!hasActiveFilters()">No trips have been created yet.</p>
+    </div>
+
+    <!-- Loading State -->
+    <div class="loading-state" *ngIf="loading">
+      <mat-spinner></mat-spinner>
+      <p>Loading trips...</p>
+    </div>
+  </div>
+</div>

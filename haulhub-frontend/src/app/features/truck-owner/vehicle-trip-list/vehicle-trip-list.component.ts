@@ -274,8 +274,8 @@ export class VehicleTripListComponent implements OnInit {
     const truck = this.trucks.find(t => t.truckId === trip.truckId);
     const trailer = this.trailers.find(t => t.trailerId === trip.trailerId);
     
-    const truckInfo = truck ? `Truck: ${truck.name}` : '';
-    const trailerInfo = trailer ? `Trailer: ${trailer.name}` : '';
+    const truckInfo = truck ? `Truck: ${truck.plate}` : '';
+    const trailerInfo = trailer ? `Trailer: ${trailer.licensePlate}` : '';
     
     return [truckInfo, trailerInfo].filter(Boolean).join(' | ');
   }

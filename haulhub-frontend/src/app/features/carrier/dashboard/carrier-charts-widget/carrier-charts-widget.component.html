@@ -1,0 +1,84 @@
+<div class="dashboard-charts-widget" *ngIf="!loading && trips.length > 0">
+  <div class="charts-grid">
+    
+    <!-- Revenue vs Expenses Chart -->
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>account_balance</mat-icon>
+          Revenue vs Expenses
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-summary">
+          <div class="summary-item profit" [class.loss]="revenueData.profit < 0">
+            <span class="label">Net {{ revenueData.profit >= 0 ? 'Profit' : 'Loss' }}</span>
+            <span class="value">{{ formatCurrency(Math.abs(revenueData.profit)) }}</span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas #revenueChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Trip Status Distribution Chart -->
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>pie_chart</mat-icon>
+          Trip Status Distribution
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-summary">
+          <div class="summary-item">
+            <span class="label">Total Trips</span>
+            <span class="value">{{ trips.length }}</span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas #statusChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Top Brokers Chart -->
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>business</mat-icon>
+          Top 5 Brokers by Revenue
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-container">
+          <canvas #topBrokersChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Top Dispatchers by Profit Chart -->
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>trending_up</mat-icon>
+          Top 5 Dispatchers by Profit
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-container">
+          <canvas #topDispatchersChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+  </div>
+</div>
+
+<!-- Empty State -->
+<div class="empty-charts" *ngIf="!loading && trips.length === 0">
+  <mat-icon>insert_chart</mat-icon>
+  <p>No data available for charts</p>
+  <p class="hint">Trips will appear here once created</p>
+</div>

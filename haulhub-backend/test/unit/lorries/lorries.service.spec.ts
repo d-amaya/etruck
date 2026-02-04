@@ -312,8 +312,7 @@ describe('LorriesService', () => {
     });
 
     describe('createTrailer', () => {
-      const trailerData = {
-        carrierId: 'carrier-123',
+      const trailerDto = {
         plate: 'TRL-789',
         brand: 'Utility',
         year: 2022,
@@ -323,49 +322,192 @@ describe('LorriesService', () => {
       };
 
       it('should create a trailer successfully', async () => {
-        mockDynamoDBClient.send.mockResolvedValueOnce({});
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Items: [] }) // Check VIN uniqueness
+          .mockResolvedValueOnce({ Items: [] }) // Check plate uniqueness
+          .mockResolvedValueOnce({}); // Put new trailer
 
-        const result = await service.createTrailer(trailerData);
+        const result = await service.createTrailer('carrier-123', trailerDto);
 
         expect(result).toMatchObject({
           trailerId: expect.any(String),
           carrierId: 'carrier-123',
           plate: 'TRL-789',
           brand: 'Utility',
+          year: 2022,
+          vin: 'NEWVIN123456',
+          color: 'White',
+          reefer: null,
           isActive: true,
         });
-        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1);
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(3);
+      });
+
+      it('should create a trailer with reefer unit', async () => {
+        const trailerWithReefer = { ...trailerDto, reefer: 'Thermo King' };
+        
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Items: [] }) // Check VIN uniqueness
+          .mockResolvedValueOnce({ Items: [] }) // Check plate uniqueness
+          .mockResolvedValueOnce({}); // Put new trailer
+
+        const result = await service.createTrailer('carrier-123', trailerWithReefer);
+
+        expect(result).toMatchObject({
+          reefer: 'Thermo King',
+        });
       });
 
       it('should throw BadRequestException for invalid year (too old)', async () => {
-        const invalidData = { ...trailerData, year: 1800 };
+        const invalidDto = { ...trailerDto, year: 1800 };
 
-        await expect(service.createTrailer(invalidData)).rejects.toThrow(
+        await expect(service.createTrailer('carrier-123', invalidDto)).rejects.toThrow(
           BadRequestException,
         );
       });
 
       it('should throw BadRequestException for invalid year (future)', async () => {
         const currentYear = new Date().getFullYear();
-        const invalidData = { ...trailerData, year: currentYear + 2 };
+        const invalidDto = { ...trailerDto, year: currentYear + 2 };
 
-        await expect(service.createTrailer(invalidData)).rejects.toThrow(
+        await expect(service.createTrailer('carrier-123', invalidDto)).rejects.toThrow(
           BadRequestException,
         );
+      });
+
+      it('should throw BadRequestException when VIN already exists', async () => {
+        const existingTrailer = {
+          trailerId: 'existing-trailer',
+          vin: 'NEWVIN123456',
+        };
+
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Items: [existingTrailer] }); // VIN exists
+
+        await expect(
+          service.createTrailer('carrier-123', trailerDto),
+        ).rejects.toThrow(BadRequestException);
+        
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1);
+      });
+
+      it('should throw BadRequestException when plate already exists', async () => {
+        const existingTrailer = {
+          trailerId: 'existing-trailer',
+          plate: 'TRL-789',
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Items: [] }) // VIN unique
+          .mockResolvedValueOnce({ Items: [existingTrailer] }); // Plate exists
+
+        await expect(
+          service.createTrailer('carrier-123', trailerDto),
+        ).rejects.toThrow(BadRequestException);
+        
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
       });
     });
 
     describe('updateTrailer', () => {
       it('should update trailer successfully', async () => {
         mockDynamoDBClient.send
-          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerById
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Items: [] }) // getTrailerByPlate scan (no duplicates)
           .mockResolvedValueOnce({ Attributes: { ...mockTrailer, plate: 'TRL-999' } }); // update
 
-        const result = await service.updateTrailer('trailer-123', { plate: 'TRL-999' });
+        const result = await service.updateTrailer('trailer-123', 'carrier-123', { plate: 'TRL-999' });
 
         expect(result).toMatchObject({
           trailerId: 'trailer-123',
           plate: 'TRL-999',
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(3);
+      });
+
+      it('should throw NotFoundException when trailer not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.updateTrailer('trailer-123', 'carrier-123', { plate: 'TRL-999' }),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when trailer belongs to different carrier', async () => {
+        const differentCarrierTrailer = { ...mockTrailer, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTrailer });
+
+        await expect(
+          service.updateTrailer('trailer-123', 'carrier-123', { plate: 'TRL-999' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should validate year range when updating year', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: mockTrailer });
+
+        await expect(
+          service.updateTrailer('trailer-123', 'carrier-123', { year: 1800 }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should check VIN uniqueness when updating VIN', async () => {
+        const existingTrailerWithVin = { ...mockTrailer, trailerId: 'other-trailer', vin: 'NEWVIN123' };
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Items: [existingTrailerWithVin] }); // getTrailerByVin scan
+
+        await expect(
+          service.updateTrailer('trailer-123', 'carrier-123', { vin: 'NEWVIN123' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should check plate uniqueness when updating plate', async () => {
+        const existingTrailerWithPlate = { ...mockTrailer, trailerId: 'other-trailer', plate: 'NEWPLATE' };
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Items: [existingTrailerWithPlate] }); // getTrailerByPlate scan
+
+        await expect(
+          service.updateTrailer('trailer-123', 'carrier-123', { plate: 'NEWPLATE' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should allow updating reefer field', async () => {
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Attributes: { ...mockTrailer, reefer: 'TK-5000' } }); // update
+
+        const result = await service.updateTrailer('trailer-123', 'carrier-123', { reefer: 'TK-5000' });
+
+        expect(result).toMatchObject({
+          trailerId: 'trailer-123',
+          reefer: 'TK-5000',
+        });
+      });
+
+      it('should return existing trailer when no updates provided', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: mockTrailer });
+
+        const result = await service.updateTrailer('trailer-123', 'carrier-123', {});
+
+        expect(result).toMatchObject({
+          trailerId: 'trailer-123',
+          plate: 'TRL-456', // Use correct plate from mockTrailer
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1); // Only getTrailerByIdInternal
+      });
+    });
+
+    describe('deactivateTrailer', () => {
+      it('should deactivate trailer by setting isActive to false', async () => {
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Attributes: { ...mockTrailer, isActive: false } }); // update
+
+        const result = await service.deactivateTrailer('trailer-123', 'carrier-123');
+
+        expect(result).toMatchObject({
+          trailerId: 'trailer-123',
+          isActive: false,
         });
         expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
       });
@@ -374,18 +516,61 @@ describe('LorriesService', () => {
         mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
 
         await expect(
-          service.updateTrailer('trailer-123', { plate: 'TRL-999' }),
+          service.deactivateTrailer('trailer-123', 'carrier-123'),
         ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when trailer belongs to different carrier', async () => {
+        const differentCarrierTrailer = { ...mockTrailer, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTrailer });
+
+        await expect(
+          service.deactivateTrailer('trailer-123', 'carrier-123'),
+        ).rejects.toThrow(ForbiddenException);
+      });
+    });
+
+    describe('reactivateTrailer', () => {
+      it('should reactivate trailer by setting isActive to true', async () => {
+        const inactiveTrailer = { ...mockTrailer, isActive: false };
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: inactiveTrailer }) // getTrailerByIdInternal
+          .mockResolvedValueOnce({ Attributes: { ...mockTrailer, isActive: true } }); // update
+
+        const result = await service.reactivateTrailer('trailer-123', 'carrier-123');
+
+        expect(result).toMatchObject({
+          trailerId: 'trailer-123',
+          isActive: true,
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
+      });
+
+      it('should throw NotFoundException when trailer not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.reactivateTrailer('trailer-123', 'carrier-123'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when trailer belongs to different carrier', async () => {
+        const differentCarrierTrailer = { ...mockTrailer, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTrailer });
+
+        await expect(
+          service.reactivateTrailer('trailer-123', 'carrier-123'),
+        ).rejects.toThrow(ForbiddenException);
       });
     });
 
     describe('deleteTrailer', () => {
-      it('should soft delete trailer by setting isActive to false', async () => {
+      it('should soft delete trailer by calling deactivateTrailer', async () => {
         mockDynamoDBClient.send
-          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerById
+          .mockResolvedValueOnce({ Item: mockTrailer }) // getTrailerByIdInternal
           .mockResolvedValueOnce({ Attributes: { ...mockTrailer, isActive: false } }); // update
 
-        await service.deleteTrailer('trailer-123');
+        await service.deleteTrailer('trailer-123', 'carrier-123');
 
         expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
       });
@@ -474,6 +659,351 @@ describe('LorriesService', () => {
         const result = await service.getTrucksByCarrier('carrier-123');
 
         expect(result).toEqual([]);
+      });
+    });
+
+    describe('createTruck', () => {
+      const createTruckDto = {
+        truckOwnerId: 'owner-123',
+        plate: 'ABC-1234',
+        brand: 'Freightliner',
+        year: 2020,
+        vin: 'VIN123456789ABCDE',
+        color: 'White',
+      };
+
+      it('should create a truck successfully', async () => {
+        const mockUser = {
+          PK: 'USER#owner-123',
+          SK: 'METADATA',
+          userId: 'owner-123',
+          carrierId: 'carrier-123',
+          role: UserRole.TruckOwner,
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockUser }) // Validate carrier membership
+          .mockResolvedValueOnce({ Items: [] }) // Check VIN uniqueness
+          .mockResolvedValueOnce({ Items: [] }) // Check plate uniqueness
+          .mockResolvedValueOnce({}); // Put new truck
+
+        const result = await service.createTruck('carrier-123', createTruckDto);
+
+        expect(result).toMatchObject({
+          truckOwnerId: 'owner-123',
+          carrierId: 'carrier-123',
+          plate: 'ABC-1234',
+          brand: 'Freightliner',
+          year: 2020,
+          vin: 'VIN123456789ABCDE',
+          color: 'White',
+          isActive: true,
+        });
+        expect(result.truckId).toBeDefined();
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(4);
+      });
+
+      it('should throw BadRequestException for invalid year (too old)', async () => {
+        const invalidDto = { ...createTruckDto, year: 1899 };
+
+        await expect(
+          service.createTruck('carrier-123', invalidDto),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException for invalid year (future)', async () => {
+        const currentYear = new Date().getFullYear();
+        const invalidDto = { ...createTruckDto, year: currentYear + 2 };
+
+        await expect(
+          service.createTruck('carrier-123', invalidDto),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw ForbiddenException when truck owner does not belong to carrier', async () => {
+        const mockUser = {
+          PK: 'USER#owner-123',
+          SK: 'METADATA',
+          userId: 'owner-123',
+          carrierId: 'different-carrier',
+          role: UserRole.TruckOwner,
+        };
+
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: mockUser });
+
+        await expect(
+          service.createTruck('carrier-123', createTruckDto),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should throw NotFoundException when truck owner not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.createTruck('carrier-123', createTruckDto),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw BadRequestException when VIN already exists', async () => {
+        const mockUser = {
+          PK: 'USER#owner-123',
+          SK: 'METADATA',
+          userId: 'owner-123',
+          carrierId: 'carrier-123',
+          role: UserRole.TruckOwner,
+        };
+
+        const existingTruck = {
+          truckId: 'existing-truck',
+          vin: 'VIN123456789ABCDE',
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockUser }) // Validate carrier membership
+          .mockResolvedValueOnce({ Items: [existingTruck] }); // VIN exists
+
+        await expect(
+          service.createTruck('carrier-123', createTruckDto),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException when plate already exists', async () => {
+        const mockUser = {
+          PK: 'USER#owner-123',
+          SK: 'METADATA',
+          userId: 'owner-123',
+          carrierId: 'carrier-123',
+          role: UserRole.TruckOwner,
+        };
+
+        const existingTruck = {
+          truckId: 'existing-truck',
+          plate: 'ABC-1234',
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockUser }) // Validate carrier membership
+          .mockResolvedValueOnce({ Items: [] }) // VIN unique
+          .mockResolvedValueOnce({ Items: [existingTruck] }); // Plate exists
+
+        await expect(
+          service.createTruck('carrier-123', createTruckDto),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('updateTruck', () => {
+      const updateDto = {
+        plate: 'XYZ-9999',
+        brand: 'Peterbilt',
+        year: 2021,
+        color: 'Blue',
+      };
+
+      it('should update truck successfully', async () => {
+        const updatedTruck = { ...mockTruck, ...updateDto };
+        
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Items: [] }) // Check plate uniqueness (plate is being updated)
+          .mockResolvedValue({ Attributes: updatedTruck }); // Update
+
+        const result = await service.updateTruck('truck-123', 'carrier-123', updateDto);
+
+        expect(result).toMatchObject({
+          truckId: 'truck-123',
+          plate: 'XYZ-9999',
+          brand: 'Peterbilt',
+          year: 2021,
+          color: 'Blue',
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(3);
+      });
+
+      it('should throw NotFoundException when truck not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', updateDto),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when truck does not belong to carrier', async () => {
+        const differentCarrierTruck = { ...mockTruck, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTruck });
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', updateDto),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should throw BadRequestException for invalid year', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: mockTruck });
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', { year: 1899 }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should validate truckOwnerId belongs to carrier when updating owner', async () => {
+        const mockUser = {
+          PK: 'USER#new-owner-123',
+          SK: 'METADATA',
+          userId: 'new-owner-123',
+          carrierId: 'carrier-123',
+          role: UserRole.TruckOwner,
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Item: mockUser }) // Validate carrier membership
+          .mockResolvedValueOnce({ Attributes: { ...mockTruck, truckOwnerId: 'new-owner-123' } }); // Update
+
+        const result = await service.updateTruck('truck-123', 'carrier-123', {
+          truckOwnerId: 'new-owner-123',
+        });
+
+        expect(result.truckOwnerId).toBe('new-owner-123');
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(3);
+      });
+
+      it('should throw ForbiddenException when new owner does not belong to carrier', async () => {
+        const mockUser = {
+          PK: 'USER#new-owner-123',
+          SK: 'METADATA',
+          userId: 'new-owner-123',
+          carrierId: 'different-carrier',
+          role: UserRole.TruckOwner,
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Item: mockUser }); // Validate carrier membership
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', { truckOwnerId: 'new-owner-123' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should throw BadRequestException when updating to duplicate VIN', async () => {
+        const existingTruck = {
+          truckId: 'other-truck',
+          vin: 'NEWVIN123456',
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Items: [existingTruck] }); // VIN exists
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', { vin: 'NEWVIN123456' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException when updating to duplicate plate', async () => {
+        const existingTruck = {
+          truckId: 'other-truck',
+          plate: 'NEWPLATE',
+        };
+
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Items: [existingTruck] }); // Plate exists
+
+        await expect(
+          service.updateTruck('truck-123', 'carrier-123', { plate: 'NEWPLATE' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should allow updating VIN to same value', async () => {
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Attributes: mockTruck }); // Update
+
+        const result = await service.updateTruck('truck-123', 'carrier-123', {
+          vin: mockTruck.vin,
+        });
+
+        expect(result.vin).toBe(mockTruck.vin);
+      });
+
+      it('should return existing truck when no updates provided', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: mockTruck });
+
+        const result = await service.updateTruck('truck-123', 'carrier-123', {});
+
+        expect(result).toMatchObject({
+          truckId: 'truck-123',
+          plate: 'ABC-1234',
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('deactivateTruck', () => {
+      it('should deactivate truck successfully', async () => {
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: mockTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Attributes: { ...mockTruck, isActive: false } }); // Update
+
+        const result = await service.deactivateTruck('truck-123', 'carrier-123');
+
+        expect(result).toMatchObject({
+          truckId: 'truck-123',
+          isActive: false,
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
+      });
+
+      it('should throw NotFoundException when truck not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.deactivateTruck('truck-123', 'carrier-123'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when truck does not belong to carrier', async () => {
+        const differentCarrierTruck = { ...mockTruck, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTruck });
+
+        await expect(
+          service.deactivateTruck('truck-123', 'carrier-123'),
+        ).rejects.toThrow(ForbiddenException);
+      });
+    });
+
+    describe('reactivateTruck', () => {
+      it('should reactivate truck successfully', async () => {
+        const inactiveTruck = { ...mockTruck, isActive: false };
+        mockDynamoDBClient.send
+          .mockResolvedValueOnce({ Item: inactiveTruck }) // Get existing truck
+          .mockResolvedValueOnce({ Attributes: { ...inactiveTruck, isActive: true } }); // Update
+
+        const result = await service.reactivateTruck('truck-123', 'carrier-123');
+
+        expect(result).toMatchObject({
+          truckId: 'truck-123',
+          isActive: true,
+        });
+        expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(2);
+      });
+
+      it('should throw NotFoundException when truck not found', async () => {
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: null });
+
+        await expect(
+          service.reactivateTruck('truck-123', 'carrier-123'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw ForbiddenException when truck does not belong to carrier', async () => {
+        const differentCarrierTruck = { ...mockTruck, carrierId: 'different-carrier' };
+        mockDynamoDBClient.send.mockResolvedValueOnce({ Item: differentCarrierTruck });
+
+        await expect(
+          service.reactivateTruck('truck-123', 'carrier-123'),
+        ).rejects.toThrow(ForbiddenException);
       });
     });
   });

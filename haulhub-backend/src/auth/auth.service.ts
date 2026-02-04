@@ -238,6 +238,16 @@ export class AuthService {
   }
 
   /**
+   * Check if user has Carrier role
+   * @param user - Decoded JWT token payload
+   * @returns true if user is a carrier, false otherwise
+   */
+  isCarrier(user: any): boolean {
+    const role = this.getRole(user);
+    return role === UserRole.Carrier;
+  }
+
+  /**
    * Validate that a user belongs to a specific carrier
    * @param userId - The user's ID to validate
    * @param expectedCarrierId - The carrier ID the user should belong to

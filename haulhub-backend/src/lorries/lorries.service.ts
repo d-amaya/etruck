@@ -10,6 +10,7 @@ import {
   QueryCommand,
   GetCommand,
   UpdateCommand,
+  ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -37,6 +38,148 @@ export class LorriesService {
   ) {
     this.lorriesTableName = this.configService.lorriesTableName;
     this.trailersTableName = this.configService.trailersTableName;
+  }
+
+  /**
+   * Create a new truck for a carrier
+   * Task 3.1: Add truck creation method
+   * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 13.2, 13.3, 13.6, 13.7, 13.8
+   * 
+   * @param carrierId - The carrier ID creating the truck
+   * @param dto - Truck creation data
+   * @returns Created truck
+   */
+  async createTruck(carrierId: string, dto: any): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Validate year (1900 to current + 1)
+    // Requirement 13.8
+    const currentYear = new Date().getFullYear();
+    if (dto.year < 1900 || dto.year > currentYear + 1) {
+      throw new BadRequestException(
+        `Year must be between 1900 and ${currentYear + 1}`,
+      );
+    }
+
+    // Validate truckOwnerId belongs to same carrier
+    // Requirements 4.5, 13.7
+    await this.validateCarrierMembership(dto.truckOwnerId, carrierId);
+
+    // Check VIN uniqueness across all trucks
+    // Requirement 13.2
+    const existingTruckByVin = await this.getTruckByVin(dto.vin);
+    if (existingTruckByVin) {
+      throw new BadRequestException(
+        `A truck with VIN ${dto.vin} already exists`,
+      );
+    }
+
+    // Check plate uniqueness across all trucks
+    // Requirement 13.3
+    const existingTruckByPlate = await this.getTruckByPlate(dto.plate);
+    if (existingTruckByPlate) {
+      throw new BadRequestException(
+        `A truck with plate ${dto.plate} already exists`,
+      );
+    }
+
+    // Generate UUID for truckId
+    // Requirement 4.6
+    const truckId = uuidv4();
+
+    // Store in eTrucky-Trucks with proper keys
+    // Requirements 4.1, 4.2, 4.3, 4.7
+    const putCommand = new PutCommand({
+      TableName: this.lorriesTableName,
+      Item: {
+        // Primary keys
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+        // GSI1: Carrier index
+        GSI1PK: `CARRIER#${carrierId}`,
+        GSI1SK: `TRUCK#${truckId}`,
+        // GSI2: Owner index
+        GSI2PK: `OWNER#${dto.truckOwnerId}`,
+        GSI2SK: `TRUCK#${truckId}`,
+        // Truck data
+        truckId,
+        carrierId,
+        truckOwnerId: dto.truckOwnerId,
+        plate: dto.plate,
+        brand: dto.brand,
+        year: dto.year,
+        vin: dto.vin,
+        color: dto.color,
+        // Set isActive=true by default (Requirement 4.8)
+        isActive: true,
+      },
+    });
+
+    await dynamodbClient.send(putCommand);
+
+    return {
+      truckId,
+      carrierId,
+      truckOwnerId: dto.truckOwnerId,
+      plate: dto.plate,
+      brand: dto.brand,
+      year: dto.year,
+      vin: dto.vin,
+      color: dto.color,
+      isActive: true,
+    };
+  }
+
+  /**
+   * Get truck by VIN (for uniqueness validation)
+   * Requirement 13.2
+   */
+  private async getTruckByVin(vin: string): Promise<any | null> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Scan for VIN (no GSI for VIN, so we need to scan)
+    // In production, consider adding a GSI for VIN if this becomes a bottleneck
+    const scanCommand = new ScanCommand({
+      TableName: this.lorriesTableName,
+      FilterExpression: 'vin = :vin',
+      ExpressionAttributeValues: {
+        ':vin': vin,
+      },
+    });
+
+    try {
+      const result = await dynamodbClient.send(scanCommand);
+      return result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    } catch (error) {
+      // If scan fails, return null (assume no duplicate)
+      return null;
+    }
+  }
+
+  /**
+   * Get truck by plate (for uniqueness validation)
+   * Requirement 13.3
+   */
+  private async getTruckByPlate(plate: string): Promise<any | null> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Scan for plate (no GSI for plate, so we need to scan)
+    // In production, consider adding a GSI for plate if this becomes a bottleneck
+    const scanCommand = new ScanCommand({
+      TableName: this.lorriesTableName,
+      FilterExpression: 'plate = :plate',
+      ExpressionAttributeValues: {
+        ':plate': plate,
+      },
+    });
+
+    try {
+      const result = await dynamodbClient.send(scanCommand);
+      return result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    } catch (error) {
+      // If scan fails, return null (assume no duplicate)
+      return null;
+    }
   }
 
   /**
@@ -232,6 +375,211 @@ export class LorriesService {
   }
 
   /**
+   * Update truck details
+   * Task 3.2: Add truck update and deactivation methods
+   * Requirements: 4.13, 4.14
+   * 
+   * @param truckId - The truck ID to update
+   * @param carrierId - The carrier ID (for authorization)
+   * @param dto - Update data (plate, brand, year, vin, color, truckOwnerId)
+   * @returns Updated truck
+   */
+  async updateTruck(
+    truckId: string,
+    carrierId: string,
+    dto: Partial<{
+      plate: string;
+      brand: string;
+      year: number;
+      vin: string;
+      color: string;
+      truckOwnerId: string;
+    }>,
+  ): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify truck exists and belongs to carrier
+    const existingTruck = await this.getTruckByIdInternal(truckId);
+    if (!existingTruck) {
+      throw new NotFoundException(`Truck with ID ${truckId} not found`);
+    }
+
+    if (existingTruck.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to update this truck',
+      );
+    }
+
+    // Validate year if provided
+    if (dto.year !== undefined) {
+      const currentYear = new Date().getFullYear();
+      if (dto.year < 1900 || dto.year > currentYear + 1) {
+        throw new BadRequestException(
+          `Year must be between 1900 and ${currentYear + 1}`,
+        );
+      }
+    }
+
+    // Validate truckOwnerId belongs to same carrier if provided
+    if (dto.truckOwnerId !== undefined) {
+      await this.validateCarrierMembership(dto.truckOwnerId, carrierId);
+    }
+
+    // Check VIN uniqueness if VIN is being updated
+    if (dto.vin !== undefined && dto.vin !== existingTruck.vin) {
+      const existingTruckByVin = await this.getTruckByVin(dto.vin);
+      if (existingTruckByVin && existingTruckByVin.truckId !== truckId) {
+        throw new BadRequestException(
+          `A truck with VIN ${dto.vin} already exists`,
+        );
+      }
+    }
+
+    // Check plate uniqueness if plate is being updated
+    if (dto.plate !== undefined && dto.plate !== existingTruck.plate) {
+      const existingTruckByPlate = await this.getTruckByPlate(dto.plate);
+      if (existingTruckByPlate && existingTruckByPlate.truckId !== truckId) {
+        throw new BadRequestException(
+          `A truck with plate ${dto.plate} already exists`,
+        );
+      }
+    }
+
+    // Build update expression
+    const updateExpressions: string[] = [];
+    const expressionAttributeValues: any = {};
+    const expressionAttributeNames: any = {};
+
+    // Add updatable fields
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateExpressions.push(`#${key} = :${key}`);
+        expressionAttributeValues[`:${key}`] = value;
+        expressionAttributeNames[`#${key}`] = key;
+      }
+    });
+
+    // If truckOwnerId is being updated, also update GSI2PK and GSI2SK
+    if (dto.truckOwnerId !== undefined) {
+      updateExpressions.push(`#GSI2PK = :GSI2PK`);
+      updateExpressions.push(`#GSI2SK = :GSI2SK`);
+      expressionAttributeValues[':GSI2PK'] = `OWNER#${dto.truckOwnerId}`;
+      expressionAttributeValues[':GSI2SK'] = `TRUCK#${truckId}`;
+      expressionAttributeNames['#GSI2PK'] = 'GSI2PK';
+      expressionAttributeNames['#GSI2SK'] = 'GSI2SK';
+    }
+
+    if (updateExpressions.length === 0) {
+      // No updates provided, return existing truck
+      return this.mapItemToTruck(existingTruck);
+    }
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.lorriesTableName,
+      Key: {
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    if (!result.Attributes) {
+      throw new Error('Failed to update truck');
+    }
+
+    return this.mapItemToTruck(result.Attributes);
+  }
+
+  /**
+   * Deactivate truck (soft delete)
+   * Task 3.2: Add truck update and deactivation methods
+   * Requirements: 4.15
+   * 
+   * @param truckId - The truck ID to deactivate
+   * @param carrierId - The carrier ID (for authorization)
+   * @returns Updated truck with isActive=false
+   */
+  async deactivateTruck(truckId: string, carrierId: string): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify truck exists and belongs to carrier
+    const existingTruck = await this.getTruckByIdInternal(truckId);
+    if (!existingTruck) {
+      throw new NotFoundException(`Truck with ID ${truckId} not found`);
+    }
+
+    if (existingTruck.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to deactivate this truck',
+      );
+    }
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.lorriesTableName,
+      Key: {
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: 'SET isActive = :isActive',
+      ExpressionAttributeValues: {
+        ':isActive': false,
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    return this.mapItemToTruck(result.Attributes);
+  }
+
+  /**
+   * Reactivate truck
+   * Task 3.2: Add truck update and deactivation methods
+   * Requirements: 4.16
+   * 
+   * @param truckId - The truck ID to reactivate
+   * @param carrierId - The carrier ID (for authorization)
+   * @returns Updated truck with isActive=true
+   */
+  async reactivateTruck(truckId: string, carrierId: string): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify truck exists and belongs to carrier
+    const existingTruck = await this.getTruckByIdInternal(truckId);
+    if (!existingTruck) {
+      throw new NotFoundException(`Truck with ID ${truckId} not found`);
+    }
+
+    if (existingTruck.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to reactivate this truck',
+      );
+    }
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.lorriesTableName,
+      Key: {
+        PK: `TRUCK#${truckId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: 'SET isActive = :isActive',
+      ExpressionAttributeValues: {
+        ':isActive': true,
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    return this.mapItemToTruck(result.Attributes);
+  }
+
+  /**
    * Task 3.1.6: Validate carrier membership
    * Verifies that the truck owner belongs to the specified carrier
    */
@@ -353,46 +701,90 @@ export class LorriesService {
   }
 
   /**
-   * Task 3.2.3: Create trailer with carrier validation
+   * Get a specific trailer by ID (internal method)
+   * Uses PK format: TRAILER#{trailerId}
+   * Used for authorization checks in update/deactivate methods
    */
-  async createTrailer(trailerData: {
-    carrierId: string;
-    plate: string;
-    brand: string;
-    year: number;
-    vin: string;
-    color: string;
-    reefer?: string | null;
-  }): Promise<any> {
+  private async getTrailerByIdInternal(trailerId: string): Promise<any | null> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
-    // Validate year
+    const getCommand = new GetCommand({
+      TableName: this.trailersTableName,
+      Key: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+      },
+    });
+
+    const result = await dynamodbClient.send(getCommand);
+    return result.Item || null;
+  }
+
+  /**
+   * Create a new trailer for a carrier
+   * Task 3.3: Add trailer creation method
+   * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 13.4, 13.5
+   * 
+   * @param carrierId - The carrier ID creating the trailer
+   * @param dto - Trailer creation data
+   * @returns Created trailer
+   */
+  async createTrailer(carrierId: string, dto: any): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Validate year (1900 to current + 1)
+    // Requirement 13.8 (same validation as trucks)
     const currentYear = new Date().getFullYear();
-    if (trailerData.year < 1900 || trailerData.year > currentYear + 1) {
+    if (dto.year < 1900 || dto.year > currentYear + 1) {
       throw new BadRequestException(
         `Year must be between 1900 and ${currentYear + 1}`,
       );
     }
 
-    // Generate UUID for trailer
+    // Check VIN uniqueness across all trailers
+    // Requirement 13.4
+    const existingTrailerByVin = await this.getTrailerByVin(dto.vin);
+    if (existingTrailerByVin) {
+      throw new BadRequestException(
+        `A trailer with VIN ${dto.vin} already exists`,
+      );
+    }
+
+    // Check plate uniqueness across all trailers
+    // Requirement 13.5
+    const existingTrailerByPlate = await this.getTrailerByPlate(dto.plate);
+    if (existingTrailerByPlate) {
+      throw new BadRequestException(
+        `A trailer with plate ${dto.plate} already exists`,
+      );
+    }
+
+    // Generate UUID for trailerId
+    // Requirement 5.5
     const trailerId = uuidv4();
 
-    // Task 3.2.6: Store with GSI1 CARRIER# prefix
+    // Store in eTrucky-Trailers with proper keys
+    // Requirements 5.1, 5.2, 5.6
     const putCommand = new PutCommand({
       TableName: this.trailersTableName,
       Item: {
+        // Primary keys
         PK: `TRAILER#${trailerId}`,
         SK: 'METADATA',
-        GSI1PK: `CARRIER#${trailerData.carrierId}`,
+        // GSI1: Carrier index
+        GSI1PK: `CARRIER#${carrierId}`,
         GSI1SK: `TRAILER#${trailerId}`,
+        // Trailer data
         trailerId,
-        carrierId: trailerData.carrierId,
-        plate: trailerData.plate,
-        brand: trailerData.brand,
-        year: trailerData.year,
-        vin: trailerData.vin,
-        color: trailerData.color,
-        reefer: trailerData.reefer || null,
+        carrierId,
+        plate: dto.plate,
+        brand: dto.brand,
+        year: dto.year,
+        vin: dto.vin,
+        color: dto.color,
+        // Accept optional reefer field (Requirement 5.4)
+        reefer: dto.reefer || null,
+        // Set isActive=true by default (Requirement 5.7)
         isActive: true,
       },
     });
@@ -401,41 +793,153 @@ export class LorriesService {
 
     return {
       trailerId,
-      ...trailerData,
+      carrierId,
+      plate: dto.plate,
+      brand: dto.brand,
+      year: dto.year,
+      vin: dto.vin,
+      color: dto.color,
+      reefer: dto.reefer || null,
       isActive: true,
     };
   }
 
   /**
-   * Task 3.2.4: Update trailer
+   * Get trailer by VIN (for uniqueness validation)
+   * Requirement 13.4
+   */
+  private async getTrailerByVin(vin: string): Promise<any | null> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Scan for VIN (no GSI for VIN, so we need to scan)
+    // In production, consider adding a GSI for VIN if this becomes a bottleneck
+    const scanCommand = new ScanCommand({
+      TableName: this.trailersTableName,
+      FilterExpression: 'vin = :vin',
+      ExpressionAttributeValues: {
+        ':vin': vin,
+      },
+    });
+
+    try {
+      const result = await dynamodbClient.send(scanCommand);
+      return result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    } catch (error) {
+      // If scan fails, return null (assume no duplicate)
+      return null;
+    }
+  }
+
+  /**
+   * Get trailer by plate (for uniqueness validation)
+   * Requirement 13.5
+   */
+  private async getTrailerByPlate(plate: string): Promise<any | null> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Scan for plate (no GSI for plate, so we need to scan)
+    // In production, consider adding a GSI for plate if this becomes a bottleneck
+    const scanCommand = new ScanCommand({
+      TableName: this.trailersTableName,
+      FilterExpression: 'plate = :plate',
+      ExpressionAttributeValues: {
+        ':plate': plate,
+      },
+    });
+
+    try {
+      const result = await dynamodbClient.send(scanCommand);
+      return result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    } catch (error) {
+      // If scan fails, return null (assume no duplicate)
+      return null;
+    }
+  }
+
+  /**
+   * Update trailer details
+   * Task 3.4: Add trailer update and deactivation methods
+   * Requirements: 5.11, 5.12
+   * 
+   * @param trailerId - The trailer ID to update
+   * @param carrierId - The carrier ID (for authorization)
+   * @param dto - Update data (plate, brand, year, vin, color, reefer)
+   * @returns Updated trailer
    */
   async updateTrailer(
     trailerId: string,
-    updates: Partial<{
+    carrierId: string,
+    dto: Partial<{
       plate: string;
       brand: string;
       year: number;
       vin: string;
       color: string;
       reefer: string | null;
-      isActive: boolean;
     }>,
   ): Promise<any> {
     const dynamodbClient = this.awsService.getDynamoDBClient();
 
-    // Verify trailer exists
-    await this.getTrailerById(trailerId);
+    // Verify trailer exists and belongs to carrier
+    const existingTrailer = await this.getTrailerByIdInternal(trailerId);
+    if (!existingTrailer) {
+      throw new NotFoundException(`Trailer with ID ${trailerId} not found`);
+    }
+
+    if (existingTrailer.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to update this trailer',
+      );
+    }
+
+    // Validate year if provided
+    if (dto.year !== undefined) {
+      const currentYear = new Date().getFullYear();
+      if (dto.year < 1900 || dto.year > currentYear + 1) {
+        throw new BadRequestException(
+          `Year must be between 1900 and ${currentYear + 1}`,
+        );
+      }
+    }
+
+    // Check VIN uniqueness if VIN is being updated
+    if (dto.vin !== undefined && dto.vin !== existingTrailer.vin) {
+      const existingTrailerByVin = await this.getTrailerByVin(dto.vin);
+      if (existingTrailerByVin && existingTrailerByVin.trailerId !== trailerId) {
+        throw new BadRequestException(
+          `A trailer with VIN ${dto.vin} already exists`,
+        );
+      }
+    }
+
+    // Check plate uniqueness if plate is being updated
+    if (dto.plate !== undefined && dto.plate !== existingTrailer.plate) {
+      const existingTrailerByPlate = await this.getTrailerByPlate(dto.plate);
+      if (existingTrailerByPlate && existingTrailerByPlate.trailerId !== trailerId) {
+        throw new BadRequestException(
+          `A trailer with plate ${dto.plate} already exists`,
+        );
+      }
+    }
 
     // Build update expression
     const updateExpressions: string[] = [];
     const expressionAttributeValues: any = {};
     const expressionAttributeNames: any = {};
 
-    Object.entries(updates).forEach(([key, value]) => {
-      updateExpressions.push(`#${key} = :${key}`);
-      expressionAttributeValues[`:${key}`] = value;
-      expressionAttributeNames[`#${key}`] = key;
+    // Add updatable fields
+    Object.entries(dto).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateExpressions.push(`#${key} = :${key}`);
+        expressionAttributeValues[`:${key}`] = value;
+        expressionAttributeNames[`#${key}`] = key;
+      }
     });
+
+    if (updateExpressions.length === 0) {
+      // No updates provided, return existing trailer
+      return this.mapItemToTrailer(existingTrailer);
+    }
 
     const updateCommand = new UpdateCommand({
       TableName: this.trailersTableName,
@@ -451,14 +955,103 @@ export class LorriesService {
 
     const result = await dynamodbClient.send(updateCommand);
 
+    if (!result.Attributes) {
+      throw new Error('Failed to update trailer');
+    }
+
     return this.mapItemToTrailer(result.Attributes);
   }
 
   /**
-   * Task 3.2.5: Delete trailer (soft delete)
+   * Deactivate trailer (soft delete)
+   * Task 3.4: Add trailer update and deactivation methods
+   * Requirements: 5.13
+   * 
+   * @param trailerId - The trailer ID to deactivate
+   * @param carrierId - The carrier ID (for authorization)
+   * @returns Updated trailer with isActive=false
    */
-  async deleteTrailer(trailerId: string): Promise<void> {
-    await this.updateTrailer(trailerId, { isActive: false });
+  async deactivateTrailer(trailerId: string, carrierId: string): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify trailer exists and belongs to carrier
+    const existingTrailer = await this.getTrailerByIdInternal(trailerId);
+    if (!existingTrailer) {
+      throw new NotFoundException(`Trailer with ID ${trailerId} not found`);
+    }
+
+    if (existingTrailer.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to deactivate this trailer',
+      );
+    }
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.trailersTableName,
+      Key: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: 'SET isActive = :isActive',
+      ExpressionAttributeValues: {
+        ':isActive': false,
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    return this.mapItemToTrailer(result.Attributes);
+  }
+
+  /**
+   * Reactivate trailer
+   * Task 3.4: Add trailer update and deactivation methods
+   * Requirements: 5.14
+   * 
+   * @param trailerId - The trailer ID to reactivate
+   * @param carrierId - The carrier ID (for authorization)
+   * @returns Updated trailer with isActive=true
+   */
+  async reactivateTrailer(trailerId: string, carrierId: string): Promise<any> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+
+    // Verify trailer exists and belongs to carrier
+    const existingTrailer = await this.getTrailerByIdInternal(trailerId);
+    if (!existingTrailer) {
+      throw new NotFoundException(`Trailer with ID ${trailerId} not found`);
+    }
+
+    if (existingTrailer.carrierId !== carrierId) {
+      throw new ForbiddenException(
+        'You do not have permission to reactivate this trailer',
+      );
+    }
+
+    const updateCommand = new UpdateCommand({
+      TableName: this.trailersTableName,
+      Key: {
+        PK: `TRAILER#${trailerId}`,
+        SK: 'METADATA',
+      },
+      UpdateExpression: 'SET isActive = :isActive',
+      ExpressionAttributeValues: {
+        ':isActive': true,
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+
+    const result = await dynamodbClient.send(updateCommand);
+
+    return this.mapItemToTrailer(result.Attributes);
+  }
+
+  /**
+   * Task 3.2.5: Delete trailer (soft delete) - legacy method
+   * @deprecated Use deactivateTrailer instead
+   */
+  async deleteTrailer(trailerId: string, carrierId: string): Promise<void> {
+    await this.deactivateTrailer(trailerId, carrierId);
   }
 
   /**
@@ -687,6 +1280,24 @@ export class LorriesService {
       color: item.color,
       isActive: item.isActive,
     } as any;
+  }
+
+  /**
+   * Map DynamoDB item to Truck object
+   * Used by update and deactivation methods
+   */
+  private mapItemToTruck(item: any): any {
+    return {
+      truckId: item.truckId,
+      truckOwnerId: item.truckOwnerId,
+      carrierId: item.carrierId,
+      plate: item.plate,
+      brand: item.brand,
+      year: item.year,
+      vin: item.vin,
+      color: item.color,
+      isActive: item.isActive,
+    };
   }
 
   /**

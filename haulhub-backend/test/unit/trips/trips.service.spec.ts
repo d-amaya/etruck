@@ -2340,4 +2340,325 @@ describe('TripsService', () => {
       });
     });
   });
+
+  describe('getTripsByCarrier', () => {
+    const carrierId = 'carrier-uuid-123';
+    const mockTrips = [
+      {
+        tripId: 'trip-1',
+        carrierId,
+        dispatcherId: 'dispatcher-1',
+        driverId: 'driver-1',
+        truckId: 'truck-1',
+        trailerId: 'trailer-1',
+        truckOwnerId: 'owner-1',
+        brokerId: 'broker-001',
+        orderConfirmation: 'ORDER-001',
+        orderStatus: 'Scheduled',
+        scheduledTimestamp: '2025-01-15T08:00:00Z',
+        pickupTimestamp: null,
+        deliveryTimestamp: null,
+        pickupCompany: 'Acme Corp',
+        pickupAddress: '123 Main St',
+        pickupCity: 'Los Angeles',
+        pickupState: 'CA',
+        pickupZip: '90001',
+        pickupPhone: '555-0100',
+        pickupNotes: '',
+        deliveryCompany: 'Beta Inc',
+        deliveryAddress: '456 Oak Ave',
+        deliveryCity: 'San Francisco',
+        deliveryState: 'CA',
+        deliveryZip: '94102',
+        deliveryPhone: '555-0200',
+        deliveryNotes: '',
+        mileageEmpty: 20,
+        mileageOrder: 380,
+        mileageTotal: 400,
+        brokerRate: 0,
+        driverRate: 0,
+        truckOwnerRate: 0,
+        dispatcherRate: 0,
+        factoryRate: 0,
+        orderRate: 0,
+        orderAverage: 0,
+        brokerPayment: 2500,
+        driverPayment: 800,
+        truckOwnerPayment: 1500,
+        dispatcherPayment: 0,
+        brokerAdvance: 0,
+        driverAdvance: 0,
+        factoryAdvance: 0,
+        fuelCost: 0,
+        fuelGasAvgCost: 0,
+        fuelGasAvgGallxMil: 0,
+        brokerCost: 0,
+        factoryCost: 0,
+        lumperValue: 0,
+        detentionValue: 0,
+        orderExpenses: 0,
+        orderRevenue: 0,
+        notes: '',
+        createdAt: '2025-01-10T00:00:00Z',
+        updatedAt: '2025-01-10T00:00:00Z',
+      },
+      {
+        tripId: 'trip-2',
+        carrierId,
+        dispatcherId: 'dispatcher-2',
+        driverId: 'driver-2',
+        truckId: 'truck-2',
+        trailerId: 'trailer-2',
+        truckOwnerId: 'owner-2',
+        brokerId: 'broker-002',
+        orderConfirmation: 'ORDER-002',
+        orderStatus: 'Delivered',
+        scheduledTimestamp: '2025-01-20T10:00:00Z',
+        pickupTimestamp: '2025-01-20T10:30:00Z',
+        deliveryTimestamp: '2025-01-21T14:00:00Z',
+        pickupCompany: 'Gamma LLC',
+        pickupAddress: '789 Pine Rd',
+        pickupCity: 'Dallas',
+        pickupState: 'TX',
+        pickupZip: '75201',
+        pickupPhone: '555-0300',
+        pickupNotes: '',
+        deliveryCompany: 'Delta Co',
+        deliveryAddress: '321 Elm St',
+        deliveryCity: 'Houston',
+        deliveryState: 'TX',
+        deliveryZip: '77002',
+        deliveryPhone: '555-0400',
+        deliveryNotes: '',
+        mileageEmpty: 15,
+        mileageOrder: 250,
+        mileageTotal: 265,
+        brokerRate: 0,
+        driverRate: 0,
+        truckOwnerRate: 0,
+        dispatcherRate: 0,
+        factoryRate: 0,
+        orderRate: 0,
+        orderAverage: 0,
+        brokerPayment: 1800,
+        driverPayment: 600,
+        truckOwnerPayment: 1000,
+        dispatcherPayment: 0,
+        brokerAdvance: 0,
+        driverAdvance: 0,
+        factoryAdvance: 0,
+        fuelCost: 0,
+        fuelGasAvgCost: 0,
+        fuelGasAvgGallxMil: 0,
+        brokerCost: 0,
+        factoryCost: 0,
+        lumperValue: 0,
+        detentionValue: 0,
+        orderExpenses: 0,
+        orderRevenue: 0,
+        notes: '',
+        createdAt: '2025-01-15T00:00:00Z',
+        updatedAt: '2025-01-21T14:00:00Z',
+      },
+    ];
+
+    it('should query GSI1 with CARRIER# partition key', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      await service.getTripsByCarrier(carrierId);
+
+      expect(mockDynamoDBClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({
+            TableName: 'eTrucky-Trips',
+            IndexName: 'GSI1',
+            KeyConditionExpression: 'GSI1PK = :gsi1pk',
+            ExpressionAttributeValues: expect.objectContaining({
+              ':gsi1pk': `CARRIER#${carrierId}`,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('should return all trips without role-based filtering', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId);
+
+      expect(result).toHaveLength(2);
+      // Carrier should see all fields including sensitive payment information
+      expect(result[0].brokerPayment).toBe(2500);
+      expect(result[0].driverPayment).toBe(800);
+      expect(result[0].truckOwnerPayment).toBe(1500);
+    });
+
+    it('should support date range filtering', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: [mockTrips[0]].map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      await service.getTripsByCarrier(carrierId, {
+        startDate: '2025-01-01',
+        endDate: '2025-01-16',
+      });
+
+      expect(mockDynamoDBClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({
+            KeyConditionExpression: expect.stringContaining('BETWEEN'),
+            ExpressionAttributeValues: expect.objectContaining({
+              ':gsi1pk': `CARRIER#${carrierId}`,
+              ':startSk': expect.stringMatching(/^2025-01-01T00:00:00Z#/),
+              ':endSk': expect.stringMatching(/^2025-01-16T23:59:59Z#/),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('should apply client-side filters for dispatcher', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId, {
+        dispatcherId: 'dispatcher-1',
+      });
+
+      // Should only return trips for dispatcher-1
+      expect(result).toHaveLength(1);
+      expect(result[0].dispatcherId).toBe('dispatcher-1');
+    });
+
+    it('should apply client-side filters for driver', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId, {
+        driverId: 'driver-2',
+      });
+
+      // Should only return trips for driver-2
+      expect(result).toHaveLength(1);
+      expect(result[0].driverId).toBe('driver-2');
+    });
+
+    it('should apply client-side filters for broker', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId, {
+        brokerId: 'broker-001',
+      });
+
+      // Should only return trips for broker-001
+      expect(result).toHaveLength(1);
+      expect(result[0].brokerId).toBe('broker-001');
+    });
+
+    it('should apply client-side filters for status', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId, {
+        orderStatus: 'Delivered',
+      });
+
+      // Should only return delivered trips
+      expect(result).toHaveLength(1);
+      expect(result[0].orderStatus).toBe('Delivered');
+    });
+
+    it('should apply multiple client-side filters', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: mockTrips.map(trip => ({
+          PK: `TRIP#${trip.tripId}`,
+          SK: 'METADATA',
+          GSI1PK: `CARRIER#${carrierId}`,
+          GSI1SK: `${trip.scheduledTimestamp}#${trip.tripId}`,
+          ...trip,
+        })),
+      });
+
+      const result = await service.getTripsByCarrier(carrierId, {
+        dispatcherId: 'dispatcher-2',
+        orderStatus: 'Delivered',
+        brokerId: 'broker-002',
+      });
+
+      // Should only return trips matching all filters
+      expect(result).toHaveLength(1);
+      expect(result[0].dispatcherId).toBe('dispatcher-2');
+      expect(result[0].orderStatus).toBe('Delivered');
+      expect(result[0].brokerId).toBe('broker-002');
+    });
+
+    it('should handle empty results', async () => {
+      mockDynamoDBClient.send.mockResolvedValueOnce({
+        Items: [],
+      });
+
+      const result = await service.getTripsByCarrier(carrierId);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle DynamoDB errors gracefully', async () => {
+      mockDynamoDBClient.send.mockRejectedValueOnce(new Error('DynamoDB error'));
+
+      await expect(service.getTripsByCarrier(carrierId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
+  });
 });

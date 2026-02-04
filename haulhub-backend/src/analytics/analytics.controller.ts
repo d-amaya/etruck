@@ -17,13 +17,13 @@ export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('fleet-overview')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getFleetOverview(@CurrentUser() user: CurrentUserData) {
     return await this.analyticsService.getFleetOverview(user.userId);
   }
 
   @Get('trip-analytics')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getTripAnalytics(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
@@ -35,7 +35,7 @@ export class AnalyticsController {
   }
 
   @Get('driver-performance')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getDriverPerformance(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
@@ -47,7 +47,7 @@ export class AnalyticsController {
   }
 
   @Get('vehicle-utilization')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getVehicleUtilization(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
@@ -59,7 +59,7 @@ export class AnalyticsController {
   }
 
   @Get('revenue-analytics')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getRevenueAnalytics(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
@@ -71,13 +71,13 @@ export class AnalyticsController {
   }
 
   @Get('maintenance-alerts')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getMaintenanceAlerts(@CurrentUser() user: CurrentUserData) {
     return await this.analyticsService.getMaintenanceAlerts(user.userId);
   }
 
   @Get('broker-analytics')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getBrokerAnalytics(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
@@ -89,7 +89,7 @@ export class AnalyticsController {
   }
 
   @Get('fuel-analytics')
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getFuelAnalytics(
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,

@@ -1,0 +1,50 @@
+<div class="dashboard-container">
+  <!-- Error State -->
+  <app-error-state 
+    *ngIf="error && !loading"
+    [title]="'Dashboard Error'"
+    [message]="error"
+    [isRetrying]="loading"
+    (retry)="onRetry()">
+  </app-error-state>
+
+  <!-- Dashboard Content -->
+  <div *ngIf="!error" class="dashboard-content">
+    <!-- Unified Filter Card -->
+    <app-carrier-unified-filter-card></app-carrier-unified-filter-card>
+
+    <!-- Loading Overlay for Filter Updates -->
+    <div class="content-wrapper" [style.position]="loading ? 'relative' : 'static'">
+      <app-loading-overlay 
+        [isVisible]="loading && dashboardData !== null"
+        [message]="'Updating dashboard...'">
+      </app-loading-overlay>
+
+      <!-- Initial Load: Show Loading -->
+      <div *ngIf="loading && !dashboardData" class="loading-container">
+        <mat-spinner diameter="50"></mat-spinner>
+        <p class="loading-text">Loading dashboard...</p>
+      </div>
+
+      <!-- Loaded Content - View Mode Based -->
+      <div *ngIf="!loading || dashboardData" class="loaded-content">
+        <!-- Table View -->
+        <div *ngIf="currentViewMode === 'table'" class="table-view">
+          <div class="table-section">
+            <app-carrier-trip-table></app-carrier-trip-table>
+          </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div *ngIf="currentViewMode === 'analytics'" class="analytics-view">
+          <app-carrier-analytics-wrapper></app-carrier-analytics-wrapper>
+        </div>
+
+        <!-- Payments View -->
+        <div *ngIf="currentViewMode === 'payments'" class="payments-view">
+          <app-carrier-payments-wrapper></app-carrier-payments-wrapper>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

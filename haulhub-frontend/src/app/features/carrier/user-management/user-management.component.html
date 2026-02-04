@@ -1,0 +1,338 @@
+<div class="management-container">
+  <!-- Error State -->
+  <app-error-state 
+    *ngIf="error && !loading"
+    [title]="'User Management Error'"
+    [message]="error"
+    [isRetrying]="loading"
+    (retry)="onRetry()">
+  </app-error-state>
+
+  <!-- Loading State -->
+  <div *ngIf="loading && users.length === 0" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p class="loading-text">Loading users...</p>
+  </div>
+
+  <!-- Management Content -->
+  <div *ngIf="!error && !loading" class="management-content">
+    <!-- Page Header with Action Button -->
+    <div class="page-header">
+      <div class="header-left">
+        <button mat-button (click)="navigateBack()" class="back-button">
+          <mat-icon>arrow_back</mat-icon>
+          Back to Dashboard
+        </button>
+        <h1 class="page-title">
+          <mat-icon>people</mat-icon>
+          User Management
+        </h1>
+      </div>
+      <button mat-raised-button color="primary" class="create-btn" (click)="openCreateUserDialog()">
+        <mat-icon>add</mat-icon>
+        Add User
+      </button>
+    </div>
+
+    <!-- Filters Card -->
+    <div class="filters-card">
+      <div class="filters-content">
+        <div class="filter-group">
+          <label for="role-filter">Role</label>
+          <select 
+            id="role-filter"
+            [(ngModel)]="selectedRole" 
+            (change)="onRoleFilterChange()"
+            class="filter-select">
+            <option value="">All Roles</option>
+            <option value="DISPATCHER">Dispatchers</option>
+            <option value="DRIVER">Drivers</option>
+            <option value="TRUCK_OWNER">Truck Owners</option>
+          </select>
+        </div>
+
+        <div class="filter-group search-group">
+          <label for="search-input">Search</label>
+          <div class="search-input-wrapper">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input 
+              id="search-input"
+              type="text" 
+              placeholder="Search by name or email" 
+              [(ngModel)]="searchTerm"
+              (input)="onSearchChange()"
+              class="search-input">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Table Card -->
+    <div class="table-card">
+      <div class="table-wrapper" *ngIf="filteredUsers.length > 0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th class="actions-column">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let user of filteredUsers" [class.inactive-row]="!user.isActive">
+              <td class="name-cell">
+                <div class="user-name">{{ user.name }}</div>
+              </td>
+              <td class="email-cell">{{ user.email }}</td>
+              <td>
+                <span class="role-badge" [ngClass]="getRoleBadgeClass(user.role)">
+                  {{ getRoleDisplayName(user.role) }}
+                </span>
+              </td>
+              <td>{{ user.phone }}</td>
+              <td>
+                <span class="status-badge" [class.active]="user.isActive" [class.inactive]="!user.isActive">
+                  {{ user.isActive ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button 
+                  mat-icon-button 
+                  class="action-btn edit-btn" 
+                  (click)="editUser(user)"
+                  matTooltip="Edit user">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button 
+                  mat-icon-button 
+                  class="action-btn toggle-btn" 
+                  (click)="toggleUserStatus(user)"
+                  [matTooltip]="user.isActive ? 'Deactivate user' : 'Activate user'">
+                  <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="filteredUsers.length === 0 && !loading">
+        <mat-icon>people_outline</mat-icon>
+        <h3>No Users Found</h3>
+        <p *ngIf="searchTerm || selectedRole">Try adjusting your filters</p>
+        <p *ngIf="!searchTerm && !selectedRole">Get started by adding your first user</p>
+        <button mat-raised-button color="primary" (click)="openCreateUserDialog()" *ngIf="!searchTerm && !selectedRole">
+          <mat-icon>add</mat-icon>
+          Add User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Form Dialog -->
+<div class="dialog-overlay" *ngIf="showUserDialog" (click)="onOverlayClick($event)">
+  <div class="dialog-content" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>{{ editMode ? 'Edit User' : 'Create User' }}</h2>
+      <button mat-icon-button class="close-btn" (click)="closeDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <form [formGroup]="userForm" (ngSubmit)="saveUser()">
+      <div class="dialog-body">
+        <!-- Role Selection -->
+        <div class="form-section">
+          <h3>User Role</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Role *</mat-label>
+              <mat-select formControlName="role" [disabled]="editMode">
+                <mat-option value="DISPATCHER">Dispatcher</mat-option>
+                <mat-option value="DRIVER">Driver</mat-option>
+                <mat-option value="TRUCK_OWNER">Truck Owner</mat-option>
+              </mat-select>
+              <mat-error>{{ getErrorMessage('role') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Common Fields -->
+        <div class="form-section">
+          <h3>Personal Information</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Full Name *</mat-label>
+              <input matInput formControlName="name" placeholder="Enter full name">
+              <mat-error>{{ getErrorMessage('name') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Email *</mat-label>
+              <input matInput type="email" formControlName="email" placeholder="user@example.com" [readonly]="editMode">
+              <mat-error>{{ getErrorMessage('email') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Phone *</mat-label>
+              <input matInput formControlName="phone" placeholder="(555) 123-4567">
+              <mat-error>{{ getErrorMessage('phone') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>EIN *</mat-label>
+              <input matInput formControlName="ein" placeholder="12-3456789" [readonly]="editMode">
+              <mat-error>{{ getErrorMessage('ein') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Social Security / National ID *</mat-label>
+              <input matInput formControlName="ss" placeholder="123-45-6789" [readonly]="editMode">
+              <mat-error>{{ getErrorMessage('ss') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Address Information -->
+        <div class="form-section">
+          <h3>Address</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Street Address *</mat-label>
+              <input matInput formControlName="address" placeholder="123 Main St">
+              <mat-error>{{ getErrorMessage('address') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>City *</mat-label>
+              <input matInput formControlName="city" placeholder="City">
+              <mat-error>{{ getErrorMessage('city') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>State *</mat-label>
+              <input matInput formControlName="state" placeholder="GA" maxlength="2">
+              <mat-error>{{ getErrorMessage('state') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>ZIP Code *</mat-label>
+              <input matInput formControlName="zip" placeholder="30301">
+              <mat-error>{{ getErrorMessage('zip') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Dispatcher-specific fields -->
+        <div class="form-section" *ngIf="userForm.get('role')?.value === 'DISPATCHER'">
+          <h3>Dispatcher Details</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Commission Rate (%) *</mat-label>
+              <input matInput type="number" formControlName="rate" step="0.01" placeholder="5.00">
+              <mat-hint>Percentage commission on trips</mat-hint>
+              <mat-error>{{ getErrorMessage('rate') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Driver-specific fields -->
+        <div class="form-section" *ngIf="userForm.get('role')?.value === 'DRIVER'">
+          <h3>Driver Details</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Rate per Mile ($) *</mat-label>
+              <input matInput type="number" formControlName="rate" step="0.01" placeholder="0.50">
+              <mat-hint>Payment per mile driven</mat-hint>
+              <mat-error>{{ getErrorMessage('rate') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Corporation Name</mat-label>
+              <input matInput formControlName="corpName" placeholder="Driver Corp LLC">
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Date of Birth *</mat-label>
+              <input matInput type="date" formControlName="dob">
+              <mat-error>{{ getErrorMessage('dob') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>CDL Class *</mat-label>
+              <mat-select formControlName="cdlClass">
+                <mat-option value="A">Class A</mat-option>
+                <mat-option value="B">Class B</mat-option>
+                <mat-option value="C">Class C</mat-option>
+              </mat-select>
+              <mat-error>{{ getErrorMessage('cdlClass') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>CDL State *</mat-label>
+              <input matInput formControlName="cdlState" placeholder="GA" maxlength="2">
+              <mat-error>{{ getErrorMessage('cdlState') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>CDL Issued *</mat-label>
+              <input matInput type="date" formControlName="cdlIssued">
+              <mat-error>{{ getErrorMessage('cdlIssued') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>CDL Expires *</mat-label>
+              <input matInput type="date" formControlName="cdlExpires">
+              <mat-error>{{ getErrorMessage('cdlExpires') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Fax</mat-label>
+              <input matInput formControlName="fax" placeholder="(555) 123-4568">
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Truck Owner-specific fields -->
+        <div class="form-section" *ngIf="userForm.get('role')?.value === 'TRUCK_OWNER'">
+          <h3>Truck Owner Details</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Company Name *</mat-label>
+              <input matInput formControlName="company" placeholder="ABC Trucking Inc">
+              <mat-error>{{ getErrorMessage('company') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialog Actions -->
+      <div class="dialog-actions">
+        <button mat-button type="button" (click)="closeDialog()" [disabled]="saving">
+          Cancel
+        </button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="!userForm.valid || saving">
+          <mat-spinner *ngIf="saving" diameter="20" class="button-spinner"></mat-spinner>
+          <span *ngIf="!saving">{{ editMode ? 'Update' : 'Create' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

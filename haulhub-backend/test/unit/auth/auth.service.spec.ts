@@ -343,6 +343,91 @@ describe('AuthService', () => {
     });
   });
 
+  describe('isCarrier', () => {
+    it('should return true when user has Carrier role', () => {
+      const user = {
+        'cognito:groups': [UserRole.Carrier],
+        sub: 'user-123',
+        email: 'carrier@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when user has Dispatcher role', () => {
+      const user = {
+        'cognito:groups': [UserRole.Dispatcher],
+        sub: 'user-123',
+        email: 'dispatcher@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when user has Driver role', () => {
+      const user = {
+        'cognito:groups': [UserRole.Driver],
+        sub: 'user-123',
+        email: 'driver@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when user has TruckOwner role', () => {
+      const user = {
+        'cognito:groups': [UserRole.TruckOwner],
+        sub: 'user-123',
+        email: 'owner@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when user has Admin role', () => {
+      const user = {
+        'cognito:groups': [UserRole.Admin],
+        sub: 'user-123',
+        email: 'admin@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when cognito:groups is not present', () => {
+      const user = {
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when cognito:groups is empty', () => {
+      const user = {
+        'cognito:groups': [],
+        sub: 'user-123',
+        email: 'test@example.com',
+      };
+
+      const result = service.isCarrier(user);
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('validateCarrierMembership', () => {
     it('should return true when user belongs to the carrier', async () => {
       mockDynamoDBClient.send.mockResolvedValueOnce({

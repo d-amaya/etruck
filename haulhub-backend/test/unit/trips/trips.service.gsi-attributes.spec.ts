@@ -332,12 +332,10 @@ describe('TripsService - GSI Attributes', () => {
         expect(item.GSI5SK).toBeDefined();
 
         // Verify GSI attribute formats
-        // Note: GSI1PK uses dispatcherId as fallback since carrierId is not passed to populateGSIAttributes
-        expect(item.GSI1PK).toMatch(/^CARRIER#dispatcher-123$/);
+        expect(item.GSI1PK).toMatch(/^CARRIER#carrier-123$/);
         expect(item.GSI2PK).toMatch(/^DISPATCHER#dispatcher-123$/);
         expect(item.GSI3PK).toMatch(/^DRIVER#DRIVER-ABC$/);
-        // Note: GSI4PK uses dispatcherId as fallback since truckOwnerId is not passed to populateGSIAttributes
-        expect(item.GSI4PK).toMatch(/^OWNER#dispatcher-123$/);
+        expect(item.GSI4PK).toMatch(/^OWNER#owner-123$/);
         expect(item.GSI5PK).toMatch(/^BROKER#broker-123$/);
       }
     });

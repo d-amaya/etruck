@@ -26,9 +26,10 @@ export class BrokersController {
    * GET /brokers
    * Get all active brokers
    * Dispatchers need this when creating trips
+   * Carriers need this for filtering trips
    * Admins need this to manage brokers
    */
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   @Get()
   async getAllBrokers(
     @Query('activeOnly') activeOnly?: string,
@@ -40,9 +41,9 @@ export class BrokersController {
   /**
    * GET /brokers/:id
    * Get broker by ID
-   * Dispatchers and Admins only
+   * Dispatchers, Carriers, and Admins only
    */
-  @Roles(UserRole.Dispatcher, UserRole.Admin)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   @Get(':id')
   async getBrokerById(@Param('id') id: string): Promise<Broker> {
     return this.brokersService.getBrokerById(id);

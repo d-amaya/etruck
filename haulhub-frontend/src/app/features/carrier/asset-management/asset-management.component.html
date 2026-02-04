@@ -1,0 +1,496 @@
+<div class="management-container">
+  <div class="management-content">
+    <div class="toolbar">
+      <h2>Asset Management</h2>
+    </div>
+
+    <!-- Tabs -->
+    <mat-tab-group (selectedIndexChange)="onTabChange($event)" class="asset-tabs">
+      <!-- Dispatchers Tab -->
+      <mat-tab label="Dispatchers ({{ dispatchers.length }})">
+        <div class="tab-content">
+          <div class="tab-toolbar">
+            <button mat-raised-button color="primary" (click)="openCreateUserDialog('DISPATCHER')">
+              <mat-icon>add</mat-icon>
+              Add Dispatcher
+            </button>
+          </div>
+          
+          <div class="table-container" *ngIf="dispatchers.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let user of dispatchers">
+                  <td><strong>{{ user.name }}</strong></td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.phone }}</td>
+                  <td>
+                    <span class="status-badge" [class.active]="user.isActive">
+                      {{ user.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="actions-cell">
+                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                            [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
+                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" *ngIf="dispatchers.length === 0">
+            <mat-icon>people</mat-icon>
+            <p>No dispatchers found</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Drivers Tab -->
+      <mat-tab label="Drivers ({{ drivers.length }})">
+        <div class="tab-content">
+          <div class="tab-toolbar">
+            <button mat-raised-button color="primary" (click)="openCreateUserDialog('DRIVER')">
+              <mat-icon>add</mat-icon>
+              Add Driver
+            </button>
+          </div>
+          
+          <div class="table-container" *ngIf="drivers.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>License</th>
+                  <th>CDL Class</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let user of drivers">
+                  <td><strong>{{ user.name }}</strong></td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.phone }}</td>
+                  <td>{{ user.nationalId || user.ss }}</td>
+                  <td>{{ user.cdlClass }}</td>
+                  <td>
+                    <span class="status-badge" [class.active]="user.isActive">
+                      {{ user.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="actions-cell">
+                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                            [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
+                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" *ngIf="drivers.length === 0">
+            <mat-icon>person</mat-icon>
+            <p>No drivers found</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Truck Owners Tab -->
+      <mat-tab label="Truck Owners ({{ truckOwners.length }})">
+        <div class="tab-content">
+          <div class="tab-toolbar">
+            <button mat-raised-button color="primary" (click)="openCreateUserDialog('TRUCK_OWNER')">
+              <mat-icon>add</mat-icon>
+              Add Truck Owner
+            </button>
+          </div>
+          
+          <div class="table-container" *ngIf="truckOwners.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Company</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let user of truckOwners">
+                  <td><strong>{{ user.name }}</strong></td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.phone }}</td>
+                  <td>{{ user.company }}</td>
+                  <td>
+                    <span class="status-badge" [class.active]="user.isActive">
+                      {{ user.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="actions-cell">
+                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                            [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
+                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" *ngIf="truckOwners.length === 0">
+            <mat-icon>business</mat-icon>
+            <p>No truck owners found</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Trucks Tab -->
+      <mat-tab label="Trucks ({{ trucks.length }})">
+        <div class="tab-content">
+          <div class="tab-toolbar">
+            <button mat-raised-button color="primary" (click)="openCreateTruckDialog()">
+              <mat-icon>add</mat-icon>
+              Add Truck
+            </button>
+          </div>
+
+          <!-- Loading State -->
+          <app-loading-spinner *ngIf="loading && activeTab === 'trucks'"></app-loading-spinner>
+
+          <!-- Error State -->
+          <app-error-state 
+            *ngIf="error && !loading && activeTab === 'trucks'"
+            [message]="error"
+            (retry)="onRetry()">
+          </app-error-state>
+
+          <!-- Filters -->
+          <div class="filters" *ngIf="!loading && !error">
+            <mat-form-field appearance="outline" class="filter-field">
+              <mat-label>Filter by Owner</mat-label>
+              <mat-select [(ngModel)]="selectedOwnerId" (selectionChange)="onOwnerFilterChange()">
+                <mat-option value="">All Owners</mat-option>
+                <mat-option *ngFor="let owner of truckOwners" [value]="owner.userId">
+                  {{ owner.name }} ({{ owner.company }})
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Search by Plate</mat-label>
+              <input 
+                matInput 
+                type="text" 
+                [(ngModel)]="truckSearchTerm"
+                (input)="onTruckSearchChange()"
+                placeholder="Enter plate number">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <!-- Trucks Table -->
+          <div class="table-container" *ngIf="!loading && !error">
+            <table class="data-table" *ngIf="filteredTrucks.length > 0">
+              <thead>
+                <tr>
+                  <th>Plate</th>
+                  <th>Brand</th>
+                  <th>Year</th>
+                  <th>VIN</th>
+                  <th>Color</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let truck of filteredTrucks">
+                  <td><strong>{{ truck.plate }}</strong></td>
+                  <td>{{ truck.brand }}</td>
+                  <td>{{ truck.year }}</td>
+                  <td>{{ truck.vin }}</td>
+                  <td>{{ truck.color }}</td>
+                  <td>{{ truck.truckOwnerName }}</td>
+                  <td>
+                    <span class="status-badge" [class.active]="truck.isActive">
+                      {{ truck.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="actions-cell">
+                    <button 
+                      mat-icon-button 
+                      class="btn-icon" 
+                      (click)="editTruck(truck)"
+                      matTooltip="Edit truck">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button 
+                      mat-icon-button 
+                      class="btn-icon" 
+                      (click)="toggleTruckStatus(truck)"
+                      [matTooltip]="truck.isActive ? 'Deactivate truck' : 'Reactivate truck'">
+                      <mat-icon>{{ truck.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Empty State -->
+            <div class="empty-state" *ngIf="filteredTrucks.length === 0">
+              <mat-icon>local_shipping</mat-icon>
+              <p>No trucks found</p>
+              <p class="empty-state-hint">
+                {{ truckSearchTerm || selectedOwnerId ? 'Try adjusting your filters' : 'Add your first truck to get started' }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Trailers Tab -->
+      <mat-tab label="Trailers ({{ trailers.length }})">
+        <div class="tab-content">
+          <div class="tab-toolbar">
+            <button mat-raised-button color="primary" (click)="openCreateTrailerDialog()">
+              <mat-icon>add</mat-icon>
+              Add Trailer
+            </button>
+          </div>
+          <!-- Loading State -->
+          <app-loading-spinner *ngIf="loading && activeTab === 'trailers'"></app-loading-spinner>
+
+          <!-- Error State -->
+          <app-error-state 
+            *ngIf="error && !loading && activeTab === 'trailers'"
+            [message]="error"
+            (retry)="onRetry()">
+          </app-error-state>
+
+          <!-- Filters -->
+          <div class="filters" *ngIf="!loading && !error">
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Search by Plate</mat-label>
+              <input 
+                matInput 
+                type="text" 
+                [(ngModel)]="trailerSearchTerm"
+                (input)="onTrailerSearchChange()"
+                placeholder="Enter plate number">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <!-- Trailers Table -->
+          <div class="table-container" *ngIf="!loading && !error">
+            <table class="data-table" *ngIf="filteredTrailers.length > 0">
+              <thead>
+                <tr>
+                  <th>Plate</th>
+                  <th>Brand</th>
+                  <th>Year</th>
+                  <th>VIN</th>
+                  <th>Color</th>
+                  <th>Reefer</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let trailer of filteredTrailers">
+                  <td><strong>{{ trailer.plate }}</strong></td>
+                  <td>{{ trailer.brand }}</td>
+                  <td>{{ trailer.year }}</td>
+                  <td>{{ trailer.vin }}</td>
+                  <td>{{ trailer.color }}</td>
+                  <td>{{ trailer.reefer || 'N/A' }}</td>
+                  <td>
+                    <span class="status-badge" [class.active]="trailer.isActive">
+                      {{ trailer.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="actions-cell">
+                    <button 
+                      mat-icon-button 
+                      class="btn-icon" 
+                      (click)="editTrailer(trailer)"
+                      matTooltip="Edit trailer">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button 
+                      mat-icon-button 
+                      class="btn-icon" 
+                      (click)="toggleTrailerStatus(trailer)"
+                      [matTooltip]="trailer.isActive ? 'Deactivate trailer' : 'Reactivate trailer'">
+                      <mat-icon>{{ trailer.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Empty State -->
+            <div class="empty-state" *ngIf="filteredTrailers.length === 0">
+              <mat-icon>rv_hookup</mat-icon>
+              <p>No trailers found</p>
+              <p class="empty-state-hint">
+                {{ trailerSearchTerm ? 'Try adjusting your search' : 'Add your first trailer to get started' }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>
+
+<!-- Truck Dialog -->
+<div class="dialog-overlay" *ngIf="showTruckDialog" (click)="onTruckOverlayClick($event)">
+  <div class="dialog-content">
+    <h3>{{ editMode ? 'Edit Truck' : 'Create Truck' }}</h3>
+    
+    <form [formGroup]="truckForm" (ngSubmit)="saveTruck()">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Truck Owner *</mat-label>
+        <mat-select formControlName="truckOwnerId">
+          <mat-option value="">Select Owner</mat-option>
+          <mat-option *ngFor="let owner of truckOwners" [value]="owner.userId">
+            {{ owner.name }} ({{ owner.company }})
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="truckForm.get('truckOwnerId')?.hasError('required')">
+          Truck owner is required
+        </mat-error>
+      </mat-form-field>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>License Plate *</mat-label>
+          <input matInput type="text" formControlName="plate">
+          <mat-error>{{ getErrorMessage('plate', truckForm) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Brand *</mat-label>
+          <input matInput type="text" formControlName="brand" placeholder="e.g., Freightliner">
+          <mat-error>{{ getErrorMessage('brand', truckForm) }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Year *</mat-label>
+          <input matInput type="number" formControlName="year" [min]="1900" [max]="currentYear + 1">
+          <mat-error>{{ getErrorMessage('year', truckForm) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Color *</mat-label>
+          <input matInput type="text" formControlName="color">
+          <mat-error>{{ getErrorMessage('color', truckForm) }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>VIN (17 characters) *</mat-label>
+        <input matInput type="text" formControlName="vin" maxlength="17">
+        <mat-hint>Vehicle Identification Number (17 characters)</mat-hint>
+        <mat-error>{{ getErrorMessage('vin', truckForm) }}</mat-error>
+      </mat-form-field>
+
+      <div class="dialog-actions">
+        <button mat-button type="button" (click)="closeTruckDialog()" [disabled]="saving">
+          Cancel
+        </button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="saving || truckForm.invalid">
+          <mat-spinner *ngIf="saving" diameter="20"></mat-spinner>
+          <span *ngIf="!saving">{{ editMode ? 'Update' : 'Create' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Trailer Dialog -->
+<div class="dialog-overlay" *ngIf="showTrailerDialog" (click)="onTrailerOverlayClick($event)">
+  <div class="dialog-content">
+    <h3>{{ editMode ? 'Edit Trailer' : 'Create Trailer' }}</h3>
+    
+    <form [formGroup]="trailerForm" (ngSubmit)="saveTrailer()">
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>License Plate *</mat-label>
+          <input matInput type="text" formControlName="plate">
+          <mat-error>{{ getErrorMessage('plate', trailerForm) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Brand *</mat-label>
+          <input matInput type="text" formControlName="brand" placeholder="e.g., Great Dane">
+          <mat-error>{{ getErrorMessage('brand', trailerForm) }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Year *</mat-label>
+          <input matInput type="number" formControlName="year" [min]="1900" [max]="currentYear + 1">
+          <mat-error>{{ getErrorMessage('year', trailerForm) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Color *</mat-label>
+          <input matInput type="text" formControlName="color">
+          <mat-error>{{ getErrorMessage('color', trailerForm) }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>VIN (17 characters) *</mat-label>
+        <input matInput type="text" formControlName="vin" maxlength="17">
+        <mat-hint>Vehicle Identification Number (17 characters)</mat-hint>
+        <mat-error>{{ getErrorMessage('vin', trailerForm) }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Reefer Unit (Optional)</mat-label>
+        <input matInput type="text" formControlName="reefer" placeholder="Leave blank if not refrigerated">
+        <mat-hint>Refrigeration unit identifier</mat-hint>
+      </mat-form-field>
+
+      <div class="dialog-actions">
+        <button mat-button type="button" (click)="closeTrailerDialog()" [disabled]="saving">
+          Cancel
+        </button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="saving || trailerForm.invalid">
+          <mat-spinner *ngIf="saving" diameter="20"></mat-spinner>
+          <span *ngIf="!saving">{{ editMode ? 'Update' : 'Create' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

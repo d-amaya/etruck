@@ -1,0 +1,302 @@
+@import '../../../../../styles/variables';
+
+.trip-table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.table-filters {
+  padding: 10px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+
+  .filter-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    .filter-field {
+      flex: 0 1 auto;
+      min-width: 140px;
+      max-width: 200px;
+
+      ::ng-deep {
+        .mat-mdc-form-field {
+          width: 100%;
+          font-size: 13px;
+        }
+
+        .mat-mdc-text-field-wrapper {
+          padding-bottom: 0;
+        }
+
+        .mdc-text-field--filled {
+          background-color: white;
+          border-radius: 4px 4px 0 0;
+          height: 44px;
+
+          &:not(.mdc-text-field--disabled) {
+            background-color: white;
+          }
+
+          .mat-mdc-form-field-flex {
+            height: 44px;
+            align-items: center;
+          }
+
+          .mat-mdc-form-field-infix {
+            padding-top: 12px;
+            padding-bottom: 4px;
+            min-height: 44px;
+          }
+        }
+
+        .mat-mdc-form-field-subscript-wrapper {
+          display: none;
+        }
+
+        input.mat-mdc-input-element {
+          font-size: 13px;
+          padding: 0;
+          height: 20px;
+          line-height: 20px;
+        }
+
+        .mat-mdc-select {
+          font-size: 13px;
+        }
+
+        .mat-mdc-floating-label {
+          font-size: 12px;
+          top: 20px;
+        }
+
+        .mat-mdc-icon-button {
+          width: 32px;
+          height: 32px;
+          padding: 4px;
+
+          .mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+        }
+      }
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .action-buttons-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .action-btn {
+      width: 40px;
+      height: 40px;
+      margin-top: 2px;
+      
+      &.clear-btn {
+        background-color: #1976d2 !important;
+        color: white !important;
+        border-radius: 50%;
+        
+        .mat-icon {
+          color: white !important;
+        }
+
+        &:hover {
+          background-color: #1565c0 !important;
+        }
+      }
+    }
+  }
+}
+
+.table-wrapper {
+  overflow-x: auto;
+
+  .trip-table {
+    width: 100%;
+    min-width: 1200px;
+
+    th {
+      font-weight: 600;
+      font-size: 14px;
+      color: #212121;
+      background-color: #f5f5f5;
+      padding: 16px;
+      border-bottom: 2px solid #e0e0e0;
+
+      &.numeric {
+        text-align: right;
+      }
+    }
+
+    td {
+      padding: 16px;
+      font-size: 14px;
+      color: #424242;
+      border-bottom: 1px solid #f0f0f0;
+
+      &.numeric {
+        text-align: right;
+        font-weight: 600;
+      }
+
+      &.location-cell {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .trip-row {
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: #fafafa;
+      }
+    }
+
+    mat-chip {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      min-height: 24px;
+      padding: 4px 12px;
+      border-radius: 12px;
+
+      &.status-scheduled {
+        background-color: #e3f2fd;
+        color: #0d47a1;
+      }
+
+      &.status-picked-up {
+        background-color: #fff3e0;
+        color: #e65100;
+      }
+
+      &.status-in-transit {
+        background-color: #f3e5f5;
+        color: #4a148c;
+      }
+
+      &.status-delivered {
+        background-color: #e8f5e9;
+        color: #1b5e20;
+      }
+
+      &.status-paid {
+        background-color: #e0f2f1;
+        color: #004d40;
+      }
+    }
+
+    .positive-profit {
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    .negative-profit {
+      color: #c62828;
+      font-weight: 600;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 4px;
+
+      .action-btn {
+        width: 36px;
+        height: 36px;
+        color: #1976d2 !important;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+
+        &:hover {
+          background-color: #e3f2fd !important;
+        }
+      }
+    }
+  }
+
+  mat-paginator {
+    border-top: 1px solid #e0e0e0;
+    background-color: #fafafa;
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: #bdbdbd;
+    margin-bottom: 16px;
+  }
+
+  h3 {
+    margin: 0 0 8px 0;
+    font-size: 20px;
+    font-weight: 500;
+    color: #424242;
+  }
+
+  p {
+    margin: 0;
+    color: #757575;
+    font-size: 14px;
+  }
+}
+
+.loading-state {
+  padding: 16px;
+
+  .skeleton-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 16px;
+    background-color: #fafafa;
+    border-radius: 4px;
+
+    .skeleton-cell {
+      height: 20px;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s ease-in-out infinite;
+      border-radius: 4px;
+      flex: 1;
+    }
+  }
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

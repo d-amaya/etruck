@@ -8,6 +8,8 @@ import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { FuelModule } from './fuel/fuel.module';
 import { DocumentsModule } from './documents/documents.module';
+import { UsersModule } from './users/users.module';
+import { CarrierModule } from './carrier/carrier.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { DocumentsModule } from './documents/documents.module';
     AnalyticsModule,
     FuelModule,
     DocumentsModule,
+    UsersModule,
+    CarrierModule,
   ],
 })
 export class AppModule {}

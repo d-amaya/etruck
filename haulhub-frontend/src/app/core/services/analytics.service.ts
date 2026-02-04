@@ -168,4 +168,60 @@ export class AnalyticsService {
     }
     return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
   }
+
+  // Carrier-specific analytics methods
+  getCarrierTripAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<TripAnalytics> {
+    let params = new HttpParams().set('carrierId', carrierId);
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<TripAnalytics>(`${this.apiUrl}/trip-analytics`, { params });
+  }
+
+  getCarrierDriverPerformance(carrierId: string, startDate?: Date, endDate?: Date): Observable<DriverPerformance[]> {
+    let params = new HttpParams().set('carrierId', carrierId);
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<DriverPerformance[]>(`${this.apiUrl}/driver-performance`, { params });
+  }
+
+  getCarrierVehicleUtilization(carrierId: string, startDate?: Date, endDate?: Date): Observable<VehicleUtilization[]> {
+    let params = new HttpParams().set('carrierId', carrierId);
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<VehicleUtilization[]>(`${this.apiUrl}/vehicle-utilization`, { params });
+  }
+
+  getCarrierBrokerAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<any> {
+    let params = new HttpParams().set('carrierId', carrierId);
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<any>(`${this.apiUrl}/broker-analytics`, { params });
+  }
+
+  getCarrierFuelAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<any> {
+    let params = new HttpParams().set('carrierId', carrierId);
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
+  }
 }

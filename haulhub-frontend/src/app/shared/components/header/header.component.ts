@@ -71,10 +71,14 @@ export class HeaderComponent implements OnInit {
         return 'Dispatcher';
       case UserRole.LorryOwner:
         return 'Lorry Owner';
+      case UserRole.TruckOwner:
+        return 'Truck Owner';
       case UserRole.Driver:
         return 'Driver';
       case UserRole.Admin:
         return 'Admin';
+      case UserRole.Carrier:
+        return 'Carrier';
       default:
         return '';
     }
@@ -116,7 +120,15 @@ export class HeaderComponent implements OnInit {
     const user = this.authService.currentUserValue;
     if (!user) return [];
 
-    // No navigation items needed - role-based title shown in dashboard
+    // Carrier navigation: Manage Trips and Manage Assets
+    if (user.role === UserRole.Carrier) {
+      return [
+        { label: 'Manage Trips', route: '/carrier/dashboard' },
+        { label: 'Manage Assets', route: '/carrier/assets' }
+      ];
+    }
+
+    // No navigation items for other roles
     return [];
   }
 

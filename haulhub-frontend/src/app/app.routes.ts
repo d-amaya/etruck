@@ -38,6 +38,12 @@ export const routes: Routes = [
     loadChildren: () => import('./features/admin/admin.routes').then(m => m.ADMIN_ROUTES)
   },
   {
+    path: 'carrier',
+    canActivate: [authGuard],
+    data: { roles: [UserRole.Carrier] },
+    loadChildren: () => import('./features/carrier/carrier.routes').then(m => m.CARRIER_ROUTES)
+  },
+  {
     path: '**',
     redirectTo: '/auth/login'
   }

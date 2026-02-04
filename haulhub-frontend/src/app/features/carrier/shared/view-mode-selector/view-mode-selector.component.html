@@ -1,0 +1,27 @@
+<div class="view-mode-selector">
+  <div class="view-links">
+    <a class="view-link" 
+       [class.active]="selectedMode === 'table'"
+       (click)="onViewModeChange('table')"
+       matTooltip="Table View">
+      <mat-icon>table_chart</mat-icon>
+      <span>Table</span>
+    </a>
+    
+    <a class="view-link" 
+       [class.active]="selectedMode === 'analytics'"
+       (click)="onViewModeChange('analytics')"
+       matTooltip="Analytics">
+      <mat-icon>analytics</mat-icon>
+      <span>Analytics</span>
+    </a>
+    
+    <a class="view-link" 
+       [class.active]="selectedMode === 'payments'"
+       (click)="onViewModeChange('payments')"
+       matTooltip="Payments">
+      <mat-icon>payments</mat-icon>
+      <span>Payments</span>
+    </a>
+  </div>
+</div>

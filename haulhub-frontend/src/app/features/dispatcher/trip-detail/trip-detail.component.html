@@ -40,7 +40,7 @@
             <mat-icon>arrow_back</mat-icon>
             Back to Dashboard
           </button>
-          <button mat-raised-button color="primary" (click)="onEditTrip()">
+          <button mat-raised-button color="primary" (click)="onEditTrip()" *ngIf="canEditTrip()">
             <mat-icon>edit</mat-icon>
             Edit Trip
           </button>
@@ -182,7 +182,7 @@
       </mat-card>
 
       <!-- Fuel Cost Information Card -->
-      <mat-card class="detail-card" *ngIf="hasFuelData()">
+      <mat-card class="detail-card">
         <mat-card-header>
           <mat-card-title>Fuel Cost Information</mat-card-title>
         </mat-card-header>
