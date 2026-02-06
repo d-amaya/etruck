@@ -11,13 +11,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TripService } from '../../../../core/services';
 import { CarrierService, User } from '../../../../core/services/carrier.service';
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
-import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit } from '@haulhub/shared';
+import { Trip, TripStatus, Broker, calculateTripProfit } from '@haulhub/shared';
 import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-charts-widget.component';
 
 @Component({
@@ -33,7 +31,6 @@ import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-c
     MatTooltipModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatInputModule,
     MatChipsModule,
     MatProgressSpinnerModule,
     CarrierChartsWidgetComponent
@@ -59,7 +56,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   trips: Trip[] = [];
   totalTrips = 0;
-  pageSize = 25;
+  pageSize = 10;
   pageIndex = 0;
   loading = false;
 
@@ -82,7 +79,6 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private tripService: TripService,
     private carrierService: CarrierService,
     private filterService: CarrierFilterService,
     private router: Router
@@ -92,18 +88,18 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       brokerId: [null],
       dispatcherId: [null],
       driverId: [null],
-      truckPlate: ['']
+      truckId: [null]
     });
   }
 
   ngOnInit(): void {
-    this.loadFilterOptions();
     this.loadAssets();
     
     // Subscribe to shared date filter
     this.filterService.dateFilter$
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
+        this.pageIndex = 0; // Reset to first page on date filter change
         this.loadTrips();
       });
     
@@ -116,9 +112,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  private loadFilterOptions(): void {
-    // Load brokers
-    this.tripService.getBrokers().subscribe({
+  private loadAssets(): void {
+    // Load brokers for display mapping
+    this.carrierService.getBrokers().subscribe({
       next: (brokers) => {
         this.brokers = brokers.filter(b => b.isActive);
         this.brokerMap.clear();
@@ -127,7 +123,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       error: (error) => console.error('Error loading brokers:', error)
     });
 
-    // Load dispatchers
+    // Load dispatchers for display mapping
     this.carrierService.getUsers('DISPATCHER').subscribe({
       next: (response) => {
         this.dispatchers = response.users.filter(u => u.isActive);
@@ -137,7 +133,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       error: (error) => console.error('Error loading dispatchers:', error)
     });
 
-    // Load drivers
+    // Load drivers for display mapping
     this.carrierService.getUsers('DRIVER').subscribe({
       next: (response) => {
         this.drivers = response.users.filter(u => u.isActive);
@@ -146,10 +142,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       },
       error: (error) => console.error('Error loading drivers:', error)
     });
-  }
 
-  private loadAssets(): void {
-    // Load trucks
+    // Load trucks for display mapping
     this.carrierService.getTrucks().subscribe({
       next: (response) => {
         this.trucks = response.trucks.filter(t => t.isActive);
@@ -159,7 +153,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       error: (error) => console.error('Error loading trucks:', error)
     });
 
-    // Load trailers
+    // Load trailers for display mapping
     this.carrierService.getTrailers().subscribe({
       next: (response) => {
         this.trailers = response.trailers.filter(t => t.isActive);
@@ -172,12 +166,36 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   loadTrips(): void {
     this.loading = true;
-    const filters = this.buildFilters();
+    const dateFilter = this.filterService.getCurrentFilter();
+    const formValue = this.filterForm.value;
     
-    this.tripService.getTrips(filters).subscribe({
+    console.log('[CarrierTripTable] Loading trips with pagination:', {
+      page: this.pageIndex,
+      pageSize: this.pageSize,
+      startDate: dateFilter.startDate,
+      endDate: dateFilter.endDate,
+      filters: formValue
+    });
+    
+    this.carrierService.getDashboardMetrics(
+      dateFilter.startDate,
+      dateFilter.endDate,
+      this.pageIndex,
+      this.pageSize,
+      formValue.status,
+      formValue.brokerId,
+      formValue.dispatcherId,
+      formValue.driverId,
+      formValue.truckId
+    ).subscribe({
       next: (response) => {
+        console.log('[CarrierTripTable] Received response:', {
+          tripsReceived: response.trips.length,
+          pagination: response.pagination,
+          totalTrips: response.pagination?.totalTrips
+        });
         this.trips = response.trips;
-        this.totalTrips = response.trips.length;
+        this.totalTrips = response.pagination?.totalTrips || response.trips.length;
         this.loading = false;
       },
       error: (error) => {
@@ -187,67 +205,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     });
   }
 
-  private buildFilters(): TripFilters {
-    const dateFilter = this.filterService.getCurrentFilter();
-    const formValue = this.filterForm.value;
-    
-    console.log('[buildFilters] Form values:', formValue);
-    
-    const filters: TripFilters = {
-      limit: 1000 // Increase limit to ensure all matching trips are fetched
-    };
-
-    if (dateFilter.startDate) {
-      filters.startDate = dateFilter.startDate.toISOString();
-    }
-    if (dateFilter.endDate) {
-      filters.endDate = dateFilter.endDate.toISOString();
-    }
-    if (formValue.status) {
-      (filters as any).orderStatus = formValue.status;
-    }
-    if (formValue.brokerId) {
-      (filters as any).brokerId = formValue.brokerId;
-    }
-    if (formValue.dispatcherId) {
-      (filters as any).dispatcherId = formValue.dispatcherId;
-      console.log('[buildFilters] Including dispatcherId:', formValue.dispatcherId);
-    } else {
-      console.log('[buildFilters] No dispatcherId selected, value is:', formValue.dispatcherId);
-    }
-    if (formValue.driverId) {
-      (filters as any).driverId = formValue.driverId;
-    }
-    if (formValue.truckPlate) {
-      // truckPlate now contains the truckId directly from the dropdown
-      (filters as any).truckId = formValue.truckPlate;
-      console.log('[buildFilters] Including truckId:', formValue.truckPlate);
-    }
-
-    console.log('[buildFilters] Final filters:', filters);
-    return filters;
-  }
-
-  onDropdownChange(): void {
-    this.pageIndex = 0;
-    this.loadTrips();
-  }
-
-  onTextInputBlur(): void {
-    this.pageIndex = 0;
-    this.loadTrips();
-  }
-
-  onTextInputKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      this.pageIndex = 0;
-      this.loadTrips();
-    }
-  }
-
-  clearField(fieldName: string): void {
-    this.filterForm.patchValue({ [fieldName]: '' });
+  onFilterChange(): void {
+    this.pageIndex = 0; // Reset to first page when filters change
     this.loadTrips();
   }
 
@@ -257,7 +216,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       brokerId: null,
       dispatcherId: null,
       driverId: null,
-      truckPlate: ''
+      truckId: null
     });
     this.pageIndex = 0;
     this.loadTrips();
@@ -273,22 +232,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.router.navigate(['/carrier/trips', trip.tripId]);
   }
 
-  editTrip(trip: Trip): void {
-    this.router.navigate(['/carrier/trips', trip.tripId, 'edit']);
-  }
-
-  deleteTrip(trip: Trip): void {
-    // TODO: Implement delete with confirmation dialog
-    console.log('Delete trip:', trip.tripId);
-  }
-
   createTrip(): void {
     this.router.navigate(['/carrier/trips/create']);
-  }
-
-  exportPDF(): void {
-    // TODO: Implement PDF export
-    console.log('Export PDF');
   }
 
   formatDate(dateString: string): string {
@@ -426,7 +371,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   get hasActiveFilters(): boolean {
     const formValue = this.filterForm.value;
-    return !!(formValue.status || formValue.brokerId || formValue.dispatcherId || formValue.driverId || formValue.truckPlate);
+    return !!(formValue.status || formValue.brokerId || formValue.dispatcherId || formValue.driverId || formValue.truckId);
   }
 
   Math = Math;

@@ -122,6 +122,13 @@ export class CarrierController {
     @CurrentUser() user: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: string,
+    @Query('brokerId') brokerId?: string,
+    @Query('dispatcherId') dispatcherId?: string,
+    @Query('driverId') driverId?: string,
+    @Query('truckId') truckId?: string,
   ) {
     this.validateCarrierAccess(user);
     const carrierId = this.getCarrierId(user);
@@ -145,7 +152,7 @@ export class CarrierController {
         this.brokersService.getAllBrokers(true), // Only active brokers
       ]);
 
-      // Calculate active trips count (status not 'Paid')
+      // Calculate active trips count (status not 'Paid') from ALL trips
       const activeTrips = allTrips.filter(trip => trip.orderStatus !== 'Paid').length;
 
       // Calculate active assets count (trucks + trailers with isActive=true)
@@ -159,7 +166,7 @@ export class CarrierController {
       const drivers = activeUsers.filter(u => u.role === 'DRIVER').length;
       const truckOwners = activeUsers.filter(u => u.role === 'TRUCK_OWNER').length;
 
-      // Calculate trip status breakdown
+      // Calculate trip status breakdown from ALL trips
       const tripStatusBreakdown = {
         scheduled: allTrips.filter(t => t.orderStatus === 'Scheduled').length,
         pickedUp: allTrips.filter(t => t.orderStatus === 'Picked Up').length,
@@ -174,7 +181,7 @@ export class CarrierController {
       
       if (dateFilter.start && dateFilter.end) {
         // Use provided date range
-        financialTrips = allTrips; // Already filtered by date in getTripsByCarrier
+        financialTrips = allTrips; // Use ALL trips for financial calculations
         const startMonth = dateFilter.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         const endMonth = dateFilter.end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         financialPeriodLabel = startMonth === endMonth ? startMonth : `${startMonth} - ${endMonth}`;
@@ -277,7 +284,7 @@ export class CarrierController {
           };
         });
 
-      // Calculate broker performance (for charts)
+      // Calculate broker performance (for charts) from ALL trips
       const brokerPerformance = new Map<string, { revenue: number; count: number; name: string }>();
       allTrips.forEach(trip => {
         if (trip.brokerId) {
@@ -302,7 +309,7 @@ export class CarrierController {
         .slice(0, 5)
         .map(b => ({ name: b.name, revenue: b.revenue, count: b.count }));
 
-      // Calculate dispatcher performance (for charts)
+      // Calculate dispatcher performance (for charts) from ALL trips
       const dispatcherPerformance = new Map<string, { profit: number; count: number; name: string }>();
       allTrips.forEach(trip => {
         if (trip.dispatcherId) {
@@ -332,7 +339,7 @@ export class CarrierController {
         .slice(0, 5)
         .map(d => ({ name: d.name, profit: d.profit, count: d.count }));
 
-      // Calculate aggregated chart data
+      // Calculate aggregated chart data from ALL trips (date-filtered only)
       const chartAggregates = {
         totalRevenue: allTrips.reduce((sum, t) => sum + (t.brokerPayment || 0), 0),
         totalExpenses: allTrips.reduce((sum, t) => sum + (t.driverPayment || 0) + (t.truckOwnerPayment || 0) + (t.fuelCost || 0), 0),
@@ -343,9 +350,60 @@ export class CarrierController {
         totalTripsInRange: allTrips.length
       };
 
-      // Return only first page of trips (25 by default)
-      const pageSize = 25;
-      const paginatedTrips = allTrips.slice(0, pageSize);
+      // Apply table-specific filters for pagination (status, broker, dispatcher, driver, truck)
+      let filteredTripsForTable = allTrips;
+      
+      console.log('[Dashboard] Applying table filters:', {
+        status,
+        brokerId,
+        dispatcherId,
+        driverId,
+        truckId,
+        totalTripsBeforeFilter: allTrips.length
+      });
+      
+      if (status) {
+        console.log('[Dashboard] Filtering by status:', status);
+        filteredTripsForTable = filteredTripsForTable.filter(t => {
+          const matches = t.orderStatus === status;
+          if (!matches) {
+            console.log(`  Trip ${t.tripId.substring(0, 8)} has status "${t.orderStatus}", not matching "${status}"`);
+          }
+          return matches;
+        });
+        console.log(`[Dashboard] After status filter: ${filteredTripsForTable.length} trips`);
+      }
+      if (brokerId) {
+        filteredTripsForTable = filteredTripsForTable.filter(t => t.brokerId === brokerId);
+      }
+      if (dispatcherId) {
+        filteredTripsForTable = filteredTripsForTable.filter(t => t.dispatcherId === dispatcherId);
+      }
+      if (driverId) {
+        filteredTripsForTable = filteredTripsForTable.filter(t => t.driverId === driverId);
+      }
+      if (truckId) {
+        filteredTripsForTable = filteredTripsForTable.filter(t => t.truckId === truckId);
+      }
+
+      // Return only requested page of table-filtered trips (10 by default)
+      const currentPage = page ? parseInt(page, 10) : 0;
+      const currentPageSize = pageSize ? parseInt(pageSize, 10) : 10;
+      const startIndex = currentPage * currentPageSize;
+      const endIndex = startIndex + currentPageSize;
+      const paginatedTrips = filteredTripsForTable.slice(startIndex, endIndex);
+
+      console.log('[Dashboard] Pagination:', {
+        requestedPage: page,
+        requestedPageSize: pageSize,
+        currentPage,
+        currentPageSize,
+        totalTripsAll: allTrips.length,
+        totalTripsFiltered: filteredTripsForTable.length,
+        startIndex,
+        endIndex,
+        returningTrips: paginatedTrips.length
+      });
 
       return {
         metrics: {
@@ -371,7 +429,13 @@ export class CarrierController {
         topDrivers,
         recentActivity,
         chartAggregates, // Pre-calculated aggregates for charts
-        trips: paginatedTrips, // Only first page of trips
+        trips: paginatedTrips, // Only requested page of trips
+        pagination: {
+          page: currentPage,
+          pageSize: currentPageSize,
+          totalTrips: filteredTripsForTable.length,
+          totalPages: Math.ceil(filteredTripsForTable.length / currentPageSize),
+        },
       };
     } catch (error: any) {
       console.error('Error getting dashboard metrics:', error);

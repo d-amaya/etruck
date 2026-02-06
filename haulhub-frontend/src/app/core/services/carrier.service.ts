@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { Truck, Trailer, Driver } from './trip.service';
+import { Broker } from '@haulhub/shared';
 
 // ============================================================================
 // Interfaces
@@ -63,7 +64,13 @@ export interface DashboardResponse {
   topDrivers: TopDriver[];
   recentActivity: any[];
   chartAggregates: ChartAggregates; // Pre-calculated aggregates
-  trips: any[]; // First page of trips only
+  trips: any[]; // Current page of trips
+  pagination?: {
+    page: number;
+    pageSize: number;
+    totalTrips: number;
+    totalPages: number;
+  };
 }
 
 export interface User {
@@ -213,16 +220,47 @@ export class CarrierService {
   // ============================================================================
 
   /**
-   * Get dashboard metrics for the carrier with optional date filter
+   * Get dashboard metrics for the carrier with optional date filter and pagination
    * Includes active trips, assets, users, financial summary, top performers, and recent activity
    */
-  getDashboardMetrics(startDate?: Date | null, endDate?: Date | null): Observable<DashboardResponse> {
+  getDashboardMetrics(
+    startDate?: Date | null,
+    endDate?: Date | null,
+    page?: number,
+    pageSize?: number,
+    status?: string | null,
+    brokerId?: string | null,
+    dispatcherId?: string | null,
+    driverId?: string | null,
+    truckId?: string | null
+  ): Observable<DashboardResponse> {
     const params: any = {};
     if (startDate) {
       params.startDate = startDate.toISOString();
     }
     if (endDate) {
       params.endDate = endDate.toISOString();
+    }
+    if (page !== undefined) {
+      params.page = page.toString();
+    }
+    if (pageSize !== undefined) {
+      params.pageSize = pageSize.toString();
+    }
+    if (status) {
+      params.status = status;
+    }
+    if (brokerId) {
+      params.brokerId = brokerId;
+    }
+    if (dispatcherId) {
+      params.dispatcherId = dispatcherId;
+    }
+    if (driverId) {
+      params.driverId = driverId;
+    }
+    if (truckId) {
+      params.truckId = truckId;
     }
     return this.apiService.get<DashboardResponse>('/carrier/dashboard', params);
   }
@@ -389,5 +427,16 @@ export class CarrierService {
    */
   reactivateTrailer(trailerId: string): Observable<{ trailer: Trailer }> {
     return this.updateTrailerStatus(trailerId, true);
+  }
+
+  // ============================================================================
+  // Broker Operations
+  // ============================================================================
+
+  /**
+   * Get all brokers (global list)
+   */
+  getBrokers(): Observable<Broker[]> {
+    return this.apiService.get<Broker[]>('/brokers', { activeOnly: 'true' });
   }
 }

@@ -7,7 +7,7 @@
     <form [formGroup]="filterForm" class="filter-row">
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Status</mat-label>
-        <mat-select formControlName="status" (selectionChange)="onDropdownChange()">
+        <mat-select formControlName="status" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">All Statuses</mat-option>
           <mat-option *ngFor="let status of statusOptions" [value]="status">
             {{ getStatusLabel(status) }}
@@ -17,7 +17,7 @@
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Broker</mat-label>
-        <mat-select formControlName="brokerId" (selectionChange)="onDropdownChange()">
+        <mat-select formControlName="brokerId" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">All Brokers</mat-option>
           <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
             {{ broker.brokerName }}
@@ -27,7 +27,7 @@
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Dispatcher</mat-label>
-        <mat-select formControlName="dispatcherId" (selectionChange)="onDropdownChange()">
+        <mat-select formControlName="dispatcherId" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">All Dispatchers</mat-option>
           <mat-option *ngFor="let dispatcher of dispatchers" [value]="dispatcher.userId">
             {{ dispatcher.name }}
@@ -37,7 +37,7 @@
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Driver</mat-label>
-        <mat-select formControlName="driverId" (selectionChange)="onDropdownChange()">
+        <mat-select formControlName="driverId" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">All Drivers</mat-option>
           <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
             {{ driver.name }}
@@ -47,7 +47,7 @@
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Truck</mat-label>
-        <mat-select formControlName="truckPlate" (selectionChange)="onDropdownChange()">
+        <mat-select formControlName="truckId" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">All Trucks</mat-option>
           <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
             {{ truck.plate }}
