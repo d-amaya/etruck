@@ -80,6 +80,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   statusOptions = Object.values(TripStatus);
   brokers: Broker[] = [];
+  trucks: any[] = [];
+  drivers: any[] = [];
   
   // Asset lookup maps for filter validation and conversion
   private truckPlateToIdMap = new Map<string, string>(); // plate -> truckId
@@ -119,8 +121,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     this.filterForm = this.fb.group({
       status: [null],
       brokerId: [null],
-      truckPlate: [''],
-      driverLicense: ['']
+      truckId: [null],
+      driverId: [null]
     });
   }
 
@@ -136,21 +138,14 @@ export class TripTableComponent implements OnInit, OnDestroy {
       this.trailerMap = cache.trailers;
       this.driverMap = cache.drivers;
       
+      // Convert maps to arrays for dropdowns
+      this.trucks = Array.from(cache.trucks.values());
+      this.drivers = Array.from(cache.drivers.values());
+      
       this.truckPlates = Array.from(cache.truckPlates.keys());
       this.trailerPlates = Array.from(cache.trailerPlates.keys());
       this.driverLicenses = Array.from(cache.driverLicenses.keys());
     });
-    
-    // Setup autocomplete filtering
-    this.filteredTruckPlates = this.filterForm.get('truckPlate')!.valueChanges.pipe(
-      startWith(''),
-      map(value => this._filterTruckPlates(value || ''))
-    );
-    
-    this.filteredDriverLicenses = this.filterForm.get('driverLicense')!.valueChanges.pipe(
-      startWith(''),
-      map(value => this._filterDriverLicenses(value || ''))
-    );
     
     // Load brokers for filter dropdown
     this.dashboardState.brokers$
@@ -661,37 +656,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private applyFilters(): void {
     const formValue = this.filterForm.value;
     
-    // Validate and convert truck plate to truckId
-    let truckId: string | null = null;
-    if (formValue.truckPlate?.trim()) {
-      const plateUpper = formValue.truckPlate.trim().toUpperCase();
-      truckId = this.truckPlateToIdMap.get(plateUpper) || null;
-      
-      if (!truckId) {
-        this.truckPlateError = `Truck plate "${formValue.truckPlate}" not found in your fleet`;
-        return; // Don't apply filter if invalid
-      }
-      this.truckPlateError = '';
-    }
-    
-    // Validate and convert driver license to driverId
-    let driverId: string | null = null;
-    if (formValue.driverLicense?.trim()) {
-      const licenseUpper = formValue.driverLicense.trim().toUpperCase();
-      driverId = this.driverLicenseToIdMap.get(licenseUpper) || null;
-      
-      if (!driverId) {
-        this.driverLicenseError = `Driver license "${formValue.driverLicense}" not found in your team`;
-        return; // Don't apply filter if invalid
-      }
-      this.driverLicenseError = '';
-    }
-    
     const filtersToApply = {
       status: formValue.status,
       brokerId: formValue.brokerId,
-      truckId: truckId,
-      driverId: driverId,
+      truckId: formValue.truckId,
+      driverId: formValue.driverId,
       driverName: null
     };
     

@@ -26,39 +26,23 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck Plate</mat-label>
-        <input matInput formControlName="truckPlate" placeholder="Enter truck plate" 
-               [matAutocomplete]="autoTruck"
-               (blur)="validateTruckPlate(); onTextInputBlur()" 
-               (keydown)="onTextInputKeydown($event)">
-        <mat-autocomplete #autoTruck="matAutocomplete">
-          <mat-option *ngFor="let plate of filteredTruckPlates | async" [value]="plate">
-            {{ plate }}
+        <mat-label>Truck</mat-label>
+        <mat-select formControlName="truckId" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Trucks</mat-option>
+          <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
+            {{ truck.plate }}
           </mat-option>
-        </mat-autocomplete>
-        <mat-hint *ngIf="truckPlateError" class="error-hint">{{ truckPlateError }}</mat-hint>
-        <button mat-icon-button matSuffix *ngIf="filterForm.get('truckPlate')?.value" 
-                (click)="clearField('truckPlate')" type="button" tabindex="-1">
-          <mat-icon>clear</mat-icon>
-        </button>
+        </mat-select>
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Driver License</mat-label>
-        <input matInput formControlName="driverLicense" placeholder="Enter driver license" 
-               [matAutocomplete]="autoDriver"
-               (blur)="validateDriverLicense(); onTextInputBlur()" 
-               (keydown)="onTextInputKeydown($event)">
-        <mat-autocomplete #autoDriver="matAutocomplete">
-          <mat-option *ngFor="let license of filteredDriverLicenses | async" [value]="license">
-            {{ license }}
+        <mat-label>Driver</mat-label>
+        <mat-select formControlName="driverId" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Drivers</mat-option>
+          <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+            {{ driver.name }}
           </mat-option>
-        </mat-autocomplete>
-        <mat-hint *ngIf="driverLicenseError" class="error-hint">{{ driverLicenseError }}</mat-hint>
-        <button mat-icon-button matSuffix *ngIf="filterForm.get('driverLicense')?.value" 
-                (click)="clearField('driverLicense')" type="button" tabindex="-1">
-          <mat-icon>clear</mat-icon>
-        </button>
+        </mat-select>
       </mat-form-field>
 
       <div class="spacer"></div>

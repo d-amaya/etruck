@@ -93,8 +93,6 @@ export interface Trip {
   loadedMiles?: number;
   emptyMiles?: number;
   totalMiles?: number;
-  fuelAvgCost?: number;
-  fuelAvgGallonsPerMile?: number;
   lumperFees?: number;
   detentionFees?: number;
 }

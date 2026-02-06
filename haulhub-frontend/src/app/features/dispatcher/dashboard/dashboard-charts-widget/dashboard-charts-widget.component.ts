@@ -101,6 +101,16 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
             profit: payment.totalProfit || 0
           };
           
+          // Set expense breakdown
+          this.expenseData = {
+            driver: payment.totalDriverPayments || 0,
+            owner: payment.totalTruckOwnerPayments || 0,
+            fuel: payment.totalFuelCost || 0,
+            fees: (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0) + (payment.totalAdditionalFees || 0)
+          };
+          
+          console.log('[Charts Widget] Expense data:', this.expenseData);
+          
           // Set top performers
           const performers = agg.topPerformers || {};
           this.topBrokers = (performers.topBrokers || []).map((b: any) => ({

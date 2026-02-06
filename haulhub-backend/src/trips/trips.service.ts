@@ -3315,17 +3315,23 @@ export class TripsService {
     let totalTruckOwnerPayments = 0;
     let totalLumperFees = 0;
     let totalDetentionFees = 0;
+    let totalFuelCost = 0;
 
     trips.forEach(trip => {
       totalBrokerPayments += trip.brokerPayment || 0;
       totalDriverPayments += trip.driverPayment || 0;
       totalTruckOwnerPayments += trip.truckOwnerPayment || 0;
-      totalLumperFees += trip.lumperFees || 0;
-      totalDetentionFees += trip.detentionFees || 0;
+      totalLumperFees += trip.lumperValue || 0;
+      totalDetentionFees += trip.detentionValue || 0;
+      
+      // Calculate fuel cost using correct field names
+      if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil && trip.mileageTotal) {
+        totalFuelCost += trip.fuelGasAvgCost * trip.fuelGasAvgGallxMil * trip.mileageTotal;
+      }
     });
 
     const totalAdditionalFees = totalLumperFees + totalDetentionFees;
-    const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalAdditionalFees;
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalAdditionalFees - totalFuelCost;
 
     return {
       totalBrokerPayments,
@@ -3334,6 +3340,7 @@ export class TripsService {
       totalLumperFees,
       totalDetentionFees,
       totalAdditionalFees,
+      totalFuelCost,
       totalProfit,
     };
   }
