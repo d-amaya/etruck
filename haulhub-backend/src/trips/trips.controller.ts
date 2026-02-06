@@ -47,27 +47,6 @@ export class TripsController {
   }
 
   /**
-   * GET /trips/:id
-   * Get a specific trip by ID
-   * Requirements: 4.4, 19.2
-   * 
-   * Authorization: User must be the carrier, dispatcher who created the trip,
-   * or the driver assigned to the trip, or the lorry owner, or admin
-   */
-  @Get(':id')
-  @Roles(UserRole.Carrier, UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
-  async getTripById(
-    @CurrentUser() user: CurrentUserData,
-    @Param('id') tripId: string,
-  ): Promise<Trip> {
-    return this.tripsService.getTripById(
-      tripId,
-      user.userId,
-      user.role as UserRole,
-    );
-  }
-
-  /**
    * PATCH /trips/:id
    * Update trip details (Dispatcher only)
    * Requirements: 4.4, 20.1
@@ -232,6 +211,85 @@ export class TripsController {
     profit: number[];
   }> {
     return this.tripsService.getPaymentsTimeline(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/dashboard/top-performers
+   * Get top performing brokers, drivers, and trucks
+   * 
+   * Dispatcher only - returns top 5 performers by revenue/trips
+   */
+  @Get('dashboard/top-performers')
+  @Roles(UserRole.Dispatcher)
+  async getTopPerformers(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<{
+    topBrokers: Array<{ name: string; revenue: number; count: number }>;
+    topDrivers: Array<{ name: string; trips: number }>;
+    topTrucks: Array<{ name: string; trips: number }>;
+  }> {
+    return this.tripsService.getTopPerformers(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/dashboard
+   * Get unified dashboard data (aggregates + paginated trips)
+   * 
+   * Dispatcher only - returns chart aggregates from ALL trips + first page of trips
+   * This consolidates multiple endpoints into one for better performance
+   */
+  @Get('dashboard')
+  @Roles(UserRole.Dispatcher)
+  async getDashboard(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<{
+    chartAggregates: {
+      statusSummary: Record<TripStatus, number>;
+      paymentSummary: {
+        totalBrokerPayments: number;
+        totalDriverPayments: number;
+        totalTruckOwnerPayments: number;
+        totalLumperFees: number;
+        totalDetentionFees: number;
+        totalAdditionalFees: number;
+        totalProfit: number;
+      };
+      topPerformers: {
+        topBrokers: Array<{ name: string; revenue: number; count: number }>;
+        topDrivers: Array<{ name: string; trips: number }>;
+        topTrucks: Array<{ name: string; trips: number }>;
+      };
+    };
+    trips: any[];
+    lastEvaluatedKey?: string;
+  }> {
+    return this.tripsService.getDashboard(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/:id
+   * Get a specific trip by ID
+   * Requirements: 4.4, 19.2
+   * 
+   * Authorization: User must be the carrier, dispatcher who created the trip,
+   * or the driver assigned to the trip, or the lorry owner, or admin
+   * 
+   * NOTE: This route MUST be after all specific routes (dashboard, reports, etc.)
+   * to avoid matching those paths as IDs
+   */
+  @Get(':id')
+  @Roles(UserRole.Carrier, UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Admin)
+  async getTripById(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') tripId: string,
+  ): Promise<Trip> {
+    return this.tripsService.getTripById(
+      tripId,
+      user.userId,
+      user.role as UserRole,
+    );
   }
 
   /**

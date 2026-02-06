@@ -78,21 +78,58 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
           this.loading = true;
           // Build API filters with ONLY date range (ignore other filters)
           const apiFilters = this.buildApiFiltersForCharts(filters);
-          return this.tripService.getTrips(apiFilters);
+          
+          // Use unified dashboard endpoint instead of multiple calls
+          return this.tripService.getDashboard(apiFilters);
         })
       )
       .subscribe({
-        next: (response) => {
-          if (!response || !response.trips) return; // Skip if empty response
+        next: (response: any) => {
+          console.log('[Charts Widget] Dashboard response:', response);
           
-          this.trips = response.trips || [];
+          if (!response || !response.chartAggregates) return;
+          
+          const agg = response.chartAggregates;
+          
+          // Use backend aggregates
+          this.statusData = agg.statusSummary || {};
+          
+          const payment = agg.paymentSummary || {};
+          this.revenueData = {
+            revenue: payment.totalBrokerPayments || 0,
+            expenses: (payment.totalDriverPayments || 0) + (payment.totalTruckOwnerPayments || 0),
+            profit: payment.totalProfit || 0
+          };
+          
+          // Set top performers
+          const performers = agg.topPerformers || {};
+          this.topBrokers = (performers.topBrokers || []).map((b: any) => ({
+            name: b.name,
+            value: b.revenue,
+            count: b.count
+          }));
+          this.topDrivers = (performers.topDrivers || []).map((d: any) => ({
+            name: d.name,
+            value: d.trips,
+            count: d.trips
+          }));
+          this.topTrucks = (performers.topTrucks || []).map((t: any) => ({
+            name: t.name,
+            value: t.trips,
+            count: t.trips
+          }));
+          
+          // We have aggregates, no need for trips array
+          const totalTrips = Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
+          
+          console.log(`[Charts Widget] Loaded aggregates for ${totalTrips} trips`);
+          
           this.loading = false;
-          this.calculateChartData();
           // Render charts after a delay to ensure view is ready
           setTimeout(() => this.tryRenderCharts(), 200);
         },
         error: (error) => {
-          console.error('[Charts Widget] Error loading trips for charts:', error);
+          console.error('[Charts Widget] Error loading dashboard aggregates:', error);
           this.loading = false;
         }
       });
@@ -150,24 +187,35 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       expense: !!this.expenseChartRef
     });
     // Initial render if data is already available
-    if (this.trips.length > 0) {
+    if (this.hasAggregateData()) {
       setTimeout(() => this.renderCharts(), 100);
     }
   }
 
+  hasAggregateData(): boolean {
+    return Object.keys(this.statusData).length > 0 || 
+           this.revenueData.revenue > 0 ||
+           this.topBrokers.length > 0;
+  }
+
+  getTotalTrips(): number {
+    return Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
+  }
+
   private tryRenderCharts(): void {
-    // Only render if we have data and all canvas refs are available
-    if (this.trips.length > 0 && 
-        this.revenueChartRef && 
+    const hasData = this.hasAggregateData();
+    const hasRefs = !!(this.revenueChartRef && 
         this.statusChartRef && 
         this.topPerformersChartRef && 
-        this.expenseChartRef) {
+        this.expenseChartRef);
+    
+    console.log('[Charts Widget] Render check:', { hasData, hasRefs });
+    
+    if (hasData && hasRefs) {
       this.renderCharts();
-    } else {
-      console.log('[Charts Widget] Not ready to render:', {
-        hasTrips: this.trips.length > 0,
-        hasRefs: !!(this.revenueChartRef && this.statusChartRef && this.topPerformersChartRef && this.expenseChartRef)
-      });
+    } else if (hasData && !hasRefs) {
+      // Retry after a short delay if we have data but refs aren't ready yet
+      setTimeout(() => this.tryRenderCharts(), 100);
     }
   }
 
@@ -275,11 +323,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     // Destroy existing charts
     this.charts.forEach(chart => chart.destroy());
     this.charts = [];
-
-    if (this.trips.length === 0) {
-      console.log('[Charts Widget] No trips, skipping chart render');
-      return;
-    }
 
     this.renderRevenueChart();
     this.renderStatusChart();

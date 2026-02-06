@@ -21,6 +21,7 @@ import { AuthService } from '../../../../core/services';
 import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData, calculateTripExpenses } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
+import { AssetCacheService } from '../asset-cache.service';
 import { PdfExportService } from '../../../../core/services/pdf-export.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
@@ -108,6 +109,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private dashboardState: DashboardStateService,
     private sharedFilterService: SharedFilterService,
+    private assetCache: AssetCacheService,
     private pdfExportService: PdfExportService,
     private router: Router,
     private dialog: MatDialog,
@@ -123,8 +125,21 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Load all carrier assets for filter validation and autocomplete
-    this.loadAllCarrierAssets();
+    // Load assets from cache
+    this.assetCache.loadAssets().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(cache => {
+      this.truckPlateToIdMap = cache.truckPlates;
+      this.trailerPlateToIdMap = cache.trailerPlates;
+      this.driverLicenseToIdMap = cache.driverLicenses;
+      this.truckMap = cache.trucks;
+      this.trailerMap = cache.trailers;
+      this.driverMap = cache.drivers;
+      
+      this.truckPlates = Array.from(cache.truckPlates.keys());
+      this.trailerPlates = Array.from(cache.trailerPlates.keys());
+      this.driverLicenses = Array.from(cache.driverLicenses.keys());
+    });
     
     // Setup autocomplete filtering
     this.filteredTruckPlates = this.filterForm.get('truckPlate')!.valueChanges.pipe(
@@ -142,7 +157,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(brokers => {
         this.brokers = brokers;
-        // Build broker lookup map
         this.brokerMap.clear();
         brokers.forEach(broker => {
           this.brokerMap.set(broker.brokerId, broker);
@@ -189,134 +203,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
    * Load all carrier assets for filter validation and autocomplete
    * Builds lookup maps: plate -> truckId, plate -> trailerId, license -> driverId
    */
-  private loadAllCarrierAssets(): void {
-    // Load all trucks for this carrier (backend uses carrierId from JWT)
-    this.tripService.getTrucksByCarrier().subscribe({
-      next: (trucks) => {
-        this.truckPlateToIdMap.clear();
-        this.truckPlates = [];
-        
-        trucks.filter(t => t.isActive).forEach(truck => {
-          const plateUpper = truck.plate.toUpperCase();
-          this.truckPlateToIdMap.set(plateUpper, truck.truckId);
-          this.truckPlates.push(truck.plate);
-        });
-        
-        // Store in localStorage for persistence
-        localStorage.setItem('carrier_truck_map', JSON.stringify(Array.from(this.truckPlateToIdMap.entries())));
-        
-      },
-      error: (error) => {
-        console.error('Error loading trucks for filters:', error);
-        // Try to load from localStorage as fallback
-        const stored = localStorage.getItem('carrier_truck_map');
-        if (stored) {
-          this.truckPlateToIdMap = new Map(JSON.parse(stored));
-          this.truckPlates = Array.from(this.truckPlateToIdMap.keys());
-        }
-      }
-    });
-
-    // Load all trailers for this carrier
-    this.tripService.getTrailersByCarrier().subscribe({
-      next: (trailers) => {
-        this.trailerPlateToIdMap.clear();
-        this.trailerPlates = [];
-        
-        trailers.filter(t => t.isActive).forEach(trailer => {
-          const plateUpper = trailer.plate.toUpperCase();
-          this.trailerPlateToIdMap.set(plateUpper, trailer.trailerId);
-          this.trailerPlates.push(trailer.plate);
-        });
-        
-        // Store in localStorage for persistence
-        localStorage.setItem('carrier_trailer_map', JSON.stringify(Array.from(this.trailerPlateToIdMap.entries())));
-        
-      },
-      error: (error) => {
-        console.error('Error loading trailers for filters:', error);
-        const stored = localStorage.getItem('carrier_trailer_map');
-        if (stored) {
-          this.trailerPlateToIdMap = new Map(JSON.parse(stored));
-          this.trailerPlates = Array.from(this.trailerPlateToIdMap.keys());
-        }
-      }
-    });
-
-    // Load all drivers for this carrier
-    this.tripService.getDriversByCarrier().subscribe({
-      next: (drivers) => {
-        this.driverLicenseToIdMap.clear();
-        this.driverLicenses = [];
-        
-        drivers.filter(d => d.isActive).forEach(driver => {
-          // Use nationalId (driver license) as the searchable identifier
-          if (driver.nationalId) {
-            const licenseUpper = driver.nationalId.toUpperCase();
-            this.driverLicenseToIdMap.set(licenseUpper, driver.userId);
-            this.driverLicenses.push(driver.nationalId);
-          }
-        });
-        
-        // Store in localStorage for persistence
-        localStorage.setItem('carrier_driver_map', JSON.stringify(Array.from(this.driverLicenseToIdMap.entries())));
-        
-      },
-      error: (error) => {
-        console.error('Error loading drivers for filters:', error);
-        // Try to load from localStorage as fallback
-        const stored = localStorage.getItem('carrier_driver_map');
-        if (stored) {
-          this.driverLicenseToIdMap = new Map(JSON.parse(stored));
-          this.driverLicenses = Array.from(this.driverLicenseToIdMap.keys());
-        }
-      }
-    });
-  }
-
-  /**
-   * Load all assets (trucks, trailers, drivers) for enrichment
-   */
-  private loadAssets(): void {
-    const carrierId = this.authService.carrierId;
-    if (!carrierId) {
-      console.warn('No carrierId available for loading assets');
-      return;
-    }
-
-    // Load trucks
-    this.tripService.getTrucksByCarrier(carrierId).subscribe({
-      next: (trucks) => {
-        this.truckMap.clear();
-        trucks.forEach(truck => {
-          this.truckMap.set(truck.truckId, truck);
-        });
-      },
-      error: (error) => console.error('Error loading trucks:', error)
-    });
-
-    // Load trailers
-    this.tripService.getTrailersByCarrier(carrierId).subscribe({
-      next: (trailers) => {
-        this.trailerMap.clear();
-        trailers.forEach(trailer => {
-          this.trailerMap.set(trailer.trailerId, trailer);
-        });
-      },
-      error: (error) => console.error('Error loading trailers:', error)
-    });
-
-    // Load drivers
-    this.tripService.getDriversByCarrier(carrierId).subscribe({
-      next: (drivers) => {
-        this.driverMap.clear();
-        drivers.forEach(driver => {
-          this.driverMap.set(driver.userId, driver);
-        });
-      },
-      error: (error) => console.error('Error loading drivers:', error)
-    });
-  }
 
   /**
    * Enrich trips with human-readable names from lookup maps

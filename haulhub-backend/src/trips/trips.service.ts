@@ -3175,6 +3175,237 @@ export class TripsService {
   }
 
   /**
+   * Get top performers (brokers, drivers, trucks) for dashboard charts
+   */
+  async getTopPerformers(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<{
+    topBrokers: Array<{ name: string; revenue: number; count: number }>;
+    topDrivers: Array<{ name: string; trips: number }>;
+    topTrucks: Array<{ name: string; trips: number }>;
+  }> {
+    // Get ALL trips for aggregation
+    const trips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+
+    // Calculate broker performance
+    const brokerPerformance = new Map<string, { revenue: number; count: number; name: string }>();
+    const driverPerformance = new Map<string, { trips: number; name: string }>();
+    const truckPerformance = new Map<string, { trips: number; name: string }>();
+
+    for (const trip of trips) {
+      // Broker performance
+      if (trip.brokerId) {
+        const existing = brokerPerformance.get(trip.brokerId);
+        if (existing) {
+          existing.revenue += trip.brokerPayment || 0;
+          existing.count++;
+        } else {
+          brokerPerformance.set(trip.brokerId, {
+            revenue: trip.brokerPayment || 0,
+            count: 1,
+            name: trip.brokerName || 'Unknown Broker'
+          });
+        }
+      }
+
+      // Driver performance
+      if (trip.driverId) {
+        const existing = driverPerformance.get(trip.driverId);
+        if (existing) {
+          existing.trips++;
+        } else {
+          driverPerformance.set(trip.driverId, {
+            trips: 1,
+            name: trip.driverName || 'Unknown Driver'
+          });
+        }
+      }
+
+      // Truck performance
+      if (trip.truckId) {
+        const existing = truckPerformance.get(trip.truckId);
+        if (existing) {
+          existing.trips++;
+        } else {
+          truckPerformance.set(trip.truckId, {
+            trips: 1,
+            name: `Truck ${trip.truckId.substring(0, 8)}` // Use first 8 chars of UUID
+          });
+        }
+      }
+    }
+
+    // Sort and get top 5
+    const topBrokers = Array.from(brokerPerformance.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+      .map(b => ({ name: b.name, revenue: b.revenue, count: b.count }));
+
+    const topDrivers = Array.from(driverPerformance.values())
+      .sort((a, b) => b.trips - a.trips)
+      .slice(0, 5)
+      .map(d => ({ name: d.name, trips: d.trips }));
+
+    const topTrucks = Array.from(truckPerformance.values())
+      .sort((a, b) => b.trips - a.trips)
+      .slice(0, 5)
+      .map(t => ({ name: t.name, trips: t.trips }));
+
+    return {
+      topBrokers,
+      topDrivers,
+      topTrucks,
+    };
+  }
+
+  /**
+   * Get unified dashboard data (aggregates + paginated trips)
+   * Consolidates multiple queries into one for better performance
+   */
+  async getDashboard(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<{
+    chartAggregates: {
+      statusSummary: Record<TripStatus, number>;
+      paymentSummary: any;
+      topPerformers: any;
+    };
+    trips: any[];
+    lastEvaluatedKey?: string;
+  }> {
+    // Get ALL trips for aggregation (no pagination)
+    const allTrips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+
+    // Calculate all aggregates from the same dataset
+    const statusSummary = await this.calculateStatusSummary(allTrips);
+    const paymentSummary = await this.calculatePaymentSummary(allTrips);
+    const topPerformers = await this.calculateTopPerformers(allTrips);
+
+    // Get paginated trips for the table
+    const paginatedResult = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+
+    return {
+      chartAggregates: {
+        statusSummary,
+        paymentSummary,
+        topPerformers,
+      },
+      trips: paginatedResult.trips,
+      lastEvaluatedKey: paginatedResult.lastEvaluatedKey,
+    };
+  }
+
+  private async calculateStatusSummary(trips: any[]): Promise<Record<TripStatus, number>> {
+    const summary: Record<string, number> = {};
+    for (const status of Object.values(TripStatus)) {
+      summary[status] = 0;
+    }
+    trips.forEach(trip => {
+      const status = trip.orderStatus || TripStatus.Scheduled;
+      summary[status] = (summary[status] || 0) + 1;
+    });
+    return summary as Record<TripStatus, number>;
+  }
+
+  private async calculatePaymentSummary(trips: any[]): Promise<any> {
+    let totalBrokerPayments = 0;
+    let totalDriverPayments = 0;
+    let totalTruckOwnerPayments = 0;
+    let totalLumperFees = 0;
+    let totalDetentionFees = 0;
+
+    trips.forEach(trip => {
+      totalBrokerPayments += trip.brokerPayment || 0;
+      totalDriverPayments += trip.driverPayment || 0;
+      totalTruckOwnerPayments += trip.truckOwnerPayment || 0;
+      totalLumperFees += trip.lumperFees || 0;
+      totalDetentionFees += trip.detentionFees || 0;
+    });
+
+    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalAdditionalFees;
+
+    return {
+      totalBrokerPayments,
+      totalDriverPayments,
+      totalTruckOwnerPayments,
+      totalLumperFees,
+      totalDetentionFees,
+      totalAdditionalFees,
+      totalProfit,
+    };
+  }
+
+  private async calculateTopPerformers(trips: any[]): Promise<any> {
+    const brokerPerformance = new Map<string, { revenue: number; count: number; name: string }>();
+    const driverPerformance = new Map<string, { trips: number; name: string }>();
+    const truckPerformance = new Map<string, { trips: number; name: string }>();
+
+    trips.forEach(trip => {
+      if (trip.brokerId) {
+        const existing = brokerPerformance.get(trip.brokerId);
+        if (existing) {
+          existing.revenue += trip.brokerPayment || 0;
+          existing.count++;
+        } else {
+          brokerPerformance.set(trip.brokerId, {
+            revenue: trip.brokerPayment || 0,
+            count: 1,
+            name: trip.brokerName || 'Unknown Broker'
+          });
+        }
+      }
+
+      if (trip.driverId) {
+        const existing = driverPerformance.get(trip.driverId);
+        if (existing) {
+          existing.trips++;
+        } else {
+          driverPerformance.set(trip.driverId, {
+            trips: 1,
+            name: trip.driverName || 'Unknown Driver'
+          });
+        }
+      }
+
+      if (trip.truckId) {
+        const existing = truckPerformance.get(trip.truckId);
+        if (existing) {
+          existing.trips++;
+        } else {
+          truckPerformance.set(trip.truckId, {
+            trips: 1,
+            name: `Truck ${trip.truckId.substring(0, 8)}`
+          });
+        }
+      }
+    });
+
+    const topBrokers = Array.from(brokerPerformance.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+      .map(b => ({ name: b.name, revenue: b.revenue, count: b.count }));
+
+    const topDrivers = Array.from(driverPerformance.values())
+      .sort((a, b) => b.trips - a.trips)
+      .slice(0, 5)
+      .map(d => ({ name: d.name, trips: d.trips }));
+
+    const topTrucks = Array.from(truckPerformance.values())
+      .sort((a, b) => b.trips - a.trips)
+      .slice(0, 5)
+      .map(t => ({ name: t.name, trips: t.trips }));
+
+    return {
+      topBrokers,
+      topDrivers,
+      topTrucks,
+    };
+  }
+
+  /**
    * Delete a trip
    * Requirements: 18.1, 18.2, 18.3, 18.4, 18.5
    * 

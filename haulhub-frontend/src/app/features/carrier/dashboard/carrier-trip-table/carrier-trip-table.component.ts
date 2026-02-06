@@ -15,6 +15,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CarrierService, User } from '../../../../core/services/carrier.service';
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
+import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { Trip, TripStatus, Broker, calculateTripProfit } from '@haulhub/shared';
 import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-charts-widget.component';
 
@@ -81,6 +82,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private carrierService: CarrierService,
     private filterService: CarrierFilterService,
+    private assetCache: CarrierAssetCacheService,
     private router: Router
   ) {
     this.filterForm = this.fb.group({
@@ -93,7 +95,22 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.loadAssets();
+    // Load assets from cache
+    this.assetCache.loadAssets().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(cache => {
+      this.trucks = Array.from(cache.trucks.values());
+      this.trailers = Array.from(cache.trailers.values());
+      this.drivers = Array.from(cache.drivers.values());
+      this.dispatchers = Array.from(cache.dispatchers.values());
+      this.brokers = Array.from(cache.brokers.values());
+      
+      this.truckMap = cache.trucks;
+      this.trailerMap = cache.trailers;
+      this.driverMap = cache.drivers;
+      this.dispatcherMap = cache.dispatchers;
+      this.brokerMap = cache.brokers;
+    });
     
     // Subscribe to shared date filter
     this.filterService.dateFilter$
@@ -112,57 +129,6 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  private loadAssets(): void {
-    // Load brokers for display mapping
-    this.carrierService.getBrokers().subscribe({
-      next: (brokers) => {
-        this.brokers = brokers.filter(b => b.isActive);
-        this.brokerMap.clear();
-        this.brokers.forEach(b => this.brokerMap.set(b.brokerId, b));
-      },
-      error: (error) => console.error('Error loading brokers:', error)
-    });
-
-    // Load dispatchers for display mapping
-    this.carrierService.getUsers('DISPATCHER').subscribe({
-      next: (response) => {
-        this.dispatchers = response.users.filter(u => u.isActive);
-        this.dispatcherMap.clear();
-        this.dispatchers.forEach(d => this.dispatcherMap.set(d.userId, d));
-      },
-      error: (error) => console.error('Error loading dispatchers:', error)
-    });
-
-    // Load drivers for display mapping
-    this.carrierService.getUsers('DRIVER').subscribe({
-      next: (response) => {
-        this.drivers = response.users.filter(u => u.isActive);
-        this.driverMap.clear();
-        this.drivers.forEach(d => this.driverMap.set(d.userId, d));
-      },
-      error: (error) => console.error('Error loading drivers:', error)
-    });
-
-    // Load trucks for display mapping
-    this.carrierService.getTrucks().subscribe({
-      next: (response) => {
-        this.trucks = response.trucks.filter(t => t.isActive);
-        this.truckMap.clear();
-        this.trucks.forEach(t => this.truckMap.set(t.truckId, t));
-      },
-      error: (error) => console.error('Error loading trucks:', error)
-    });
-
-    // Load trailers for display mapping
-    this.carrierService.getTrailers().subscribe({
-      next: (response) => {
-        this.trailers = response.trailers.filter(t => t.isActive);
-        this.trailerMap.clear();
-        this.trailers.forEach(t => this.trailerMap.set(t.trailerId, t));
-      },
-      error: (error) => console.error('Error loading trailers:', error)
-    });
-  }
 
   loadTrips(): void {
     this.loading = true;

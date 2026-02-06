@@ -1,4 +1,4 @@
-<div class="dashboard-charts-widget" *ngIf="!loading && trips.length > 0">
+<div class="dashboard-charts-widget" *ngIf="!loading && hasAggregateData()">
   <div class="charts-grid">
     
     <!-- Revenue vs Expenses Chart -->
@@ -34,7 +34,7 @@
         <div class="chart-summary">
           <div class="summary-item">
             <span class="label">Total Trips</span>
-            <span class="value">{{ trips.length }}</span>
+            <span class="value">{{ getTotalTrips() }}</span>
           </div>
         </div>
         <div class="chart-container">
@@ -83,7 +83,7 @@
 </div>
 
 <!-- Empty State -->
-<div class="empty-charts" *ngIf="!loading && trips.length === 0">
+<div class="empty-charts" *ngIf="!loading && !hasAggregateData()">
   <mat-icon>insert_chart</mat-icon>
   <p>No data available for charts</p>
   <p class="hint">Create trips to see visual analytics</p>

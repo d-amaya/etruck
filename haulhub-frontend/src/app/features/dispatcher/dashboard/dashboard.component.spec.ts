@@ -70,11 +70,6 @@ describe('DashboardComponent', () => {
     });
   });
 
-  it('should start initial load on init', () => {
-    component.ngOnInit();
-    expect(dashboardStateServiceSpy.startInitialLoad).toHaveBeenCalled();
-  });
-
   it('should subscribe to loading state changes', () => {
     const newLoadingState = {
       isLoading: true,
@@ -110,23 +105,6 @@ describe('DashboardComponent', () => {
 
     expect(component.errorState).toEqual(newErrorState);
   });
-
-  it('should complete load after timeout on init', fakeAsync(() => {
-    component.ngOnInit();
-    tick(1500);
-
-    expect(dashboardStateServiceSpy.completeLoad).toHaveBeenCalled();
-  }));
-
-  it('should handle retry correctly', fakeAsync(() => {
-    component.onRetry();
-    
-    expect(dashboardStateServiceSpy.clearError).toHaveBeenCalled();
-    expect(dashboardStateServiceSpy.startInitialLoad).toHaveBeenCalled();
-    
-    tick(1500);
-    expect(dashboardStateServiceSpy.completeLoad).toHaveBeenCalled();
-  }));
 
   it('should clean up subscriptions on destroy', () => {
     spyOn(component['destroy$'], 'next');

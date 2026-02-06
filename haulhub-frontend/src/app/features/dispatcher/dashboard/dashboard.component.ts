@@ -61,15 +61,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Start initial load
-    this.dashboardState.startInitialLoad();
-    
     // Subscribe to loading state
     this.dashboardState.loading$
       .pipe(takeUntil(this.destroy$))
       .subscribe(loadingState => {
         this.loadingState = loadingState;
-        // Trigger change detection to avoid ExpressionChangedAfterItHasBeenCheckedError
         this.cdr.detectChanges();
       });
     
@@ -88,11 +84,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.currentViewMode = mode;
         this.cdr.detectChanges();
       });
-    
-    // Simulate initial load completion after components are ready
-    setTimeout(() => {
-      this.dashboardState.completeLoad();
-    }, 1500);
   }
 
   ngOnDestroy(): void {
@@ -102,12 +93,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   
   onRetry(): void {
     this.dashboardState.clearError();
-    this.dashboardState.startInitialLoad();
-    
-    // Simulate retry
-    setTimeout(() => {
-      this.dashboardState.completeLoad();
-    }, 1500);
   }
 
   onCreateTrip(): void {

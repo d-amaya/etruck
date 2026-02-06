@@ -246,4 +246,28 @@ export class TripService {
   getPaymentsTimeline(filters?: TripFilters): Observable<PaymentsTimeline> {
     return this.apiService.get<PaymentsTimeline>('/trips/dashboard/payments-timeline', filters);
   }
+
+  getTopPerformers(filters?: TripFilters): Observable<{
+    topBrokers: Array<{ name: string; revenue: number; count: number }>;
+    topDrivers: Array<{ name: string; trips: number }>;
+    topTrucks: Array<{ name: string; trips: number }>;
+  }> {
+    return this.apiService.get('/trips/dashboard/top-performers', filters);
+  }
+
+  getDashboard(filters?: TripFilters): Observable<{
+    chartAggregates: {
+      statusSummary: Record<TripStatus, number>;
+      paymentSummary: PaymentSummary;
+      topPerformers: {
+        topBrokers: Array<{ name: string; revenue: number; count: number }>;
+        topDrivers: Array<{ name: string; trips: number }>;
+        topTrucks: Array<{ name: string; trips: number }>;
+      };
+    };
+    trips: Trip[];
+    lastEvaluatedKey?: string;
+  }> {
+    return this.apiService.get('/trips/dashboard', filters);
+  }
 }
