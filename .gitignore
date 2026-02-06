@@ -1,4 +1,5 @@
 # IDE and Editor
+.agents/
 .kiro/
 .vscode/
 .idea/
@@ -66,3 +67,5 @@ cdk.context.json
 # Temporary files
 *.tmp
 .cache/
+
+AGENTS.md
