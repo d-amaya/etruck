@@ -168,9 +168,14 @@
         line-height: 28px;
 
         &.active {
-          background-color: #e3f2fd;
-          color: #1976d2;
-          font-weight: 500;
+          background-color: #e3f2fd !important;
+          color: #1976d2 !important;
+          font-weight: 500 !important;
+          
+          ::ng-deep .mat-mdc-button-persistent-ripple,
+          ::ng-deep .mdc-button__label {
+            color: #1976d2 !important;
+          }
         }
       }
     }

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject } from 'rxjs';
 import { takeUntil, switchMap, debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -6,6 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
+import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { TripService } from '../../../../core/services';
 import { CarrierService, User } from '../../../../core/services/carrier.service';
 import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateTripExpenses } from '@haulhub/shared';
@@ -26,6 +27,74 @@ interface TopPerformer {
   styleUrls: ['./carrier-charts-widget.component.scss']
 })
 export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterViewInit {
+  @Input() set dashboardData(data: any) {
+    if (!data || !data.chartAggregates) return;
+    
+    const agg = data.chartAggregates;
+    
+    console.log('Dashboard data received:', {
+      statusSummary: agg.statusSummary,
+      paymentSummary: agg.paymentSummary,
+      topPerformers: agg.topPerformers,
+      brokerMapSize: this.brokerMap.size,
+      driverMapSize: this.driverMap.size
+    });
+    
+    // Handle unified endpoint structure
+    this.statusData = agg.statusSummary || {};
+    this.totalTripsInRange = Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
+    
+    const payment = agg.paymentSummary || {};
+    this.revenueData = {
+      revenue: payment.totalBrokerPayments || 0,
+      expenses: (payment.totalDriverPayments || 0) + (payment.totalTruckOwnerPayments || 0) + (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0) + (payment.totalFuelCost || 0),
+      profit: payment.totalProfit || 0
+    };
+    
+    const topPerformers = agg.topPerformers || {};
+    
+    // Resolve broker IDs to names
+    this.topBrokers = (topPerformers.topBrokers || []).map((b: any) => {
+      const broker = this.brokerMap.get(b.id);
+      return {
+        name: broker?.brokerName || b.id.substring(0, 8),
+        value: b.revenue,
+        count: b.count
+      };
+    });
+    
+    // Resolve driver IDs to names
+    this.topDrivers = (topPerformers.topDrivers || []).map((d: any) => {
+      const driver = this.driverMap.get(d.id);
+      return {
+        name: driver?.name || d.id.substring(0, 8),
+        value: d.trips,
+        count: d.trips
+      };
+    });
+    
+    // Resolve dispatcher IDs to names
+    this.topDispatchers = (topPerformers.topDispatchers || []).map((d: any) => {
+      const dispatcher = this.dispatcherMap.get(d.id);
+      return {
+        name: dispatcher?.name || d.id.substring(0, 8),
+        value: d.profit,
+        count: d.count
+      };
+    });
+    
+    console.log('Processed chart data:', {
+      revenueData: this.revenueData,
+      topBrokers: this.topBrokers,
+      topDrivers: this.topDrivers,
+      topDispatchers: this.topDispatchers
+    });
+    
+    this.dataLoaded = true;
+    this.loading = false;
+    setTimeout(() => this.tryRenderCharts(), 200);
+  }
+
   @ViewChild('revenueChart') revenueChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('statusChart') statusChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('topBrokersChart') topBrokersChartRef!: ElementRef<HTMLCanvasElement>;
@@ -34,16 +103,11 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   private destroy$ = new Subject<void>();
   private charts: Chart[] = [];
 
-  trips: Trip[] = [];
   loading = true;
-  dispatchers: User[] = [];
-  private dispatcherMap = new Map<string, string>();
-  private dataLoaded = false; // Track if data has been loaded
+  private dataLoaded = false;
 
-  // Math utility for template
   Math = Math;
 
-  // Chart data - will be populated from backend aggregates
   revenueData = { revenue: 0, expenses: 0, profit: 0 };
   statusData: { [key: string]: number } = {};
   topBrokers: TopPerformer[] = [];
@@ -51,89 +115,26 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   topDrivers: TopPerformer[] = [];
   totalTripsInRange = 0;
 
+  // Asset maps for name resolution
+  private brokerMap = new Map<string, any>();
+  private driverMap = new Map<string, any>();
+  private dispatcherMap = new Map<string, any>();
+
   constructor(
     private carrierFilterService: CarrierFilterService,
     private tripService: TripService,
-    private carrierService: CarrierService
+    private carrierService: CarrierService,
+    private assetCache: CarrierAssetCacheService
   ) {}
 
   ngOnInit(): void {
-    // Load dispatchers first
-    this.loadDispatchers();
-    
-    this.carrierFilterService.dateFilter$
-      .pipe(
-        debounceTime(50), // Wait 50ms for both dates to be set
-        distinctUntilChanged((prev, curr) => 
-          prev.startDate?.getTime() === curr.startDate?.getTime() &&
-          prev.endDate?.getTime() === curr.endDate?.getTime()
-        ),
-        takeUntil(this.destroy$),
-        switchMap(dateFilter => {
-          console.log('[Carrier Charts Widget] Loading data for date range:', dateFilter);
-          this.loading = true;
-          this.dataLoaded = false;
-          // Use dashboard endpoint to get ALL trips for accurate aggregation
-          return this.carrierService.getDashboardMetrics(dateFilter.startDate, dateFilter.endDate);
-        })
-      )
-      .subscribe({
-        next: (response) => {
-          if (!response) return;
-          
-          // Use pre-calculated aggregates from backend
-          const agg = response.chartAggregates;
-          this.totalTripsInRange = agg.totalTripsInRange;
-          
-          this.revenueData = {
-            revenue: agg.totalRevenue,
-            expenses: agg.totalExpenses,
-            profit: agg.totalRevenue - agg.totalExpenses
-          };
-          
-          this.statusData = agg.statusBreakdown;
-          
-          this.topBrokers = agg.topBrokers.map(b => ({
-            name: b.name,
-            value: b.revenue,
-            count: b.count
-          }));
-          
-          this.topDispatchers = agg.topDispatchers.map(d => ({
-            name: d.name,
-            value: d.profit,
-            count: d.count
-          }));
-          
-          this.topDrivers = agg.topDrivers.map(d => ({
-            name: d.name,
-            value: d.trips,
-            count: d.trips
-          }));
-          
-          console.log(`[Carrier Charts Widget] Loaded aggregates from ${this.totalTripsInRange} trips`);
-          
-          this.dataLoaded = true;
-          this.loading = false;
-          setTimeout(() => this.tryRenderCharts(), 200);
-        },
-        error: (error) => {
-          console.error('[Carrier Charts Widget] Error loading dashboard:', error);
-          this.loading = false;
-        }
-      });
-  }
-
-  private loadDispatchers(): void {
-    this.carrierService.getUsers('DISPATCHER').subscribe({
-      next: (response) => {
-        this.dispatchers = response.users || [];
-        this.dispatcherMap.clear();
-        this.dispatchers.forEach(d => this.dispatcherMap.set(d.userId, d.name));
-      },
-      error: (error) => {
-        console.error('[Carrier Charts Widget] Error loading dispatchers:', error);
-      }
+    // Load assets for name resolution
+    this.assetCache.loadAssets().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(cache => {
+      this.brokerMap = cache.brokers;
+      this.driverMap = cache.drivers;
+      this.dispatcherMap = cache.dispatchers;
     });
   }
 
@@ -155,17 +156,16 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     this.charts.forEach(chart => chart.destroy());
     this.charts = [];
 
-    console.log('[Carrier Charts Widget] Rendering charts with data:', {
-      revenueData: this.revenueData,
-      statusDataKeys: Object.keys(this.statusData),
-      topBrokersCount: this.topBrokers.length,
-      topDispatchersCount: this.topDispatchers.length
-    });
-
     if (this.totalTripsInRange === 0) {
-      console.log('[Carrier Charts Widget] No trips to render');
       return;
     }
+
+    console.log('Rendering charts, refs:', {
+      revenue: !!this.revenueChartRef,
+      status: !!this.statusChartRef,
+      brokers: !!this.topBrokersChartRef,
+      dispatchers: !!this.topDispatchersChartRef
+    });
 
     this.renderRevenueChart();
     this.renderStatusChart();
@@ -263,12 +263,11 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
         datasets: [{
           label: 'Revenue ($)',
           data: this.topBrokers.map(b => b.value),
-          backgroundColor: '#1976d2',
+          backgroundColor: ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'],
           borderRadius: 4
         }]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
@@ -276,7 +275,7 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
           tooltip: {
             callbacks: {
               label: (context) => {
-                const value = context.parsed.x || 0;
+                const value = context.parsed.y || 0;
                 const broker = this.topBrokers[context.dataIndex];
                 return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${broker.count} trips)`;
               }
@@ -285,6 +284,12 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
         },
         scales: {
           x: {
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45
+            }
+          },
+          y: {
             ticks: {
               callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
             }
@@ -297,10 +302,27 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   }
 
   private renderTopDispatchersChart(): void {
-    if (!this.topDispatchersChartRef) return;
+    if (!this.topDispatchersChartRef) {
+      console.log('No dispatcher chart ref');
+      return;
+    }
+    if (this.topDispatchers.length === 0) {
+      console.log('No dispatcher data');
+      return;
+    }
 
     const ctx = this.topDispatchersChartRef.nativeElement.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.log('No dispatcher chart context');
+      return;
+    }
+
+    console.log('Rendering dispatcher chart with data:', this.topDispatchers);
+
+    const colors = this.topDispatchers.map((d, i) => {
+      const baseColors = ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'];
+      return d.value >= 0 ? baseColors[i] : '#f44336';
+    });
 
     const config: ChartConfiguration = {
       type: 'bar',
@@ -309,12 +331,11 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
         datasets: [{
           label: 'Net Profit ($)',
           data: this.topDispatchers.map(d => d.value),
-          backgroundColor: this.topDispatchers.map(d => d.value >= 0 ? '#4caf50' : '#f44336'),
+          backgroundColor: colors,
           borderRadius: 4
         }]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
@@ -322,7 +343,7 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
           tooltip: {
             callbacks: {
               label: (context) => {
-                const value = context.parsed.x || 0;
+                const value = context.parsed.y || 0;
                 const dispatcher = this.topDispatchers[context.dataIndex];
                 return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${dispatcher.count} trips)`;
               }
@@ -331,6 +352,12 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
         },
         scales: {
           x: {
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45
+            }
+          },
+          y: {
             ticks: {
               callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
             }
@@ -368,7 +395,7 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
       case TripStatus.Paid:
         return '#009688';
       default:
-        console.warn('[Carrier Charts Widget] Unknown status for color:', status);
+        // Removed debug warning
         return '#757575';
     }
   }

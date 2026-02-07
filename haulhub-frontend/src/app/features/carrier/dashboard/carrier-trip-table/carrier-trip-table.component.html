@@ -1,6 +1,6 @@
 <div class="trip-table-container">
   <!-- Dashboard Charts Widget -->
-  <app-carrier-charts-widget></app-carrier-charts-widget>
+  <app-carrier-charts-widget [dashboardData]="lastDashboardResponse"></app-carrier-charts-widget>
 
   <!-- Table Filters -->
   <div class="table-filters" *ngIf="!loading">
@@ -27,37 +27,55 @@
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Dispatcher</mat-label>
-        <mat-select formControlName="dispatcherId" (selectionChange)="onFilterChange()">
+        <input type="text" matInput formControlName="dispatcherId" [matAutocomplete]="dispatcherAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('dispatcherId')?.value" matSuffix mat-icon-button (click)="clearDispatcherFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #dispatcherAuto="matAutocomplete" [displayWith]="displayDispatcher" (optionSelected)="onFilterChange()">
           <mat-option [value]="null">All Dispatchers</mat-option>
-          <mat-option *ngFor="let dispatcher of dispatchers" [value]="dispatcher.userId">
+          <mat-option *ngFor="let dispatcher of filteredDispatchers | async" [value]="dispatcher.userId">
             {{ dispatcher.name }}
           </mat-option>
-        </mat-select>
+        </mat-autocomplete>
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Driver</mat-label>
-        <mat-select formControlName="driverId" (selectionChange)="onFilterChange()">
+        <input type="text" matInput formControlName="driverId" [matAutocomplete]="driverAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('driverId')?.value" matSuffix mat-icon-button (click)="clearDriverFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #driverAuto="matAutocomplete" [displayWith]="displayDriver" (optionSelected)="onFilterChange()">
           <mat-option [value]="null">All Drivers</mat-option>
-          <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+          <mat-option *ngFor="let driver of filteredDrivers | async" [value]="driver.userId">
             {{ driver.name }}
           </mat-option>
-        </mat-select>
+        </mat-autocomplete>
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Truck</mat-label>
-        <mat-select formControlName="truckId" (selectionChange)="onFilterChange()">
+        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck" (optionSelected)="onFilterChange()">
           <mat-option [value]="null">All Trucks</mat-option>
-          <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
+          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
             {{ truck.plate }}
           </mat-option>
-        </mat-select>
+        </mat-autocomplete>
       </mat-form-field>
 
       <div class="spacer"></div>
 
       <div class="action-buttons-group">
+        <button mat-icon-button (click)="exportPDF()" type="button"
+                [matTooltip]="'Export to PDF'"
+                class="action-btn export-btn">
+          <mat-icon>download</mat-icon>
+        </button>
+        
         <button mat-icon-button (click)="clearAllFilters()" type="button"
                 [matTooltip]="'Clear all filters'"
                 class="action-btn clear-btn">

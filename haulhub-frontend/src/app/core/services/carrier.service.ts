@@ -220,6 +220,37 @@ export class CarrierService {
   // ============================================================================
 
   /**
+   * Get unified dashboard data (aggregates + paginated trips)
+   */
+  getDashboardUnified(filters?: any): Observable<{
+    chartAggregates: any;
+    trips: any[];
+    lastEvaluatedKey?: string;
+  }> {
+    const { lastEvaluatedKey, ...queryFilters } = filters || {};
+    const options = lastEvaluatedKey 
+      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
+      : undefined;
+
+    return this.apiService.get('/carrier/dashboard-unified', queryFilters, options);
+  }
+
+  /**
+   * Get trips only (no aggregates) - for pagination
+   */
+  getTrips(filters?: any): Observable<{
+    trips: any[];
+    lastEvaluatedKey?: string;
+  }> {
+    const { lastEvaluatedKey, ...queryFilters } = filters || {};
+    const options = lastEvaluatedKey 
+      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
+      : undefined;
+
+    return this.apiService.get('/carrier/trips', queryFilters, options);
+  }
+
+  /**
    * Get dashboard metrics for the carrier with optional date filter and pagination
    * Includes active trips, assets, users, financial summary, top performers, and recent activity
    */

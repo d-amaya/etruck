@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { CarrierDashboardStateService } from './carrier-dashboard-state.service';
 
 export type ViewMode = 'table' | 'analytics' | 'payments';
 
@@ -21,6 +22,8 @@ export class CarrierFilterService {
 
   dateFilter$: Observable<CarrierDateFilter> = this.dateFilterSubject.asObservable();
   viewMode$: Observable<ViewMode> = this.viewModeSubject.asObservable();
+
+  constructor(private dashboardState: CarrierDashboardStateService) {}
 
   private getDefaultStartDate(): Date {
     const date = new Date();
@@ -49,6 +52,7 @@ export class CarrierFilterService {
 
   updateDateFilter(startDate: Date | null, endDate: Date | null): void {
     this.dateFilterSubject.next({ startDate, endDate });
+    this.dashboardState.updateFilters({ dateRange: { startDate, endDate } });
   }
 
   setPreset(preset: 'week' | 'month' | 'quarter' | 'year'): void {

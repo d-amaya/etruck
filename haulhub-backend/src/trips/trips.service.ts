@@ -2918,7 +2918,7 @@ export class TripsService {
    * Helper method to get ALL trips for aggregation purposes (no pagination)
    * This fetches all trips matching the filters by paginating through all results
    */
-  private async getAllTripsForAggregation(
+  async getAllTripsForAggregation(
     userId: string,
     userRole: UserRole,
     filters: TripFilters,

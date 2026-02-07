@@ -40,6 +40,7 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   activePreset: string | null = 'month';
   maxDate = new Date();
+  private settingPreset = false;
   
   private destroy$ = new Subject<void>();
 
@@ -66,23 +67,31 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(value => {
-        if (value.startDate && value.endDate) {
+        console.log('Form changed, settingPreset:', this.settingPreset, 'activePreset:', this.activePreset);
+        if (value.startDate && value.endDate && !this.settingPreset) {
           this.filterService.updateDateFilter(value.startDate, value.endDate);
-          this.activePreset = null; // Clear preset when manually changed
+          this.activePreset = null;
         }
       });
   }
 
   setPreset(preset: 'week' | 'month' | 'quarter' | 'year'): void {
+    console.log('Setting preset:', preset);
+    this.settingPreset = true;
     this.activePreset = preset;
     this.filterService.setPreset(preset);
     
-    // Update form to reflect the preset
     const filter = this.filterService.getCurrentFilter();
     this.filterForm.patchValue({
       startDate: filter.startDate,
       endDate: filter.endDate
     }, { emitEvent: false });
+    
+    console.log('After setPreset, activePreset:', this.activePreset);
+    setTimeout(() => {
+      this.settingPreset = false;
+      console.log('Reset settingPreset flag');
+    }, 600);
   }
 
   clearFilters(): void {

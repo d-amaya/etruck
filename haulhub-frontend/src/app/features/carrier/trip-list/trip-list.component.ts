@@ -151,11 +151,7 @@ export class CarrierTripListComponent implements OnInit {
     
     this.tripService.getTrips(filters).subscribe({
       next: (response) => {
-        console.log('Received response:', {
-          tripCount: response.trips.length,
-          hasMorePages: !!response.lastEvaluatedKey,
-          lastEvaluatedKey: response.lastEvaluatedKey ? response.lastEvaluatedKey.substring(0, 50) + '...' : 'none'
-        });
+        // Removed debug log
         
         this.trips = response.trips;
         
@@ -180,7 +176,7 @@ export class CarrierTripListComponent implements OnInit {
         
         // Safety check: ensure totalTrips is at least the number of trips we have
         if (this.totalTrips < response.trips.length) {
-          console.warn('totalTrips was less than trips received, adjusting');
+          // Removed debug warning
           this.totalTrips = response.trips.length;
         }
         

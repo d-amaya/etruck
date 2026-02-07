@@ -9,6 +9,8 @@ export interface CarrierAssetCache {
   drivers: Map<string, any>;
   dispatchers: Map<string, any>;
   brokers: Map<string, any>;
+  truckPlates: Map<string, string>; // plate -> truckId
+  trailerPlates: Map<string, string>; // plate -> trailerId
   timestamp: number;
 }
 
@@ -19,10 +21,17 @@ export class CarrierAssetCacheService {
   private cacheSubject = new BehaviorSubject<CarrierAssetCache | null>(null);
   public cache$: Observable<CarrierAssetCache | null> = this.cacheSubject.asObservable();
   private loading = false;
-  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private refreshing = false;
+  private readonly CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+  private readonly REFRESH_DEBOUNCE_MS = 1000; // 1 second
+  private readonly FAILED_LOOKUP_TTL_MS = 15 * 60 * 1000; // 15 minutes
+  private lastRefreshAttempt = 0;
+  private failedTruckLookups = new Map<string, number>();
+  private failedDriverLookups = new Map<string, number>();
+  private failedTrailerLookups = new Map<string, number>();
 
   constructor(private carrierService: CarrierService) {
-    this.loadFromSessionStorage();
+    this.loadFromLocalStorage();
   }
 
   loadAssets(): Observable<CarrierAssetCache> {
@@ -33,7 +42,7 @@ export class CarrierAssetCacheService {
     }
 
     if (cache && !this.isCacheValid(cache)) {
-      console.log('Carrier asset cache expired, reloading...');
+      // Removed debug log
       this.cacheSubject.next(null);
     }
 
@@ -68,16 +77,18 @@ export class CarrierAssetCacheService {
     }).pipe(
       tap(({ trucks, trailers, drivers, dispatchers, brokers }) => {
         const cache: CarrierAssetCache = {
-          trucks: new Map(trucks.filter(t => t.isActive).map(t => [t.truckId, t])),
-          trailers: new Map(trailers.filter(t => t.isActive).map(t => [t.trailerId, t])),
-          drivers: new Map(drivers.filter(d => d.isActive).map(d => [d.userId, d])),
-          dispatchers: new Map(dispatchers.filter(d => d.isActive).map(d => [d.userId, d])),
-          brokers: new Map(brokers.filter(b => b.isActive).map(b => [b.brokerId, b])),
+          trucks: new Map(trucks.map(t => [t.truckId, t])),
+          trailers: new Map(trailers.map(t => [t.trailerId, t])),
+          drivers: new Map(drivers.map(d => [d.userId, d])),
+          dispatchers: new Map(dispatchers.map(d => [d.userId, d])),
+          brokers: new Map(brokers.map(b => [b.brokerId, b])),
+          truckPlates: new Map(trucks.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.truckId])),
+          trailerPlates: new Map(trailers.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.trailerId])),
           timestamp: Date.now()
         };
         
         this.cacheSubject.next(cache);
-        this.saveToSessionStorage(cache);
+        this.saveToLocalStorage(cache);
         this.loading = false;
       }),
       map(() => this.cacheSubject.value!),
@@ -88,9 +99,68 @@ export class CarrierAssetCacheService {
     );
   }
 
+  /**
+   * Refresh trucks on cache miss
+   */
+  private refreshTrucksOnMiss(): Observable<any[]> {
+    const now = Date.now();
+    
+    if (this.refreshing || (now - this.lastRefreshAttempt) < this.REFRESH_DEBOUNCE_MS) {
+      const cache = this.cacheSubject.value;
+      return of(cache ? Array.from(cache.trucks.values()) : []);
+    }
+    
+    this.lastRefreshAttempt = now;
+    this.refreshing = true;
+    
+    return this.carrierService.getTrucks().pipe(
+      map(response => response.trucks),
+      tap(trucks => {
+        const cache = this.cacheSubject.value;
+        if (cache) {
+          cache.trucks = new Map(trucks.map(t => [t.truckId, t]));
+          cache.truckPlates = new Map(trucks.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.truckId]));
+          this.cacheSubject.next(cache);
+          this.saveToLocalStorage(cache);
+        }
+        this.refreshing = false;
+      }),
+      catchError(() => {
+        this.refreshing = false;
+        const cache = this.cacheSubject.value;
+        return of(cache ? Array.from(cache.trucks.values()) : []);
+      })
+    );
+  }
+
+  /**
+   * Get truck name with cache-on-miss
+   */
+  getTruckName(truckId: string): Observable<string> {
+    const cache = this.cacheSubject.value;
+    if (cache?.trucks.has(truckId)) {
+      return of(cache.trucks.get(truckId)?.plate || 'Unknown Truck');
+    }
+
+    const failedAt = this.failedTruckLookups.get(truckId);
+    if (failedAt && (Date.now() - failedAt) < this.FAILED_LOOKUP_TTL_MS) {
+      return of('Unknown Truck');
+    }
+
+    return this.refreshTrucksOnMiss().pipe(
+      map(trucks => {
+        const truck = trucks.find(t => t.truckId === truckId);
+        if (!truck) {
+          this.failedTruckLookups.set(truckId, Date.now());
+        }
+        return truck?.plate || 'Unknown Truck';
+      })
+    );
+  }
+
   clearCache(): void {
     this.cacheSubject.next(null);
-    sessionStorage.removeItem('carrier_asset_cache');
+    localStorage.removeItem('etrucky_carrier_asset_cache');
   }
 
   private isCacheValid(cache: CarrierAssetCache): boolean {
@@ -105,11 +175,13 @@ export class CarrierAssetCacheService {
       drivers: new Map(),
       dispatchers: new Map(),
       brokers: new Map(),
+      truckPlates: new Map(),
+      trailerPlates: new Map(),
       timestamp: Date.now()
     };
   }
 
-  private saveToSessionStorage(cache: CarrierAssetCache): void {
+  private saveToLocalStorage(cache: CarrierAssetCache): void {
     try {
       const serialized = {
         trucks: Array.from(cache.trucks.entries()),
@@ -117,17 +189,19 @@ export class CarrierAssetCacheService {
         drivers: Array.from(cache.drivers.entries()),
         dispatchers: Array.from(cache.dispatchers.entries()),
         brokers: Array.from(cache.brokers.entries()),
+        truckPlates: Array.from(cache.truckPlates.entries()),
+        trailerPlates: Array.from(cache.trailerPlates.entries()),
         timestamp: cache.timestamp
       };
-      sessionStorage.setItem('carrier_asset_cache', JSON.stringify(serialized));
+      localStorage.setItem('etrucky_carrier_asset_cache', JSON.stringify(serialized));
     } catch (e) {
-      console.warn('Failed to save carrier asset cache to sessionStorage:', e);
+      // Removed debug warning
     }
   }
 
-  private loadFromSessionStorage(): void {
+  private loadFromLocalStorage(): void {
     try {
-      const stored = sessionStorage.getItem('carrier_asset_cache');
+      const stored = localStorage.getItem('etrucky_carrier_asset_cache');
       if (stored) {
         const serialized = JSON.parse(stored);
         const cache: CarrierAssetCache = {
@@ -136,18 +210,20 @@ export class CarrierAssetCacheService {
           drivers: new Map(serialized.drivers),
           dispatchers: new Map(serialized.dispatchers),
           brokers: new Map(serialized.brokers),
+          truckPlates: new Map(serialized.truckPlates || []),
+          trailerPlates: new Map(serialized.trailerPlates || []),
           timestamp: serialized.timestamp || 0
         };
         
         if (this.isCacheValid(cache)) {
           this.cacheSubject.next(cache);
         } else {
-          console.log('Cached carrier assets expired, will reload on first use');
-          sessionStorage.removeItem('carrier_asset_cache');
+          // Removed debug log
+          localStorage.removeItem('etrucky_carrier_asset_cache');
         }
       }
     } catch (e) {
-      console.warn('Failed to load carrier asset cache from sessionStorage:', e);
+      // Removed debug warning
     }
   }
 }

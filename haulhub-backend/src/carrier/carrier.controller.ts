@@ -11,16 +11,18 @@ import {
   ForbiddenException,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '@haulhub/shared';
+import { UserRole, TripFilters } from '@haulhub/shared';
 import { UsersService } from '../users/users.service';
 import { TripsService } from '../trips/trips.service';
 import { LorriesService } from '../lorries/lorries.service';
 import { BrokersService } from '../admin/brokers.service';
+import { CarrierService } from './carrier.service';
 
 /**
  * Carrier Controller
@@ -46,6 +48,7 @@ export class CarrierController {
     private readonly tripsService: TripsService,
     private readonly lorriesService: LorriesService,
     private readonly brokersService: BrokersService,
+    private readonly carrierService: CarrierService,
   ) {}
 
   /**
@@ -97,6 +100,68 @@ export class CarrierController {
   // ============================================================================
   // Dashboard Endpoints
   // ============================================================================
+
+  /**
+   * Get unified dashboard data (aggregates + paginated trips)
+   * 
+   * This consolidates multiple endpoints into one for better performance:
+   * - Status summary (trip counts by status)
+   * - Payment summary (revenue, expenses, profit)
+   * - Top performers (brokers, drivers, trucks)
+   * - Paginated trips for the table
+   * 
+   * Performance: Reduces API calls from 4+ to 1
+   * 
+   * @param user - Current authenticated carrier user
+   * @param filters - Trip filters (date range, status, broker, etc.)
+   * @param paginationToken - Pagination token from previous request
+   * @returns Unified dashboard data
+   * 
+   * @example
+   * GET /api/carrier/dashboard-unified?startDate=2024-01-01&endDate=2024-12-31&limit=20
+   * Authorization: Bearer <carrier-jwt-token>
+   */
+  @Get('dashboard-unified')
+  async getDashboardUnified(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+    @Headers('x-pagination-token') paginationToken?: string,
+  ) {
+    this.validateCarrierAccess(user);
+    const carrierId = this.getCarrierId(user);
+
+    const filtersWithToken = {
+      ...filters,
+      lastEvaluatedKey: paginationToken,
+    };
+
+    return this.carrierService.getDashboard(carrierId, filtersWithToken);
+  }
+
+  /**
+   * Get trips only (no aggregates) - for pagination
+   */
+  @Get('trips')
+  async getTrips(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+    @Headers('x-pagination-token') paginationToken?: string,
+  ) {
+    this.validateCarrierAccess(user);
+    const carrierId = this.getCarrierId(user);
+
+    const filtersWithToken = {
+      ...filters,
+      lastEvaluatedKey: paginationToken,
+    };
+
+    const result = await this.tripsService.getTrips(carrierId, UserRole.Carrier, filtersWithToken);
+    
+    return {
+      trips: result.trips,
+      lastEvaluatedKey: result.lastEvaluatedKey,
+    };
+  }
 
   /**
    * Get carrier dashboard metrics and overview
@@ -353,25 +418,18 @@ export class CarrierController {
       // Apply table-specific filters for pagination (status, broker, dispatcher, driver, truck)
       let filteredTripsForTable = allTrips;
       
-      console.log('[Dashboard] Applying table filters:', {
-        status,
-        brokerId,
-        dispatcherId,
-        driverId,
-        truckId,
-        totalTripsBeforeFilter: allTrips.length
-      });
+      // Removed debug log
       
       if (status) {
-        console.log('[Dashboard] Filtering by status:', status);
+        // Removed debug log
         filteredTripsForTable = filteredTripsForTable.filter(t => {
           const matches = t.orderStatus === status;
           if (!matches) {
-            console.log(`  Trip ${t.tripId.substring(0, 8)} has status "${t.orderStatus}", not matching "${status}"`);
+            // Removed debug log
           }
           return matches;
         });
-        console.log(`[Dashboard] After status filter: ${filteredTripsForTable.length} trips`);
+        // Removed debug log
       }
       if (brokerId) {
         filteredTripsForTable = filteredTripsForTable.filter(t => t.brokerId === brokerId);
@@ -393,17 +451,7 @@ export class CarrierController {
       const endIndex = startIndex + currentPageSize;
       const paginatedTrips = filteredTripsForTable.slice(startIndex, endIndex);
 
-      console.log('[Dashboard] Pagination:', {
-        requestedPage: page,
-        requestedPageSize: pageSize,
-        currentPage,
-        currentPageSize,
-        totalTripsAll: allTrips.length,
-        totalTripsFiltered: filteredTripsForTable.length,
-        startIndex,
-        endIndex,
-        returningTrips: paginatedTrips.length
-      });
+      // Removed debug log
 
       return {
         metrics: {

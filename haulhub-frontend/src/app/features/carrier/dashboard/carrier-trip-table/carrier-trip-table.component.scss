@@ -103,17 +103,69 @@
       height: 40px;
       margin-top: 2px;
       
-      &.clear-btn {
+      &.export-btn {
         background-color: #1976d2 !important;
         color: white !important;
-        border-radius: 50%;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        border-radius: 50% !important;
         
         .mat-icon {
+          font-size: 20px !important;
+          width: 20px !important;
+          height: 20px !important;
           color: white !important;
+          line-height: 20px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
 
         &:hover {
           background-color: #1565c0 !important;
+          color: white !important;
+          
+          .mat-icon {
+            color: white !important;
+          }
+        }
+      }
+      
+      &.clear-btn {
+        background-color: #1976d2 !important;
+        color: white !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        border-radius: 50% !important;
+        
+        .mat-icon {
+          font-size: 22px !important;
+          width: 22px !important;
+          height: 22px !important;
+          color: white !important;
+          line-height: 22px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+
+        &:hover {
+          background-color: #1565c0 !important;
+          color: white !important;
+          
+          .mat-icon {
+            color: white !important;
+          }
         }
       }
     }
@@ -175,30 +227,51 @@
       min-height: 24px;
       padding: 4px 12px;
       border-radius: 12px;
+      border: 1px solid transparent;
+      width: 100px;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+
+      ::ng-deep .mdc-evolution-chip__cell,
+      ::ng-deep .mdc-evolution-chip__action,
+      ::ng-deep .mat-mdc-chip-action-label {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+      }
 
       &.status-scheduled {
         background-color: #e3f2fd;
         color: #0d47a1;
+        border-color: #90caf9;
       }
 
       &.status-picked-up {
         background-color: #fff3e0;
         color: #e65100;
+        border-color: #ffe082;
       }
 
       &.status-in-transit {
         background-color: #f3e5f5;
         color: #4a148c;
+        border-color: #ce93d8;
       }
 
       &.status-delivered {
         background-color: #e8f5e9;
         color: #1b5e20;
+        border-color: #a5d6a7;
       }
 
       &.status-paid {
         background-color: #e0f2f1;
         color: #004d40;
+        border-color: #80cbc4;
       }
     }
 

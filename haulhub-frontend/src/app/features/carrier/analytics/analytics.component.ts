@@ -136,7 +136,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
 
   ngAfterViewInit(): void {
     // Charts will be created when tabs are activated via onTabChange
-    console.log('[Carrier Analytics] ngAfterViewInit called - charts will be created on tab activation');
+    // Removed debug log
   }
 
   ngOnDestroy(): void {
@@ -355,7 +355,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
 
   private createFuelCostChart(): void {
     if (!this.fuelCostChartRef || !this.fuelCostTrendData) {
-      console.warn('[Carrier Analytics] Cannot create fuel cost chart - missing ref or data');
+      // Removed debug warning
       return;
     }
 
