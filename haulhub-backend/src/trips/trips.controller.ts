@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  Headers,
   UseGuards,
 } from '@nestjs/common';
 import { TripsService } from './trips.service';
@@ -108,11 +109,18 @@ export class TripsController {
   async getTrips(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: TripFilters,
+    @Headers('x-pagination-token') paginationToken?: string,
   ): Promise<{ trips: Trip[]; lastEvaluatedKey?: string; assets?: any }> {
+    // Use pagination token from header if provided, otherwise fall back to query param
+    const filtersWithToken = {
+      ...filters,
+      lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey
+    };
+    
     return this.tripsService.getTrips(
       user.userId,
       user.role as UserRole,
-      filters,
+      filtersWithToken,
     );
   }
 
@@ -274,6 +282,7 @@ export class TripsController {
   async getDashboard(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: TripFilters,
+    @Headers('x-pagination-token') paginationToken?: string,
   ): Promise<{
     chartAggregates: {
       statusSummary: Record<TripStatus, number>;
@@ -295,7 +304,13 @@ export class TripsController {
     trips: any[];
     lastEvaluatedKey?: string;
   }> {
-    return this.tripsService.getDashboard(user.userId, filters);
+    // Use pagination token from header if provided, otherwise fall back to query param
+    const filtersWithToken = {
+      ...filters,
+      lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey
+    };
+    
+    return this.tripsService.getDashboard(user.userId, filtersWithToken);
   }
 
   /**

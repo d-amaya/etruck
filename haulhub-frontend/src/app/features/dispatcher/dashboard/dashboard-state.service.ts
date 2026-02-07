@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, combineLatest, Subject } from 'rxjs';
-import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
+import { BehaviorSubject, Observable, combineLatest, Subject, of } from 'rxjs';
+import { distinctUntilChanged, debounceTime, tap, map, catchError } from 'rxjs/operators';
 import { TripStatus, Broker, Trip } from '@haulhub/shared';
 import { TripService } from '../../../core/services/trip.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -49,8 +49,8 @@ export interface ErrorState {
   providedIn: 'root'
 })
 export class DashboardStateService {
-  private readonly FILTERS_STORAGE_KEY = 'haulhub_dispatcher_filters';
-  private readonly PAGINATION_STORAGE_KEY = 'haulhub_dispatcher_pagination';
+  private readonly FILTERS_STORAGE_KEY = 'etrucky_dispatcher_filters';
+  private readonly PAGINATION_STORAGE_KEY = 'etrucky_dispatcher_pagination';
 
   private filtersSubject = new BehaviorSubject<DashboardFilters>(this.loadFiltersFromStorage());
   private paginationSubject = new BehaviorSubject<PaginationState>(this.loadPaginationFromStorage());
@@ -84,7 +84,7 @@ export class DashboardStateService {
     this.filters$,
     this.pagination$
   ]).pipe(
-    debounceTime(100), // Small debounce to handle rapid updates
+    debounceTime(200), // Debounce to batch rapid filter+pagination updates
     distinctUntilChanged((prev, curr) => 
       JSON.stringify(prev) === JSON.stringify(curr)
     )
@@ -94,7 +94,17 @@ export class DashboardStateService {
   private brokersCache: Broker[] = [];
   private brokersSubject = new BehaviorSubject<Broker[]>([]);
   public brokers$: Observable<Broker[]> = this.brokersSubject.asObservable();
+  private brokersRefreshing = false;
+  private lastBrokerRefreshAttempt = 0;
+  private readonly BROKER_REFRESH_DEBOUNCE_MS = 1000;
+  private failedBrokerLookups = new Map<string, number>(); // UUID -> timestamp of failure
+  private readonly FAILED_LOOKUP_TTL_MS = 15 * 60 * 1000; // 15 minutes
+  
   private loadingTimeout: any;
+  
+  // Dashboard data (trips + chartAggregates) from trip-table
+  private dashboardDataSubject = new BehaviorSubject<any>(null);
+  public dashboardData$: Observable<any> = this.dashboardDataSubject.asObservable();
   
   // Filtered trips for payment summary calculation
   private filteredTripsSubject = new BehaviorSubject<Trip[]>([]);
@@ -119,17 +129,20 @@ export class DashboardStateService {
     const currentFilters = this.filtersSubject.value;
     const newFilters = { ...currentFilters, ...filters };
     
-    this.filtersSubject.next(newFilters);
-    this.saveFiltersToStorage(newFilters);
-    
-    // Reset to page 0 and clear pagination tokens when filters change
+    // Reset to page 0 when filters change
     const currentPagination = this.paginationSubject.value;
     const newPagination = { page: 0, pageSize: currentPagination.pageSize, pageTokens: [] };
     
-    this.paginationSubject.next(newPagination);
+    // Batch both updates in a microtask to ensure single emission
+    Promise.resolve().then(() => {
+      this.filtersSubject.next(newFilters);
+      this.paginationSubject.next(newPagination);
+    });
+    
+    this.saveFiltersToStorage(newFilters);
     this.savePaginationToStorage(newPagination);
     
-    // Show filter update loading state with simple message
+    // Show filter update loading state
     this.setLoadingState(true, false, true);
     this.clearError();
   }
@@ -153,6 +166,14 @@ export class DashboardStateService {
       this.paginationSubject.next(newPagination);
       this.savePaginationToStorage(newPagination);
     }
+  }
+
+  updatePaginationSilent(pagination: Partial<PaginationState>): void {
+    const currentPagination = this.paginationSubject.value;
+    const newPagination = { ...currentPagination, ...pagination };
+    // Update the value directly without emitting to prevent triggering new queries
+    (this.paginationSubject as any)._value = newPagination;
+    this.savePaginationToStorage(newPagination);
   }
 
   clearFilters(): void {
@@ -189,11 +210,89 @@ export class DashboardStateService {
     this.filteredTripsSubject.next(trips);
   }
 
+  updateDashboardData(data: any): void {
+    this.dashboardDataSubject.next(data);
+  }
+
   /**
    * Trigger payment summary refresh after data mutations (delete, create, update)
    */
   triggerPaymentSummaryRefresh(): void {
     this.refreshPaymentSummarySubject.next();
+  }
+
+  /**
+   * Get broker name by ID with cache-on-miss
+   * If broker not found, refresh cache and try again
+   */
+  getBrokerName(brokerId: string): Observable<string> {
+    const brokers = this.brokersSubject.value;
+    const broker = brokers.find(b => b.brokerId === brokerId);
+    
+    if (broker) {
+      return of(broker.brokerName);
+    }
+    
+    // Check if we've recently tried and failed (within 15 minutes)
+    const failedAt = this.failedBrokerLookups.get(brokerId);
+    if (failedAt) {
+      const age = Date.now() - failedAt;
+      if (age < this.FAILED_LOOKUP_TTL_MS) {
+        // Still within 15-minute window, don't retry yet
+        return of('Unknown Broker');
+      } else {
+        // 15 minutes passed, remove from failed list and retry
+        this.failedBrokerLookups.delete(brokerId);
+      }
+    }
+    
+    // Cache miss - refresh and retry (only once per 15 minutes)
+    return this.refreshBrokersOnMiss().pipe(
+      map(freshBrokers => {
+        const foundBroker = freshBrokers.find(b => b.brokerId === brokerId);
+        
+        if (!foundBroker) {
+          // Still not found - mark as failed with current timestamp
+          this.failedBrokerLookups.set(brokerId, Date.now());
+        } else {
+          // Found! Remove from failed list if it was there
+          this.failedBrokerLookups.delete(brokerId);
+        }
+        
+        return foundBroker?.brokerName || 'Unknown Broker';
+      })
+    );
+  }
+
+  /**
+   * Refresh brokers on miss - called when a broker lookup fails
+   */
+  private refreshBrokersOnMiss(): Observable<Broker[]> {
+    const now = Date.now();
+    
+    // Debounce: Don't refresh if we just refreshed within the last second
+    if (this.brokersRefreshing || (now - this.lastBrokerRefreshAttempt) < this.BROKER_REFRESH_DEBOUNCE_MS) {
+      return of(this.brokersSubject.value);
+    }
+    
+    this.lastBrokerRefreshAttempt = now;
+    this.brokersRefreshing = true;
+    
+    return this.tripService.getBrokers().pipe(
+      tap(brokers => {
+        this.brokersCache = brokers;
+        this.brokersSubject.next(brokers);
+        this.brokersRefreshing = false;
+        
+        // Clear failed lookups on successful refresh
+        // This allows retry after TTL expiration or manual refresh
+        this.failedBrokerLookups.clear();
+      }),
+      catchError(() => {
+        this.brokersRefreshing = false;
+        return of(this.brokersSubject.value);
+      })
+    );
   }
 
   private getDefaultFilters(): DashboardFilters {

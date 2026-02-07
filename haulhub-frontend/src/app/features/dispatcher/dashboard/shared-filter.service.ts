@@ -90,14 +90,11 @@ export class SharedFilterService {
     };
     
     // Check if filters actually changed to avoid unnecessary updates
-    // Skip check if force is true (e.g., when user clicks preset buttons)
     if (!force && this.filtersEqual(currentFilters, newFilters)) {
       return;
     }
     
-    this.filtersSubject.next(newFilters);
-    
-    // Notify DashboardStateService to update its filters and reset pagination
+    // Only notify DashboardStateService
     if (this.dashboardStateService) {
       this.dashboardStateService.updateFilters({
         dateRange: filters.dateRange || currentFilters.dateRange,
@@ -106,6 +103,9 @@ export class SharedFilterService {
         truckId: filters.truckId !== undefined ? filters.truckId : currentFilters.truckId,
         driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId
       });
+      
+      // Update local subject to keep it in sync (but this won't trigger dashboard updates)
+      this.filtersSubject.next(newFilters);
     }
   }
 

@@ -21,9 +21,9 @@ interface UserData {
 })
 export class AuthService {
   private readonly baseUrl = environment.apiBaseUrl;
-  private readonly USER_DATA_KEY = 'haulhub_user';
-  private readonly ACCESS_TOKEN_KEY = 'haulhub_access_token';
-  private readonly REFRESH_TOKEN_KEY = 'haulhub_refresh_token';
+  private readonly USER_DATA_KEY = 'etrucky_user';
+  private readonly ACCESS_TOKEN_KEY = 'etrucky_access_token';
+  private readonly REFRESH_TOKEN_KEY = 'etrucky_refresh_token';
 
   private currentUserSubject!: BehaviorSubject<UserData | null>;
   public currentUser$!: Observable<UserData | null>;

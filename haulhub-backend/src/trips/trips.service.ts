@@ -997,11 +997,9 @@ export class TripsService {
       // Apply role-based filtering to hide sensitive fields
       const filteredTrips = result.trips.map(trip => this.filterTripByRole(trip, userRole) as Trip);
 
-      // Enrich trips with asset metadata for frontend display
-      const enrichedResponse = await this.enrichTripsWithAssetMetadata(filteredTrips, userId, userRole);
-
+      // Return trips without asset enrichment - frontend uses asset cache
       return {
-        ...enrichedResponse,
+        trips: filteredTrips,
         lastEvaluatedKey: result.lastEvaluatedKey,
       };
     } catch (error: any) {
@@ -2482,63 +2480,32 @@ export class TripsService {
 
     // Filter by dispatcher (for carrier queries)
     if (filters.dispatcherId) {
-      const beforeCount = filtered.length;
-      filtered = filtered.filter(trip => {
-        const matches = trip.dispatcherId === filters.dispatcherId;
-        if (!matches && beforeCount <= 10) {
-          console.log(`[applyAllFilters] Trip ${trip.tripId} dispatcher mismatch: ${trip.dispatcherId} !== ${filters.dispatcherId}`);
-        }
-        return matches;
-      });
-      console.log(`[applyAllFilters] After dispatcher filter (${filters.dispatcherId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
+      filtered = filtered.filter(trip => trip.dispatcherId === filters.dispatcherId);
     }
 
     // Filter by broker
     if (filters.brokerId) {
-      const beforeCount = filtered.length;
-      
-      // Log unique broker IDs in the dataset
-      const uniqueBrokers = [...new Set(filtered.map(t => t.brokerId))];
-      console.log(`[applyAllFilters] Unique broker IDs in ${beforeCount} trips:`, uniqueBrokers.slice(0, 10));
-      
-      filtered = filtered.filter(trip => {
-        const matches = trip.brokerId === filters.brokerId;
-        if (!matches && beforeCount <= 10) {
-          console.log(`[applyAllFilters] Trip ${trip.tripId} broker mismatch: ${trip.brokerId} !== ${filters.brokerId}`);
-        }
-        return matches;
-      });
-      console.log(`[applyAllFilters] After broker filter (${filters.brokerId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
+      filtered = filtered.filter(trip => trip.brokerId === filters.brokerId);
     }
 
     // Filter by status
     if (filters.orderStatus) {
-      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.orderStatus === filters.orderStatus);
-      console.log(`[applyAllFilters] After status filter (${filters.orderStatus}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by truck
     if (filters.truckId) {
-      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.truckId === filters.truckId);
-      console.log(`[applyAllFilters] After truck filter (${filters.truckId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by driver
     if (filters.driverId) {
-      const beforeCount = filtered.length;
       filtered = filtered.filter(trip => trip.driverId === filters.driverId);
-      console.log(`[applyAllFilters] After driver filter (${filters.driverId}): ${filtered.length} trips (removed ${beforeCount - filtered.length})`);
     }
 
     // Filter by driver name (case-insensitive)
     if (filters.driverName) {
       filtered = this.applyDriverNameFilter(filtered, filters.driverName);
-    }
-
-    if (initialCount !== filtered.length) {
-      console.log(`[applyAllFilters] Total: ${initialCount} → ${filtered.length} trips after all filters`);
     }
 
     return filtered;
@@ -3029,6 +2996,7 @@ export class TripsService {
     totalLumperValue: number;
     totalDetentionValue: number;
     totalAdditionalFees: number;
+    totalFuelCost: number;
     totalProfit: number;
   }> {
     // Get ALL trips for the dispatcher with filters (no pagination limit for aggregation)
@@ -3064,6 +3032,7 @@ export class TripsService {
       totalLumperValue,
       totalDetentionValue,
       totalAdditionalFees,
+      totalFuelCost: totalFuelCosts,
       totalProfit,
     };
   }
@@ -3081,6 +3050,8 @@ export class TripsService {
       totalBrokerPayments: number;
       totalDriverPayments: number;
       totalTruckOwnerPayments: number;
+      totalFuelCost: number;
+      totalAdditionalFees: number;
       totalProfit: number;
     };
     assets: {
@@ -3120,6 +3091,8 @@ export class TripsService {
         totalBrokerPayments: fullPaymentSummary.totalBrokerPayments,
         totalDriverPayments: fullPaymentSummary.totalDriverPayments,
         totalTruckOwnerPayments: fullPaymentSummary.totalTruckOwnerPayments,
+        totalFuelCost: fullPaymentSummary.totalFuelCost,
+        totalAdditionalFees: fullPaymentSummary.totalAdditionalFees,
         totalProfit: fullPaymentSummary.totalProfit,
       },
       assets: {
@@ -3399,9 +3372,9 @@ export class TripsService {
   }
 
   private async calculateTopPerformers(trips: any[]): Promise<any> {
-    const brokerPerformance = new Map<string, { revenue: number; count: number; name: string }>();
-    const driverPerformance = new Map<string, { trips: number; name: string }>();
-    const truckPerformance = new Map<string, { trips: number; name: string }>();
+    const brokerPerformance = new Map<string, { revenue: number; count: number; id: string }>();
+    const driverPerformance = new Map<string, { trips: number; id: string }>();
+    const truckPerformance = new Map<string, { trips: number; id: string }>();
 
     trips.forEach(trip => {
       if (trip.brokerId) {
@@ -3413,7 +3386,7 @@ export class TripsService {
           brokerPerformance.set(trip.brokerId, {
             revenue: trip.brokerPayment || 0,
             count: 1,
-            name: trip.brokerName || 'Unknown Broker'
+            id: trip.brokerId
           });
         }
       }
@@ -3425,7 +3398,7 @@ export class TripsService {
         } else {
           driverPerformance.set(trip.driverId, {
             trips: 1,
-            name: trip.driverName || 'Unknown Driver'
+            id: trip.driverId
           });
         }
       }
@@ -3437,7 +3410,7 @@ export class TripsService {
         } else {
           truckPerformance.set(trip.truckId, {
             trips: 1,
-            name: `Truck ${trip.truckId.substring(0, 8)}`
+            id: trip.truckId
           });
         }
       }
@@ -3446,17 +3419,17 @@ export class TripsService {
     const topBrokers = Array.from(brokerPerformance.values())
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5)
-      .map(b => ({ name: b.name, revenue: b.revenue, count: b.count }));
+      .map(b => ({ id: b.id, revenue: b.revenue, count: b.count }));
 
     const topDrivers = Array.from(driverPerformance.values())
       .sort((a, b) => b.trips - a.trips)
       .slice(0, 5)
-      .map(d => ({ name: d.name, trips: d.trips }));
+      .map(d => ({ id: d.id, trips: d.trips }));
 
     const topTrucks = Array.from(truckPerformance.values())
       .sort((a, b) => b.trips - a.trips)
       .slice(0, 5)
-      .map(t => ({ name: t.name, trips: t.trips }));
+      .map(t => ({ id: t.id, trips: t.trips }));
 
     return {
       topBrokers,

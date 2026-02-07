@@ -55,7 +55,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
   
   displayedColumns = [
     'scheduledTimestamp',
-    'scheduledTime',
     'pickupLocation',
     'dropoffLocation',
     'brokerName',
@@ -82,6 +81,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
   brokers: Broker[] = [];
   trucks: any[] = [];
   drivers: any[] = [];
+  
+  // Filtered observables for autocomplete
+  filteredTrucks!: Observable<any[]>;
+  filteredDrivers!: Observable<any[]>;
   
   // Asset lookup maps for filter validation and conversion
   private truckPlateToIdMap = new Map<string, string>(); // plate -> truckId
@@ -127,6 +130,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Sort status options alphabetically by label
+    this.statusOptions = this.statusOptions.sort((a, b) => 
+      this.getStatusLabel(a).localeCompare(this.getStatusLabel(b))
+    );
+    
     // Load assets from cache
     this.assetCache.loadAssets().pipe(
       takeUntil(this.destroy$)
@@ -138,20 +146,38 @@ export class TripTableComponent implements OnInit, OnDestroy {
       this.trailerMap = cache.trailers;
       this.driverMap = cache.drivers;
       
-      // Convert maps to arrays for dropdowns
-      this.trucks = Array.from(cache.trucks.values());
-      this.drivers = Array.from(cache.drivers.values());
+      // Convert maps to arrays for dropdowns and sort alphabetically
+      this.trucks = Array.from(cache.trucks.values()).sort((a, b) => 
+        a.plate.localeCompare(b.plate)
+      );
+      this.drivers = Array.from(cache.drivers.values()).sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
       
       this.truckPlates = Array.from(cache.truckPlates.keys());
       this.trailerPlates = Array.from(cache.trailerPlates.keys());
       this.driverLicenses = Array.from(cache.driverLicenses.keys());
+      
+      // Setup autocomplete filtering for trucks
+      this.filteredTrucks = this.filterForm.get('truckId')!.valueChanges.pipe(
+        startWith(''),
+        map(value => this._filterTrucks(value || ''))
+      );
+      
+      // Setup autocomplete filtering for drivers
+      this.filteredDrivers = this.filterForm.get('driverId')!.valueChanges.pipe(
+        startWith(''),
+        map(value => this._filterDrivers(value || ''))
+      );
     });
     
-    // Load brokers for filter dropdown
+    // Load brokers for filter dropdown and sort alphabetically
     this.dashboardState.brokers$
       .pipe(takeUntil(this.destroy$))
       .subscribe(brokers => {
-        this.brokers = brokers;
+        this.brokers = brokers.sort((a, b) => 
+          a.brokerName.localeCompare(b.brokerName)
+        );
         this.brokerMap.clear();
         brokers.forEach(broker => {
           this.brokerMap.set(broker.brokerId, broker);
@@ -163,8 +189,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     this.filterForm.patchValue({
       status: currentFilters.status,
       brokerId: currentFilters.brokerId,
-      truckPlate: '',
-      driverLicense: ''
+      truckId: currentFilters.truckId || '',
+      driverId: currentFilters.driverId || ''
     }, { emitEvent: false });
 
     // Subscribe to the combined filters and pagination observable
@@ -180,13 +206,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
       this.trips = result.trips;
       this.totalTrips = result.total;
       
-      // Build lookup maps from backend-enriched trip data for table display
-      if (result.assets) {
-        result.assets.trucks.forEach((truck: any) => this.truckMap.set(truck.truckId, truck));
-        result.assets.trailers.forEach((trailer: any) => this.trailerMap.set(trailer.trailerId, trailer));
-        result.assets.drivers.forEach((driver: any) => {
-          this.driverMap.set(driver.userId, driver);
-        });
+      // Share dashboard data (including chartAggregates) with other components
+      if (result.chartAggregates) {
+        this.dashboardState.updateDashboardData(result);
       }
       
       // Update the dashboard state with the filtered trips for payment summary calculation
@@ -267,12 +289,76 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Filter trucks for autocomplete (by plate)
+   */
+  private _filterTrucks(value: string | any): any[] {
+    // If value is an object (selected option), return all trucks
+    if (typeof value === 'object') {
+      return this.trucks;
+    }
+    
+    const filterValue = (value || '').toString().toLowerCase();
+    return this.trucks.filter(truck => 
+      truck.plate.toLowerCase().includes(filterValue)
+    );
+  }
+
+  /**
    * Filter driver licenses for autocomplete
    */
   private _filterDriverLicenses(value: string): string[] {
     const filterValue = value.toLowerCase();
     return this.driverLicenses.filter(license => license.toLowerCase().includes(filterValue));
   }
+
+  /**
+   * Filter drivers for autocomplete (by name)
+   */
+  private _filterDrivers(value: string | any): any[] {
+    // If value is an object (selected option), return all drivers
+    if (typeof value === 'object') {
+      return this.drivers;
+    }
+    
+    const filterValue = (value || '').toString().toLowerCase();
+    return this.drivers.filter(driver => 
+      driver.name.toLowerCase().includes(filterValue)
+    );
+  }
+
+  /**
+   * Clear truck filter
+   */
+  clearTruckFilter(): void {
+    this.filterForm.patchValue({ truckId: null }, { emitEvent: false });
+    this.applyFilters();
+  }
+
+  /**
+   * Clear driver filter
+   */
+  clearDriverFilter(): void {
+    this.filterForm.patchValue({ driverId: null }, { emitEvent: false });
+    this.applyFilters();
+  }
+
+  /**
+   * Display function for truck autocomplete - shows plate instead of UUID
+   */
+  displayTruck = (truckId: string | null): string => {
+    if (!truckId) return '';
+    const truck = this.truckMap.get(truckId);
+    return truck ? truck.plate : '';
+  };
+
+  /**
+   * Display function for driver autocomplete - shows name instead of UUID
+   */
+  displayDriver = (driverId: string | null): string => {
+    if (!driverId) return '';
+    const driver = this.driverMap.get(driverId);
+    return driver ? driver.name : '';
+  };
 
   /**
    * Validate truck plate on blur
@@ -310,33 +396,42 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
   }
 
-  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number, assets?: any }> {
+  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number, assets?: any, chartAggregates?: any }> {
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
 
-    return this.tripService.getTrips(apiFilters).pipe(
-      map(response => {
+    // Always fetch aggregates on first page load (page 0)
+    // Table filters don't affect chart aggregates - charts always show all trips in date range
+    const isPaginating = pagination.page > 0;
+    const needsAggregates = !isPaginating;
+
+    const apiCall$: Observable<any> = needsAggregates 
+      ? this.tripService.getDashboard(apiFilters)
+      : this.tripService.getTrips(apiFilters);
+
+    return apiCall$.pipe(
+      map((response: any) => {
         this.loading = false;
         const trips = response.trips;
         
         // Backend handles all filtering - just sort the results
-        const sortedTrips = trips.sort((a, b) => {
+        const sortedTrips = trips.sort((a: any, b: any) => {
           const dateA = new Date(a.scheduledTimestamp).getTime();
           const dateB = new Date(b.scheduledTimestamp).getTime();
           return dateB - dateA; // Descending order
         });
         
-        // Update pagination state with new lastEvaluatedKey
+        // Update pagination state with new lastEvaluatedKey (silently, without triggering new query)
         if (response.lastEvaluatedKey) {
-          // Store the token for the next page
-          const pageTokens = pagination.pageTokens || [];
-          if (!pageTokens[pagination.page]) {
-            pageTokens[pagination.page] = response.lastEvaluatedKey;
-            this.dashboardState.updatePagination({ 
-              lastEvaluatedKey: response.lastEvaluatedKey,
-              pageTokens 
-            });
-          }
+          // Store the token for the NEXT page
+          // When on page 0, store token at index 0 (for fetching page 1)
+          // When on page 1, store token at index 1 (for fetching page 2), etc.
+          const pageTokens = [...(pagination.pageTokens || [])];
+          pageTokens[pagination.page] = response.lastEvaluatedKey;
+          
+          this.dashboardState.updatePaginationSilent({ 
+            pageTokens 
+          });
         }
         
         // Calculate total for pagination
@@ -353,7 +448,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
           total = itemsBeforeCurrentPage + currentPageItems;
         }
         
-        return { trips: sortedTrips, total, assets: response.assets };
+        return { trips: sortedTrips, total, chartAggregates: response.chartAggregates };
       }),
       catchError(error => {
         this.loading = false;
@@ -634,8 +729,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     this.filterForm.patchValue({
       status: null,
       brokerId: null,
-      truckPlate: '',
-      driverLicense: ''
+      truckId: null,
+      driverId: null
     });
     
     // Manually reset the paginator UI to page 0
@@ -650,16 +745,32 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   /**
    * Apply filters to shared filter service
-   * Converts human-readable inputs (plate, license) to UUIDs before sending to backend
+   * Only applies filters if truck and driver selections are valid (from the list)
    */
   private applyFilters(): void {
     const formValue = this.filterForm.value;
     
+    // Validate truck selection - only apply if it's a valid UUID or null
+    let truckId = formValue.truckId;
+    if (truckId && typeof truckId === 'string' && !this.isValidUUID(truckId)) {
+      // User typed something but didn't select from list - ignore it
+      console.log('Invalid truck selection, ignoring:', truckId);
+      truckId = null;
+    }
+    
+    // Validate driver selection - only apply if it's a valid UUID or null
+    let driverId = formValue.driverId;
+    if (driverId && typeof driverId === 'string' && !this.isValidUUID(driverId)) {
+      // User typed something but didn't select from list - ignore it
+      console.log('Invalid driver selection, ignoring:', driverId);
+      driverId = null;
+    }
+    
     const filtersToApply = {
       status: formValue.status,
       brokerId: formValue.brokerId,
-      truckId: formValue.truckId,
-      driverId: formValue.driverId
+      truckId: truckId,
+      driverId: driverId
     };
     
     this.sharedFilterService.updateFilters(filtersToApply);
@@ -668,6 +779,14 @@ export class TripTableComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       console.log('Pagination state after filter update:', this.dashboardState['paginationSubject'].value);
     }, 150);
+  }
+
+  /**
+   * Check if a string is a valid UUID
+   */
+  private isValidUUID(str: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
   }
 
   /**

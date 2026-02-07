@@ -86,7 +86,13 @@ export class TripService {
   }
 
   getTrips(filters?: TripFilters): Observable<TripsResponse> {
-    return this.apiService.get<TripsResponse>('/trips', filters);
+    // Extract pagination token and send as header instead of query param
+    const { lastEvaluatedKey, ...queryFilters } = filters || {};
+    const options = lastEvaluatedKey 
+      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
+      : undefined;
+    
+    return this.apiService.get<TripsResponse>('/trips', queryFilters, options);
   }
 
   getTripById(tripId: string): Observable<Trip> {
@@ -282,6 +288,12 @@ export class TripService {
     trips: Trip[];
     lastEvaluatedKey?: string;
   }> {
-    return this.apiService.get('/trips/dashboard', filters);
+    // Extract pagination token and send as header instead of query param
+    const { lastEvaluatedKey, ...queryFilters } = filters || {};
+    const options = lastEvaluatedKey 
+      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
+      : undefined;
+    
+    return this.apiService.get('/trips/dashboard', queryFilters, options);
   }
 }

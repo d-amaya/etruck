@@ -55,92 +55,14 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   ) {}
 
   ngOnInit(): void {
-    // Track previous date range to detect changes
-    let previousDateRange: { startDate: Date | null; endDate: Date | null } | null = null;
-    
-    // Subscribe to filter changes but only reload when date range changes
-    this.sharedFilterService.filters$
-      .pipe(
-        takeUntil(this.destroy$),
-        switchMap(filters => {
-          // Check if date range actually changed
-          const dateRangeChanged = !previousDateRange ||
-            filters.dateRange.startDate?.getTime() !== previousDateRange.startDate?.getTime() ||
-            filters.dateRange.endDate?.getTime() !== previousDateRange.endDate?.getTime();
-          
-          // Update previous date range
-          previousDateRange = { ...filters.dateRange };
-          
-          if (!dateRangeChanged && this.trips.length > 0) {
-            return []; // Return empty observable to skip
-          }
-          
-          this.loading = true;
-          // Build API filters with ONLY date range (ignore other filters)
-          const apiFilters = this.buildApiFiltersForCharts(filters);
-          
-          // Use unified dashboard endpoint instead of multiple calls
-          return this.tripService.getDashboard(apiFilters);
-        })
-      )
+    // Subscribe to shared dashboard data from trip-table
+    this.dashboardState.dashboardData$
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response: any) => {
-          console.log('[Charts Widget] Dashboard response:', response);
-          
           if (!response || !response.chartAggregates) return;
           
-          const agg = response.chartAggregates;
-          
-          // Use backend aggregates
-          this.statusData = agg.statusSummary || {};
-          
-          const payment = agg.paymentSummary || {};
-          this.revenueData = {
-            revenue: payment.totalBrokerPayments || 0,
-            expenses: (payment.totalDriverPayments || 0) + (payment.totalTruckOwnerPayments || 0),
-            profit: payment.totalProfit || 0
-          };
-          
-          // Set expense breakdown
-          this.expenseData = {
-            driver: payment.totalDriverPayments || 0,
-            owner: payment.totalTruckOwnerPayments || 0,
-            fuel: payment.totalFuelCost || 0,
-            fees: (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0) + (payment.totalAdditionalFees || 0)
-          };
-          
-          console.log('[Charts Widget] Expense data:', this.expenseData);
-          
-          // Set top performers
-          const performers = agg.topPerformers || {};
-          this.topBrokers = (performers.topBrokers || []).map((b: any) => ({
-            name: b.name,
-            value: b.revenue,
-            count: b.count
-          }));
-          this.topDrivers = (performers.topDrivers || []).map((d: any) => ({
-            name: d.name,
-            value: d.trips,
-            count: d.trips
-          }));
-          this.topTrucks = (performers.topTrucks || []).map((t: any) => ({
-            name: t.name,
-            value: t.trips,
-            count: t.trips
-          }));
-          
-          // We have aggregates, no need for trips array
-          const totalTrips = Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
-          
-          console.log(`[Charts Widget] Loaded aggregates for ${totalTrips} trips`);
-          
-          this.loading = false;
-          // Render charts after a delay to ensure view is ready
-          setTimeout(() => this.tryRenderCharts(), 200);
-        },
-        error: (error) => {
-          console.error('[Charts Widget] Error loading dashboard aggregates:', error);
-          this.loading = false;
+          this.processChartAggregates(response.chartAggregates);
         }
       });
     
@@ -190,12 +112,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   }
 
   ngAfterViewInit(): void {
-    console.log('[Charts Widget] AfterViewInit - Canvas refs:', {
-      revenue: !!this.revenueChartRef,
-      status: !!this.statusChartRef,
-      topPerformers: !!this.topPerformersChartRef,
-      expense: !!this.expenseChartRef
-    });
     // Initial render if data is already available
     if (this.hasAggregateData()) {
       setTimeout(() => this.renderCharts(), 100);
@@ -218,8 +134,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         this.statusChartRef && 
         this.topPerformersChartRef && 
         this.expenseChartRef);
-    
-    console.log('[Charts Widget] Render check:', { hasData, hasRefs });
     
     if (hasData && hasRefs) {
       this.renderCharts();
@@ -561,6 +475,65 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount);
+  }
+
+  private processChartAggregates(agg: any): void {
+    // Use backend aggregates
+    this.statusData = agg.statusSummary || {};
+    
+    const payment = agg.paymentSummary || {};
+    
+    // Calculate total expenses - backend already includes all expenses in profit calculation
+    // Total expenses = driver + owner + fuel + fees
+    const totalExpenses = 
+      (payment.totalDriverPayments || 0) + 
+      (payment.totalTruckOwnerPayments || 0) + 
+      (payment.totalFuelCost || 0) + 
+      (payment.totalAdditionalFees || 0);
+    
+    this.revenueData = {
+      revenue: payment.totalBrokerPayments || 0,
+      expenses: totalExpenses,
+      profit: payment.totalProfit || 0
+    };
+    
+    // Set expense breakdown
+    this.expenseData = {
+      driver: payment.totalDriverPayments || 0,
+      owner: payment.totalTruckOwnerPayments || 0,
+      fuel: payment.totalFuelCost || 0,
+      fees: payment.totalAdditionalFees || 0
+    };
+    
+    // Set top performers - map IDs to names using cache-on-miss
+    const performers = agg.topPerformers || {};
+    
+    // Process brokers with cache-on-miss
+    this.topBrokers = [];
+    (performers.topBrokers || []).forEach((b: any) => {
+      this.dashboardState.getBrokerName(b.id).subscribe(name => {
+        this.topBrokers.push({ name, value: b.revenue, count: b.count });
+        // Re-render chart after all brokers are resolved
+        if (this.topBrokers.length === (performers.topBrokers || []).length) {
+          setTimeout(() => this.tryRenderCharts(), 100);
+        }
+      });
+    });
+    
+    this.topDrivers = (performers.topDrivers || []).map((d: any) => ({
+      name: d.id ? d.id.substring(0, 8) : 'Unknown',
+      value: d.trips,
+      count: d.trips
+    }));
+    this.topTrucks = (performers.topTrucks || []).map((t: any) => ({
+      name: t.id ? t.id.substring(0, 8) : 'Unknown',
+      value: t.trips,
+      count: t.trips
+    }));
+    
+    
+    this.loading = false;
+    setTimeout(() => this.tryRenderCharts(), 200);
   }
 
   ngOnDestroy(): void {
