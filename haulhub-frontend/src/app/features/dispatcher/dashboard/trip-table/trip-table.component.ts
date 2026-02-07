@@ -54,6 +54,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   @ViewChild(MatPaginator) paginator?: MatPaginator;
   
   displayedColumns = [
+    'status',
     'scheduledTimestamp',
     'pickupLocation',
     'dropoffLocation',
@@ -61,7 +62,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'truckId',
     'trailerId',
     'driverName',
-    'status',
     'revenue',
     'expenses',
     'profitLoss',

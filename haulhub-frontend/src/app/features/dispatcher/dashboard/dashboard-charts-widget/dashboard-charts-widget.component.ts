@@ -344,12 +344,11 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         datasets: [{
           label: 'Revenue ($)',
           data: this.topBrokers.map(b => b.value),
-          backgroundColor: '#1976d2',
+          backgroundColor: ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'],
           borderRadius: 4
         }]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
@@ -357,7 +356,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
           tooltip: {
             callbacks: {
               label: (context) => {
-                const value = context.parsed.x || 0;
+                const value = context.parsed.y || 0;
                 const broker = this.topBrokers[context.dataIndex];
                 return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${broker.count} trips)`;
               }
@@ -366,6 +365,12 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
         },
         scales: {
           x: {
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45
+            }
+          },
+          y: {
             ticks: {
               callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
             }
@@ -383,36 +388,27 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     const ctx = this.expenseChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
+    // Sort expenses by value (highest to lowest)
+    const expenses = [
+      { label: 'Driver Pay', value: this.expenseData.driver },
+      { label: 'Owner Pay', value: this.expenseData.owner },
+      { label: 'Fuel Cost', value: this.expenseData.fuel },
+      { label: 'Fees', value: this.expenseData.fees }
+    ].sort((a, b) => b.value - a.value);
+
+    // Assign colors from darkest to lightest
+    const colors = ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6'];
+
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
         labels: ['Expenses'],
-        datasets: [
-          {
-            label: 'Driver Pay',
-            data: [this.expenseData.driver],
-            backgroundColor: '#ff9800',
-            borderRadius: 4
-          },
-          {
-            label: 'Owner Pay',
-            data: [this.expenseData.owner],
-            backgroundColor: '#9c27b0',
-            borderRadius: 4
-          },
-          {
-            label: 'Fuel Cost',
-            data: [this.expenseData.fuel],
-            backgroundColor: '#f44336',
-            borderRadius: 4
-          },
-          {
-            label: 'Fees',
-            data: [this.expenseData.fees],
-            backgroundColor: '#607d8b',
-            borderRadius: 4
-          }
-        ]
+        datasets: expenses.map((expense, index) => ({
+          label: expense.label,
+          data: [expense.value],
+          backgroundColor: colors[index],
+          borderRadius: 4
+        }))
       },
       options: {
         responsive: true,

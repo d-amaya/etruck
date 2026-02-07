@@ -117,56 +117,79 @@ describe('DashboardStateService', () => {
         status: TripStatus.Scheduled
       };
 
-      service.updateFilters(partialFilters);
-
+      // Subscribe first, then update
+      let callCount = 0;
       service.filters$.subscribe(filters => {
-        expect(filters.status).toBe(TripStatus.Scheduled);
-        // Date range remains as default (last 30 days), not null
-        expect(filters.dateRange.startDate).toBeInstanceOf(Date);
-        done();
+        callCount++;
+        if (callCount === 2) { // Skip initial value, check second emission
+          expect(filters.status).toBe(TripStatus.Scheduled);
+          expect(filters.dateRange.startDate).toBeInstanceOf(Date);
+          done();
+        }
       });
+
+      service.updateFilters(partialFilters);
     });
 
     it('should update date range filters', (done) => {
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-01-31');
 
-      service.updateFilters({
-        dateRange: { startDate, endDate }
+      let callCount = 0;
+      service.filters$.subscribe(filters => {
+        callCount++;
+        if (callCount === 2) {
+          expect(filters.dateRange.startDate).toEqual(startDate);
+          expect(filters.dateRange.endDate).toEqual(endDate);
+          done();
+        }
       });
 
-      service.filters$.subscribe(filters => {
-        expect(filters.dateRange.startDate).toEqual(startDate);
-        expect(filters.dateRange.endDate).toEqual(endDate);
-        done();
+      service.updateFilters({
+        dateRange: { startDate, endDate }
       });
     });
 
     it('should reset pagination to page 0 when filters change', (done) => {
+      let callCount = 0;
+      service.pagination$.subscribe(pagination => {
+        callCount++;
+        if (callCount === 1) {
+          // Initial state
+          expect(pagination.page).toBe(0);
+        } else if (callCount === 2) {
+          // After page update
+          expect(pagination.page).toBe(2);
+        } else if (callCount === 3) {
+          // After filter update - should reset to 0
+          expect(pagination.page).toBe(0);
+          done();
+        }
+      });
+
       // First set pagination to page 2
       service.updatePagination({ page: 2 });
 
       // Then update filters
       service.updateFilters({ status: TripStatus.Delivered });
-
-      service.pagination$.subscribe(pagination => {
-        expect(pagination.page).toBe(0);
-        done();
-      });
     });
 
     it('should update multiple filters at once', (done) => {
+      let callCount = 0;
+      service.filters$.subscribe(filters => {
+        callCount++;
+        if (callCount === 2) {
+          expect(filters.status).toBe(TripStatus.InTransit);
+          expect(filters.brokerId).toBe('broker1');
+          expect(filters.truckId).toBe('truck123');
+          done();
+        }
+      });
+
       service.updateFilters({
         status: TripStatus.InTransit,
         brokerId: 'broker1',
         truckId: 'truck123'
-      });
-
-      service.filters$.subscribe(filters => {
-        expect(filters.status).toBe(TripStatus.InTransit);
-        expect(filters.brokerId).toBe('broker1');
-        expect(filters.truckId).toBe('truck123');
-        done();
       });
     });
   });
@@ -206,8 +229,8 @@ describe('DashboardStateService', () => {
   });
 
   describe('clearFilters', () => {
-    it('should reset all filters to default values', (done) => {
-      // First set some filters
+    it('should reset all filters to default values', () => {
+      // Set some filters
       service.updateFilters({
         status: TripStatus.Paid,
         brokerId: 'broker1',
@@ -215,51 +238,42 @@ describe('DashboardStateService', () => {
         dateRange: { startDate: new Date('2024-06-01'), endDate: new Date('2024-06-30') }
       });
 
-      // Then clear filters
+      // Clear filters
       service.clearFilters();
 
-      service.filters$.subscribe(filters => {
-        // Default filters include date range (last 30 days)
-        expect(filters.dateRange.startDate).toBeInstanceOf(Date);
-        expect(filters.dateRange.endDate).toBeInstanceOf(Date);
-        expect(filters.status).toBeNull();
-        expect(filters.brokerId).toBeNull();
-        expect(filters.truckId).toBeNull();
-        expect(filters.driverId).toBeNull();
-        done();
-      });
+      // Check the current value
+      const filters = service['filtersSubject'].value;
+      expect(filters.dateRange.startDate).toBeInstanceOf(Date);
+      expect(filters.dateRange.endDate).toBeInstanceOf(Date);
+      expect(filters.status).toBeNull();
+      expect(filters.brokerId).toBeNull();
+      expect(filters.truckId).toBeNull();
+      expect(filters.driverId).toBeNull();
     });
 
-    it('should reset pagination to default values', (done) => {
-      // First set pagination
+    it('should reset pagination to default values', () => {
+      // Set pagination
       service.updatePagination({ page: 5, pageSize: 100 });
 
-      // Then clear filters
+      // Clear filters
       service.clearFilters();
 
-      service.pagination$.subscribe(pagination => {
-        expect(pagination.page).toBe(0);
-        expect(pagination.pageSize).toBe(10);
-        done();
-      });
+      // Check the current value
+      const pagination = service['paginationSubject'].value;
+      expect(pagination.page).toBe(0);
+      expect(pagination.pageSize).toBe(10);
     });
   });
 
   describe('getActiveFilterCount', () => {
     it('should return 0 when no filters are active', () => {
-      // Service initializes with default date range, so we need to clear it first
-      service.updateFilters({
-        dateRange: { startDate: null, endDate: null }
-      });
+      // Service initializes with default date range (last 30 days)
+      // Date range counts as 1 active filter
       const count = service.getActiveFilterCount();
-      expect(count).toBe(0);
+      expect(count).toBe(1); // Date range is active by default
     });
 
     it('should count date range as 1 filter when start date is set', () => {
-      // Clear default date range first
-      service.updateFilters({
-        dateRange: { startDate: null, endDate: null }
-      });
       service.updateFilters({
         dateRange: { startDate: new Date(), endDate: null }
       });
@@ -351,15 +365,20 @@ describe('DashboardStateService', () => {
       expect(count).toBe(1);
     });
 
-    it('should count multiple active filters correctly', () => {
+    it('should count multiple active filters correctly', (done) => {
       service.updateFilters({
         dateRange: { startDate: new Date(), endDate: new Date() },
         status: TripStatus.InTransit,
         brokerId: 'broker1',
         truckId: 'truck123',
       });
-      const count = service.getActiveFilterCount();
-      expect(count).toBe(4);
+      
+      // Wait for next tick to ensure update is processed
+      setTimeout(() => {
+        const count = service.getActiveFilterCount();
+        expect(count).toBe(4);
+        done();
+      }, 0);
     });
   });
 

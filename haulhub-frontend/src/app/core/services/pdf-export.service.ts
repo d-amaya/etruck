@@ -86,7 +86,7 @@ export class PdfExportService {
     yPosition = 45;
 
     // ========== APPLIED FILTERS SECTION ==========
-    const filterText = this.buildFilterText(filters, brokerMap, driverMap);
+    const filterText = this.buildFilterText(filters, brokerMap, driverMap, truckMap);
     if (filterText) {
       doc.setFillColor(lightBlue[0], lightBlue[1], lightBlue[2]);
       doc.rect(14, yPosition - 5, pageWidth - 28, 12, 'F');
@@ -330,7 +330,8 @@ export class PdfExportService {
   private buildFilterText(
     filters: DashboardFilters,
     brokerMap: Map<string, string>,
-    driverMap: Map<string, string>
+    driverMap: Map<string, string>,
+    truckMap: Map<string, string>
   ): string {
     const parts: string[] = [];
 
@@ -350,7 +351,8 @@ export class PdfExportService {
     }
 
     if (filters.truckId) {
-      parts.push(`Truck: ${filters.truckId.substring(0, 8)}`);
+      const truckPlate = truckMap.get(filters.truckId) || filters.truckId.substring(0, 8);
+      parts.push(`Truck: ${truckPlate}`);
     }
 
     if (filters.driverId) {

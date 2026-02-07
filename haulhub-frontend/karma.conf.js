@@ -38,6 +38,18 @@ module.exports = function (config) {
     restartOnFileChange: true,
     browserNoActivityTimeout: 60000,
     browserDisconnectTimeout: 10000,
-    browserDisconnectTolerance: 3
+    browserDisconnectTolerance: 3,
+    customLaunchers: {
+      ChromeHeadlessCI: {
+        base: 'ChromeHeadless',
+        flags: [
+          '--no-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-software-rasterizer',
+          '--disable-extensions'
+        ]
+      }
+    }
   });
 };

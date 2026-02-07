@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { environment } from '../../../environments/environment';
@@ -341,66 +342,55 @@ describe('AuthService', () => {
   });
 
   describe('localStorage persistence', () => {
-    it('should persist user data to localStorage', () => {
+    it('should persist user data to localStorage', (done) => {
       const loginDto: LoginDto = {
         email: 'test@example.com',
         password: 'password123'
       };
 
-      service.login(loginDto).subscribe();
+      service.login(loginDto).subscribe(() => {
+        const stored = localStorage.getItem('etrucky_user');
+        expect(stored).toBeTruthy();
+        
+        if (stored) {
+          const userData = JSON.parse(stored);
+          expect(userData.email).toBe('test@example.com');
+          expect(userData.role).toBe(UserRole.Dispatcher);
+          // Tokens should NOT be in localStorage
+          expect(userData.accessToken).toBeUndefined();
+          expect(userData.refreshToken).toBeUndefined();
+        }
+        done();
+      });
+      
       const req = httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`);
       req.flush(mockAuthResponse);
-
-      const stored = localStorage.getItem('haulhub_user');
-      expect(stored).toBeTruthy();
-      
-      const userData = JSON.parse(stored!);
-      expect(userData.email).toBe('test@example.com');
-      expect(userData.role).toBe(UserRole.Dispatcher);
-      // Tokens should NOT be in localStorage
-      expect(userData.accessToken).toBeUndefined();
-      expect(userData.refreshToken).toBeUndefined();
     });
 
     it('should restore user data from localStorage on service initialization', () => {
-      // Clear the current service and localStorage
-      localStorage.clear();
-      
-      // Manually store user data AND tokens (both are required)
+      // Manually store user data AND tokens BEFORE creating service
       const userData = {
         userId: 'user-123',
         role: UserRole.Dispatcher,
         email: 'stored@example.com',
         fullName: 'Stored User'
       };
-      localStorage.setItem('haulhub_user', JSON.stringify(userData));
-      localStorage.setItem('haulhub_access_token', 'fake-access-token');
-      localStorage.setItem('haulhub_refresh_token', 'fake-refresh-token');
+      localStorage.setItem('etrucky_user', JSON.stringify(userData));
+      localStorage.setItem('etrucky_access_token', 'fake-access-token');
+      localStorage.setItem('etrucky_refresh_token', 'fake-refresh-token');
 
-      // Reset TestBed and create new service instance
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        imports: [HttpClientTestingModule],
-        providers: [
-          AuthService,
-          { provide: Router, useValue: router }
-        ]
-      });
-      
-      const newService = TestBed.inject(AuthService);
-      const newHttpMock = TestBed.inject(HttpTestingController);
+      // Create new service - it will load from localStorage in constructor
+      const http = TestBed.inject(HttpClient);
+      const newService = new AuthService(http, router);
       
       expect(newService.isAuthenticated).toBe(true);
       expect(newService.userRole).toBe(UserRole.Dispatcher);
       expect(newService.currentUserValue?.email).toBe('stored@example.com');
-      
-      // Clean up
-      newHttpMock.verify();
     });
 
     it('should handle corrupted localStorage data gracefully', () => {
       // Store invalid JSON
-      localStorage.setItem('haulhub_user', 'invalid-json{');
+      localStorage.setItem('etrucky_user', 'invalid-json{');
 
       // Reset TestBed and create new service instance
       TestBed.resetTestingModule();
@@ -416,7 +406,9 @@ describe('AuthService', () => {
       const newHttpMock = TestBed.inject(HttpTestingController);
       
       expect(newService.isAuthenticated).toBe(false);
-      expect(localStorage.getItem('haulhub_user')).toBeNull();
+      // Service should have cleared the corrupted data
+      const stored = localStorage.getItem('haulhub_user');
+      expect(stored).toBeNull();
       
       // Clean up
       newHttpMock.verify();

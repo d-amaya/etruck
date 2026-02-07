@@ -396,6 +396,21 @@
       padding: 4px 12px;
       border-radius: 12px;
       border: 1px solid transparent;
+      width: 100px;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+
+      ::ng-deep .mdc-evolution-chip__cell,
+      ::ng-deep .mdc-evolution-chip__action,
+      ::ng-deep .mat-mdc-chip-action-label {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+      }
 
       &.status-scheduled {
         background-color: #e3f2fd;
