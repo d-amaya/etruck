@@ -196,7 +196,8 @@ describe('PdfExportService', () => {
 
     const brokerMap = new Map();
     const driverMap = new Map();
-    const filterText = (service as any).buildFilterText(filtersWithDate, brokerMap, driverMap);
+    const truckMap = new Map();
+    const filterText = (service as any).buildFilterText(filtersWithDate, brokerMap, driverMap, truckMap);
     expect(filterText).toContain('Date Range:');
     expect(filterText).toContain('Jan');
   });
@@ -209,52 +210,57 @@ describe('PdfExportService', () => {
 
     const brokerMap = new Map();
     const driverMap = new Map();
-    const filterText = (service as any).buildFilterText(filtersWithStatus, brokerMap, driverMap);
+    const truckMap = new Map();
+    const filterText = (service as any).buildFilterText(filtersWithStatus, brokerMap, driverMap, truckMap);
     expect(filterText).toContain('Status: Scheduled');
   });
 
   it('should build filter text with broker', () => {
     const brokerMap = new Map([['broker-1', 'Test Broker']]);
     const driverMap = new Map();
+    const truckMap = new Map();
     
     const filtersWithBroker = {
       ...mockFilters,
       brokerId: 'broker-1'
     };
 
-    const filterText = (service as any).buildFilterText(filtersWithBroker, brokerMap, driverMap);
+    const filterText = (service as any).buildFilterText(filtersWithBroker, brokerMap, driverMap, truckMap);
     expect(filterText).toContain('Broker: Test Broker');
   });
 
   it('should build filter text with truck', () => {
     const filtersWithTruck = {
       ...mockFilters,
-      truckId: 'ABC123'
+      truckId: 'truck-123'
     };
 
     const brokerMap = new Map();
     const driverMap = new Map();
-    const filterText = (service as any).buildFilterText(filtersWithTruck, brokerMap, driverMap);
-    expect(filterText).toContain('Truck: ABC123');
+    const truckMap = new Map([['truck-123', 'ABC-1234']]);
+    const filterText = (service as any).buildFilterText(filtersWithTruck, brokerMap, driverMap, truckMap);
+    expect(filterText).toContain('Truck: ABC-1234');
   });
 
   it('should build filter text with driver ID', () => {
     const driverMap = new Map([['driver-1', 'John Driver']]);
     const brokerMap = new Map();
+    const truckMap = new Map();
     
     const filtersWithDriver = {
       ...mockFilters,
       driverId: 'driver-1'
     };
 
-    const filterText = (service as any).buildFilterText(filtersWithDriver, brokerMap, driverMap);
+    const filterText = (service as any).buildFilterText(filtersWithDriver, brokerMap, driverMap, truckMap);
     expect(filterText).toContain('Driver: John Driver');
   });
 
   it('should return empty filter text when no filters applied', () => {
     const brokerMap = new Map();
     const driverMap = new Map();
-    const filterText = (service as any).buildFilterText(mockFilters, brokerMap, driverMap);
+    const truckMap = new Map();
+    const filterText = (service as any).buildFilterText(mockFilters, brokerMap, driverMap, truckMap);
     expect(filterText).toBe('');
   });
 
