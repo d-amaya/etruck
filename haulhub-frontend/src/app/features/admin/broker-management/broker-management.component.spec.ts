@@ -17,14 +17,14 @@ describe('BrokerManagementComponent', () => {
   const mockBrokers: Broker[] = [
     {
       brokerId: 'broker-1',
-      brokerName: 'ABC Logistics',
+      brokerName: 'Test Broker',
       isActive: true,
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-15T10:00:00Z'
     },
     {
       brokerId: 'broker-2',
-      brokerName: 'XYZ Transport',
+      brokerName: 'Test Broker',
       isActive: false,
       createdAt: '2024-01-16T10:00:00Z',
       updatedAt: '2024-01-16T10:00:00Z'

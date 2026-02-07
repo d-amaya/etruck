@@ -183,12 +183,42 @@ export class TripsController {
     totalBrokerPayments: number;
     totalDriverPayments: number;
     totalTruckOwnerPayments: number;
-    totalLumperFees: number;
-    totalDetentionFees: number;
+    totalLumperValue: number;
+    totalDetentionValue: number;
     totalAdditionalFees: number;
     totalProfit: number;
   }> {
     return this.tripsService.getPaymentSummary(user.userId, filters);
+  }
+
+  /**
+   * GET /trips/dashboard/export
+   * Get all data needed for PDF export in a single call
+   * 
+   * Dispatcher only - returns trips, summaries, and asset lookups
+   */
+  @Get('dashboard/export')
+  @Roles(UserRole.Dispatcher)
+  async getDashboardExport(
+    @CurrentUser() user: CurrentUserData,
+    @Query() filters: TripFilters,
+  ): Promise<{
+    trips: Trip[];
+    summaryByStatus: Record<TripStatus, number>;
+    paymentSummary: {
+      totalBrokerPayments: number;
+      totalDriverPayments: number;
+      totalTruckOwnerPayments: number;
+      totalProfit: number;
+    };
+    assets: {
+      brokers: Array<{ brokerId: string; brokerName: string }>;
+      trucks: Array<{ truckId: string; plate: string }>;
+      drivers: Array<{ userId: string; name: string }>;
+      trailers: Array<{ trailerId: string; plate: string }>;
+    };
+  }> {
+    return this.tripsService.getDashboardExport(user.userId, filters);
   }
 
   /**
@@ -251,8 +281,8 @@ export class TripsController {
         totalBrokerPayments: number;
         totalDriverPayments: number;
         totalTruckOwnerPayments: number;
-        totalLumperFees: number;
-        totalDetentionFees: number;
+        totalLumperValue: number;
+        totalDetentionValue: number;
         totalAdditionalFees: number;
         totalProfit: number;
       };

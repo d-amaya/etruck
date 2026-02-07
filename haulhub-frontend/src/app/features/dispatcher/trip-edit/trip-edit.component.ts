@@ -152,9 +152,9 @@ export class TripEditComponent implements OnInit {
       driverId: [{ value: '', disabled: true }, Validators.required],
       
       // Mileage Tracking (Enhanced)
-      loadedMiles: ['', [Validators.required, Validators.min(0)]],
-      emptyMiles: ['', [Validators.required, Validators.min(0)]],
-      totalMiles: [{ value: '', disabled: true }], // Auto-calculated
+      mileageOrder: ['', [Validators.required, Validators.min(0)]],
+      mileageEmpty: ['', [Validators.required, Validators.min(0)]],
+      mileageTotal: [{ value: '', disabled: true }], // Auto-calculated
       
       // Financial Details (Enhanced)
       orderRate: ['', [Validators.required, Validators.min(0.01)]],
@@ -183,27 +183,27 @@ export class TripEditComponent implements OnInit {
       deliveryNotes: [''],
       
       // Additional Fees
-      lumperFees: [0, Validators.min(0)],
-      detentionFees: [0, Validators.min(0)],
+      lumperValue: [0, Validators.min(0)],
+      detentionValue: [0, Validators.min(0)],
       
       // Fuel Management
-      fuelAvgCost: ['', Validators.min(0)],
-      fuelAvgGallonsPerMile: ['', Validators.min(0)],
+      fuelGasAvgCost: ['', Validators.min(0)],
+      fuelGasAvgGallxMil: ['', Validators.min(0)],
       
       // Notes
       notes: ['']
     });
     
     // Auto-calculate total miles when loaded or empty miles change
-    this.tripForm.get('loadedMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
-    this.tripForm.get('emptyMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    this.tripForm.get('mileageOrder')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    this.tripForm.get('mileageEmpty')?.valueChanges.subscribe(() => this.calculateTotalMiles());
   }
   
   private calculateTotalMiles(): void {
-    const loadedMiles = parseFloat(this.tripForm.get('loadedMiles')?.value) || 0;
-    const emptyMiles = parseFloat(this.tripForm.get('emptyMiles')?.value) || 0;
-    const totalMiles = loadedMiles + emptyMiles;
-    this.tripForm.get('totalMiles')?.setValue(totalMiles, { emitEvent: false });
+    const mileageOrder = parseFloat(this.tripForm.get('mileageOrder')?.value) || 0;
+    const mileageEmpty = parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0;
+    const mileageTotal = mileageOrder + mileageEmpty;
+    this.tripForm.get('mileageTotal')?.setValue(mileageTotal, { emitEvent: false });
   }
 
   private loadBrokers(): void {
@@ -261,9 +261,9 @@ export class TripEditComponent implements OnInit {
     });
     
     this.tripForm.patchValue({
-      // Basic info
-      pickupLocation: trip.pickupLocation,
-      dropoffLocation: trip.dropoffLocation,
+      // Basic info - construct location strings from city/state
+      pickupLocation: trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '',
+      dropoffLocation: trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '',
       status: trip.orderStatus,
       scheduledTimestamp: scheduledDatetimeLocal,
       brokerId: trip.brokerId,
@@ -277,8 +277,8 @@ export class TripEditComponent implements OnInit {
       driverId: trip.driverId,
       
       // Mileage
-      loadedMiles: trip.mileageOrder || 0,
-      emptyMiles: trip.mileageEmpty || 0,
+      mileageOrder: trip.mileageOrder || 0,
+      mileageEmpty: trip.mileageEmpty || 0,
       
       // Financial details
       orderRate: trip.orderRate || trip.brokerPayment || 0,
@@ -307,12 +307,12 @@ export class TripEditComponent implements OnInit {
       deliveryNotes: trip.deliveryNotes || '',
       
       // Additional fees
-      lumperFees: trip.lumperValue || 0,
-      detentionFees: trip.detentionValue || 0,
+      lumperValue: trip.lumperValue || 0,
+      detentionValue: trip.detentionValue || 0,
       
       // Fuel management
-      fuelAvgCost: trip.fuelGasAvgCost || '',
-      fuelAvgGallonsPerMile: trip.fuelGasAvgGallxMil || '',
+      fuelGasAvgCost: trip.fuelGasAvgCost || '',
+      fuelGasAvgGallxMil: trip.fuelGasAvgGallxMil || '',
       
       // Notes
       notes: trip.notes || ''
@@ -357,9 +357,9 @@ export class TripEditComponent implements OnInit {
       orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
       
       // Mileage tracking (enhanced)
-      mileageOrder: parseFloat(formValue.loadedMiles),
-      mileageEmpty: parseFloat(formValue.emptyMiles),
-      mileageTotal: parseFloat(formValue.totalMiles),
+      mileageOrder: parseFloat(formValue.mileageOrder),
+      mileageEmpty: parseFloat(formValue.mileageEmpty),
+      mileageTotal: parseFloat(formValue.mileageTotal),
       
       // Financial details (enhanced)
       orderRate: parseFloat(formValue.orderRate),
@@ -388,12 +388,12 @@ export class TripEditComponent implements OnInit {
       deliveryNotes: formValue.deliveryNotes?.trim() || undefined,
       
       // Additional fees
-      lumperValue: parseFloat(formValue.lumperFees) || 0,
-      detentionValue: parseFloat(formValue.detentionFees) || 0,
+      lumperValue: parseFloat(formValue.lumperValue) || 0,
+      detentionValue: parseFloat(formValue.detentionValue) || 0,
       
       // Fuel management
-      fuelGasAvgCost: formValue.fuelAvgCost ? parseFloat(formValue.fuelAvgCost) : undefined,
-      fuelGasAvgGallxMil: formValue.fuelAvgGallonsPerMile ? parseFloat(formValue.fuelAvgGallonsPerMile) : undefined,
+      fuelGasAvgCost: formValue.fuelGasAvgCost ? parseFloat(formValue.fuelGasAvgCost) : undefined,
+      fuelGasAvgGallxMil: formValue.fuelGasAvgGallxMil ? parseFloat(formValue.fuelGasAvgGallxMil) : undefined,
       
       // Notes
       notes: formValue.notes?.trim() || undefined
@@ -472,13 +472,13 @@ export class TripEditComponent implements OnInit {
       brokerPayment: parseFloat(this.tripForm.get('brokerPayment')?.value) || 0,
       truckOwnerPayment: parseFloat(this.tripForm.get('truckOwnerPayment')?.value) || 0,
       driverPayment: parseFloat(this.tripForm.get('driverPayment')?.value) || 0,
-      lumperValue: parseFloat(this.tripForm.get('lumperFees')?.value) || 0,
-      detentionValue: parseFloat(this.tripForm.get('detentionFees')?.value) || 0,
-      fuelGasAvgCost: parseFloat(this.tripForm.get('fuelAvgCost')?.value) || 0,
-      fuelGasAvgGallxMil: parseFloat(this.tripForm.get('fuelAvgGallonsPerMile')?.value) || 0,
-      mileageOrder: parseFloat(this.tripForm.get('loadedMiles')?.value) || 0,
-      mileageEmpty: parseFloat(this.tripForm.get('emptyMiles')?.value) || 0,
-      mileageTotal: (parseFloat(this.tripForm.get('loadedMiles')?.value) || 0) + (parseFloat(this.tripForm.get('emptyMiles')?.value) || 0),
+      lumperValue: parseFloat(this.tripForm.get('lumperValue')?.value) || 0,
+      detentionValue: parseFloat(this.tripForm.get('detentionValue')?.value) || 0,
+      fuelGasAvgCost: parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0,
+      fuelGasAvgGallxMil: parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0,
+      mileageOrder: parseFloat(this.tripForm.get('mileageOrder')?.value) || 0,
+      mileageEmpty: parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0,
+      mileageTotal: (parseFloat(this.tripForm.get('mileageOrder')?.value) || 0) + (parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0),
       fuelCost: 0 // Will be calculated by calculateFuelCost
     };
     

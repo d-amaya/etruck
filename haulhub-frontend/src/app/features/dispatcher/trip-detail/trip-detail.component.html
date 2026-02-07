@@ -70,11 +70,11 @@
           </div>
           <div class="detail-row">
             <span class="detail-label">Pickup Location:</span>
-            <span class="detail-value">{{ trip.pickupLocation }}</span>
+            <span class="detail-value">{{ trip.pickupCity }}, {{ trip.pickupState }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Dropoff Location:</span>
-            <span class="detail-value">{{ trip.dropoffLocation }}</span>
+            <span class="detail-value">{{ trip.deliveryCity }}, {{ trip.deliveryState }}</span>
           </div>
         </mat-card-content>
       </mat-card>
@@ -85,10 +85,6 @@
           <mat-card-title>Broker Information</mat-card-title>
         </mat-card-header>
         <mat-card-content>
-          <div class="detail-row">
-            <span class="detail-label">Broker Name:</span>
-            <span class="detail-value">{{ trip.brokerName || 'N/A' }}</span>
-          </div>
           <div class="detail-row">
             <span class="detail-label">Broker ID:</span>
             <span class="detail-value">{{ trip.brokerId }}</span>

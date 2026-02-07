@@ -274,9 +274,8 @@ export class TripDetailComponent implements OnInit {
    */
   getDriverName(): string {
     if (!this.trip) return 'N/A';
-    if (this.trip.driverName) return this.trip.driverName;
     const driver = this.driverMap.get(this.trip.driverId);
-    return driver?.name || 'N/A';
+    return driver?.name || this.trip.driverId.substring(0, 8);
   }
 
   /**
@@ -284,7 +283,6 @@ export class TripDetailComponent implements OnInit {
    */
   getDriverLicense(): string {
     if (!this.trip) return 'N/A';
-    if (this.trip.driverLicense) return this.trip.driverLicense;
     const driver = this.driverMap.get(this.trip.driverId);
     return driver?.nationalId || 'N/A';
   }

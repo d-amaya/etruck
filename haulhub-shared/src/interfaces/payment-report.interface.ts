@@ -16,17 +16,15 @@ export interface TripPaymentDetail {
   pickupLocation: string;
   dropoffLocation: string;
   brokerId: string;
-  brokerName: string;
   truckId: string;
   driverId: string;
-  driverName: string;
   brokerPayment: number;
   truckOwnerPayment: number;
   driverPayment: number;
   mileageOrder?: number;
   // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-  lumperFees?: number;
-  detentionFees?: number;
+  lumperValue?: number;
+  detentionValue?: number;
   orderStatus: string;
 }
 
@@ -35,19 +33,17 @@ export interface DispatcherPaymentReport {
   totalDriverPayments: number;
   totalTruckOwnerPayments: number;
   // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-  totalLumperFees?: number;
-  totalDetentionFees?: number;
+  totalLumperValue?: number;
+  totalDetentionValue?: number;
   totalAdditionalFees?: number;
   profit: number;
   tripCount: number;
   trips: TripPaymentDetail[];
   groupedByBroker?: Record<string, {
-    brokerName: string;
     totalPayment: number;
     tripCount: number;
   }>;
   groupedByDriver?: Record<string, {
-    driverName: string;
     totalPayment: number;
     tripCount: number;
   }>;

@@ -31,7 +31,6 @@ describe('TripTableComponent', () => {
     dispatcherId: 'dispatcher-1',
     carrierId: 'carrier-1',
     driverId: 'driver-1',
-    driverName: 'John Doe',
     truckId: 'ABC123',
     truckOwnerId: 'owner-1',
     trailerId: 'trailer-1',
@@ -54,7 +53,6 @@ describe('TripTableComponent', () => {
     deliveryPhone: '555-0200',
     deliveryNotes: '',
     brokerId: 'broker-1',
-    brokerName: 'Test Broker',
     brokerPayment: 1000,
     truckOwnerPayment: 400,
     driverPayment: 300,
@@ -105,7 +103,6 @@ describe('TripTableComponent', () => {
         brokerId: null,
         truckId: null,
         driverId: null,
-        driverName: null
       }),
       pagination$: of({ page: 0, pageSize: 25 }),
       filtersAndPagination$: of([
@@ -115,7 +112,6 @@ describe('TripTableComponent', () => {
           brokerId: null,
           truckId: null,
           driverId: null,
-          driverName: null
         },
         { page: 0, pageSize: 25 }
       ]),
@@ -128,7 +124,6 @@ describe('TripTableComponent', () => {
       brokerId: null,
       truckId: null,
       driverId: null,
-      driverName: null
     });
     
     sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [
@@ -141,7 +136,6 @@ describe('TripTableComponent', () => {
         brokerId: null,
         truckId: null,
         driverId: null,
-        driverName: null
       })
     });
     sharedFilterServiceSpy.getCurrentFilters.and.returnValue({
@@ -150,7 +144,6 @@ describe('TripTableComponent', () => {
       brokerId: null,
       truckId: null,
       driverId: null,
-      driverName: null
     });
     
     pdfExportServiceSpy = jasmine.createSpyObj('PdfExportService', ['exportDashboard']);

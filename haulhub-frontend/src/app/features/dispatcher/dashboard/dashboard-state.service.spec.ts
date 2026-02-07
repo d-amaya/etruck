@@ -14,21 +14,21 @@ describe('DashboardStateService', () => {
   const mockBrokers: Broker[] = [
     {
       brokerId: 'broker1',
-      brokerName: 'Broker One',
+      brokerName: 'Test Broker',
       isActive: true,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
     },
     {
       brokerId: 'broker2',
-      brokerName: 'Broker Two',
+      brokerName: 'Test Broker',
       isActive: true,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
     },
     {
       brokerId: 'broker3',
-      brokerName: 'Inactive Broker',
+      brokerName: 'Test Broker',
       isActive: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
@@ -79,7 +79,6 @@ describe('DashboardStateService', () => {
         expect(filters.brokerId).toBeNull();
         expect(filters.truckId).toBeNull();
         expect(filters.driverId).toBeNull();
-        expect(filters.driverName).toBeNull();
         done();
       });
     });
@@ -213,7 +212,6 @@ describe('DashboardStateService', () => {
         status: TripStatus.Paid,
         brokerId: 'broker1',
         truckId: 'truck123',
-        driverName: 'John Doe',
         dateRange: { startDate: new Date('2024-06-01'), endDate: new Date('2024-06-30') }
       });
 
@@ -228,7 +226,6 @@ describe('DashboardStateService', () => {
         expect(filters.brokerId).toBeNull();
         expect(filters.truckId).toBeNull();
         expect(filters.driverId).toBeNull();
-        expect(filters.driverName).toBeNull();
         done();
       });
     });
@@ -324,17 +321,17 @@ describe('DashboardStateService', () => {
       expect(count).toBe(1);
     });
 
-    it('should count driver name as 1 filter', () => {
+    it('should count driver ID as 1 filter', () => {
       // Clear default date range first
       service.updateFilters({
         dateRange: { startDate: null, endDate: null }
       });
-      service.updateFilters({ driverName: 'John Doe' });
+      service.updateFilters({ driverId: 'driver-1' });
       const count = service.getActiveFilterCount();
       expect(count).toBe(1);
     });
 
-    it('should count driver ID as 1 filter', () => {
+    it('should count driver ID as 1 filter (duplicate test)', () => {
       // Clear default date range first
       service.updateFilters({
         dateRange: { startDate: null, endDate: null }
@@ -344,12 +341,12 @@ describe('DashboardStateService', () => {
       expect(count).toBe(1);
     });
 
-    it('should count driver name and ID as 1 filter (not 2)', () => {
+    it('should count driver ID as 1 filter', () => {
       // Clear default date range first
       service.updateFilters({
         dateRange: { startDate: null, endDate: null }
       });
-      service.updateFilters({ driverId: 'driver123', driverName: 'John Doe' });
+      service.updateFilters({ driverId: 'driver-1' });
       const count = service.getActiveFilterCount();
       expect(count).toBe(1);
     });
@@ -360,10 +357,9 @@ describe('DashboardStateService', () => {
         status: TripStatus.InTransit,
         brokerId: 'broker1',
         truckId: 'truck123',
-        driverName: 'John Doe'
       });
       const count = service.getActiveFilterCount();
-      expect(count).toBe(5);
+      expect(count).toBe(4);
     });
   });
 

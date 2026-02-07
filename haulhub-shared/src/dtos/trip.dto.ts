@@ -152,37 +152,22 @@ export class CreateTripDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  loadedMiles?: number;
+  fuelGasAvgCost?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  emptyMiles?: number;
+  fuelGasAvgGallxMil?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  totalMiles?: number;
+  lumperValue?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  fuelAvgCost?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  fuelAvgGallonsPerMile?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  lumperFees?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  detentionFees?: number;
+  detentionValue?: number;
 }
 
 export class UpdateTripDto {
@@ -347,43 +332,15 @@ export class UpdateTripDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  loadedMiles?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  fuelGasAvgCost?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  emptyMiles?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  totalMiles?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  fuelAvgCost?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  fuelAvgGallonsPerMile?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  lumperFees?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  detentionFees?: number;
-
-  // Additional eTrucky fields
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  orderRate?: number;
+  fuelGasAvgGallxMil?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -395,15 +352,11 @@ export class UpdateTripDto {
   @IsNumber()
   detentionValue?: number;
 
+  // Additional eTrucky fields
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  fuelGasAvgCost?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  fuelGasAvgGallxMil?: number;
+  orderRate?: number;
 
   @IsOptional()
   @Type(() => Number)

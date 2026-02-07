@@ -118,8 +118,8 @@
       <ng-container matColumnDef="brokerName">
         <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Broker</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Broker: ' + (trip.brokerName || trip.brokerId)">
-          {{ trip.brokerName || trip.brokerId }}
+            [attr.aria-label]="'Broker: ' + getBrokerName(trip.brokerId)">
+          {{ getBrokerName(trip.brokerId) }}
         </td>
       </ng-container>
 
@@ -143,10 +143,10 @@
 
       <!-- Driver Column -->
       <ng-container matColumnDef="driverName">
-        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Driver License</th>
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Driver</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Driver license: ' + (trip.driverLicense || trip.driverId)">
-          {{ trip.driverLicense || getDriverDisplay(trip.driverId) }}
+            [attr.aria-label]="'Driver: ' + getDriverName(trip.driverId)">
+          {{ getDriverName(trip.driverId) }}
         </td>
       </ng-container>
 

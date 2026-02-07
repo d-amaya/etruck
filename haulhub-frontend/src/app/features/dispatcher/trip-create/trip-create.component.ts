@@ -145,9 +145,9 @@ export class TripCreateComponent implements OnInit {
       driverId: ['', Validators.required],
       
       // Mileage Tracking (Enhanced)
-      loadedMiles: ['', [Validators.required, Validators.min(0)]],
-      emptyMiles: ['', [Validators.required, Validators.min(0)]],
-      totalMiles: [{ value: '', disabled: true }], // Auto-calculated
+      mileageOrder: ['', [Validators.required, Validators.min(0)]],
+      mileageEmpty: ['', [Validators.required, Validators.min(0)]],
+      mileageTotal: [{ value: '', disabled: true }], // Auto-calculated
       
       // Financial Details
       brokerPayment: ['', [Validators.required, Validators.min(0.01)]],
@@ -174,27 +174,27 @@ export class TripCreateComponent implements OnInit {
       deliveryNotes: [''],
       
       // Additional Fees
-      lumperFees: [0, Validators.min(0)],
-      detentionFees: [0, Validators.min(0)],
+      lumperValue: [0, Validators.min(0)],
+      detentionValue: [0, Validators.min(0)],
       
       // Fuel Management
-      fuelAvgCost: ['', Validators.min(0)],
-      fuelAvgGallonsPerMile: ['', Validators.min(0)],
+      fuelGasAvgCost: ['', Validators.min(0)],
+      fuelGasAvgGallxMil: ['', Validators.min(0)],
       
       // Notes
       notes: ['']
     });
     
     // Auto-calculate total miles when loaded or empty miles change
-    this.tripForm.get('loadedMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
-    this.tripForm.get('emptyMiles')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    this.tripForm.get('mileageOrder')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    this.tripForm.get('mileageEmpty')?.valueChanges.subscribe(() => this.calculateTotalMiles());
   }
   
   private calculateTotalMiles(): void {
-    const loadedMiles = parseFloat(this.tripForm.get('loadedMiles')?.value) || 0;
-    const emptyMiles = parseFloat(this.tripForm.get('emptyMiles')?.value) || 0;
-    const totalMiles = loadedMiles + emptyMiles;
-    this.tripForm.get('totalMiles')?.setValue(totalMiles, { emitEvent: false });
+    const mileageOrder = parseFloat(this.tripForm.get('mileageOrder')?.value) || 0;
+    const mileageEmpty = parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0;
+    const mileageTotal = mileageOrder + mileageEmpty;
+    this.tripForm.get('mileageTotal')?.setValue(mileageTotal, { emitEvent: false });
   }
 
   private loadBrokers(): void {
@@ -283,9 +283,9 @@ export class TripCreateComponent implements OnInit {
       driverId: formValue.driverId,
       
       // Mileage tracking
-      mileageOrder: parseFloat(formValue.loadedMiles),
-      mileageEmpty: parseFloat(formValue.emptyMiles),
-      mileageTotal: parseFloat(formValue.totalMiles),
+      mileageOrder: parseFloat(formValue.mileageOrder),
+      mileageEmpty: parseFloat(formValue.mileageEmpty),
+      mileageTotal: parseFloat(formValue.mileageTotal),
       
       // Financial details
       brokerPayment: parseFloat(formValue.brokerPayment),
@@ -295,9 +295,6 @@ export class TripCreateComponent implements OnInit {
       // Legacy fields for backward compatibility
       pickupLocation: formValue.pickupLocation.trim(),
       dropoffLocation: formValue.dropoffLocation.trim(),
-      loadedMiles: parseFloat(formValue.loadedMiles),
-      emptyMiles: parseFloat(formValue.emptyMiles),
-      totalMiles: parseFloat(formValue.totalMiles),
     };
 
     // Add optional fields if provided
@@ -319,10 +316,10 @@ export class TripCreateComponent implements OnInit {
     if (formValue.deliveryNotes?.trim()) tripData.deliveryNotes = formValue.deliveryNotes.trim();
     
     if (formValue.notes?.trim()) tripData.notes = formValue.notes.trim();
-    if (formValue.lumperFees) tripData.lumperFees = parseFloat(formValue.lumperFees);
-    if (formValue.detentionFees) tripData.detentionFees = parseFloat(formValue.detentionFees);
-    if (formValue.fuelAvgCost) tripData.fuelAvgCost = parseFloat(formValue.fuelAvgCost);
-    if (formValue.fuelAvgGallonsPerMile) tripData.fuelAvgGallonsPerMile = parseFloat(formValue.fuelAvgGallonsPerMile);
+    if (formValue.lumperValue) tripData.lumperValue = parseFloat(formValue.lumperValue);
+    if (formValue.detentionValue) tripData.detentionValue = parseFloat(formValue.detentionValue);
+    if (formValue.fuelGasAvgCost) tripData.fuelGasAvgCost = parseFloat(formValue.fuelGasAvgCost);
+    if (formValue.fuelGasAvgGallxMil) tripData.fuelGasAvgGallxMil = parseFloat(formValue.fuelGasAvgGallxMil);
     
     this.loading = true;
     this.tripService.createTrip(tripData).subscribe({
@@ -382,20 +379,20 @@ export class TripCreateComponent implements OnInit {
     const brokerPayment = parseFloat(this.tripForm.get('brokerPayment')?.value) || 0;
     const truckOwnerPayment = parseFloat(this.tripForm.get('truckOwnerPayment')?.value) || 0;
     const driverPayment = parseFloat(this.tripForm.get('driverPayment')?.value) || 0;
-    const lumperFees = parseFloat(this.tripForm.get('lumperFees')?.value) || 0;
-    const detentionFees = parseFloat(this.tripForm.get('detentionFees')?.value) || 0;
+    const lumperValue = parseFloat(this.tripForm.get('lumperValue')?.value) || 0;
+    const detentionValue = parseFloat(this.tripForm.get('detentionValue')?.value) || 0;
     
     // Calculate fuel cost if fuel data is provided
     let fuelCost = 0;
-    const fuelAvgCost = parseFloat(this.tripForm.get('fuelAvgCost')?.value) || 0;
-    const fuelAvgGallonsPerMile = parseFloat(this.tripForm.get('fuelAvgGallonsPerMile')?.value) || 0;
+    const fuelGasAvgCost = parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0;
+    const fuelGasAvgGallxMil = parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0;
     
-    if (fuelAvgCost > 0 && fuelAvgGallonsPerMile > 0) {
-      const totalMiles = parseFloat(this.tripForm.get('totalMiles')?.value) || 0;
-      fuelCost = totalMiles * fuelAvgGallonsPerMile * fuelAvgCost;
+    if (fuelGasAvgCost > 0 && fuelGasAvgGallxMil > 0) {
+      const mileageTotal = parseFloat(this.tripForm.get('mileageTotal')?.value) || 0;
+      fuelCost = mileageTotal * fuelGasAvgGallxMil * fuelGasAvgCost;
     }
     
-    const totalExpenses = truckOwnerPayment + driverPayment + fuelCost + lumperFees + detentionFees;
+    const totalExpenses = truckOwnerPayment + driverPayment + fuelCost + lumperValue + detentionValue;
     return brokerPayment - totalExpenses;
   }
 

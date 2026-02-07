@@ -132,7 +132,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       this.enrichedDriverData = Object.entries(this.report.groupedByDriver).map(([driverId, data]) => {
         const driver = this.driverMap.get(driverId);
         return {
-          driverName: driver?.name || data.driverName || driverId.substring(0, 8),
+          driverName: driver?.name || driverId.substring(0, 8),
           totalPayment: data.totalPayment,
           tripCount: data.tripCount
         };
@@ -257,7 +257,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     
     return Object.entries(this.report.groupedByBroker).map(([brokerId, data]) => ({
       brokerId,
-      brokerName: data.brokerName,
+      brokerName: brokerId.substring(0, 8),
       totalPayment: data.totalPayment,
       tripCount: data.tripCount
     }));

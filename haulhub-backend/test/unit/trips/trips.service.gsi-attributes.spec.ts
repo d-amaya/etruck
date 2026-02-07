@@ -4,6 +4,8 @@ import { AwsService } from '../../../src/config/aws.service';
 import { ConfigService } from '../../../src/config/config.service';
 import { BrokersService } from '../../../src/admin/brokers.service';
 import { IndexSelectorService } from '../../../src/trips/index-selector.service';
+import { LorriesService } from '../../../src/lorries/lorries.service';
+import { UsersService } from '../../../src/users/users.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('TripsService - GSI Attributes', () => {
@@ -48,6 +50,19 @@ describe('TripsService - GSI Attributes', () => {
               filterExpressionAttributes: [],
               rationale: 'Default index selected for testing',
             }),
+          },
+        },
+        {
+          provide: LorriesService,
+          useValue: {
+            getTrucksByCarrier: jest.fn(),
+            getTrailersByCarrier: jest.fn(),
+          },
+        },
+        {
+          provide: UsersService,
+          useValue: {
+            getUsersByCarrier: jest.fn(),
           },
         },
       ],

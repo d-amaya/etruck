@@ -32,6 +32,8 @@ import {
   TripFilters,
 } from '@haulhub/shared';
 import { v4 as uuidv4 } from 'uuid';
+import { LorriesService } from '../lorries/lorries.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class TripsService {
@@ -43,6 +45,8 @@ export class TripsService {
     private readonly configService: ConfigService,
     private readonly brokersService: BrokersService,
     private readonly indexSelectorService: IndexSelectorService,
+    private readonly lorriesService: LorriesService,
+    private readonly usersService: UsersService,
   ) {
     this.tripsTableName = this.configService.tripsTableName;
     this.lorriesTableName = this.configService.lorriesTableName;
@@ -264,12 +268,12 @@ export class TripsService {
       
       // Costs and expenses
       fuelCost: 0,
-      fuelGasAvgCost: 0,
-      fuelGasAvgGallxMil: 0,
+      fuelGasAvgCost: dto.fuelGasAvgCost || 0,
+      fuelGasAvgGallxMil: dto.fuelGasAvgGallxMil || 0,
       brokerCost: 0,
       factoryCost: 0,
-      lumperValue: dto.lumperFees || 0,
-      detentionValue: dto.detentionFees || 0,
+      lumperValue: dto.lumperValue || 0,
+      detentionValue: dto.detentionValue || 0,
       orderExpenses: 0,
       orderRevenue: 0,
       
@@ -479,49 +483,30 @@ export class TripsService {
       expressionAttributeValues[':mileageOrder'] = dto.mileageOrder;
     }
 
-    // Enhanced Mileage Tracking (Requirements 3.1, 3.2, 3.3, 3.4, 3.5)
-    if (dto.loadedMiles !== undefined) {
-      updateExpressions.push('#loadedMiles = :loadedMiles');
-      expressionAttributeNames['#loadedMiles'] = 'loadedMiles';
-      expressionAttributeValues[':loadedMiles'] = dto.loadedMiles;
-    }
-
-    if (dto.emptyMiles !== undefined) {
-      updateExpressions.push('#emptyMiles = :emptyMiles');
-      expressionAttributeNames['#emptyMiles'] = 'emptyMiles';
-      expressionAttributeValues[':emptyMiles'] = dto.emptyMiles;
-    }
-
-    if (dto.totalMiles !== undefined) {
-      updateExpressions.push('#totalMiles = :totalMiles');
-      expressionAttributeNames['#totalMiles'] = 'totalMiles';
-      expressionAttributeValues[':totalMiles'] = dto.totalMiles;
-    }
-
     // Fuel Management (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
-    if (dto.fuelAvgCost !== undefined) {
-      updateExpressions.push('#fuelAvgCost = :fuelAvgCost');
-      expressionAttributeNames['#fuelAvgCost'] = 'fuelAvgCost';
-      expressionAttributeValues[':fuelAvgCost'] = dto.fuelAvgCost;
+    if (dto.fuelGasAvgCost !== undefined) {
+      updateExpressions.push('#fuelGasAvgCost = :fuelGasAvgCost');
+      expressionAttributeNames['#fuelGasAvgCost'] = 'fuelGasAvgCost';
+      expressionAttributeValues[':fuelGasAvgCost'] = dto.fuelGasAvgCost;
     }
 
-    if (dto.fuelAvgGallonsPerMile !== undefined) {
-      updateExpressions.push('#fuelAvgGallonsPerMile = :fuelAvgGallonsPerMile');
-      expressionAttributeNames['#fuelAvgGallonsPerMile'] = 'fuelAvgGallonsPerMile';
-      expressionAttributeValues[':fuelAvgGallonsPerMile'] = dto.fuelAvgGallonsPerMile;
+    if (dto.fuelGasAvgGallxMil !== undefined) {
+      updateExpressions.push('#fuelGasAvgGallxMil = :fuelGasAvgGallxMil');
+      expressionAttributeNames['#fuelGasAvgGallxMil'] = 'fuelGasAvgGallxMil';
+      expressionAttributeValues[':fuelGasAvgGallxMil'] = dto.fuelGasAvgGallxMil;
     }
 
     // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-    if (dto.lumperFees !== undefined) {
-      updateExpressions.push('#lumperFees = :lumperFees');
-      expressionAttributeNames['#lumperFees'] = 'lumperFees';
-      expressionAttributeValues[':lumperFees'] = dto.lumperFees;
+    if (dto.lumperValue !== undefined) {
+      updateExpressions.push('#lumperValue = :lumperValue');
+      expressionAttributeNames['#lumperValue'] = 'lumperValue';
+      expressionAttributeValues[':lumperValue'] = dto.lumperValue;
     }
 
-    if (dto.detentionFees !== undefined) {
-      updateExpressions.push('#detentionFees = :detentionFees');
-      expressionAttributeNames['#detentionFees'] = 'detentionFees';
-      expressionAttributeValues[':detentionFees'] = dto.detentionFees;
+    if (dto.detentionValue !== undefined) {
+      updateExpressions.push('#detentionValue = :detentionValue');
+      expressionAttributeNames['#detentionValue'] = 'detentionValue';
+      expressionAttributeValues[':detentionValue'] = dto.detentionValue;
     }
 
     if (dto.notes !== undefined) {
@@ -2511,6 +2496,11 @@ export class TripsService {
     // Filter by broker
     if (filters.brokerId) {
       const beforeCount = filtered.length;
+      
+      // Log unique broker IDs in the dataset
+      const uniqueBrokers = [...new Set(filtered.map(t => t.brokerId))];
+      console.log(`[applyAllFilters] Unique broker IDs in ${beforeCount} trips:`, uniqueBrokers.slice(0, 10));
+      
       filtered = filtered.filter(trip => {
         const matches = trip.brokerId === filters.brokerId;
         if (!matches && beforeCount <= 10) {
@@ -2703,9 +2693,8 @@ export class TripsService {
       truckOwnerPayment: trip.truckOwnerPayment,
       driverPayment: trip.driverPayment,
       mileageOrder: trip.mileageOrder,
-      lumperFees: trip.lumperValue, // Map from new field name
-      detentionFees: trip.detentionValue, // Map from new field name
-      status: trip.orderStatus, // Use orderStatus as the source
+      lumperValue: trip.lumperValue,
+      detentionValue: trip.detentionValue,
       orderStatus: trip.orderStatus,
     }));
 
@@ -2736,9 +2725,9 @@ export class TripsService {
     const totalTruckOwnerPayments = trips.reduce((sum, trip) => sum + trip.truckOwnerPayment, 0);
     
     // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
-    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
-    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    const totalLumperValue = trips.reduce((sum, trip) => sum + (trip.lumperValue || 0), 0);
+    const totalDetentionValue = trips.reduce((sum, trip) => sum + (trip.detentionValue || 0), 0);
+    const totalAdditionalFees = totalLumperValue + totalDetentionValue;
     
     // Profit calculation includes additional fees as expenses (Requirement 7.2)
     const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalAdditionalFees;
@@ -2747,8 +2736,8 @@ export class TripsService {
       totalBrokerPayments,
       totalDriverPayments,
       totalTruckOwnerPayments,
-      totalLumperFees,
-      totalDetentionFees,
+      totalLumperValue,
+      totalDetentionValue,
       totalAdditionalFees,
       profit: totalProfit,
       tripCount: trips.length,
@@ -3037,8 +3026,8 @@ export class TripsService {
     totalBrokerPayments: number;
     totalDriverPayments: number;
     totalTruckOwnerPayments: number;
-    totalLumperFees: number;
-    totalDetentionFees: number;
+    totalLumperValue: number;
+    totalDetentionValue: number;
     totalAdditionalFees: number;
     totalProfit: number;
   }> {
@@ -3053,17 +3042,17 @@ export class TripsService {
     
     // Calculate fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
     const totalFuelCosts = trips.reduce((sum, trip) => {
-      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.mileageOrder || 0) + (trip.emptyMiles || 0);
-        return sum + (totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost);
+      if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
+        const totalMiles = trip.mileageTotal || trip.mileageOrder || 0;
+        return sum + (totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost);
       }
       return sum;
     }, 0);
     
     // Calculate additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-    const totalLumperFees = trips.reduce((sum, trip) => sum + (trip.lumperFees || 0), 0);
-    const totalDetentionFees = trips.reduce((sum, trip) => sum + (trip.detentionFees || 0), 0);
-    const totalAdditionalFees = totalLumperFees + totalDetentionFees;
+    const totalLumperValue = trips.reduce((sum, trip) => sum + (trip.lumperValue || 0), 0);
+    const totalDetentionValue = trips.reduce((sum, trip) => sum + (trip.detentionValue || 0), 0);
+    const totalAdditionalFees = totalLumperValue + totalDetentionValue;
     
     // Profit calculation includes fuel costs and additional fees as expenses (Requirements 6.2, 7.2)
     const totalProfit = totalBrokerPayments - totalDriverPayments - totalTruckOwnerPayments - totalFuelCosts - totalAdditionalFees;
@@ -3072,10 +3061,73 @@ export class TripsService {
       totalBrokerPayments,
       totalDriverPayments,
       totalTruckOwnerPayments,
-      totalLumperFees,
-      totalDetentionFees,
+      totalLumperValue,
+      totalDetentionValue,
       totalAdditionalFees,
       totalProfit,
+    };
+  }
+
+  /**
+   * Get all data needed for PDF export in a single call
+   */
+  async getDashboardExport(
+    dispatcherId: string,
+    filters: TripFilters,
+  ): Promise<{
+    trips: Trip[];
+    summaryByStatus: Record<TripStatus, number>;
+    paymentSummary: {
+      totalBrokerPayments: number;
+      totalDriverPayments: number;
+      totalTruckOwnerPayments: number;
+      totalProfit: number;
+    };
+    assets: {
+      brokers: Array<{ brokerId: string; brokerName: string }>;
+      trucks: Array<{ truckId: string; plate: string }>;
+      drivers: Array<{ userId: string; name: string }>;
+      trailers: Array<{ trailerId: string; plate: string }>;
+    };
+  }> {
+    // Get all trips
+    const trips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+    
+    // Get summary by status
+    const summaryByStatus = await this.getTripSummaryByStatus(dispatcherId, filters);
+    
+    // Get payment summary
+    const fullPaymentSummary = await this.getPaymentSummary(dispatcherId, filters);
+    
+    // Get carrier ID from first trip or query user
+    const carrierId = trips.length > 0 ? trips[0].carrierId : dispatcherId;
+    
+    // Get assets in parallel
+    const [brokers, trucks, users, trailers] = await Promise.all([
+      this.brokersService.getAllBrokers(true),
+      this.lorriesService.getTrucksByCarrier(carrierId),
+      this.usersService.getUsersByCarrier(carrierId),
+      this.lorriesService.getTrailersByCarrier(carrierId),
+    ]);
+    
+    // Filter only drivers from users
+    const drivers = users.filter(u => u.role === 'DRIVER');
+    
+    return {
+      trips,
+      summaryByStatus,
+      paymentSummary: {
+        totalBrokerPayments: fullPaymentSummary.totalBrokerPayments,
+        totalDriverPayments: fullPaymentSummary.totalDriverPayments,
+        totalTruckOwnerPayments: fullPaymentSummary.totalTruckOwnerPayments,
+        totalProfit: fullPaymentSummary.totalProfit,
+      },
+      assets: {
+        brokers: brokers.map(b => ({ brokerId: b.brokerId, brokerName: b.brokerName })),
+        trucks: trucks.map((t: any) => ({ truckId: t.truckId, plate: t.plate })),
+        drivers: drivers.map(d => ({ userId: d.userId, name: d.name })),
+        trailers: trailers.map((t: any) => ({ trailerId: t.trailerId, plate: t.plate })),
+      },
     };
   }
 
@@ -3127,13 +3179,13 @@ export class TripsService {
       monthlyData[monthKey].truckOwnerPayments += trip.truckOwnerPayment;
       
       // Add fuel costs (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
-      if (trip.fuelAvgCost && trip.fuelAvgGallonsPerMile) {
-        const totalMiles = (trip.loadedMiles || trip.mileageOrder || 0) + (trip.emptyMiles || 0);
-        monthlyData[monthKey].fuelCosts += totalMiles * trip.fuelAvgGallonsPerMile * trip.fuelAvgCost;
+      if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
+        const totalMiles = trip.mileageTotal || trip.mileageOrder || 0;
+        monthlyData[monthKey].fuelCosts += totalMiles * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost;
       }
       
       // Add additional fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-      monthlyData[monthKey].additionalFees += (trip.lumperFees || 0) + (trip.detentionFees || 0);
+      monthlyData[monthKey].additionalFees += (trip.lumperValue || 0) + (trip.detentionValue || 0);
     }
 
     // Sort months chronologically
@@ -3176,6 +3228,7 @@ export class TripsService {
 
   /**
    * Get top performers (brokers, drivers, trucks) for dashboard charts
+   * Returns IDs as names - frontend will enrich with actual names from session storage
    */
   async getTopPerformers(
     dispatcherId: string,
@@ -3204,7 +3257,7 @@ export class TripsService {
           brokerPerformance.set(trip.brokerId, {
             revenue: trip.brokerPayment || 0,
             count: 1,
-            name: trip.brokerName || 'Unknown Broker'
+            name: trip.brokerId // Return ID, frontend will enrich
           });
         }
       }
@@ -3217,7 +3270,7 @@ export class TripsService {
         } else {
           driverPerformance.set(trip.driverId, {
             trips: 1,
-            name: trip.driverName || 'Unknown Driver'
+            name: trip.driverId // Return ID, frontend will enrich
           });
         }
       }
@@ -3583,34 +3636,7 @@ export class TripsService {
 
     // Enrich trips with names
     const enrichedTrips = trips.map(trip => {
-      const enriched = { ...trip };
-      
-      // Add broker name
-      if (trip.brokerId && brokerMap.has(trip.brokerId)) {
-        enriched.brokerName = brokerMap.get(trip.brokerId)!.brokerName;
-      }
-      
-      // Add driver name and license
-      if (trip.driverId && driverMap.has(trip.driverId)) {
-        const driver = driverMap.get(trip.driverId)!;
-        enriched.driverName = driver.name;
-        enriched.driverLicense = driver.nationalId; // Add driver license for table display
-      }
-      
-      // Ensure legacy location fields are populated
-      if (!enriched.pickupLocation && trip.pickupCity && trip.pickupState) {
-        enriched.pickupLocation = `${trip.pickupCity}, ${trip.pickupState}`;
-      }
-      if (!enriched.dropoffLocation && trip.deliveryCity && trip.deliveryState) {
-        enriched.dropoffLocation = `${trip.deliveryCity}, ${trip.deliveryState}`;
-      }
-      
-      // Ensure legacy status field is populated
-      if (!enriched.status && trip.orderStatus) {
-        enriched.status = trip.orderStatus as any;
-      }
-      
-      return enriched;
+      return { ...trip };
     });
 
     // Return enriched trips and asset metadata

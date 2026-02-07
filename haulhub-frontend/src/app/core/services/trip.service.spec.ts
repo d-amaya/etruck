@@ -74,7 +74,6 @@ describe('TripService', () => {
       dispatcherId: 'dispatcher-1',
       carrierId: 'carrier-1',
       driverId: 'driver-1',
-      driverName: 'John Doe',
       truckId: 'truck-1',
       truckOwnerId: 'owner-1',
       trailerId: 'trailer-1',
@@ -97,7 +96,6 @@ describe('TripService', () => {
       deliveryPhone: '555-0200',
       deliveryNotes: '',
       brokerId: 'broker-1',
-      brokerName: 'Test Broker',
       brokerPayment: 1000,
       truckOwnerPayment: 600,
       driverPayment: 300,
@@ -144,14 +142,14 @@ describe('TripService', () => {
     const mockBrokers: Broker[] = [
       {
         brokerId: 'broker-1',
-        brokerName: 'Test Broker 1',
+      brokerName: 'Test Broker',
         isActive: true,
         createdAt: '2024-11-16T10:00:00Z',
         updatedAt: '2024-11-16T10:00:00Z'
       },
       {
         brokerId: 'broker-2',
-        brokerName: 'Test Broker 2',
+      brokerName: 'Test Broker',
         isActive: true,
         createdAt: '2024-11-16T10:00:00Z',
         updatedAt: '2024-11-16T10:00:00Z'
@@ -174,7 +172,6 @@ describe('TripService', () => {
         dispatcherId: 'dispatcher-1',
         carrierId: 'carrier-1',
         driverId: 'driver-1',
-        driverName: 'John Doe',
         truckId: 'truck-1',
         truckOwnerId: 'owner-1',
         trailerId: 'trailer-1',
@@ -197,7 +194,6 @@ describe('TripService', () => {
         deliveryPhone: '555-0200',
         deliveryNotes: '',
         brokerId: 'broker-1',
-        brokerName: 'Test Broker',
         brokerPayment: 1000,
         truckOwnerPayment: 600,
         driverPayment: 300,

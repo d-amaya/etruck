@@ -29,10 +29,8 @@ describe('PaymentReportComponent', () => {
         pickupLocation: 'City A, State A',
         dropoffLocation: 'City B, State B',
         brokerId: 'broker1',
-        brokerName: 'Broker One',
         truckId: 'ABC-123',
         driverId: 'driver1',
-        driverName: 'John Doe',
         brokerPayment: 2000,
         truckOwnerPayment: 800,
         driverPayment: 600,
@@ -42,14 +40,12 @@ describe('PaymentReportComponent', () => {
     ],
     groupedByBroker: {
       'broker1': {
-        brokerName: 'Broker One',
         totalPayment: 10000,
         tripCount: 5
       }
     },
     groupedByDriver: {
       'driver1': {
-        driverName: 'John Doe',
         totalPayment: 3000,
         tripCount: 5
       }
@@ -149,7 +145,7 @@ describe('PaymentReportComponent', () => {
     const brokerData = component.getBrokerGroupedData();
     
     expect(brokerData.length).toBe(1);
-    expect(brokerData[0].brokerName).toBe('Broker One');
+    expect(brokerData[0].brokerName).toBe('broker1');
     expect(brokerData[0].totalPayment).toBe(10000);
   });
 

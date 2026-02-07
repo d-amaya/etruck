@@ -11,7 +11,6 @@ export interface DashboardFilters {
   status: TripStatus | null;
   brokerId: string | null;
   truckId: string | null;
-  driverName: string | null;
   driverId: string | null;
 }
 
@@ -33,7 +32,6 @@ export class SharedFilterService {
     status: null,
     brokerId: null,
     truckId: null,
-    driverName: null,
     driverId: null
   };
 
@@ -106,7 +104,6 @@ export class SharedFilterService {
         status: filters.status !== undefined ? filters.status : currentFilters.status,
         brokerId: filters.brokerId !== undefined ? filters.brokerId : currentFilters.brokerId,
         truckId: filters.truckId !== undefined ? filters.truckId : currentFilters.truckId,
-        driverName: filters.driverName !== undefined ? filters.driverName : currentFilters.driverName,
         driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId
       });
     }
@@ -130,7 +127,6 @@ export class SharedFilterService {
     return filters1.status === filters2.status &&
            filters1.brokerId === filters2.brokerId &&
            filters1.truckId === filters2.truckId &&
-           filters1.driverName === filters2.driverName &&
            filters1.driverId === filters2.driverId;
   }
 
@@ -163,7 +159,6 @@ export class SharedFilterService {
     if (filters.status) count++;
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
-    if (filters.driverName) count++;
     if (filters.driverId) count++;
 
     return count;

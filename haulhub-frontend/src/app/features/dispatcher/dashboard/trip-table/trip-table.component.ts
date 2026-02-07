@@ -200,37 +200,35 @@ export class TripTableComponent implements OnInit, OnDestroy {
    */
 
   /**
-   * Enrich trips with human-readable names from lookup maps
+   * Get broker name from ID
    */
-  private enrichTripsWithNames(trips: Trip[]): Trip[] {
-    return trips.map(trip => {
-      const enrichedTrip = { ...trip };
-      
-      // Enrich broker name
-      if (trip.brokerId && this.brokerMap.has(trip.brokerId)) {
-        enrichedTrip.brokerName = this.brokerMap.get(trip.brokerId)!.brokerName;
-      }
-      
-      // Enrich driver name
-      if (trip.driverId && this.driverMap.has(trip.driverId)) {
-        enrichedTrip.driverName = this.driverMap.get(trip.driverId)!.name;
-      }
-      
-      // Ensure pickupLocation and dropoffLocation are set
-      if (!enrichedTrip.pickupLocation && trip.pickupCity && trip.pickupState) {
-        enrichedTrip.pickupLocation = `${trip.pickupCity}, ${trip.pickupState}`;
-      }
-      if (!enrichedTrip.dropoffLocation && trip.deliveryCity && trip.deliveryState) {
-        enrichedTrip.dropoffLocation = `${trip.deliveryCity}, ${trip.deliveryState}`;
-      }
-      
-      // Ensure status is set
-      if (!enrichedTrip.status && trip.orderStatus) {
-        enrichedTrip.status = trip.orderStatus as any;
-      }
-      
-      return enrichedTrip;
-    });
+  getBrokerName(brokerId: string): string {
+    return this.brokerMap.get(brokerId)?.brokerName || brokerId.substring(0, 8);
+  }
+
+  /**
+   * Get driver name from ID
+   */
+  getDriverName(driverId: string): string {
+    return this.driverMap.get(driverId)?.name || driverId.substring(0, 8);
+  }
+
+  /**
+   * Get pickup location string
+   */
+  getPickupLocation(trip: Trip): string {
+    return trip.pickupCity && trip.pickupState 
+      ? `${trip.pickupCity}, ${trip.pickupState}` 
+      : '';
+  }
+
+  /**
+   * Get delivery location string
+   */
+  getDeliveryLocation(trip: Trip): string {
+    return trip.deliveryCity && trip.deliveryState 
+      ? `${trip.deliveryCity}, ${trip.deliveryState}` 
+      : '';
   }
 
   /**
@@ -442,11 +440,13 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   deleteTrip(trip: Trip): void {
     try {
+      const pickupLoc = this.getPickupLocation(trip);
+      const deliveryLoc = this.getDeliveryLocation(trip);
       const dialogRef = this.dialog.open(ConfirmDialogComponent, {
         width: '400px',
         data: {
           title: 'Delete Trip',
-          message: `Are you sure you want to delete this trip from ${trip.pickupLocation} to ${trip.dropoffLocation}?`,
+          message: `Are you sure you want to delete this trip from ${pickupLoc} to ${deliveryLoc}?`,
           confirmText: 'Delete',
           cancelText: 'Cancel'
         }
@@ -627,8 +627,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       status: null,
       brokerId: null,
       truckId: null,
-      driverId: null,
-      driverName: null
+      driverId: null
     });
     
     // Also clear the form fields visually
@@ -660,8 +659,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       status: formValue.status,
       brokerId: formValue.brokerId,
       truckId: formValue.truckId,
-      driverId: formValue.driverId,
-      driverName: null
+      driverId: formValue.driverId
     };
     
     this.sharedFilterService.updateFilters(filtersToApply);

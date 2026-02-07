@@ -4,15 +4,12 @@ import autoTable from 'jspdf-autotable';
 import { TripService } from './trip.service';
 import { DashboardStateService, DashboardFilters } from '../../features/dispatcher/dashboard/dashboard-state.service';
 import { Trip, TripStatus, TripFilters, calculateTripProfit } from '@haulhub/shared';
-import { forkJoin, Observable, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { Observable } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PdfExportService {
-  private truckMap = new Map<string, any>();
-
   constructor(
     private tripService: TripService,
     private dashboardState: DashboardStateService
@@ -21,21 +18,10 @@ export class PdfExportService {
   exportDashboard(): void {
     const filters = this.dashboardState['filtersSubject'].value;
 
-    // Load all required data - fetch ALL trips by following pagination
-    forkJoin({
-      trips: this.fetchAllTrips(this.buildApiFilters(filters)),
-      summaryByStatus: this.tripService.getTripSummaryByStatus(this.buildApiFilters(filters)),
-      paymentSummary: this.tripService.getPaymentSummary(this.buildApiFilters(filters)),
-      trucks: this.tripService.getTrucksByCarrier()
-    }).subscribe({
+    // Load all data in a single API call
+    this.tripService.getDashboardExport(this.buildApiFilters(filters)).subscribe({
       next: (data) => {
-        // Populate truck map for plate lookups
-        this.truckMap.clear();
-        data.trucks.forEach(truck => {
-          this.truckMap.set(truck.truckId, truck);
-        });
-        
-        this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, filters);
+        this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, data.assets, filters);
       },
       error: (error) => {
         console.error('Error loading dashboard data for PDF export:', error);
@@ -44,36 +30,24 @@ export class PdfExportService {
     });
   }
 
-  private fetchAllTrips(filters: TripFilters): Observable<Trip[]> {
-    const allTrips: Trip[] = [];
-    
-    const fetchPage = (lastKey?: string): Observable<Trip[]> => {
-      const pageFilters = lastKey ? { ...filters, lastEvaluatedKey: lastKey } : filters;
-      
-      return this.tripService.getTrips(pageFilters).pipe(
-        switchMap(response => {
-          allTrips.push(...response.trips);
-          
-          // If there's more data, fetch the next page
-          if (response.lastEvaluatedKey) {
-            return fetchPage(response.lastEvaluatedKey);
-          }
-          
-          // No more pages, return all trips
-          return of(allTrips);
-        })
-      );
-    };
-    
-    return fetchPage();
-  }
-
   private generatePdf(
     trips: Trip[],
     summaryByStatus: Record<TripStatus, number>,
     paymentSummary: any,
+    assets: {
+      brokers: Array<{ brokerId: string; brokerName: string }>;
+      trucks: Array<{ truckId: string; plate: string }>;
+      drivers: Array<{ userId: string; name: string }>;
+      trailers: Array<{ trailerId: string; plate: string }>;
+    },
     filters: DashboardFilters
   ): void {
+    // Create lookup maps
+    const brokerMap = new Map(assets.brokers.map(b => [b.brokerId, b.brokerName]));
+    const truckMap = new Map(assets.trucks.map(t => [t.truckId, t.plate]));
+    const driverMap = new Map(assets.drivers.map(d => [d.userId, d.name]));
+    const trailerMap = new Map(assets.trailers.map(t => [t.trailerId, t.plate]));
+
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -112,7 +86,7 @@ export class PdfExportService {
     yPosition = 45;
 
     // ========== APPLIED FILTERS SECTION ==========
-    const filterText = this.buildFilterText(filters);
+    const filterText = this.buildFilterText(filters, brokerMap, driverMap);
     if (filterText) {
       doc.setFillColor(lightBlue[0], lightBlue[1], lightBlue[2]);
       doc.rect(14, yPosition - 5, pageWidth - 28, 12, 'F');
@@ -206,13 +180,17 @@ export class PdfExportService {
         const profit = this.calculateProfit(trip);
         const pickupLocation = trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '';
         const dropoffLocation = trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '';
+        const brokerName = brokerMap.get(trip.brokerId) || trip.brokerId.substring(0, 8);
+        const truckPlate = truckMap.get(trip.truckId) || trip.truckId.substring(0, 8);
+        const driverName = driverMap.get(trip.driverId) || trip.driverId.substring(0, 8);
+        
         return [
           this.formatDate(trip.scheduledTimestamp),
           this.truncateText(pickupLocation, 20),
           this.truncateText(dropoffLocation, 20),
-          this.truncateText(trip.brokerName || 'N/A', 18),
-          this.getTruckDisplay(trip.truckId),
-          this.truncateText(trip.driverName || 'N/A', 18),
+          this.truncateText(brokerName, 18),
+          this.truncateText(truckPlate, 14),
+          this.truncateText(driverName, 18),
           this.getStatusLabel(trip.orderStatus as any),
           this.formatCurrency(trip.brokerPayment),
           this.formatCurrency(trip.driverPayment),
@@ -344,7 +322,11 @@ export class PdfExportService {
     return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
   }
 
-  private buildFilterText(filters: DashboardFilters): string {
+  private buildFilterText(
+    filters: DashboardFilters,
+    brokerMap: Map<string, string>,
+    driverMap: Map<string, string>
+  ): string {
     const parts: string[] = [];
 
     if (filters.dateRange.startDate || filters.dateRange.endDate) {
@@ -358,18 +340,17 @@ export class PdfExportService {
     }
 
     if (filters.brokerId) {
-      const broker = this.dashboardState.getBrokers().find(b => b.brokerId === filters.brokerId);
-      if (broker) {
-        parts.push(`Broker: ${broker.brokerName}`);
-      }
+      const brokerName = brokerMap.get(filters.brokerId) || filters.brokerId.substring(0, 8);
+      parts.push(`Broker: ${brokerName}`);
     }
 
     if (filters.truckId) {
-      parts.push(`Truck: ${filters.truckId}`);
+      parts.push(`Truck: ${filters.truckId.substring(0, 8)}`);
     }
 
-    if (filters.driverName) {
-      parts.push(`Driver: ${filters.driverName}`);
+    if (filters.driverId) {
+      const driverName = driverMap.get(filters.driverId) || filters.driverId.substring(0, 8);
+      parts.push(`Driver: ${driverName}`);
     }
 
     return parts.length > 0 ? `Filters: ${parts.join(' | ')}` : '';
@@ -406,8 +387,8 @@ export class PdfExportService {
     if (filters.truckId) {
       apiFilters.truckId = filters.truckId;
     }
-    if (filters.driverName) {
-      apiFilters.driverName = filters.driverName;
+    if (filters.driverId) {
+      apiFilters.driverId = filters.driverId;
     }
 
     return apiFilters;
@@ -449,12 +430,6 @@ export class PdfExportService {
   /**
    * Get truck display name (plate)
    */
-  private getTruckDisplay(truckId: string): string {
-    if (!truckId) return 'N/A';
-    const truck = this.truckMap.get(truckId);
-    return truck ? truck.plate : 'N/A';
-  }
-
   /**
    * Draw a professional truck logo using vector shapes
    */

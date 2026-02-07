@@ -37,7 +37,7 @@ xdescribe('VehicleTripListComponent', () => {
 
   const mockBroker: Broker = {
     brokerId: 'broker-1',
-    brokerName: 'Test Broker',
+      brokerName: 'Test Broker',
     isActive: true,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z'

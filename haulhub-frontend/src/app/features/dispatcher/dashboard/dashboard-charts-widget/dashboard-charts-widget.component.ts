@@ -271,20 +271,20 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       const status = trip.orderStatus || 'Scheduled';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
 
-      // Broker performance
-      if (trip.brokerName) {
-        const broker = brokerMap.get(trip.brokerName) || { revenue: 0, count: 0 };
-        broker.revenue += trip.brokerPayment || 0;
-        broker.count += 1;
-        brokerMap.set(trip.brokerName, broker);
-      }
+      // Broker performance - DISABLED: Using backend aggregates instead
+      // if (trip.brokerId) {
+      //   const broker = brokerMap.get(trip.brokerId) || { revenue: 0, count: 0 };
+      //   broker.revenue += trip.brokerPayment || 0;
+      //   broker.count += 1;
+      //   brokerMap.set(trip.brokerId, broker);
+      // }
 
-      // Driver performance
-      if (trip.driverName) {
-        const driver = driverMap.get(trip.driverName) || { trips: 0 };
-        driver.trips += 1;
-        driverMap.set(trip.driverName, driver);
-      }
+      // Driver performance - DISABLED: Using backend aggregates instead
+      // if (trip.driverId) {
+      //   const driver = driverMap.get(trip.driverId) || { trips: 0 };
+      //   driver.trips += 1;
+      //   driverMap.set(trip.driverId, driver);
+      // }
 
       // Truck performance
       if (trip.truckId) {

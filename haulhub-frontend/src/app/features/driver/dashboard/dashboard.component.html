@@ -97,9 +97,9 @@
             <div class="trip-header">
               <div class="trip-route">
                 <mat-icon>place</mat-icon>
-                <span class="location">{{ trip.pickupLocation }}</span>
+                <span class="location">{{ trip.pickupCity }}, {{ trip.pickupState }}</span>
                 <mat-icon>arrow_forward</mat-icon>
-                <span class="location">{{ trip.dropoffLocation }}</span>
+                <span class="location">{{ trip.deliveryCity }}, {{ trip.deliveryState }}</span>
               </div>
               <mat-chip [class]="getStatusClass(trip.orderStatus || 'Scheduled')">
                 {{ getStatusLabel(trip.orderStatus || 'Scheduled') }}
@@ -113,10 +113,6 @@
               <div class="detail-item">
                 <mat-icon>local_shipping</mat-icon>
                 <span>{{ trip.truckId }}</span>
-              </div>
-              <div class="detail-item">
-                <mat-icon>business</mat-icon>
-                <span>{{ trip.brokerName }}</span>
               </div>
               <div class="detail-item payment">
                 <mat-icon>payments</mat-icon>

@@ -134,21 +134,21 @@
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Loaded Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="loadedMiles" placeholder="0.0">
+              <input matInput type="number" step="0.1" formControlName="mileageOrder" placeholder="0.0">
               <mat-hint>Miles driven with cargo</mat-hint>
-              <mat-error>{{ getErrorMessage('loadedMiles') }}</mat-error>
+              <mat-error>{{ getErrorMessage('mileageOrder') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Empty Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="emptyMiles" placeholder="0.0">
+              <input matInput type="number" step="0.1" formControlName="mileageEmpty" placeholder="0.0">
               <mat-hint>Deadhead miles</mat-hint>
-              <mat-error>{{ getErrorMessage('emptyMiles') }}</mat-error>
+              <mat-error>{{ getErrorMessage('mileageEmpty') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Total Miles</mat-label>
-              <input matInput type="number" formControlName="totalMiles" readonly>
+              <input matInput type="number" formControlName="mileageTotal" readonly>
               <mat-hint>Auto-calculated</mat-hint>
             </mat-form-field>
           </div>
@@ -156,13 +156,13 @@
           <div class="form-row">
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Avg Fuel Cost ($/gallon)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="fuelAvgCost" placeholder="0.00">
+              <input matInput type="number" step="0.01" formControlName="fuelGasAvgCost" placeholder="0.00">
               <mat-hint>Average fuel price (optional)</mat-hint>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Avg Gallons Per Mile</mat-label>
-              <input matInput type="number" step="0.001" formControlName="fuelAvgGallonsPerMile" placeholder="0.000">
+              <input matInput type="number" step="0.001" formControlName="fuelGasAvgGallxMil" placeholder="0.000">
               <mat-hint>Fuel efficiency (optional)</mat-hint>
             </mat-form-field>
           </div>
@@ -210,13 +210,13 @@
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Lumper Fees ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="lumperFees" placeholder="0.00">
+              <input matInput type="number" step="0.01" formControlName="lumperValue" placeholder="0.00">
               <mat-hint>Loading/unloading fees</mat-hint>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Detention Fees ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="detentionFees" placeholder="0.00">
+              <input matInput type="number" step="0.01" formControlName="detentionValue" placeholder="0.00">
               <mat-hint>Delay charges</mat-hint>
             </mat-form-field>
           </div>

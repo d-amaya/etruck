@@ -15,7 +15,6 @@ export interface DashboardFilters {
   brokerId: string | null;
   truckId: string | null;
   driverId: string | null;
-  driverName: string | null;
 }
 
 export interface PaymentSummary {
@@ -174,7 +173,7 @@ export class DashboardStateService {
     if (filters.status) count++;
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
-    if (filters.driverId || filters.driverName) count++;
+    if (filters.driverId) count++;
     return count;
   }
 
@@ -214,8 +213,7 @@ export class DashboardStateService {
       status: null,
       brokerId: null,
       truckId: null,
-      driverId: null,
-      driverName: null
+      driverId: null
     };
   }
 

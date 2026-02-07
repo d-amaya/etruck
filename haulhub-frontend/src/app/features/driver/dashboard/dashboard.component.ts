@@ -52,9 +52,9 @@ export class DashboardComponent implements OnInit {
         // Filter for upcoming trips (not delivered or paid)
         this.upcomingTrips = trips
           .filter(t => 
-            t.status === TripStatus.Scheduled || 
-            t.status === TripStatus.PickedUp || 
-            t.status === TripStatus.InTransit
+            t.orderStatus === TripStatus.Scheduled || 
+            t.orderStatus === TripStatus.PickedUp || 
+            t.orderStatus === TripStatus.InTransit
           )
           .slice(0, 5);
         
@@ -71,11 +71,11 @@ export class DashboardComponent implements OnInit {
   private calculateSummary(trips: Trip[]): void {
     this.tripSummary = {
       total: trips.length,
-      scheduled: trips.filter(t => t.status === TripStatus.Scheduled).length,
+      scheduled: trips.filter(t => t.orderStatus === TripStatus.Scheduled).length,
       inProgress: trips.filter(t => 
-        t.status === TripStatus.PickedUp || t.status === TripStatus.InTransit
+        t.orderStatus === TripStatus.PickedUp || t.orderStatus === TripStatus.InTransit
       ).length,
-      delivered: trips.filter(t => t.status === TripStatus.Delivered).length,
+      delivered: trips.filter(t => t.orderStatus === TripStatus.Delivered).length,
       totalEarnings: trips.reduce((sum, trip) => sum + trip.driverPayment, 0)
     };
   }

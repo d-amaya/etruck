@@ -31,7 +31,6 @@ xdescribe('Dashboard Integration Tests', () => {
     dispatcherId: 'dispatcher-1',
     carrierId: 'carrier-1',
     driverId: 'driver-1',
-    driverName: 'John Doe',
     truckId: 'truck-1',
     truckOwnerId: 'owner-1',
     trailerId: 'trailer-1',
@@ -54,7 +53,6 @@ xdescribe('Dashboard Integration Tests', () => {
     deliveryPhone: '555-0200',
     deliveryNotes: '',
     brokerId: 'broker-1',
-    brokerName: 'ABC Logistics',
     brokerPayment: 1500,
     truckOwnerPayment: 500,
     driverPayment: 800,
@@ -98,9 +96,7 @@ xdescribe('Dashboard Integration Tests', () => {
       deliveryCity: 'Boston',
       deliveryState: 'MA',
       brokerId: 'broker-1',
-      brokerName: 'ABC Logistics',
       truckId: 'LRY-001',
-      driverName: 'John Doe',
       driverId: 'driver-1',
       orderStatus: TripStatus.Scheduled,
       brokerPayment: 1500,
@@ -118,9 +114,7 @@ xdescribe('Dashboard Integration Tests', () => {
       deliveryCity: 'Detroit',
       deliveryState: 'MI',
       brokerId: 'broker-2',
-      brokerName: 'XYZ Transport',
       truckId: 'LRY-002',
-      driverName: 'Jane Smith',
       driverId: 'driver-2',
       orderStatus: TripStatus.InTransit,
       brokerPayment: 1200,
@@ -135,14 +129,14 @@ xdescribe('Dashboard Integration Tests', () => {
   const mockBrokers: Broker[] = [
     { 
       brokerId: 'broker-1', 
-      brokerName: 'ABC Logistics', 
+      brokerName: 'Test Broker',
       isActive: true,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
     },
     { 
       brokerId: 'broker-2', 
-      brokerName: 'XYZ Transport', 
+      brokerName: 'Test Broker',
       isActive: true,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
@@ -155,7 +149,6 @@ xdescribe('Dashboard Integration Tests', () => {
     brokerId: null,
     truckId: null,
     driverId: null,
-    driverName: null
   };
 
   const defaultPagination: PaginationState = {

@@ -82,19 +82,6 @@ export interface Trip {
   // Audit timestamps
   createdAt?: string;
   updatedAt?: string;
-  
-  // Legacy fields (backward compatibility - optional)
-  driverName?: string;
-  driverLicense?: string;
-  brokerName?: string;
-  pickupLocation?: string;
-  dropoffLocation?: string;
-  status?: TripStatus;
-  loadedMiles?: number;
-  emptyMiles?: number;
-  totalMiles?: number;
-  lumperFees?: number;
-  detentionFees?: number;
 }
 
 export interface InvoicePayment {

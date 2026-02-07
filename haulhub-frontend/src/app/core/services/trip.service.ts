@@ -243,6 +243,20 @@ export class TripService {
     return this.apiService.get<PaymentSummary>('/trips/dashboard/payment-summary', filters);
   }
 
+  getDashboardExport(filters?: TripFilters): Observable<{
+    trips: Trip[];
+    summaryByStatus: Record<TripStatus, number>;
+    paymentSummary: PaymentSummary;
+    assets: {
+      brokers: Array<{ brokerId: string; brokerName: string }>;
+      trucks: Array<{ truckId: string; plate: string }>;
+      drivers: Array<{ userId: string; name: string }>;
+      trailers: Array<{ trailerId: string; plate: string }>;
+    };
+  }> {
+    return this.apiService.get('/trips/dashboard/export', filters);
+  }
+
   getPaymentsTimeline(filters?: TripFilters): Observable<PaymentsTimeline> {
     return this.apiService.get<PaymentsTimeline>('/trips/dashboard/payments-timeline', filters);
   }
