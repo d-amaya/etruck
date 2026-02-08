@@ -1,2 +1,12 @@
 // Reuse dispatcher analytics dashboard styles
 @import '../../dispatcher/analytics-dashboard/analytics-dashboard.component.scss';
+
+.profit-positive {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.profit-negative {
+  color: #d32f2f;
+  font-weight: 500;
+}

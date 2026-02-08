@@ -224,4 +224,15 @@ export class AnalyticsService {
     }
     return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
   }
+
+  getDispatcherPerformance(startDate?: Date, endDate?: Date): Observable<any[]> {
+    let params = new HttpParams();
+    if (startDate) {
+      params = params.set('startDate', startDate.toISOString());
+    }
+    if (endDate) {
+      params = params.set('endDate', endDate.toISOString());
+    }
+    return this.http.get<any[]>(`${this.apiUrl}/dispatcher-performance`, { params });
+  }
 }

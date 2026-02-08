@@ -147,7 +147,7 @@ export class TripsController {
    * - dispatcher (driver and truck owner)
    */
   @Get('reports/payments')
-  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner)
+  @Roles(UserRole.Dispatcher, UserRole.Driver, UserRole.LorryOwner, UserRole.TruckOwner, UserRole.Carrier)
   async getPaymentReport(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: any,

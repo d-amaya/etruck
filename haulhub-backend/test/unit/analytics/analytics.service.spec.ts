@@ -210,7 +210,7 @@ describe('AnalyticsService', () => {
 
       mockTripsService.awsService.getDynamoDBClient.mockReturnValue(mockDynamoDBClient);
 
-      const result = await service.getTripAnalytics('dispatcher1');
+      const result = await service.getTripAnalytics('dispatcher1', 'Dispatcher');
 
       expect(result).toBeDefined();
       expect(result.totalTrips).toBe(2);
@@ -278,7 +278,7 @@ describe('AnalyticsService', () => {
 
       mockTripsService.awsService.getDynamoDBClient.mockReturnValue(mockDynamoDBClient);
 
-      const result = await service.getDriverPerformance('dispatcher1');
+      const result = await service.getDriverPerformance('dispatcher1', 'Dispatcher');
 
       expect(result).toBeDefined();
       expect(result.length).toBe(1);
@@ -343,7 +343,7 @@ describe('AnalyticsService', () => {
 
       mockTripsService.awsService.getDynamoDBClient.mockReturnValue(mockDynamoDBClient);
 
-      const result = await service.getVehicleUtilization('dispatcher1');
+      const result = await service.getVehicleUtilization('dispatcher1', 'Dispatcher');
 
       expect(result).toBeDefined();
       expect(result.length).toBe(1);

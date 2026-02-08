@@ -2669,6 +2669,7 @@ export class TripsService {
     // Generate role-specific report
     switch (role) {
       case UserRole.Dispatcher:
+      case UserRole.Carrier:
         return this.generateDispatcherReport(tripPaymentDetails, filters.groupBy);
       case UserRole.Driver:
         return this.generateDriverReport(tripPaymentDetails, filters.groupBy);

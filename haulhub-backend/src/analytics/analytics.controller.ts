@@ -31,7 +31,7 @@ export class AnalyticsController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getTripAnalytics(user.userId, start, end);
+    return await this.analyticsService.getTripAnalytics(user.userId, user.role, start, end);
   }
 
   @Get('driver-performance')
@@ -43,7 +43,7 @@ export class AnalyticsController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getDriverPerformance(user.userId, start, end);
+    return await this.analyticsService.getDriverPerformance(user.userId, user.role, start, end);
   }
 
   @Get('vehicle-utilization')
@@ -55,7 +55,7 @@ export class AnalyticsController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getVehicleUtilization(user.userId, start, end);
+    return await this.analyticsService.getVehicleUtilization(user.userId, user.role, start, end);
   }
 
   @Get('revenue-analytics')
@@ -85,7 +85,7 @@ export class AnalyticsController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getBrokerAnalytics(user.userId, start, end);
+    return await this.analyticsService.getBrokerAnalytics(user.userId, user.role, start, end);
   }
 
   @Get('fuel-analytics')
@@ -97,6 +97,18 @@ export class AnalyticsController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return await this.analyticsService.getFuelAnalytics(user.userId, start, end);
+    return await this.analyticsService.getFuelAnalytics(user.userId, user.role, start, end);
+  }
+
+  @Get('dispatcher-performance')
+  @Roles(UserRole.Carrier, UserRole.Admin)
+  async getDispatcherPerformance(
+    @CurrentUser() user: CurrentUserData,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return await this.analyticsService.getDispatcherPerformance(user.userId, start, end);
   }
 }

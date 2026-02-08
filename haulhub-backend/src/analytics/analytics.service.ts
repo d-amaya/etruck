@@ -57,6 +57,17 @@ export interface VehicleUtilization {
   averageRevenuePerTrip: number;
 }
 
+export interface DispatcherPerformance {
+  dispatcherId: string;
+  dispatcherName: string;
+  totalTrips: number;
+  completedTrips: number;
+  totalRevenue: number;
+  totalProfit: number;
+  averageProfit: number;
+  completionRate: number;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -178,44 +189,46 @@ export class AnalyticsService {
     }
   }
 
-  async getTripAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
+  async getTripAnalytics(userId: string, userRole: string, startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
     try {
-      // Get all trips for this dispatcher within date range using GSI2 (Dispatcher index)
+      // Determine which GSI to use based on user role
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+      
+      // Get all trips for this user within date range
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
+      let keyConditionExpression = `${indexName}PK = :userPK`;
       const expressionAttributeValues: any = {
-        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
+        ':userPK': `${pkPrefix}#${userId}`,
       };
       
-      // Add date range to KeyConditionExpression (not FilterExpression)
-      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
-      // For date range queries, we need to use full ISO 8601 timestamps
+      // Add date range to KeyConditionExpression
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
-        // Start of day for startDate
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        // End of day for endDate
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: indexName,
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -287,44 +300,46 @@ export class AnalyticsService {
     }
   }
 
-  async getDriverPerformance(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<DriverPerformance[]> {
+  async getDriverPerformance(userId: string, userRole: string, startDate?: Date, endDate?: Date): Promise<DriverPerformance[]> {
     try {
-      // Get all trips for this dispatcher within date range using GSI1
+      // Determine which GSI to use based on user role
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+      
+      // Get all trips for this user within date range
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
+      let keyConditionExpression = `${indexName}PK = :userPK`;
       const expressionAttributeValues: any = {
-        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
+        ':userPK': `${pkPrefix}#${userId}`,
       };
       
-      // Add date range to KeyConditionExpression (not FilterExpression)
-      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
-      // For date range queries, we need to use full ISO 8601 timestamps
+      // Add date range to KeyConditionExpression
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
-        // Start of day for startDate
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        // End of day for endDate
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: indexName,
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -410,44 +425,46 @@ export class AnalyticsService {
     }
   }
 
-  async getVehicleUtilization(dispatcherId: string, startDate?: Date, endDate?: Date): Promise<VehicleUtilization[]> {
+  async getVehicleUtilization(userId: string, userRole: string, startDate?: Date, endDate?: Date): Promise<VehicleUtilization[]> {
     try {
-      // Get all trips for this dispatcher within date range using GSI1
+      // Determine which GSI to use based on user role
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+      
+      // Get all trips for this user within date range
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
+      let keyConditionExpression = `${indexName}PK = :userPK`;
       const expressionAttributeValues: any = {
-        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
+        ':userPK': `${pkPrefix}#${userId}`,
       };
       
-      // Add date range to KeyConditionExpression (not FilterExpression)
-      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
-      // For date range queries, we need to use full ISO 8601 timestamps
+      // Add date range to KeyConditionExpression
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
-        // Start of day for startDate
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        // End of day for endDate
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: indexName,
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -774,44 +791,46 @@ export class AnalyticsService {
     }
   }
 
-  async getFuelAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date) {
+  async getFuelAnalytics(userId: string, userRole: string, startDate?: Date, endDate?: Date) {
     try {
-      // Get all trips for this dispatcher within date range using GSI1
+      // Determine which GSI to use based on user role
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+      
+      // Get all trips for this user within date range
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
+      let keyConditionExpression = `${indexName}PK = :userPK`;
       const expressionAttributeValues: any = {
-        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
+        ':userPK': `${pkPrefix}#${userId}`,
       };
       
-      // Add date range to KeyConditionExpression (not FilterExpression)
-      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
-      // For date range queries, we need to use full ISO 8601 timestamps
+      // Add date range to KeyConditionExpression
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
-        // Start of day for startDate
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        // End of day for endDate
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: indexName,
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -997,44 +1016,46 @@ export class AnalyticsService {
     }
   }
 
-  async getBrokerAnalytics(dispatcherId: string, startDate?: Date, endDate?: Date) {
+  async getBrokerAnalytics(userId: string, userRole: string, startDate?: Date, endDate?: Date) {
     try {
-      // Get all trips for this dispatcher within date range using GSI1
+      // Determine which GSI to use based on user role
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+      
+      // Get all trips for this user within date range
       const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
       const tripsTableName = this.tripsService['tripsTableName'];
       
       const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
       
       // Build key condition expression with date range
-      let keyConditionExpression = 'GSI2PK = :dispatcherPK';
+      let keyConditionExpression = `${indexName}PK = :userPK`;
       const expressionAttributeValues: any = {
-        ':dispatcherPK': `DISPATCHER#${dispatcherId}`,
+        ':userPK': `${pkPrefix}#${userId}`,
       };
       
-      // Add date range to KeyConditionExpression (not FilterExpression)
-      // GSI sort keys use format: <ISO_TIMESTAMP>#<tripId>
-      // For date range queries, we need to use full ISO 8601 timestamps
+      // Add date range to KeyConditionExpression
       if (startDate && endDate) {
-        keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
-        // Start of day for startDate
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        // End of day for endDate
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
-        keyConditionExpression += ' AND GSI2SK >= :startDate';
+        keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
         const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
-        keyConditionExpression += ' AND GSI2SK <= :endDate';
+        keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
         const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
       const queryCommand = new QueryCommand({
         TableName: tripsTableName,
-        IndexName: 'GSI2',
+        IndexName: indexName,
         KeyConditionExpression: keyConditionExpression,
         ExpressionAttributeValues: expressionAttributeValues,
       });
@@ -1124,6 +1145,109 @@ export class AnalyticsService {
         totalRevenue: 0,
         totalTrips: 0,
       };
+    }
+  }
+
+  async getDispatcherPerformance(carrierId: string, startDate?: Date, endDate?: Date): Promise<DispatcherPerformance[]> {
+    try {
+      const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
+      const tripsTableName = this.tripsService['tripsTableName'];
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      let keyConditionExpression = 'GSI1PK = :carrierPK';
+      const expressionAttributeValues: any = {
+        ':carrierPK': `CARRIER#${carrierId}`,
+      };
+      
+      if (startDate && endDate) {
+        keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':startDate'] = startISO;
+        expressionAttributeValues[':endDate'] = endISO;
+      } else if (startDate) {
+        keyConditionExpression += ' AND GSI1SK >= :startDate';
+        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        expressionAttributeValues[':startDate'] = startISO;
+      } else if (endDate) {
+        keyConditionExpression += ' AND GSI1SK <= :endDate';
+        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        expressionAttributeValues[':endDate'] = endISO;
+      }
+      
+      const queryCommand = new QueryCommand({
+        TableName: tripsTableName,
+        IndexName: 'GSI1',
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+      });
+      
+      const result = await dynamodbClient.send(queryCommand);
+      const trips = (result.Items || []).map(item => this.tripsService['mapItemToTrip'](item));
+      
+      const dispatcherMap = new Map<string, { trips: any[] }>();
+      
+      for (const trip of trips) {
+        if (!dispatcherMap.has(trip.dispatcherId)) {
+          dispatcherMap.set(trip.dispatcherId, { trips: [] });
+        }
+        dispatcherMap.get(trip.dispatcherId)!.trips.push(trip);
+      }
+      
+      const usersTableName = this.tripsService['configService'].usersTableName;
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const dispatcherDetailsMap = new Map<string, any>();
+      await Promise.all(
+        Array.from(dispatcherMap.keys()).map(async (dispatcherId) => {
+          try {
+            const result = await dynamodbClient.send(new GetCommand({
+              TableName: usersTableName,
+              Key: { PK: `USER#${dispatcherId}`, SK: 'METADATA' },
+            }));
+            if (result.Item) {
+              dispatcherDetailsMap.set(dispatcherId, result.Item);
+            }
+          } catch (error) {
+            console.error(`Error fetching dispatcher ${dispatcherId}:`, error);
+          }
+        })
+      );
+      
+      const performance: DispatcherPerformance[] = [];
+      
+      for (const [dispatcherId, data] of dispatcherMap.entries()) {
+        const totalTrips = data.trips.length;
+        const completedTrips = data.trips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+        const totalRevenue = data.trips.reduce((sum, trip) => sum + trip.brokerPayment, 0);
+        const totalExpenses = data.trips.reduce((sum, trip) => 
+          sum + trip.driverPayment + trip.truckOwnerPayment + (trip.fuelCost || 0) + (trip.lumperValue || 0) + (trip.detentionValue || 0), 0
+        );
+        const totalProfit = totalRevenue - totalExpenses;
+        const averageProfit = totalTrips > 0 ? totalProfit / totalTrips : 0;
+        const completionRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
+        
+        const dispatcher = dispatcherDetailsMap.get(dispatcherId);
+        const dispatcherName = dispatcher ? dispatcher.name : dispatcherId.substring(0, 8);
+        
+        performance.push({
+          dispatcherId,
+          dispatcherName,
+          totalTrips,
+          completedTrips,
+          totalRevenue,
+          totalProfit,
+          averageProfit,
+          completionRate,
+        });
+      }
+      
+      performance.sort((a, b) => b.totalProfit - a.totalProfit);
+      
+      return performance;
+    } catch (error) {
+      console.error('Error getting dispatcher performance:', error);
+      return [];
     }
   }
 }

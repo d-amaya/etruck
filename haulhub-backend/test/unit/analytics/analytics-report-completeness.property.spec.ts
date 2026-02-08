@@ -180,7 +180,7 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
 
             // Get trip analytics report (use dispatcherId from first trip)
             const dispatcherId = trips[0].dispatcherId;
-            const report = await service.getTripAnalytics(dispatcherId);
+            const report = await service.getTripAnalytics(dispatcherId, 'Dispatcher');
 
             // Verify all required fields are present
             expect(report).toBeDefined();
@@ -253,7 +253,7 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
 
             // Get driver performance report (use dispatcherId from first trip)
             const dispatcherId = trips[0].dispatcherId;
-            const report = await service.getDriverPerformance(dispatcherId);
+            const report = await service.getDriverPerformance(dispatcherId, 'Dispatcher');
 
             // Verify report is an array
             expect(Array.isArray(report)).toBe(true);
@@ -314,7 +314,7 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
 
             // Get vehicle utilization report (use dispatcherId from first trip)
             const dispatcherId = trips[0].dispatcherId;
-            const report = await service.getVehicleUtilization(dispatcherId);
+            const report = await service.getVehicleUtilization(dispatcherId, 'Dispatcher');
 
             // Verify report is an array
             expect(Array.isArray(report)).toBe(true);
@@ -497,9 +497,9 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
             // Get all reports (use dispatcherId from first trip)
             const dispatcherId = trips[0].dispatcherId;
             const fleetOverview = await service.getFleetOverview(dispatcherId);
-            const tripAnalytics = await service.getTripAnalytics(dispatcherId);
-            const driverPerformance = await service.getDriverPerformance(dispatcherId);
-            const vehicleUtilization = await service.getVehicleUtilization(dispatcherId);
+            const tripAnalytics = await service.getTripAnalytics(dispatcherId, 'Dispatcher');
+            const driverPerformance = await service.getDriverPerformance(dispatcherId, 'Dispatcher');
+            const vehicleUtilization = await service.getVehicleUtilization(dispatcherId, 'Dispatcher');
             const revenueAnalytics = await service.getRevenueAnalytics(dispatcherId);
 
             // Verify trip count consistency

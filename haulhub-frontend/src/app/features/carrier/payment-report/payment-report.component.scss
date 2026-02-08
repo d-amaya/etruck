@@ -1,82 +1,180 @@
-.payment-report-card {
-  margin: 16px 0;
+.payment-report-container {
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
 }
 
 .loading-container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 48px;
-  gap: 16px;
+  align-items: center;
+  padding: 40px;
+}
+
+.report-content {
+  margin-top: 0;
 }
 
 .summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .summary-card {
   display: flex;
   align-items: center;
-  padding: 16px;
-  border-radius: 8px;
-  gap: 12px;
-  
-  &.revenue {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+  gap: 10px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-left: 3px solid transparent;
+  flex: 1;
+  min-width: 140px;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   }
-  
-  &.expenses {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
+
+  .card-icon {
+    mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
   }
-  
-  &.profit {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
+
+  .card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+
+    .card-label {
+      font-size: 10px;
+      color: #757575;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .card-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #212121;
+      font-family: 'Roboto Mono', monospace;
+    }
   }
-  
-  &.trips {
-    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-    color: white;
+
+  &.income {
+    border-left-color: #4caf50;
+    
+    .card-icon mat-icon {
+      color: #4caf50;
+    }
+  }
+
+  &.expense {
+    border-left-color: #ff9800;
+    
+    .card-icon mat-icon {
+      color: #ff9800;
+    }
   }
 }
 
-.card-icon {
-  font-size: 40px;
-  
-  .material-icons {
-    font-size: 40px;
+.report-tabs {
+  margin-top: 0;
+
+  .tab-content {
+    padding: 24px 0;
   }
 }
 
-.card-content {
+.data-table {
+  overflow-x: auto;
+  margin-top: 16px;
+  width: 100%;
+  max-width: 100%;
   flex: 1;
 }
 
-.card-label {
-  font-size: 12px;
-  opacity: 0.9;
-  margin-bottom: 4px;
-}
-
-.card-value {
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.tab-content {
-  padding: 16px 0;
-}
-
-.payment-table {
+.analytics-table {
   width: 100%;
-  
-  th {
-    font-weight: 600;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: fixed;
+
+  ::ng-deep {
+    .mat-mdc-header-row {
+      background: #f5f5f5 !important;
+      height: 48px !important;
+      min-height: 48px !important;
+    }
+
+    .mat-mdc-header-cell {
+      padding: 12px 16px !important;
+      text-align: left !important;
+      font-weight: 600 !important;
+      color: #424242 !important;
+      border-bottom: 2px solid #e0e0e0 !important;
+      white-space: nowrap !important;
+      background: #f5f5f5 !important;
+      height: 48px !important;
+      line-height: normal !important;
+    }
+
+    .mat-mdc-row {
+      transition: background 0.2s ease !important;
+      height: 48px !important;
+      min-height: 48px !important;
+
+      &:hover {
+        background: #fafafa !important;
+      }
+    }
+
+    .mat-mdc-cell {
+      padding: 12px 16px !important;
+      border-bottom: 1px solid #e0e0e0 !important;
+      color: #616161 !important;
+      height: 48px !important;
+      line-height: normal !important;
+
+      strong {
+        color: #212121 !important;
+        font-weight: 600 !important;
+      }
+    }
   }
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 14px;
 }

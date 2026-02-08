@@ -1,134 +1,148 @@
-<mat-card class="payment-report-card">
-  <mat-card-header>
-    <mat-card-title>Payment Report</mat-card-title>
-  </mat-card-header>
-
-  <mat-card-content>
-    <div *ngIf="loading" class="loading-container">
-      <mat-spinner diameter="40"></mat-spinner>
-      <p>Loading payment report...</p>
+<div class="payment-report-container">
+  <!-- Export Button -->
+  <div class="page-header">
+    <div class="header-actions">
+      <button mat-raised-button color="primary" (click)="onExportData()" [disabled]="loading || !report">
+        <mat-icon>download</mat-icon>
+        Export PDF
+      </button>
     </div>
+  </div>
 
-    <div *ngIf="!loading && report" class="report-content">
-      <!-- Summary Cards -->
-      <div class="summary-cards">
-        <div class="summary-card revenue">
-          <div class="card-icon">
-            <span class="material-icons">attach_money</span>
-          </div>
-          <div class="card-content">
-            <div class="card-label">Total Revenue</div>
-            <div class="card-value">{{ report.totalBrokerPayments | currency }}</div>
-          </div>
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <!-- Report Content -->
+  <div *ngIf="!loading && report" class="report-content">
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="summary-card income">
+        <div class="card-icon">
+          <mat-icon>attach_money</mat-icon>
         </div>
-
-        <div class="summary-card expenses">
-          <div class="card-icon">
-            <span class="material-icons">payments</span>
-          </div>
-          <div class="card-content">
-            <div class="card-label">Total Expenses</div>
-            <div class="card-value">
-              {{ (report.totalDriverPayments + report.totalTruckOwnerPayments) | currency }}
-            </div>
-          </div>
-        </div>
-
-        <div class="summary-card profit">
-          <div class="card-icon">
-            <span class="material-icons">trending_up</span>
-          </div>
-          <div class="card-content">
-            <div class="card-label">Net Profit</div>
-            <div class="card-value">{{ report.profit | currency }}</div>
-          </div>
-        </div>
-
-        <div class="summary-card trips">
-          <div class="card-icon">
-            <span class="material-icons">local_shipping</span>
-          </div>
-          <div class="card-content">
-            <div class="card-label">Total Trips</div>
-            <div class="card-value">{{ report.tripCount }}</div>
-          </div>
+        <div class="card-content">
+          <span class="card-label">Broker Payments</span>
+          <span class="card-value">{{ formatCurrency(report.totalBrokerPayments) }}</span>
         </div>
       </div>
 
-      <!-- Grouped Data Tabs -->
-      <mat-tab-group [(selectedIndex)]="activeTabIndex" (selectedIndexChange)="onTabChange($event)">
-        <mat-tab label="By Broker">
-          <div class="tab-content">
-            <table mat-table [dataSource]="getEnrichedBrokerData()" class="payment-table">
+      <div class="summary-card expense">
+        <div class="card-icon">
+          <mat-icon>payments</mat-icon>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Driver Payments</span>
+          <span class="card-value">{{ formatCurrency(report.totalDriverPayments) }}</span>
+        </div>
+      </div>
+
+      <div class="summary-card expense">
+        <div class="card-icon">
+          <mat-icon>local_shipping</mat-icon>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Truck Owner Payments</span>
+          <span class="card-value">{{ formatCurrency(report.totalTruckOwnerPayments) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabbed Views -->
+    <mat-tab-group class="report-tabs" [selectedIndex]="activeTabIndex" (selectedIndexChange)="onTabChange($event)">
+      <!-- By Broker Tab -->
+      <mat-tab label="By Broker">
+        <div class="tab-content">
+          <div class="data-table">
+            <table mat-table [dataSource]="getEnrichedBrokerData()" class="analytics-table">
               <ng-container matColumnDef="brokerName">
-                <th mat-header-cell *matHeaderCellDef>Broker</th>
-                <td mat-cell *matCellDef="let row">{{ row.brokerName }}</td>
+                <th mat-header-cell *matHeaderCellDef>Broker Name</th>
+                <td mat-cell *matCellDef="let element">{{ element.brokerName }}</td>
               </ng-container>
 
               <ng-container matColumnDef="totalPayment">
                 <th mat-header-cell *matHeaderCellDef>Total Payment</th>
-                <td mat-cell *matCellDef="let row">{{ row.totalPayment | currency }}</td>
+                <td mat-cell *matCellDef="let element">{{ formatCurrency(element.totalPayment) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="tripCount">
-                <th mat-header-cell *matHeaderCellDef>Trips</th>
-                <td mat-cell *matCellDef="let row">{{ row.tripCount }}</td>
+                <th mat-header-cell *matHeaderCellDef>Trip Count</th>
+                <td mat-cell *matCellDef="let element">{{ element.tripCount }}</td>
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="brokerColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: brokerColumns;"></tr>
             </table>
           </div>
-        </mat-tab>
 
-        <mat-tab label="By Driver">
-          <div class="tab-content">
-            <table mat-table [dataSource]="enrichedDriverData" class="payment-table">
+          <div *ngIf="getEnrichedBrokerData().length === 0" class="no-data">
+            No broker data available for the selected period
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- By Driver Tab -->
+      <mat-tab label="By Driver">
+        <div class="tab-content">
+          <div class="data-table">
+            <table mat-table [dataSource]="enrichedDriverData" class="analytics-table">
               <ng-container matColumnDef="driverName">
-                <th mat-header-cell *matHeaderCellDef>Driver</th>
-                <td mat-cell *matCellDef="let row">{{ row.driverName }}</td>
+                <th mat-header-cell *matHeaderCellDef>Driver Name</th>
+                <td mat-cell *matCellDef="let element">{{ element.driverName }}</td>
               </ng-container>
 
               <ng-container matColumnDef="totalPayment">
                 <th mat-header-cell *matHeaderCellDef>Total Payment</th>
-                <td mat-cell *matCellDef="let row">{{ row.totalPayment | currency }}</td>
+                <td mat-cell *matCellDef="let element">{{ formatCurrency(element.totalPayment) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="tripCount">
-                <th mat-header-cell *matHeaderCellDef>Trips</th>
-                <td mat-cell *matCellDef="let row">{{ row.tripCount }}</td>
+                <th mat-header-cell *matHeaderCellDef>Trip Count</th>
+                <td mat-cell *matCellDef="let element">{{ element.tripCount }}</td>
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="driverColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: driverColumns;"></tr>
             </table>
           </div>
-        </mat-tab>
 
-        <mat-tab label="By Truck">
-          <div class="tab-content">
-            <table mat-table [dataSource]="enrichedTruckData" class="payment-table">
-              <ng-container matColumnDef="truckName">
-                <th mat-header-cell *matHeaderCellDef>Truck</th>
-                <td mat-cell *matCellDef="let row">{{ row.truckName }}</td>
+          <div *ngIf="enrichedDriverData.length === 0" class="no-data">
+            No driver data available for the selected period
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- By Truck Owner Tab -->
+      <mat-tab label="By Truck Owner">
+        <div class="tab-content">
+          <div class="data-table">
+            <table mat-table [dataSource]="enrichedTruckOwnerData" class="analytics-table">
+              <ng-container matColumnDef="ownerName">
+                <th mat-header-cell *matHeaderCellDef>Truck Owner</th>
+                <td mat-cell *matCellDef="let element">{{ element.ownerName }}</td>
               </ng-container>
 
               <ng-container matColumnDef="totalPayment">
                 <th mat-header-cell *matHeaderCellDef>Total Payment</th>
-                <td mat-cell *matCellDef="let row">{{ row.totalPayment | currency }}</td>
+                <td mat-cell *matCellDef="let element">{{ formatCurrency(element.totalPayment) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="tripCount">
-                <th mat-header-cell *matHeaderCellDef>Trips</th>
-                <td mat-cell *matCellDef="let row">{{ row.tripCount }}</td>
+                <th mat-header-cell *matHeaderCellDef>Trip Count</th>
+                <td mat-cell *matCellDef="let element">{{ element.tripCount }}</td>
               </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="truckColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: truckColumns;"></tr>
+              <tr mat-header-row *matHeaderRowDef="truckOwnerColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: truckOwnerColumns;"></tr>
             </table>
           </div>
-        </mat-tab>
-      </mat-tab-group>
-    </div>
-  </mat-card-content>
-</mat-card>
+
+          <div *ngIf="enrichedTruckOwnerData.length === 0" class="no-data">
+            No truck owner data available for the selected period
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>

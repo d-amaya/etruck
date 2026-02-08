@@ -3,16 +3,11 @@
   <app-carrier-unified-filter-card></app-carrier-unified-filter-card>
   
   <!-- Header with Actions -->
-  <div class="page-header">
-    <h1 class="page-title">Carrier Analytics</h1>
+  <div class="page-header" style="justify-content: flex-end;">
     <div class="header-actions">
-      <button mat-raised-button color="primary" (click)="onRefresh()">
-        <mat-icon>refresh</mat-icon>
-        Refresh
-      </button>
-      <button mat-raised-button (click)="onExportData()">
+      <button mat-raised-button color="primary" (click)="onExportData()">
         <mat-icon>download</mat-icon>
-        Export
+        Export PDF
       </button>
     </div>
   </div>
@@ -47,48 +42,54 @@
 
   <!-- Charts Section -->
   <mat-tab-group *ngIf="!isLoading && !error" class="charts-section" (selectedIndexChange)="onTabChange($event)" [selectedIndex]="selectedTabIndex">
-      <!-- Vehicle Performance Tab -->
-      <mat-tab label="Vehicle Performance">
+      <!-- Dispatcher Performance Tab -->
+      <mat-tab label="Dispatcher Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-content>
-              <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
+              <div *ngIf="dispatcherPerformanceData && dispatcherPerformanceData.length > 0" class="data-table">
                 <div class="column-descriptions">
-                  <p><strong>Utilization Rate:</strong> Percentage of days the vehicle was actively used for trips. <strong>Avg Revenue/Trip:</strong> Average revenue earned per trip for this vehicle.</p>
+                  <p><strong>Completion Rate:</strong> Percentage of trips successfully completed. <strong>Avg Profit/Trip:</strong> Average profit per trip managed by this dispatcher.</p>
                 </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
-                      <th>Truck</th>
+                      <th>Dispatcher Name</th>
                       <th>Total Trips</th>
-                      <th>Total Distance</th>
+                      <th>Completed</th>
                       <th>Total Revenue</th>
-                      <th>Utilization Rate</th>
-                      <th>Avg Revenue/Trip</th>
+                      <th>Total Profit</th>
+                      <th>Avg Profit/Trip</th>
+                      <th>Completion Rate</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let vehicle of vehicleUtilizationData">
-                      <td>{{ vehicle.vehicleName }}</td>
-                      <td>{{ vehicle.totalTrips }}</td>
-                      <td>{{ vehicle.totalDistance | number:'1.0-0' }} mi</td>
-                      <td>{{ formatCurrency(vehicle.totalRevenue) }}</td>
+                    <tr *ngFor="let dispatcher of dispatcherPerformanceData">
+                      <td><strong>{{ dispatcher.dispatcherName }}</strong></td>
+                      <td>{{ dispatcher.totalTrips }}</td>
+                      <td>{{ dispatcher.completedTrips }}</td>
+                      <td>{{ formatCurrency(dispatcher.totalRevenue) }}</td>
+                      <td [class.profit-positive]="dispatcher.totalProfit >= 0" [class.profit-negative]="dispatcher.totalProfit < 0">
+                        {{ formatCurrency(dispatcher.totalProfit) }}
+                      </td>
+                      <td [class.profit-positive]="dispatcher.averageProfit >= 0" [class.profit-negative]="dispatcher.averageProfit < 0">
+                        {{ formatCurrency(dispatcher.averageProfit) }}
+                      </td>
                       <td>
-                        <span class="utilization-badge" [class.high]="vehicle.utilizationRate >= 70" 
-                              [class.medium]="vehicle.utilizationRate >= 40 && vehicle.utilizationRate < 70"
-                              [class.low]="vehicle.utilizationRate < 40">
-                          {{ vehicle.utilizationRate | number:'1.1-1' }}%
+                        <span class="completion-badge" [class.high]="dispatcher.completionRate >= 90"
+                              [class.medium]="dispatcher.completionRate >= 70 && dispatcher.completionRate < 90"
+                              [class.low]="dispatcher.completionRate < 70">
+                          {{ dispatcher.completionRate | number:'1.0-0' }}%
                         </span>
                       </td>
-                      <td>{{ formatCurrency(vehicle.averageRevenuePerTrip) }}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div class="no-data" *ngIf="!vehicleUtilizationData || vehicleUtilizationData.length === 0">
-                <mat-icon>local_shipping</mat-icon>
-                <p>No vehicle utilization data available</p>
-                <p class="hint">Create trips to see vehicle utilization metrics</p>
+              <div class="no-data" *ngIf="!dispatcherPerformanceData || dispatcherPerformanceData.length === 0">
+                <mat-icon>person</mat-icon>
+                <p>No dispatcher performance data available</p>
+                <p class="hint">Assign dispatchers to trips to see performance metrics</p>
               </div>
             </mat-card-content>
           </mat-card>
@@ -195,29 +196,57 @@
         </div>
       </mat-tab>
 
-      <!-- Fuel Efficiency Tab -->
-      <mat-tab label="Fuel Efficiency">
+      <!-- Vehicle Performance Tab -->
+      <mat-tab label="Vehicle Performance">
         <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-content>
-              <div *ngIf="fuelCostChartData">
-                <div class="chart-data-preview" style="margin-bottom: 16px;">
-                  <p><strong>Average Fuel Cost:</strong> {{ formatCurrency(fuelCostChartData.avgCost) }}</p>
-                  <p><strong>Total Fuel Expenses:</strong> {{ formatCurrency(fuelCostChartData.totalCost) }}</p>
-                  <p><strong>Trips with Fuel Data:</strong> {{ fuelCostChartData.tripCount }}</p>
+              <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
+                <div class="column-descriptions">
+                  <p><strong>Utilization Rate:</strong> Percentage of days the vehicle was actively used for trips. <strong>Avg Revenue/Trip:</strong> Average revenue earned per trip for this vehicle.</p>
                 </div>
-                <div class="chart-container" *ngIf="fuelCostTrendData">
-                  <canvas #fuelCostChart></canvas>
-                </div>
+                <table class="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Truck</th>
+                      <th>Total Trips</th>
+                      <th>Total Distance</th>
+                      <th>Total Revenue</th>
+                      <th>Utilization Rate</th>
+                      <th>Avg Revenue/Trip</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let vehicle of vehicleUtilizationData">
+                      <td>{{ vehicle.vehicleName }}</td>
+                      <td>{{ vehicle.totalTrips }}</td>
+                      <td>{{ vehicle.totalDistance | number:'1.0-0' }} mi</td>
+                      <td>{{ formatCurrency(vehicle.totalRevenue) }}</td>
+                      <td>
+                        <span class="utilization-badge" [class.high]="vehicle.utilizationRate >= 70" 
+                              [class.medium]="vehicle.utilizationRate >= 40 && vehicle.utilizationRate < 70"
+                              [class.low]="vehicle.utilizationRate < 40">
+                          {{ vehicle.utilizationRate | number:'1.1-1' }}%
+                        </span>
+                      </td>
+                      <td>{{ formatCurrency(vehicle.averageRevenuePerTrip) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div class="no-data" *ngIf="!fuelCostChartData">
-                <mat-icon>local_gas_station</mat-icon>
-                <p>No fuel cost data available</p>
-                <p class="hint">Add fuel cost information to trips to see analytics</p>
+              <div class="no-data" *ngIf="!vehicleUtilizationData || vehicleUtilizationData.length === 0">
+                <mat-icon>local_shipping</mat-icon>
+                <p>No vehicle utilization data available</p>
+                <p class="hint">Create trips to see vehicle utilization metrics</p>
               </div>
             </mat-card-content>
           </mat-card>
+        </div>
+      </mat-tab>
 
+      <!-- Fuel Efficiency Tab -->
+      <mat-tab label="Fuel Efficiency">
+        <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-content>
               <div *ngIf="fuelEfficiencyChartData">

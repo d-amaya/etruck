@@ -13,12 +13,14 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, distinctUntilChanged } from 'rxjs/operators';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierUnifiedFilterCardComponent } from '../shared/unified-filter-card/unified-filter-card.component';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 Chart.register(...registerables);
 
@@ -70,6 +72,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   isLoading = true;
   error: string | null = null;
   selectedTabIndex = 0;
+  private isLoadingAnalytics = false;
   
   // Date Range Filter
   startDate: Date | null = null;
@@ -94,6 +97,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   // Fleet Utilization Data
   driverPerformanceData: any[] = [];
   vehicleUtilizationData: any[] = [];
+  dispatcherPerformanceData: any[] = [];
   
   // Broker Performance Data
   brokerAnalyticsData: any = null;
@@ -115,24 +119,23 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   ) {}
 
   ngOnInit(): void {
-    // Get carrier ID from auth service
-    this.carrierId = this.authService.carrierId;
-    
-    if (!this.carrierId) {
-      this.error = 'Unable to load carrier information';
-      this.isLoading = false;
-      return;
-    }
-    
     // Initialize empty KPI cards
     this.initializeKPICards();
     
-    // Subscribe to date filter changes
-    this.filterService.dateFilter$.pipe(takeUntil(this.destroy$)).subscribe(dateFilter => {
-      this.startDate = dateFilter.startDate;
-      this.endDate = dateFilter.endDate;
-      this.loadAllAnalytics();
-    });
+    // Subscribe to date filter changes with distinctUntilChanged to prevent duplicate calls
+    this.filterService.dateFilter$
+      .pipe(
+        distinctUntilChanged((prev, curr) => 
+          prev.startDate?.getTime() === curr.startDate?.getTime() && 
+          prev.endDate?.getTime() === curr.endDate?.getTime()
+        ),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(dateFilter => {
+        this.startDate = dateFilter.startDate;
+        this.endDate = dateFilter.endDate;
+        this.loadAllAnalytics();
+      });
   }
 
   ngAfterViewInit(): void {
@@ -188,6 +191,12 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   private loadAllAnalytics(): void {
+    // Prevent concurrent loads
+    if (this.isLoadingAnalytics) {
+      return;
+    }
+    
+    this.isLoadingAnalytics = true;
     this.isLoading = true;
     this.error = null;
 
@@ -209,19 +218,13 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
       }
     }
 
-    // Load trip analytics with date filter (using carrier context)
+    // Load trip analytics (backend uses authenticated user context)
     this.loadTripAnalytics();
   }
 
   private loadTripAnalytics(): void {
-    if (!this.carrierId) {
-      this.error = 'Unable to load carrier information';
-      this.isLoading = false;
-      return;
-    }
-
-    // Use carrier-specific analytics endpoint
-    this.analyticsService.getCarrierTripAnalytics(this.carrierId, this.startDate || undefined, this.endDate || undefined)
+    // Backend automatically uses authenticated user's context
+    this.analyticsService.getTripAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -229,12 +232,15 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
           this.loadFleetUtilizationData();
           this.loadBrokerAnalyticsData();
           this.loadFuelEfficiencyData();
+          this.loadDispatcherPerformanceData();
           this.isLoading = false;
+          this.isLoadingAnalytics = false;
         },
         error: (error) => {
           console.error('[Carrier Analytics] Error loading trip analytics:', error);
           this.error = 'Failed to load analytics data. Please try again.';
           this.isLoading = false;
+          this.isLoadingAnalytics = false;
           
           this.snackBar.open('Error loading analytics data', 'Close', {
             duration: 5000
@@ -244,10 +250,8 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   private loadFleetUtilizationData(): void {
-    if (!this.carrierId) return;
-
-    // Load driver performance (carrier context)
-    this.analyticsService.getCarrierDriverPerformance(this.carrierId, this.startDate || undefined, this.endDate || undefined)
+    // Load driver performance (backend uses authenticated user context)
+    this.analyticsService.getDriverPerformance(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -258,8 +262,8 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
         }
       });
 
-    // Load vehicle utilization (carrier context)
-    this.analyticsService.getCarrierVehicleUtilization(this.carrierId, this.startDate || undefined, this.endDate || undefined)
+    // Load vehicle utilization (backend uses authenticated user context)
+    this.analyticsService.getVehicleUtilization(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -272,9 +276,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   private loadBrokerAnalyticsData(): void {
-    if (!this.carrierId) return;
-
-    this.analyticsService.getCarrierBrokerAnalytics(this.carrierId, this.startDate || undefined, this.endDate || undefined)
+    this.analyticsService.getBrokerAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -286,11 +288,22 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
       });
   }
 
-  private loadFuelEfficiencyData(): void {
-    if (!this.carrierId) return;
+  private loadDispatcherPerformanceData(): void {
+    this.analyticsService.getDispatcherPerformance(this.startDate || undefined, this.endDate || undefined)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.dispatcherPerformanceData = data;
+        },
+        error: (error) => {
+          console.error('[Carrier Analytics] Error loading dispatcher performance:', error);
+        }
+      });
+  }
 
-    // Load real fuel analytics data (carrier context)
-    this.analyticsService.getCarrierFuelAnalytics(this.carrierId, this.startDate || undefined, this.endDate || undefined)
+  private loadFuelEfficiencyData(): void {
+    // Load real fuel analytics data (backend uses authenticated user context)
+    this.analyticsService.getFuelAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -464,10 +477,222 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   onExportData(): void {
-    // TODO: Implement data export functionality
-    this.snackBar.open('Export functionality coming soon', 'Close', {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const primaryBlue: [number, number, number] = [25, 118, 210];
+    const profitGreen: [number, number, number] = [46, 125, 50];
+    const lossRed: [number, number, number] = [211, 47, 47];
+    
+    let yPos = 20;
+    
+    // Header with eTrucky banner
+    doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('eTrucky', 14, 22);
+    doc.setFontSize(16);
+    doc.text('Carrier Analytics Report', pageWidth / 2, 22, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 22, { align: 'right' });
+    
+    yPos = 50;
+    
+    // Summary Cards
+    const cardWidth = (pageWidth - 28 - 15) / 4;
+    const cardHeight = 25;
+    const cardGap = 5;
+    
+    this.kpiCards.forEach((kpi, index) => {
+      const x = 14 + (cardWidth + cardGap) * index;
+      const color = kpi.color === 'success' ? profitGreen : kpi.color === 'warn' ? lossRed : primaryBlue;
+      this.drawSummaryCard(doc, x, yPos, cardWidth, cardHeight, kpi.title, kpi.value, color);
+    });
+    
+    yPos += cardHeight + 15;
+    
+    // 1. Dispatcher Performance
+    if (this.dispatcherPerformanceData && this.dispatcherPerformanceData.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Dispatcher Performance', 14, yPos);
+      yPos += 5;
+      
+      const dispatcherData = this.dispatcherPerformanceData.map(d => [
+        d.dispatcherName,
+        d.totalTrips.toString(),
+        d.completedTrips.toString(),
+        this.formatCurrency(d.totalRevenue),
+        this.formatCurrency(d.totalProfit),
+        `${d.completionRate.toFixed(0)}%`
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Dispatcher', 'Trips', 'Completed', 'Revenue', 'Profit', 'Rate']],
+        body: dispatcherData,
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'center' }
+        },
+        didParseCell: (data) => {
+          if (data.column.index === 4 && data.section === 'body') {
+            const value = this.dispatcherPerformanceData[data.row.index].totalProfit;
+            data.cell.styles.textColor = value >= 0 ? profitGreen : lossRed;
+          }
+        }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // 2. Driver Performance
+    if (this.driverPerformanceData && this.driverPerformanceData.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Driver Performance', 14, yPos);
+      yPos += 5;
+      
+      const driverData = this.driverPerformanceData.map(d => [
+        d.driverName,
+        d.totalTrips.toString(),
+        d.completedTrips.toString(),
+        `${d.totalDistance.toFixed(0)} mi`,
+        this.formatCurrency(d.totalRevenue),
+        `${d.onTimeDeliveryRate.toFixed(0)}%`
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Driver', 'Trips', 'Completed', 'Distance', 'Earnings', 'Rate']],
+        body: driverData,
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          4: { halign: 'right' },
+          5: { halign: 'center' }
+        }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // 3. Broker Performance
+    if (this.brokerAnalyticsData && this.brokerAnalyticsData.brokers && this.brokerAnalyticsData.brokers.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Broker Performance', 14, yPos);
+      yPos += 5;
+      
+      const brokerData = this.brokerAnalyticsData.brokers.map((b: any) => [
+        b.brokerName || 'Unknown',
+        (b.tripCount || 0).toString(),
+        (b.completedTrips || 0).toString(),
+        this.formatCurrency(b.totalRevenue || 0),
+        this.formatCurrency(b.averageRevenue || 0)
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Broker', 'Trips', 'Completed', 'Revenue', 'Avg/Trip']],
+        body: brokerData,
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          3: { halign: 'right' },
+          4: { halign: 'right' }
+        }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // 4. Vehicle Performance
+    if (this.vehicleUtilizationData && this.vehicleUtilizationData.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Vehicle Performance', 14, yPos);
+      yPos += 5;
+      
+      const vehicleData = this.vehicleUtilizationData.map(v => [
+        v.vehicleName,
+        v.totalTrips.toString(),
+        `${v.totalDistance.toFixed(0)} mi`,
+        this.formatCurrency(v.totalRevenue),
+        `${v.utilizationRate.toFixed(1)}%`,
+        this.formatCurrency(v.averageRevenuePerTrip)
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Truck', 'Trips', 'Distance', 'Revenue', 'Utilization', 'Avg/Trip']],
+        body: vehicleData,
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          3: { halign: 'right' },
+          4: { halign: 'center' },
+          5: { halign: 'right' }
+        }
+      });
+    }
+    
+    // Save PDF
+    doc.save(`carrier-analytics-${new Date().toISOString().split('T')[0]}.pdf`);
+    
+    this.snackBar.open('Analytics exported to PDF successfully', 'Close', {
       duration: 3000
     });
+  }
+
+  private drawSummaryCard(doc: jsPDF, x: number, y: number, width: number, height: number, label: string, value: string, color: [number, number, number]): void {
+    // Card background
+    doc.setFillColor(250, 250, 250);
+    doc.roundedRect(x, y, width, height, 3, 3, 'F');
+    
+    // Colored top border
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.rect(x, y, width, 3, 'F');
+    
+    // Label
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(label, x + width / 2, y + 12, { align: 'center' });
+    
+    // Value
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(color[0], color[1], color[2]);
+    doc.text(value, x + width / 2, y + 20, { align: 'center' });
   }
 
   onTabChange(index: number): void {
