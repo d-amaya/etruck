@@ -6,7 +6,7 @@ export interface PaymentReportFilters {
   lorryId?: string; // Legacy - maps to truckId
   driverId?: string;
   dispatcherId?: string;
-  groupBy?: 'broker' | 'driver' | 'truck' | 'dispatcher';
+  groupBy?: 'broker' | 'driver' | 'truck' | 'truckOwner' | 'dispatcher';
 }
 
 export interface TripPaymentDetail {
@@ -17,6 +17,7 @@ export interface TripPaymentDetail {
   dropoffLocation: string;
   brokerId: string;
   truckId: string;
+  truckOwnerId: string;
   driverId: string;
   brokerPayment: number;
   truckOwnerPayment: number;
@@ -48,6 +49,10 @@ export interface DispatcherPaymentReport {
     tripCount: number;
   }>;
   groupedByTruck?: Record<string, {
+    totalPayment: number;
+    tripCount: number;
+  }>;
+  groupedByTruckOwner?: Record<string, {
     totalPayment: number;
     tripCount: number;
   }>;

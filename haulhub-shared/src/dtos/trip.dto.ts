@@ -31,9 +31,9 @@ export class CreateTripDto {
   @IsNotEmpty()
   trailerId!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  truckOwnerId!: string;
+  truckOwnerId?: string;
 
   @IsString()
   @IsNotEmpty()

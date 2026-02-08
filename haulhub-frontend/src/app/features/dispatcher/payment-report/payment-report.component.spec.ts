@@ -30,6 +30,7 @@ describe('PaymentReportComponent', () => {
         dropoffLocation: 'City B, State B',
         brokerId: 'broker1',
         truckId: 'ABC-123',
+        truckOwnerId: 'owner1',
         driverId: 'driver1',
         brokerPayment: 2000,
         truckOwnerPayment: 800,
@@ -55,6 +56,12 @@ describe('PaymentReportComponent', () => {
         totalPayment: 4000,
         tripCount: 5
       }
+    },
+    groupedByTruckOwner: {
+      'owner1': {
+        totalPayment: 4000,
+        tripCount: 5
+      }
     }
   };
 
@@ -63,7 +70,8 @@ describe('PaymentReportComponent', () => {
       'getPaymentReport', 
       'getBrokers',
       'getTrucksByCarrier',
-      'getDriversByCarrier'
+      'getDriversByCarrier',
+      'getTruckOwnersByCarrier'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -76,6 +84,9 @@ describe('PaymentReportComponent', () => {
     ]));
     tripServiceSpy.getDriversByCarrier.and.returnValue(of([
       { userId: 'driver1', name: 'John Doe', email: 'john@example.com' }
+    ]));
+    tripServiceSpy.getTruckOwnersByCarrier.and.returnValue(of([
+      { userId: 'owner1', name: 'Owner One', email: 'owner1@example.com' }
     ]));
 
     await TestBed.configureTestingModule({
@@ -166,10 +177,10 @@ describe('PaymentReportComponent', () => {
     component.ngOnInit();
     fixture.detectChanges();
     
-    const truckData = component.getTruckGroupedData();
+    const truckData = component.getTruckOwnerGroupedData();
     
     expect(truckData.length).toBe(1);
-    expect(truckData[0].truckName).toContain('ABC-123');
+    expect(truckData[0].ownerName).toBeDefined();
     expect(truckData[0].totalPayment).toBe(4000);
   });
 
@@ -207,7 +218,7 @@ describe('PaymentReportComponent', () => {
     
     expect(component.getBrokerGroupedData()).toEqual([]);
     expect(component.getDriverGroupedData()).toEqual([]);
-    expect(component.getTruckGroupedData()).toEqual([]);
+    expect(component.getTruckOwnerGroupedData()).toEqual([]);
   });
 
   it('should initialize activeTabIndex to 0', () => {

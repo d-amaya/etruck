@@ -135,10 +135,10 @@
           <mat-tab label="By Truck Owner">
             <div class="tab-content">
               <div class="data-table">
-                <table mat-table [dataSource]="getTruckGroupedData()" class="analytics-table">
-                <ng-container matColumnDef="truckName">
-                  <th mat-header-cell *matHeaderCellDef>Truck</th>
-                  <td mat-cell *matCellDef="let element">{{ element.truckName }}</td>
+                <table mat-table [dataSource]="getTruckOwnerGroupedData()" class="analytics-table">
+                <ng-container matColumnDef="ownerName">
+                  <th mat-header-cell *matHeaderCellDef>Truck Owner</th>
+                  <td mat-cell *matCellDef="let element">{{ element.ownerName }}</td>
                 </ng-container>
 
                 <ng-container matColumnDef="totalPayment">
@@ -151,13 +151,13 @@
                   <td mat-cell *matCellDef="let element">{{ element.tripCount }}</td>
                 </ng-container>
 
-                <tr mat-header-row *matHeaderRowDef="truckColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: truckColumns;"></tr>
+                <tr mat-header-row *matHeaderRowDef="truckOwnerColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: truckOwnerColumns;"></tr>
               </table>
               </div>
 
-              <div *ngIf="getTruckGroupedData().length === 0" class="no-data">
-                No truck data available for the selected period
+              <div *ngIf="getTruckOwnerGroupedData().length === 0" class="no-data">
+                No truck owner data available for the selected period
               </div>
             </div>
           </mat-tab>

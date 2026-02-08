@@ -54,16 +54,17 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   // Table columns
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
-  truckColumns: string[] = ['truckName', 'totalPayment', 'tripCount'];
+  truckOwnerColumns: string[] = ['ownerName', 'totalPayment', 'tripCount'];
   
   // Enriched data for display
   enrichedDriverData: any[] = [];
-  enrichedTruckData: any[] = [];
+  enrichedTruckOwnerData: any[] = [];
   
   // Asset maps
   private truckMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
   private brokerMap = new Map<string, any>();
+  private truckOwnerMap = new Map<string, any>();
 
   constructor(
     private fb: FormBuilder,
@@ -122,6 +123,13 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       },
       error: (error) => console.error('Error loading brokers:', error)
     });
+    
+    this.tripService.getTruckOwnersByCarrier().subscribe({
+      next: (owners) => {
+        owners.forEach(owner => this.truckOwnerMap.set(owner.userId, owner));
+      },
+      error: (error) => console.error('Error loading truck owners:', error)
+    });
   }
 
   ngOnDestroy(): void {
@@ -147,13 +155,12 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       });
     }
     
-    // Enrich truck data
-    if (this.report.groupedByTruck) {
-      this.enrichedTruckData = Object.entries(this.report.groupedByTruck).map(([truckId, data]) => {
-        const truck = this.truckMap.get(truckId);
-        const truckName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : truckId.substring(0, 8);
+    // Enrich truck owner data
+    if (this.report.groupedByTruckOwner) {
+      this.enrichedTruckOwnerData = Object.entries(this.report.groupedByTruckOwner).map(([ownerId, data]) => {
+        const owner = this.truckOwnerMap.get(ownerId);
         return {
-          truckName,
+          ownerName: owner?.name || ownerId.substring(0, 8),
           totalPayment: data.totalPayment,
           tripCount: data.tripCount
         };
@@ -237,8 +244,8 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     return this.enrichedDriverData;
   }
 
-  getTruckGroupedData(): any[] {
-    return this.enrichedTruckData;
+  getTruckOwnerGroupedData(): any[] {
+    return this.enrichedTruckOwnerData;
   }
 
   formatCurrency(amount: number): string {

@@ -211,7 +211,7 @@ export class TripsService {
       driverId: dto.driverId,
       truckId: dto.truckId,
       trailerId: dto.trailerId,
-      truckOwnerId: dto.truckOwnerId,
+      truckOwnerId: dto.truckOwnerId || '',
       brokerId: dto.brokerId,
       
       // Order information
@@ -2654,6 +2654,7 @@ export class TripsService {
       brokerId: trip.brokerId,
       brokerName: '', // Will be fetched separately if needed
       truckId: trip.truckId,
+      truckOwnerId: trip.truckOwnerId,
       driverId: trip.driverId,
       driverName: '', // Will be fetched separately if needed
       brokerPayment: trip.brokerPayment,
@@ -2713,6 +2714,7 @@ export class TripsService {
       groupedByBroker: this.groupByBroker(trips),
       groupedByDriver: this.groupByDriver(trips),
       groupedByTruck: this.groupByTruck(trips),
+      groupedByTruckOwner: this.groupByTruckOwner(trips),
     };
 
     return report;
@@ -2849,6 +2851,30 @@ export class TripsService {
       }
       grouped[trip.truckId].totalPayment += trip.truckOwnerPayment;
       grouped[trip.truckId].tripCount += 1;
+    }
+
+    return grouped;
+  }
+
+  private groupByTruckOwner(trips: TripPaymentDetail[]): Record<string, {
+    totalPayment: number;
+    tripCount: number;
+  }> {
+    const grouped: Record<string, {
+      totalPayment: number;
+      tripCount: number;
+    }> = {};
+
+    for (const trip of trips) {
+      const ownerId = trip.truckOwnerId;
+      if (!grouped[ownerId]) {
+        grouped[ownerId] = {
+          totalPayment: 0,
+          tripCount: 0,
+        };
+      }
+      grouped[ownerId].totalPayment += trip.truckOwnerPayment;
+      grouped[ownerId].tripCount += 1;
     }
 
     return grouped;

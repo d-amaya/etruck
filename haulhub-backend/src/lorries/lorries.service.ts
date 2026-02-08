@@ -678,6 +678,40 @@ export class LorriesService {
   }
 
   /**
+   * Get all truck owners for a carrier
+   * Query eTrucky-Users table by carrierId and role=TRUCK_OWNER
+   */
+  async getTruckOwnersByCarrier(carrierId: string): Promise<any[]> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const usersTableName = this.configService.usersTableName;
+
+    const queryCommand = new QueryCommand({
+      TableName: usersTableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :pk AND begins_with(GSI1SK, :role)',
+      ExpressionAttributeValues: {
+        ':pk': `CARRIER#${carrierId}`,
+        ':role': 'ROLE#TRUCK_OWNER#',
+      },
+    });
+
+    const result = await dynamodbClient.send(queryCommand);
+
+    if (!result.Items || result.Items.length === 0) {
+      return [];
+    }
+
+    return result.Items.map((item) => ({
+      userId: item.userId,
+      name: item.name,
+      email: item.email,
+      phone: item.phone,
+      corpName: item.corpName,
+      isActive: item.isActive,
+    }));
+  }
+
+  /**
    * Task 3.2.2: Get trailer by ID
    */
   async getTrailerById(trailerId: string): Promise<any> {

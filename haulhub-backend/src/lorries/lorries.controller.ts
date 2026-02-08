@@ -94,6 +94,18 @@ export class LorriesController {
   }
 
   /**
+   * GET /lorries/truck-owners
+   * Get all truck owners for the current carrier
+   * 
+   * - Dispatchers see all truck owners in their carrier (filtered by carrierId)
+   */
+  @Get('truck-owners')
+  @Roles(UserRole.Dispatcher, UserRole.Carrier)
+  async getTruckOwners(@CurrentUser() user: CurrentUserData): Promise<any[]> {
+    return this.lorriesService.getTruckOwnersByCarrier(user.carrierId);
+  }
+
+  /**
    * GET /lorries/:id
    * Get a specific lorry with authorization check
    * Requirements: 6.4, 19.2
