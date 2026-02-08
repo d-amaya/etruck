@@ -1,0 +1,76 @@
+.trip-info {
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+
+  h3 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .label {
+    font-weight: 500;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .value {
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+
+  button {
+    min-width: 100px;
+  }
+}
+
+::ng-deep .mat-mdc-dialog-container {
+  overflow: visible !important;
+
+  .mat-mdc-dialog-title {
+    color: #1976d2 !important;
+    font-weight: 600 !important;
+    font-size: 20px !important;
+  }
+}
+
+::ng-deep .mat-mdc-dialog-surface {
+  overflow: visible !important;
+  border-radius: 12px !important;
+}

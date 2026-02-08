@@ -83,6 +83,7 @@ export class TripsController {
       user.userId,
       user.role as UserRole,
       dto.orderStatus,
+      dto.notes,
     );
   }
 
@@ -203,10 +204,10 @@ export class TripsController {
    * GET /trips/dashboard/export
    * Get all data needed for PDF export in a single call
    * 
-   * Dispatcher only - returns trips, summaries, and asset lookups
+   * Dispatcher and Driver - returns trips, summaries, and asset lookups
    */
   @Get('dashboard/export')
-  @Roles(UserRole.Dispatcher)
+  @Roles(UserRole.Dispatcher, UserRole.Driver)
   async getDashboardExport(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: TripFilters,
@@ -226,7 +227,7 @@ export class TripsController {
       trailers: Array<{ trailerId: string; plate: string }>;
     };
   }> {
-    return this.tripsService.getDashboardExport(user.userId, filters);
+    return this.tripsService.getDashboardExport(user.userId, user.role as UserRole, filters);
   }
 
   /**
@@ -274,11 +275,13 @@ export class TripsController {
    * GET /trips/dashboard
    * Get unified dashboard data (aggregates + paginated trips)
    * 
-   * Dispatcher only - returns chart aggregates from ALL trips + first page of trips
+   * Dispatcher: Returns chart aggregates from ALL carrier trips + first page of trips
+   * Driver: Returns chart aggregates from driver's trips + first page of trips (sensitive data filtered)
+   * 
    * This consolidates multiple endpoints into one for better performance
    */
   @Get('dashboard')
-  @Roles(UserRole.Dispatcher)
+  @Roles(UserRole.Dispatcher, UserRole.Driver)
   async getDashboard(
     @CurrentUser() user: CurrentUserData,
     @Query() filters: TripFilters,
@@ -287,18 +290,19 @@ export class TripsController {
     chartAggregates: {
       statusSummary: Record<TripStatus, number>;
       paymentSummary: {
-        totalBrokerPayments: number;
+        totalBrokerPayments?: number;
         totalDriverPayments: number;
-        totalTruckOwnerPayments: number;
-        totalLumperValue: number;
-        totalDetentionValue: number;
-        totalAdditionalFees: number;
-        totalProfit: number;
+        totalTruckOwnerPayments?: number;
+        totalLumperValue?: number;
+        totalDetentionValue?: number;
+        totalAdditionalFees?: number;
+        totalProfit?: number;
       };
       topPerformers: {
-        topBrokers: Array<{ name: string; revenue: number; count: number }>;
-        topDrivers: Array<{ name: string; trips: number }>;
-        topTrucks: Array<{ name: string; trips: number }>;
+        topBrokers?: Array<{ name: string; revenue: number; count: number }>;
+        topDrivers?: Array<{ name: string; trips: number }>;
+        topTrucks?: Array<{ name: string; trips: number }>;
+        topDispatchers?: Array<{ dispatcherId: string; dispatcherName: string; payment: number }>;
       };
     };
     trips: any[];
@@ -310,7 +314,7 @@ export class TripsController {
       lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey
     };
     
-    return this.tripsService.getDashboard(user.userId, filtersWithToken);
+    return this.tripsService.getDashboard(user.userId, user.role as UserRole, filtersWithToken);
   }
 
   /**

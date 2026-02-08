@@ -142,6 +142,11 @@ export class TripService {
     return this.apiService.get<Driver[]>(`/lorries/drivers`);
   }
 
+  getDispatchersByCarrier(carrierId?: string): Observable<any[]> {
+    // Backend uses carrierId from JWT token
+    return this.apiService.get<any[]>(`/lorries/dispatchers`);
+  }
+
   getTruckOwnersByCarrier(carrierId?: string): Observable<any[]> {
     // Backend uses carrierId from JWT token
     return this.apiService.get<any[]>(`/lorries/truck-owners`);

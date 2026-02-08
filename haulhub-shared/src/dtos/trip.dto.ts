@@ -433,6 +433,10 @@ export class UpdateTripStatusDto {
   @IsEnum(TripStatus)
   @IsNotEmpty()
   orderStatus!: TripStatus;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class TripFilters {

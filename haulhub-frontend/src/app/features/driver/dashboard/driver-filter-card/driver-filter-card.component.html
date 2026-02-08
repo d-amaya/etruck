@@ -1,0 +1,58 @@
+<mat-card class="unified-filter-card">
+  <mat-card-content>
+    <div class="card-header">
+      <div class="title-row">
+        <h1 class="page-title">
+          <mat-icon>dashboard</mat-icon>
+          Driver Dashboard
+        </h1>
+      </div>
+      <h2 class="filter-title">
+        <mat-icon>date_range</mat-icon>
+        Date Range
+      </h2>
+    </div>
+
+    <form [formGroup]="filterForm" class="filter-form">
+      <div class="filter-section date-section">
+        <div class="date-row">
+          <div class="date-inputs">
+            <mat-form-field appearance="outline" class="date-field">
+              <mat-label>From</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+              <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="date-field">
+              <mat-label>To</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+              <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+            </mat-form-field>
+
+            <div class="date-presets">
+              <button mat-button type="button" (click)="applyPreset('lastMonth')"
+                      [class.active]="activePreset === 'lastMonth'">
+                Last Month
+              </button>
+              <button mat-button type="button" (click)="applyPreset('last3Months')"
+                      [class.active]="activePreset === 'last3Months'">
+                Last 3 Months
+              </button>
+              <button mat-button type="button" (click)="applyPreset('lastYear')"
+                      [class.active]="activePreset === 'lastYear'">
+                Last Year
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="dateRangeError" class="date-range-error">
+          <mat-icon>error</mat-icon>
+          <span>{{ dateRangeError }}</span>
+        </div>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

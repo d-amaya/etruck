@@ -53,15 +53,15 @@ export class LorriesController {
    * - Carriers see all trucks in their organization (filtered by carrierId)
    */
   @Get()
-  @Roles(UserRole.TruckOwner, UserRole.LorryOwner, UserRole.Dispatcher, UserRole.Carrier)
+  @Roles(UserRole.TruckOwner, UserRole.LorryOwner, UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver)
   async getLorries(@CurrentUser() user: CurrentUserData): Promise<Lorry[]> {
     // Truck owners query by their userId
     if (user.role === UserRole.TruckOwner || user.role === UserRole.LorryOwner) {
       return this.lorriesService.getLorriesByOwner(user.userId);
     }
     
-    // Dispatchers and Carriers query by their carrierId
-    if (user.role === UserRole.Dispatcher || user.role === UserRole.Carrier) {
+    // Dispatchers, Carriers, and Drivers query by their carrierId
+    if (user.role === UserRole.Dispatcher || user.role === UserRole.Carrier || user.role === UserRole.Driver) {
       return this.lorriesService.getTrucksByCarrier(user.carrierId);
     }
     
@@ -74,9 +74,10 @@ export class LorriesController {
    * Requirements: 3.2.1
    * 
    * - Dispatchers see all trailers in their carrier (filtered by carrierId)
+   * - Drivers see all trailers in their carrier (filtered by carrierId)
    */
   @Get('trailers')
-  @Roles(UserRole.Dispatcher, UserRole.Carrier)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver)
   async getTrailers(@CurrentUser() user: CurrentUserData): Promise<any[]> {
     return this.lorriesService.getTrailersByCarrier(user.carrierId);
   }
@@ -88,9 +89,21 @@ export class LorriesController {
    * - Dispatchers see all drivers in their carrier (filtered by carrierId)
    */
   @Get('drivers')
-  @Roles(UserRole.Dispatcher, UserRole.Carrier)
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver)
   async getDrivers(@CurrentUser() user: CurrentUserData): Promise<any[]> {
     return this.lorriesService.getDriversByCarrier(user.carrierId);
+  }
+
+  /**
+   * GET /lorries/dispatchers
+   * Get all dispatchers for the current carrier
+   * 
+   * - Drivers see all dispatchers in their carrier (filtered by carrierId)
+   */
+  @Get('dispatchers')
+  @Roles(UserRole.Driver, UserRole.Carrier)
+  async getDispatchers(@CurrentUser() user: CurrentUserData): Promise<any[]> {
+    return this.lorriesService.getDispatchersByCarrier(user.carrierId);
   }
 
   /**

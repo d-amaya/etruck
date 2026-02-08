@@ -751,7 +751,7 @@ describe('TripsService', () => {
         ).rejects.toThrow('Drivers cannot update trip status to Paid');
       });
 
-      it('should prevent driver from updating to Scheduled status', async () => {
+      it('should allow driver to update from Picked Up to Scheduled (correction)', async () => {
         const userId = 'user-driver-123';
 
         // Mock GSI3 query
@@ -759,9 +759,13 @@ describe('TripsService', () => {
           Items: [{ ...existingTrip, tripId: 'trip-123', orderStatus: TripStatus.PickedUp, driverId: userId }],
         });
 
-        await expect(
-          service.updateTripStatus('trip-123', userId, UserRole.Driver, TripStatus.Scheduled),
-        ).rejects.toThrow('Drivers cannot update trip status to Scheduled');
+        // Mock update command
+        mockDynamoDBClient.send.mockResolvedValueOnce({
+          Attributes: { ...existingTrip, orderStatus: TripStatus.Scheduled },
+        });
+
+        const result = await service.updateTripStatus('trip-123', userId, UserRole.Driver, TripStatus.Scheduled);
+        expect(result.orderStatus).toBe(TripStatus.Scheduled);
       });
 
       it('should prevent driver from invalid status transitions', async () => {

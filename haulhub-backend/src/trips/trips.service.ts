@@ -790,6 +790,7 @@ export class TripsService {
     userId: string,
     userRole: UserRole,
     newStatus: TripStatus,
+    notes?: string,
   ): Promise<Trip> {
     // First, get the existing trip
     let existingTrip: Trip;
@@ -811,9 +812,16 @@ export class TripsService {
     const expressionAttributeNames: Record<string, string> = {};
     const expressionAttributeValues: Record<string, any> = {};
 
-    updateExpressions.push('#status = :status');
-    expressionAttributeNames['#status'] = 'status';
-    expressionAttributeValues[':status'] = newStatus;
+    updateExpressions.push('#orderStatus = :orderStatus');
+    expressionAttributeNames['#orderStatus'] = 'orderStatus';
+    expressionAttributeValues[':orderStatus'] = newStatus;
+
+    // Update notes if provided
+    if (notes !== undefined) {
+      updateExpressions.push('#notes = :notes');
+      expressionAttributeNames['#notes'] = 'notes';
+      expressionAttributeValues[':notes'] = notes;
+    }
 
     // Record deliveryTimestamp when status changes to Delivered
     if (newStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp) {
@@ -926,14 +934,14 @@ export class TripsService {
     newStatus: TripStatus,
     userRole: UserRole,
   ): void {
+    // Allow same status (no-op update)
+    if (currentStatus === newStatus) {
+      return;
+    }
+
     // Drivers cannot update to Paid status
     if (userRole === UserRole.Driver && newStatus === TripStatus.Paid) {
       throw new ForbiddenException('Drivers cannot update trip status to Paid');
-    }
-
-    // Drivers cannot update to Scheduled status
-    if (userRole === UserRole.Driver && newStatus === TripStatus.Scheduled) {
-      throw new ForbiddenException('Drivers cannot update trip status to Scheduled');
     }
 
     // Dispatchers can update to any status (skip validation for dispatchers)
@@ -941,14 +949,14 @@ export class TripsService {
       return;
     }
 
-    // For drivers, enforce sequential transitions only
+    // For drivers, allow forward and backward transitions (for corrections)
     const validDriverTransitions: Record<TripStatus, TripStatus[]> = {
       [TripStatus.Scheduled]: [TripStatus.PickedUp],
-      [TripStatus.PickedUp]: [TripStatus.InTransit],
-      [TripStatus.InTransit]: [TripStatus.Delivered],
-      [TripStatus.Delivered]: [], // Drivers cannot update from Delivered
-      [TripStatus.Paid]: [], // No transitions from Paid
-      [TripStatus.Canceled]: [], // No transitions from Canceled
+      [TripStatus.PickedUp]: [TripStatus.Scheduled, TripStatus.InTransit],
+      [TripStatus.InTransit]: [TripStatus.PickedUp, TripStatus.Delivered],
+      [TripStatus.Delivered]: [TripStatus.InTransit],
+      [TripStatus.Paid]: [],
+      [TripStatus.Canceled]: [],
     };
 
     const allowedStatuses = validDriverTransitions[currentStatus];
@@ -3068,7 +3076,8 @@ export class TripsService {
    * Get all data needed for PDF export in a single call
    */
   async getDashboardExport(
-    dispatcherId: string,
+    userId: string,
+    role: UserRole,
     filters: TripFilters,
   ): Promise<{
     trips: Trip[];
@@ -3089,20 +3098,20 @@ export class TripsService {
     };
   }> {
     // Get all trips
-    const trips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+    const trips = await this.getAllTripsForAggregation(userId, role, filters);
     
     // Get summary by status
-    const summaryByStatus = await this.getTripSummaryByStatus(dispatcherId, filters);
+    const summaryByStatus = await this.getTripSummaryByStatus(userId, filters);
     
     // Get payment summary
-    const fullPaymentSummary = await this.getPaymentSummary(dispatcherId, filters);
+    const fullPaymentSummary = await this.getPaymentSummary(userId, filters);
     
     // Get carrier ID from first trip or query user
-    const carrierId = trips.length > 0 ? trips[0].carrierId : dispatcherId;
+    const carrierId = trips.length > 0 ? trips[0].carrierId : userId;
     
-    // Get assets in parallel
+    // Get assets in parallel (brokers only for non-drivers)
     const [brokers, trucks, users, trailers] = await Promise.all([
-      this.brokersService.getAllBrokers(true),
+      role === UserRole.Driver ? Promise.resolve([]) : this.brokersService.getAllBrokers(true),
       this.lorriesService.getTrucksByCarrier(carrierId),
       this.usersService.getUsersByCarrier(carrierId),
       this.lorriesService.getTrailersByCarrier(carrierId),
@@ -3317,7 +3326,8 @@ export class TripsService {
    * Consolidates multiple queries into one for better performance
    */
   async getDashboard(
-    dispatcherId: string,
+    userId: string,
+    role: UserRole,
     filters: TripFilters,
   ): Promise<{
     chartAggregates: {
@@ -3329,15 +3339,15 @@ export class TripsService {
     lastEvaluatedKey?: string;
   }> {
     // Get ALL trips for aggregation (no pagination)
-    const allTrips = await this.getAllTripsForAggregation(dispatcherId, UserRole.Dispatcher, filters);
+    const allTrips = await this.getAllTripsForAggregation(userId, role, filters);
 
     // Calculate all aggregates from the same dataset
     const statusSummary = await this.calculateStatusSummary(allTrips);
-    const paymentSummary = await this.calculatePaymentSummary(allTrips);
-    const topPerformers = await this.calculateTopPerformers(allTrips);
+    const paymentSummary = await this.calculatePaymentSummary(allTrips, role);
+    const topPerformers = await this.calculateTopPerformers(allTrips, role);
 
     // Get paginated trips for the table
-    const paginatedResult = await this.getTrips(dispatcherId, UserRole.Dispatcher, filters);
+    const paginatedResult = await this.getTrips(userId, role, filters);
 
     return {
       chartAggregates: {
@@ -3362,7 +3372,34 @@ export class TripsService {
     return summary as Record<TripStatus, number>;
   }
 
-  private async calculatePaymentSummary(trips: any[]): Promise<any> {
+  private async calculatePaymentSummary(trips: any[], role: UserRole): Promise<any> {
+    if (role === UserRole.Driver) {
+      // Driver-specific payment summary (only driver payment)
+      const totalDriverPayments = trips.reduce((sum, trip) => sum + (trip.driverPayment || 0), 0);
+      
+      // Calculate payment per status
+      const paymentByStatus: Record<string, number> = {};
+      trips.forEach(trip => {
+        const status = trip.orderStatus || 'Scheduled';
+        paymentByStatus[status] = (paymentByStatus[status] || 0) + (trip.driverPayment || 0);
+      });
+      
+      // Calculate payment by month
+      const paymentByMonth: Record<string, number> = {};
+      trips.forEach(trip => {
+        const date = new Date(trip.scheduledTimestamp);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        paymentByMonth[monthKey] = (paymentByMonth[monthKey] || 0) + (trip.driverPayment || 0);
+      });
+      
+      return {
+        totalDriverPayments,
+        paymentByStatus,
+        paymentByMonth,
+      };
+    }
+    
+    // Dispatcher/Carrier payment summary (full financial data)
     let totalBrokerPayments = 0;
     let totalDriverPayments = 0;
     let totalTruckOwnerPayments = 0;
@@ -3398,7 +3435,36 @@ export class TripsService {
     };
   }
 
-  private async calculateTopPerformers(trips: any[]): Promise<any> {
+  private async calculateTopPerformers(trips: any[], role: UserRole): Promise<any> {
+    if (role === UserRole.Driver) {
+      // Driver-specific top performers (top dispatchers by payment)
+      const dispatcherPerformance = new Map<string, { payment: number; id: string }>();
+      
+      trips.forEach(trip => {
+        if (trip.dispatcherId) {
+          const existing = dispatcherPerformance.get(trip.dispatcherId);
+          if (existing) {
+            existing.payment += trip.driverPayment || 0;
+          } else {
+            dispatcherPerformance.set(trip.dispatcherId, {
+              payment: trip.driverPayment || 0,
+              id: trip.dispatcherId
+            });
+          }
+        }
+      });
+      
+      const topDispatchers = Array.from(dispatcherPerformance.values())
+        .sort((a, b) => b.payment - a.payment)
+        .slice(0, 5)
+        .map(d => ({ dispatcherId: d.id, dispatcherName: d.id, payment: d.payment }));
+      
+      return {
+        topDispatchers,
+      };
+    }
+    
+    // Dispatcher/Carrier top performers (brokers, drivers, trucks)
     const brokerPerformance = new Map<string, { revenue: number; count: number; id: string }>();
     const driverPerformance = new Map<string, { trips: number; id: string }>();
     const truckPerformance = new Map<string, { trips: number; id: string }>();
@@ -3838,6 +3904,9 @@ export class TripsService {
       driverRate: trip.driverRate,
       driverAdvance: trip.driverAdvance,
       driverId: trip.driverId,
+      
+      // Dispatcher info (for display and filtering)
+      dispatcherId: trip.dispatcherId,
       
       // Vehicle info
       truckId: trip.truckId,

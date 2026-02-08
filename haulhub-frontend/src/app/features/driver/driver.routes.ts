@@ -3,7 +3,7 @@ import { Routes } from '@angular/router';
 export const DRIVER_ROUTES: Routes = [
   {
     path: 'dashboard',
-    loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
+    loadChildren: () => import('./dashboard/driver-dashboard.module').then(m => m.DriverDashboardModule)
   },
   {
     path: 'trips',

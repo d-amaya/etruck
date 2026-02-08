@@ -672,7 +672,36 @@ export class LorriesService {
       corpName: item.corpName,
       cdlClass: item.cdlClass,
       cdlState: item.cdlState,
-      nationalId: item.ss, // Driver license number
+      nationalId: item.ss,
+      isActive: item.isActive,
+    }));
+  }
+
+  async getDispatchersByCarrier(carrierId: string): Promise<any[]> {
+    const dynamodbClient = this.awsService.getDynamoDBClient();
+    const usersTableName = this.configService.usersTableName;
+
+    const queryCommand = new QueryCommand({
+      TableName: usersTableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :pk AND begins_with(GSI1SK, :role)',
+      ExpressionAttributeValues: {
+        ':pk': `CARRIER#${carrierId}`,
+        ':role': 'ROLE#DISPATCHER#',
+      },
+    });
+
+    const result = await dynamodbClient.send(queryCommand);
+
+    if (!result.Items || result.Items.length === 0) {
+      return [];
+    }
+
+    return result.Items.map((item) => ({
+      userId: item.userId,
+      name: item.name,
+      email: item.email,
+      phone: item.phone,
       isActive: item.isActive,
     }));
   }

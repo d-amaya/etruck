@@ -1,0 +1,141 @@
+<div class="driver-trip-table">
+  <!-- Dashboard Charts Widget -->
+  <app-driver-charts-widget></app-driver-charts-widget>
+
+  <!-- Trip Table Container -->
+  <div class="trip-table-container">
+    <!-- Table Filters -->
+    <div class="table-filters">
+      <form [formGroup]="filterForm" class="filter-row">
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          <mat-option [value]="null">All Statuses</mat-option>
+          <mat-option *ngFor="let status of statusOptions" [value]="status">
+            {{ getStatusLabel(status) }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Truck</mat-label>
+        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="getTruckDisplay">
+          <mat-option [value]="null">All Trucks</mat-option>
+          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
+            {{ truck.plate }}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Dispatcher</mat-label>
+        <input type="text" matInput formControlName="dispatcherId" [matAutocomplete]="dispatcherAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('dispatcherId')?.value" matSuffix mat-icon-button (click)="clearDispatcherFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #dispatcherAuto="matAutocomplete" [displayWith]="getDispatcherDisplay">
+          <mat-option [value]="null">All Dispatchers</mat-option>
+          <mat-option *ngFor="let dispatcher of filteredDispatchers | async" [value]="dispatcher.userId">
+            {{ dispatcher.name }}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <div class="spacer"></div>
+
+      <div class="action-buttons-group">
+        <button mat-icon-button (click)="clearAllFilters()" type="button"
+                matTooltip="Clear all filters"
+                class="action-btn clear-btn">
+          <mat-icon>filter_alt_off</mat-icon>
+        </button>
+
+        <button mat-icon-button (click)="exportPDF()" type="button"
+                matTooltip="Export to PDF"
+                class="action-btn export-btn">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="table-wrapper">
+    <table mat-table [dataSource]="trips" class="trips-table">
+      <ng-container matColumnDef="pickupLocation">
+        <th mat-header-cell *matHeaderCellDef>Pickup</th>
+        <td mat-cell *matCellDef="let trip">{{ trip.pickupCity }}, {{ trip.pickupState }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="deliveryLocation">
+        <th mat-header-cell *matHeaderCellDef>Delivery</th>
+        <td mat-cell *matCellDef="let trip">{{ trip.deliveryCity }}, {{ trip.deliveryState }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef>Date</th>
+        <td mat-cell *matCellDef="let trip">{{ trip.scheduledTimestamp | date:'MM/dd/yyyy' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="dispatcher">
+        <th mat-header-cell *matHeaderCellDef>Dispatcher</th>
+        <td mat-cell *matCellDef="let trip">{{ getDispatcherDisplay(trip.dispatcherId) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="truck">
+        <th mat-header-cell *matHeaderCellDef>Truck</th>
+        <td mat-cell *matCellDef="let trip">{{ getTruckDisplay(trip.truckId) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="trailer">
+        <th mat-header-cell *matHeaderCellDef>Trailer</th>
+        <td mat-cell *matCellDef="let trip">{{ getTrailerDisplay(trip.trailerId) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let trip">
+          <mat-chip [class]="getStatusClass(trip.orderStatus || trip.status || 'Scheduled')">
+            {{ getStatusLabel(trip.orderStatus || trip.status || 'Scheduled') }}
+          </mat-chip>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="driverPayment">
+        <th mat-header-cell *matHeaderCellDef>Payment</th>
+        <td mat-cell *matCellDef="let trip" class="payment-cell">{{ trip.driverPayment | currency }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let trip">
+          <button mat-icon-button (click)="openEditDialog(trip)" matTooltip="Update Status">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <div *ngIf="loading" class="loading-overlay">
+      <mat-spinner diameter="50"></mat-spinner>
+    </div>
+
+    <div *ngIf="!loading && trips.length === 0" class="no-data">
+      <p>No trips found for the selected filters.</p>
+    </div>
+  </div>
+
+  <mat-paginator 
+    [length]="totalTrips" 
+    [pageSize]="pageSize" 
+    [pageIndex]="pageIndex"
+    [pageSizeOptions]="[10, 25, 50]"
+    (page)="onPageChange($event)">
+  </mat-paginator>
+</div>

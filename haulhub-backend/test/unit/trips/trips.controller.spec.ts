@@ -233,6 +233,7 @@ describe('TripsController', () => {
         mockDispatcherUser.userId,
         UserRole.Dispatcher,
         TripStatus.PickedUp,
+        undefined,
       );
     });
 
@@ -255,6 +256,7 @@ describe('TripsController', () => {
         'DRV-001',
         UserRole.Driver,
         TripStatus.PickedUp,
+        undefined,
       );
     });
 
@@ -270,6 +272,7 @@ describe('TripsController', () => {
         'dispatcher-123',
         UserRole.Dispatcher,
         TripStatus.Delivered,
+        undefined,
       );
     });
 
@@ -290,6 +293,7 @@ describe('TripsController', () => {
         'dispatcher-123',
         UserRole.Dispatcher,
         TripStatus.Paid,
+        undefined,
       );
     });
   });
