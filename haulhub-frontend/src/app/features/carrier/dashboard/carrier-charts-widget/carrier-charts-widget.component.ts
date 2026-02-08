@@ -32,14 +32,6 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     
     const agg = data.chartAggregates;
     
-    console.log('Dashboard data received:', {
-      statusSummary: agg.statusSummary,
-      paymentSummary: agg.paymentSummary,
-      topPerformers: agg.topPerformers,
-      brokerMapSize: this.brokerMap.size,
-      driverMapSize: this.driverMap.size
-    });
-    
     // Handle unified endpoint structure
     this.statusData = agg.statusSummary || {};
     this.totalTripsInRange = Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
@@ -81,13 +73,6 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
         value: d.profit,
         count: d.count
       };
-    });
-    
-    console.log('Processed chart data:', {
-      revenueData: this.revenueData,
-      topBrokers: this.topBrokers,
-      topDrivers: this.topDrivers,
-      topDispatchers: this.topDispatchers
     });
     
     this.dataLoaded = true;
@@ -159,13 +144,6 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     if (this.totalTripsInRange === 0) {
       return;
     }
-
-    console.log('Rendering charts, refs:', {
-      revenue: !!this.revenueChartRef,
-      status: !!this.statusChartRef,
-      brokers: !!this.topBrokersChartRef,
-      dispatchers: !!this.topDispatchersChartRef
-    });
 
     this.renderRevenueChart();
     this.renderStatusChart();
@@ -316,8 +294,6 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
       console.log('No dispatcher chart context');
       return;
     }
-
-    console.log('Rendering dispatcher chart with data:', this.topDispatchers);
 
     const colors = this.topDispatchers.map((d, i) => {
       const baseColors = ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'];

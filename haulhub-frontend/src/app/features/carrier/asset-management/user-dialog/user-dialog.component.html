@@ -1,0 +1,140 @@
+<div mat-dialog-content>
+  <h2 mat-dialog-title>{{ title }}</h2>
+
+  <form [formGroup]="userForm">
+    <!-- Common Fields -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Full Name</mat-label>
+      <input matInput formControlName="name">
+      <mat-error>{{ getErrorMessage('name') }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Email</mat-label>
+      <input matInput type="email" formControlName="email">
+      <mat-error>{{ getErrorMessage('email') }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Phone</mat-label>
+      <input matInput type="tel" formControlName="phone" placeholder="+1 (234) 567-8901" maxlength="17">
+      <mat-hint>Format: +1 (XXX) XXX-XXXX</mat-hint>
+      <mat-error>{{ getErrorMessage('phone') }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Address</mat-label>
+      <input matInput formControlName="address">
+      <mat-error>{{ getErrorMessage('address') }}</mat-error>
+    </mat-form-field>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>City</mat-label>
+        <input matInput formControlName="city">
+        <mat-error>{{ getErrorMessage('city') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>State</mat-label>
+        <input matInput formControlName="state">
+        <mat-error>{{ getErrorMessage('state') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>ZIP</mat-label>
+        <input matInput formControlName="zip">
+        <mat-error>{{ getErrorMessage('zip') }}</mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>EIN</mat-label>
+        <input matInput formControlName="ein">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Social Security</mat-label>
+        <input matInput formControlName="ss">
+      </mat-form-field>
+    </div>
+
+    <!-- Dispatcher-specific Fields -->
+    <ng-container *ngIf="data.role === 'DISPATCHER'">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Rate ($/hour)</mat-label>
+        <input matInput type="number" formControlName="rate">
+      </mat-form-field>
+    </ng-container>
+
+    <!-- Driver-specific Fields -->
+    <ng-container *ngIf="data.role === 'DRIVER'">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Corporation Name</mat-label>
+        <input matInput formControlName="corpName">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Date of Birth</mat-label>
+        <input matInput type="date" formControlName="dob">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>CDL Class</mat-label>
+        <mat-select formControlName="cdlClass">
+          <mat-option value="A">Class A</mat-option>
+          <mat-option value="B">Class B</mat-option>
+          <mat-option value="C">Class C</mat-option>
+        </mat-select>
+        <mat-error>{{ getErrorMessage('cdlClass') }}</mat-error>
+      </mat-form-field>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>CDL State</mat-label>
+          <input matInput formControlName="cdlState" maxlength="2">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>CDL Issued</mat-label>
+          <input matInput type="date" formControlName="cdlIssued">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>CDL Expires</mat-label>
+          <input matInput type="date" formControlName="cdlExpires">
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Fax</mat-label>
+        <input matInput formControlName="fax">
+      </mat-form-field>
+    </ng-container>
+
+    <!-- Truck Owner-specific Fields -->
+    <ng-container *ngIf="data.role === 'TRUCK_OWNER'">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Company</mat-label>
+        <input matInput formControlName="company">
+        <mat-error>{{ getErrorMessage('company') }}</mat-error>
+      </mat-form-field>
+    </ng-container>
+  </form>
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">
+    {{ data.mode === 'view' ? 'Close' : 'Cancel' }}
+  </button>
+  <button 
+    *ngIf="data.mode !== 'view'"
+    mat-raised-button 
+    color="primary" 
+    (click)="onSave()"
+    [disabled]="saving">
+    <mat-spinner *ngIf="saving" diameter="20"></mat-spinner>
+    <span *ngIf="!saving">{{ data.mode === 'edit' ? 'Update' : 'Create' }}</span>
+  </button>
+</div>

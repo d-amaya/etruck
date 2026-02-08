@@ -38,12 +38,14 @@
                     </span>
                   </td>
                   <td class="actions-cell">
-                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                    <button mat-icon-button color="primary" (click)="editUser(user)" matTooltip="Edit">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                    <button mat-icon-button 
+                            color="primary"
+                            (click)="toggleUserStatus(user)" 
                             [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
-                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                      <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
                     </button>
                   </td>
                 </tr>
@@ -94,12 +96,14 @@
                     </span>
                   </td>
                   <td class="actions-cell">
-                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                    <button mat-icon-button color="primary" (click)="editUser(user)" matTooltip="Edit">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                    <button mat-icon-button 
+                            color="primary"
+                            (click)="toggleUserStatus(user)" 
                             [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
-                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                      <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
                     </button>
                   </td>
                 </tr>
@@ -148,12 +152,14 @@
                     </span>
                   </td>
                   <td class="actions-cell">
-                    <button mat-icon-button (click)="editUser(user)" matTooltip="Edit">
+                    <button mat-icon-button color="primary" (click)="editUser(user)" matTooltip="Edit">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button (click)="toggleUserStatus(user)" 
+                    <button mat-icon-button 
+                            color="primary"
+                            (click)="toggleUserStatus(user)" 
                             [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
-                      <mat-icon>{{ user.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                      <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
                     </button>
                   </td>
                 </tr>
@@ -243,17 +249,17 @@
                   <td class="actions-cell">
                     <button 
                       mat-icon-button 
-                      class="btn-icon" 
+                      color="primary"
                       (click)="editTruck(truck)"
                       matTooltip="Edit truck">
                       <mat-icon>edit</mat-icon>
                     </button>
                     <button 
                       mat-icon-button 
-                      class="btn-icon" 
+                      color="primary"
                       (click)="toggleTruckStatus(truck)"
                       [matTooltip]="truck.isActive ? 'Deactivate truck' : 'Reactivate truck'">
-                      <mat-icon>{{ truck.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                      <mat-icon>{{ truck.isActive ? 'block' : 'check_circle' }}</mat-icon>
                     </button>
                   </td>
                 </tr>
@@ -336,17 +342,17 @@
                   <td class="actions-cell">
                     <button 
                       mat-icon-button 
-                      class="btn-icon" 
+                      color="primary"
                       (click)="editTrailer(trailer)"
                       matTooltip="Edit trailer">
                       <mat-icon>edit</mat-icon>
                     </button>
                     <button 
                       mat-icon-button 
-                      class="btn-icon" 
+                      color="primary"
                       (click)="toggleTrailerStatus(trailer)"
                       [matTooltip]="trailer.isActive ? 'Deactivate trailer' : 'Reactivate trailer'">
-                      <mat-icon>{{ trailer.isActive ? 'pause_circle' : 'play_circle' }}</mat-icon>
+                      <mat-icon>{{ trailer.isActive ? 'block' : 'check_circle' }}</mat-icon>
                     </button>
                   </td>
                 </tr>

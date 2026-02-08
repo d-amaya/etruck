@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { CarrierController } from './carrier.controller';
+import { CarrierService } from './carrier.service';
 import { CurrentUserData } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@haulhub/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -41,6 +42,10 @@ describe('CarrierController', () => {
       getAllBrokers: jest.fn(),
     };
 
+    const mockCarrierService = {
+      getDashboard: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CarrierController],
       providers: [
@@ -48,6 +53,7 @@ describe('CarrierController', () => {
         { provide: TripsService, useValue: mockTripsService },
         { provide: LorriesService, useValue: mockLorriesService },
         { provide: BrokersService, useValue: mockBrokersService },
+        { provide: CarrierService, useValue: mockCarrierService },
       ],
     })
       .overrideGuard(JwtAuthGuard)

@@ -44,14 +44,6 @@ export class AuthService {
         const hasRefreshToken = !!localStorage.getItem(this.REFRESH_TOKEN_KEY);
         const hasValidRole = !!storedUser.role;
         
-        console.log('Auth state on init:', {
-          hasUser: true,
-          hasAccessToken,
-          hasRefreshToken,
-          hasValidRole,
-          role: storedUser.role
-        });
-        
         // If user data exists but tokens/role are missing, clear everything
         if (!hasAccessToken || !hasRefreshToken || !hasValidRole) {
           console.warn('User data is corrupted (missing tokens or role), clearing localStorage');

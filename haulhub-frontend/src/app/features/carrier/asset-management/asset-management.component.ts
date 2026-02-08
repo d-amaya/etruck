@@ -17,6 +17,7 @@ import { CarrierService } from '../../../core/services/carrier.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorStateComponent } from '../../../shared/components/error-state/error-state.component';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { UserDialogComponent, UserDialogData } from './user-dialog/user-dialog.component';
 
 interface Truck {
   truckId: string;
@@ -191,6 +192,11 @@ export class AssetManagementComponent implements OnInit {
     this.error = null;
 
     try {
+      // Ensure truck owners are loaded first
+      if (this.truckOwners.length === 0) {
+        await this.loadTruckOwners();
+      }
+
       const response = await firstValueFrom(
         this.carrierService.getTrucks(
           this.selectedOwnerId || undefined,
@@ -632,13 +638,51 @@ export class AssetManagementComponent implements OnInit {
   }
 
   openCreateUserDialog(role: string): void {
-    // TODO: Implement user creation dialog
-    this.snackBar.open(`Create ${role} - Coming soon`, 'Close', { duration: 3000 });
+    const dialogData: UserDialogData = {
+      role: role as 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER',
+      mode: 'create'
+    };
+
+    const dialogRef = this.dialog.open(UserDialogComponent, {
+      width: '600px', maxHeight: '90vh',
+      data: dialogData
+    });
+
+    dialogRef.afterClosed().subscribe(async result => {
+      if (result?.success) {
+        await this.loadUsers();
+      }
+    });
   }
 
   editUser(user: any): void {
-    // TODO: Implement user editing
-    this.snackBar.open('Edit user - Coming soon', 'Close', { duration: 3000 });
+    // Map role from user object to dialog role type
+    let role: 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER';
+    
+    if (user.role === 'Dispatcher' || user.role === 'DISPATCHER') {
+      role = 'DISPATCHER';
+    } else if (user.role === 'Driver' || user.role === 'DRIVER') {
+      role = 'DRIVER';
+    } else {
+      role = 'TRUCK_OWNER';
+    }
+    
+    const dialogData: UserDialogData = {
+      user,
+      role,
+      mode: 'edit'
+    };
+
+    const dialogRef = this.dialog.open(UserDialogComponent, {
+      width: '600px', maxHeight: '90vh',
+      data: dialogData
+    });
+
+    dialogRef.afterClosed().subscribe(async result => {
+      if (result?.success) {
+        await this.loadUsers();
+      }
+    });
   }
 
   async toggleUserStatus(user: any): Promise<void> {

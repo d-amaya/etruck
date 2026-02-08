@@ -183,6 +183,7 @@ export class ApiStack extends cdk.Stack {
           'Authorization',
           'X-Api-Key',
           'X-Amz-Security-Token',
+          'x-pagination-token',
         ],
         allowCredentials: true,
         maxAge: cdk.Duration.hours(1),

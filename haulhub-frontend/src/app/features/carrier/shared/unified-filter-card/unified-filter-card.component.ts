@@ -67,7 +67,6 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(value => {
-        console.log('Form changed, settingPreset:', this.settingPreset, 'activePreset:', this.activePreset);
         if (value.startDate && value.endDate && !this.settingPreset) {
           this.filterService.updateDateFilter(value.startDate, value.endDate);
           this.activePreset = null;
@@ -76,7 +75,6 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
   }
 
   setPreset(preset: 'week' | 'month' | 'quarter' | 'year'): void {
-    console.log('Setting preset:', preset);
     this.settingPreset = true;
     this.activePreset = preset;
     this.filterService.setPreset(preset);
@@ -87,11 +85,7 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
       endDate: filter.endDate
     }, { emitEvent: false });
     
-    console.log('After setPreset, activePreset:', this.activePreset);
-    setTimeout(() => {
-      this.settingPreset = false;
-      console.log('Reset settingPreset flag');
-    }, 600);
+    setTimeout(() => this.settingPreset = false, 600);
   }
 
   clearFilters(): void {

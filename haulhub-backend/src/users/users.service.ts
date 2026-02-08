@@ -159,6 +159,12 @@ export class UsersService {
     // Generate UUID for userId (will be replaced with Cognito sub)
     let userId: string;
 
+    // Format phone to E.164 format for Cognito (remove all non-digits, add +1 if not present)
+    const cleanPhone = dto.phone.replace(/\D/g, '');
+    const e164Phone = cleanPhone.startsWith('1') ? `+${cleanPhone}` : `+1${cleanPhone}`;
+    
+    console.log('Phone conversion:', { original: dto.phone, clean: cleanPhone, e164: e164Phone });
+
     try {
       // Create user in Cognito
       const createUserCommand = new AdminCreateUserCommand({
@@ -168,7 +174,7 @@ export class UsersService {
           { Name: 'email', Value: dto.email },
           { Name: 'email_verified', Value: 'true' },
           { Name: 'name', Value: dto.name },
-          { Name: 'phone_number', Value: dto.phone },
+          { Name: 'phone_number', Value: e164Phone },
           { Name: 'custom:carrierId', Value: carrierId },
           { Name: 'custom:nationalId', Value: dto.ss },
           { Name: 'custom:role', Value: dto.role },
@@ -205,13 +211,22 @@ export class UsersService {
       return { user, temporaryPassword };
     } catch (error: any) {
       console.error('Error creating user:', error);
+      console.error('Error details:', { name: error.name, message: error.message, fault: error.$fault });
       
       // Handle Cognito-specific errors
       if (error.name === 'UsernameExistsException') {
         throw new BadRequestException(`A user with email ${dto.email} already exists`);
       }
       
-      throw new InternalServerErrorException('Failed to create user in authentication system');
+      if (error.name === 'InvalidParameterException') {
+        // Extract the actual error message from Cognito
+        const message = error.message || error.$metadata?.message || 'Invalid user data provided';
+        throw new BadRequestException(message);
+      }
+      
+      // Pass through any error message we have
+      const errorMessage = error.message || error.$metadata?.message || 'Failed to create user in authentication system';
+      throw new InternalServerErrorException(errorMessage);
     }
   }
 
@@ -463,25 +478,16 @@ export class UsersService {
       throw new BadRequestException('Invalid email format');
     }
 
-    // Validate phone format (XXX) XXX-XXXX
-    const phoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
-    if (!phoneRegex.test(dto.phone)) {
-      throw new BadRequestException('Invalid phone format. Expected: (XXX) XXX-XXXX');
-    }
-
-    // Validate ZIP code format (XXXXX or XXXXX-XXXX)
-    const zipRegex = /^\d{5}(-\d{4})?$/;
-    if (!zipRegex.test(dto.zip)) {
-      throw new BadRequestException('Invalid ZIP code format. Expected: XXXXX or XXXXX-XXXX');
-    }
-
     // Role-specific validation
     if (dto.role === 'DISPATCHER') {
-      if (dto.rate === undefined || dto.rate === null) {
-        throw new BadRequestException('rate is required for Dispatcher role');
+      if (dto.rate !== undefined && dto.rate !== null) {
+        // Validate rate is a valid number
+        if (isNaN(Number(dto.rate))) {
+          throw new BadRequestException('rate must be a valid number');
+        }
       }
     } else if (dto.role === 'DRIVER') {
-      const driverFields = ['rate', 'corpName', 'dob', 'cdlClass', 'cdlState', 'cdlIssued', 'cdlExpires'];
+      const driverFields = ['cdlClass'];
       for (const field of driverFields) {
         if (!dto[field as keyof CreateUserDto]) {
           throw new BadRequestException(`${field} is required for Driver role`);

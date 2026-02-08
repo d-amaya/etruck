@@ -269,6 +269,21 @@
   }
 }
 
+// Override Material button colors for action buttons
+.actions-cell {
+  button[color="warn"] {
+    color: #f44336 !important;
+  }
+  
+  button[color="accent"] {
+    color: #4caf50 !important;
+  }
+  
+  button[color="primary"] {
+    color: #1976d2 !important;
+  }
+}
+
 // Responsive design
 @media (max-width: 768px) {
   .management-container {
