@@ -421,4 +421,31 @@ export class AssetCacheService {
       })
     );
   }
+
+  /**
+   * Get only active trucks for trip creation dropdowns
+   */
+  getActiveTrucks(): Observable<Array<{ truckId: string; plate: string; brand: string; year: number }>> {
+    return this.cache$.pipe(
+      map(cache => cache ? Array.from(cache.trucks.values()).filter(t => t.isActive) : [])
+    );
+  }
+
+  /**
+   * Get only active trailers for trip creation dropdowns
+   */
+  getActiveTrailers(): Observable<Array<{ trailerId: string; plate: string }>> {
+    return this.cache$.pipe(
+      map(cache => cache ? Array.from(cache.trailers.values()).filter(t => t.isActive) : [])
+    );
+  }
+
+  /**
+   * Get only active drivers for trip creation dropdowns
+   */
+  getActiveDrivers(): Observable<Array<{ userId: string; name: string }>> {
+    return this.cache$.pipe(
+      map(cache => cache ? Array.from(cache.drivers.values()).filter(d => d.isActive) : [])
+    );
+  }
 }

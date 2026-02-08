@@ -121,9 +121,11 @@ export class AssetManagementComponent implements OnInit {
 
   ngOnInit(): void {
     this.initializeForms();
-    this.loadUsers();
-    this.loadTrucks();
-    this.loadTrailers();
+    // Load users first (includes truck owners), then trucks and trailers
+    this.loadUsers().then(() => {
+      this.loadTrucks();
+      this.loadTrailers();
+    });
   }
 
   private async loadUsers(): Promise<void> {
@@ -192,11 +194,6 @@ export class AssetManagementComponent implements OnInit {
     this.error = null;
 
     try {
-      // Ensure truck owners are loaded first
-      if (this.truckOwners.length === 0) {
-        await this.loadTruckOwners();
-      }
-
       const response = await firstValueFrom(
         this.carrierService.getTrucks(
           this.selectedOwnerId || undefined,
@@ -650,7 +647,17 @@ export class AssetManagementComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(async result => {
       if (result?.success) {
-        await this.loadUsers();
+        // Only reload the specific user type that was created
+        if (result.role === 'DISPATCHER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('DISPATCHER'));
+          this.dispatchers = response.users;
+        } else if (result.role === 'DRIVER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
+          this.drivers = response.users;
+        } else if (result.role === 'TRUCK_OWNER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('TRUCK_OWNER'));
+          this.truckOwners = response.users;
+        }
       }
     });
   }
@@ -680,7 +687,17 @@ export class AssetManagementComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(async result => {
       if (result?.success) {
-        await this.loadUsers();
+        // Only reload the specific user type that was edited
+        if (result.role === 'DISPATCHER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('DISPATCHER'));
+          this.dispatchers = response.users;
+        } else if (result.role === 'DRIVER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
+          this.drivers = response.users;
+        } else if (result.role === 'TRUCK_OWNER') {
+          const response = await firstValueFrom(this.carrierService.getUsers('TRUCK_OWNER'));
+          this.truckOwners = response.users;
+        }
       }
     });
   }

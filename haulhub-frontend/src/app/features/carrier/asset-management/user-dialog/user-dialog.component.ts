@@ -144,11 +144,11 @@ export class UserDialogComponent {
         };
         await firstValueFrom(this.carrierService.createUser(createDto));
         this.snackBar.open('User created successfully!', 'Close', { duration: 3000 });
-        this.dialogRef.close({ success: true });
+        this.dialogRef.close({ success: true, role: this.data.role });
       } else if (this.data.mode === 'edit') {
         await firstValueFrom(this.carrierService.updateUser(this.data.user.userId, formData));
         this.snackBar.open('User updated successfully!', 'Close', { duration: 3000 });
-        this.dialogRef.close({ success: true });
+        this.dialogRef.close({ success: true, role: this.data.role });
       }
     } catch (err: any) {
       console.error('Error saving user:', err);
