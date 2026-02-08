@@ -63,6 +63,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   // Asset maps
   private truckMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
+  private brokerMap = new Map<string, any>();
 
   constructor(
     private fb: FormBuilder,
@@ -113,6 +114,13 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
         drivers.forEach(driver => this.driverMap.set(driver.userId, driver));
       },
       error: (error) => console.error('Error loading drivers:', error)
+    });
+    
+    this.tripService.getBrokers().subscribe({
+      next: (brokers) => {
+        brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
+      },
+      error: (error) => console.error('Error loading brokers:', error)
     });
   }
 
@@ -255,12 +263,15 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return [];
     }
     
-    return Object.entries(this.report.groupedByBroker).map(([brokerId, data]) => ({
-      brokerId,
-      brokerName: brokerId.substring(0, 8),
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
-    }));
+    return Object.entries(this.report.groupedByBroker).map(([brokerId, data]) => {
+      const broker = this.brokerMap.get(brokerId);
+      return {
+        brokerId,
+        brokerName: broker?.brokerName || brokerId.substring(0, 8),
+        totalPayment: data.totalPayment,
+        tripCount: data.tripCount
+      };
+    });
   }
   getTotalExpenses(): number {
     if (!this.report) {

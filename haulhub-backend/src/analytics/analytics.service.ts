@@ -1071,16 +1071,41 @@ export class AnalyticsService {
       }
       
       // Build broker analytics array
-      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerId, data]) => ({
-        brokerName: brokerId, // Using ID as name since brokerName is not in Trip interface
-        tripCount: data.tripCount,
-        totalRevenue: data.totalRevenue,
-        averageRevenue: data.tripCount > 0 ? data.totalRevenue / data.tripCount : 0,
-        totalDistance: data.totalDistance,
-        averageDistance: data.tripCount > 0 ? data.totalDistance / data.tripCount : 0,
-        completedTrips: data.completedTrips,
-        completionRate: data.tripCount > 0 ? (data.completedTrips / data.tripCount) * 100 : 0,
-      }));
+      // Fetch broker details for enrichment
+      const brokerIds = Array.from(brokerMap.keys());
+      const brokersTableName = this.tripsService['configService'].brokersTableName;
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      
+      const brokerDetailsMap = new Map<string, any>();
+      await Promise.all(
+        brokerIds.map(async (brokerId) => {
+          try {
+            const result = await dynamodbClient.send(new GetCommand({
+              TableName: brokersTableName,
+              Key: { PK: `BROKER#${brokerId}`, SK: 'METADATA' },
+            }));
+            if (result.Item) {
+              brokerDetailsMap.set(brokerId, result.Item);
+            }
+          } catch (error) {
+            console.error(`Error fetching broker ${brokerId}:`, error);
+          }
+        })
+      );
+      
+      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerId, data]) => {
+        const broker = brokerDetailsMap.get(brokerId);
+        return {
+          brokerName: broker?.brokerName || brokerId.substring(0, 8),
+          tripCount: data.tripCount,
+          totalRevenue: data.totalRevenue,
+          averageRevenue: data.tripCount > 0 ? data.totalRevenue / data.tripCount : 0,
+          totalDistance: data.totalDistance,
+          averageDistance: data.tripCount > 0 ? data.totalDistance / data.tripCount : 0,
+          completedTrips: data.completedTrips,
+          completionRate: data.tripCount > 0 ? (data.completedTrips / data.tripCount) * 100 : 0,
+        };
+      });
       
       // Sort by total revenue descending
       brokerAnalytics.sort((a, b) => b.totalRevenue - a.totalRevenue);

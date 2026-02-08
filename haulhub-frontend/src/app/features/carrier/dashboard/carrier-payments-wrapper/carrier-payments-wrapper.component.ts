@@ -1,22 +1,19 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { CarrierPaymentReportComponent } from '../../payment-report/payment-report.component';
 
 @Component({
   selector: 'app-carrier-payments-wrapper',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CarrierPaymentReportComponent],
   template: `
-    <div class="payments-container">
-      <p>Carrier Payments - Coming Soon</p>
-      <p>This will display payment information for the carrier</p>
+    <div class="payments-wrapper">
+      <app-carrier-payment-report [isWrapped]="true"></app-carrier-payment-report>
     </div>
   `,
   styles: [`
-    .payments-container {
-      background: white;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    .payments-wrapper {
+      width: 100%;
     }
   `]
 })

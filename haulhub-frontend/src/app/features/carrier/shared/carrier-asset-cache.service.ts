@@ -54,28 +54,8 @@ export class CarrierAssetCacheService {
 
     this.loading = true;
 
-    return forkJoin({
-      trucks: this.carrierService.getTrucks().pipe(
-        map(response => response.trucks),
-        catchError(() => of([]))
-      ),
-      trailers: this.carrierService.getTrailers().pipe(
-        map(response => response.trailers),
-        catchError(() => of([]))
-      ),
-      drivers: this.carrierService.getUsers('DRIVER').pipe(
-        map(response => response.users),
-        catchError(() => of([]))
-      ),
-      dispatchers: this.carrierService.getUsers('DISPATCHER').pipe(
-        map(response => response.users),
-        catchError(() => of([]))
-      ),
-      brokers: this.carrierService.getBrokers().pipe(
-        catchError(() => of([]))
-      )
-    }).pipe(
-      tap(({ trucks, trailers, drivers, dispatchers, brokers }) => {
+    return this.carrierService.getAllAssets().pipe(
+      tap(({ trucks, trailers, drivers, dispatchers, brokers, truckOwners }) => {
         const cache: CarrierAssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),

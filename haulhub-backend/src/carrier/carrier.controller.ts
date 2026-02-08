@@ -98,6 +98,48 @@ export class CarrierController {
   }
 
   // ============================================================================
+  // Unified Assets Endpoint
+  // ============================================================================
+
+  /**
+   * Get all assets in a single call
+   * Returns trucks, trailers, drivers, dispatchers, truck owners, and brokers
+   * 
+   * @param user - Current authenticated user (carrier)
+   * @returns All assets for the carrier
+   */
+  @Get('assets')
+  async getAllAssets(@CurrentUser() user: CurrentUserData): Promise<{
+    trucks: any[];
+    trailers: any[];
+    drivers: any[];
+    dispatchers: any[];
+    truckOwners: any[];
+    brokers: any[];
+  }> {
+    const carrierId = this.getCarrierId(user);
+
+    // Fetch all assets in parallel
+    const [trucks, trailers, drivers, dispatchers, truckOwners, brokers] = await Promise.all([
+      this.lorriesService.getTrucksByCarrier(carrierId),
+      this.lorriesService.getTrailersByCarrier(carrierId),
+      this.usersService.getUsersByCarrier(carrierId, 'DRIVER'),
+      this.usersService.getUsersByCarrier(carrierId, 'DISPATCHER'),
+      this.usersService.getUsersByCarrier(carrierId, 'TRUCK_OWNER'),
+      this.brokersService.getAllBrokers(true)
+    ]);
+
+    return {
+      trucks,
+      trailers,
+      drivers,
+      dispatchers,
+      truckOwners,
+      brokers
+    };
+  }
+
+  // ============================================================================
   // Dashboard Endpoints
   // ============================================================================
 

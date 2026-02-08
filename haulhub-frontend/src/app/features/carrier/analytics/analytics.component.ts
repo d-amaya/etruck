@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -64,6 +64,7 @@ interface ChartData {
   styleUrls: ['./analytics.component.scss']
 })
 export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewInit {
+  @Input() isWrapped = false;
   @ViewChild('fuelCostChart') fuelCostChartRef!: ElementRef<HTMLCanvasElement>;
   
   isLoading = true;

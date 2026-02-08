@@ -72,7 +72,7 @@
                 <table class="analytics-table">
                   <thead>
                     <tr>
-                      <th>Vehicle ID</th>
+                      <th>Truck</th>
                       <th>Total Trips</th>
                       <th>Total Distance</th>
                       <th>Total Revenue</th>
@@ -213,26 +213,6 @@
         <div class="tab-content">
           <mat-card class="chart-card">
             <mat-card-content>
-              <div *ngIf="fuelCostChartData">
-                <div class="chart-data-preview" style="margin-bottom: 16px;">
-                  <p><strong>Average Fuel Cost:</strong> {{ formatCurrency(fuelCostChartData.avgCost) }}</p>
-                  <p><strong>Total Fuel Expenses:</strong> {{ formatCurrency(fuelCostChartData.totalCost) }}</p>
-                  <p><strong>Trips with Fuel Data:</strong> {{ fuelCostChartData.tripCount }}</p>
-                </div>
-                <div class="chart-container" *ngIf="fuelCostTrendData">
-                  <canvas #fuelCostChart></canvas>
-                </div>
-              </div>
-              <div class="no-data" *ngIf="!fuelCostChartData">
-                <mat-icon>local_gas_station</mat-icon>
-                <p>No fuel cost data available</p>
-                <p class="hint">Add fuel cost information to trips to see analytics</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card class="chart-card">
-            <mat-card-content>
               <div *ngIf="fuelEfficiencyChartData">
                 <div class="chart-data-preview" style="margin-bottom: 16px;">
                   <p><strong>Fleet Average MPG:</strong> {{ fuelEfficiencyChartData.fleetAvgMPG | number:'1.2-2' }} mpg</p>
@@ -247,7 +227,7 @@
                   <table class="analytics-table">
                     <thead>
                       <tr>
-                        <th>Vehicle ID</th>
+                        <th>Truck</th>
                         <th>Trips</th>
                         <th>Total Miles</th>
                         <th>Total Gallons</th>

@@ -297,6 +297,25 @@ export class CarrierService {
   }
 
   // ============================================================================
+  // Unified Assets Operations
+  // ============================================================================
+
+  /**
+   * Get all assets in a single call
+   * Returns trucks, trailers, drivers, dispatchers, truck owners, and brokers
+   */
+  getAllAssets(): Observable<{
+    trucks: any[];
+    trailers: any[];
+    drivers: any[];
+    dispatchers: any[];
+    truckOwners: any[];
+    brokers: any[];
+  }> {
+    return this.apiService.get('/carrier/assets');
+  }
+
+  // ============================================================================
   // User Management Operations
   // ============================================================================
 

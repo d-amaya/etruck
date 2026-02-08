@@ -121,11 +121,33 @@ export class AssetManagementComponent implements OnInit {
 
   ngOnInit(): void {
     this.initializeForms();
-    // Load users first (includes truck owners), then trucks and trailers
-    this.loadUsers().then(() => {
-      this.loadTrucks();
-      this.loadTrailers();
-    });
+    this.loadAllAssets();
+  }
+
+  private async loadAllAssets(): Promise<void> {
+    this.loading = true;
+    this.error = null;
+
+    try {
+      const assets = await firstValueFrom(this.carrierService.getAllAssets());
+      
+      this.dispatchers = assets.dispatchers;
+      this.drivers = assets.drivers;
+      this.truckOwners = assets.truckOwners;
+      this.trucks = assets.trucks.map(truck => ({
+        ...truck,
+        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId)
+      }));
+      this.trailers = assets.trailers;
+      
+      this.applyTruckFilters();
+      this.applyTrailerFilters();
+    } catch (err: any) {
+      console.error('Error loading assets:', err);
+      this.error = err.message || 'Failed to load assets';
+    } finally {
+      this.loading = false;
+    }
   }
 
   private async loadUsers(): Promise<void> {
