@@ -161,15 +161,6 @@ cd ../haulhub-frontend && npm test
 ./scripts/dev-frontend.sh  # Terminal 2
 ```
 
-### Test Credentials
-
-All test users have password: `TempPass123!`
-
-- **Carrier**: `carrier@swiftlogistics.com`
-- **Dispatchers**: `dispatcher1@swiftlogistics.com`, `dispatcher2@swiftlogistics.com`
-- **Drivers**: `driver1@swiftlogistics.com` through `driver8@swiftlogistics.com`
-- **Truck Owners**: `owner1@swiftlogistics.com` through `owner3@swiftlogistics.com`
-
 ---
 
 ---
