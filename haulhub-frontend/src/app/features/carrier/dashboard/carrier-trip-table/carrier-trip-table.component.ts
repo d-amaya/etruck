@@ -4,8 +4,8 @@ import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subject, Observable } from 'rxjs';
-import { takeUntil, distinctUntilChanged, switchMap, startWith, map } from 'rxjs/operators';
+import { Subject, Observable, of } from 'rxjs';
+import { takeUntil, distinctUntilChanged, switchMap, startWith, map, tap } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -58,6 +58,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     'brokerName',
     'truckId',
     'driverName',
+    'truckOwnerName',
     'revenue',
     'expenses',
     'profitLoss',
@@ -78,11 +79,13 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   drivers: User[] = [];
   trucks: any[] = [];
   trailers: any[] = [];
+  truckOwners: User[] = [];
 
   // Filtered observables for autocomplete
   filteredTrucks: Observable<any[]> = new Observable();
   filteredDrivers: Observable<any[]> = new Observable();
   filteredDispatchers: Observable<any[]> = new Observable();
+  filteredTruckOwners: Observable<any[]> = new Observable();
 
   // Lookup maps for display
   private brokerMap = new Map<string, Broker>();
@@ -90,6 +93,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   private driverMap = new Map<string, User>();
   private truckMap = new Map<string, any>();
   private trailerMap = new Map<string, any>();
+  private truckOwnerMap = new Map<string, User>();
 
   private destroy$ = new Subject<void>();
 
@@ -106,7 +110,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       brokerId: [null],
       dispatcherId: [null],
       driverId: [null],
-      truckId: [null]
+      truckId: [null],
+      truckOwnerId: [null]
     });
   }
 
@@ -120,12 +125,14 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       this.drivers = Array.from(cache.drivers.values()).sort((a, b) => a.name.localeCompare(b.name));
       this.dispatchers = Array.from(cache.dispatchers.values()).sort((a, b) => a.name.localeCompare(b.name));
       this.brokers = Array.from(cache.brokers.values()).sort((a, b) => a.brokerName.localeCompare(b.brokerName));
+      this.truckOwners = Array.from(cache.truckOwners.values()).sort((a, b) => a.name.localeCompare(b.name));
       
       this.truckMap = cache.trucks;
       this.trailerMap = cache.trailers;
       this.driverMap = cache.drivers;
       this.dispatcherMap = cache.dispatchers;
       this.brokerMap = cache.brokers;
+      this.truckOwnerMap = cache.truckOwners;
       
       // Setup autocomplete filters
       this.filteredTrucks = this.filterForm.get('truckId')!.valueChanges.pipe(
@@ -142,6 +149,22 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
         startWith(''),
         map(value => this._filterDispatchers(value || ''))
       );
+
+      this.filteredTruckOwners = this.filterForm.get('truckOwnerId')!.valueChanges.pipe(
+        startWith(''),
+        map(value => this._filterTruckOwners(value || ''))
+      );
+
+      // Restore filter form from dashboard state
+      const currentFilters = this.dashboardState.getCurrentFilters();
+      this.filterForm.patchValue({
+        status: currentFilters.status,
+        brokerId: currentFilters.brokerId,
+        dispatcherId: currentFilters.dispatcherId,
+        driverId: currentFilters.driverId,
+        truckId: currentFilters.truckId,
+        truckOwnerId: currentFilters.truckOwnerId,
+      }, { emitEvent: false });
     });
     
     // Subscribe to combined filters and pagination
@@ -185,6 +208,13 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
 
   loadTrips(filters: any, pagination: any): Observable<any> {
+    // Check cache first (5-min TTL)
+    const cached = this.filterService.getCachedTrips(filters, pagination);
+    if (cached) {
+      this.loading = false;
+      return of(cached);
+    }
+
     this.loading = true;
     
     // Smart pagination: only fetch aggregates on page 0
@@ -217,6 +247,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     if (filters.truckId) {
       apiFilters.truckId = filters.truckId;
     }
+    if (filters.truckOwnerId) {
+      apiFilters.truckOwnerId = filters.truckOwnerId;
+    }
     
     if (pagination.page > 0 && pagination.pageTokens[pagination.page - 1]) {
       apiFilters.lastEvaluatedKey = pagination.pageTokens[pagination.page - 1];
@@ -224,11 +257,13 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     
     // Page 0: unified endpoint with aggregates
     // Page N: trips only endpoint
-    if (needsAggregates) {
-      return this.carrierService.getDashboardUnified(apiFilters);
-    } else {
-      return this.carrierService.getTrips(apiFilters);
-    }
+    const apiCall$ = needsAggregates
+      ? this.carrierService.getDashboardUnified(apiFilters)
+      : this.carrierService.getTrips(apiFilters);
+
+    return apiCall$.pipe(
+      tap(result => this.filterService.setCachedTrips(filters, pagination, result))
+    );
   }
 
   onFilterChange(): void {
@@ -242,6 +277,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       dispatcherId: formValue.dispatcherId,
       driverId: formValue.driverId,
       truckId: formValue.truckId,
+      truckOwnerId: formValue.truckOwnerId,
     });
   }
 
@@ -251,7 +287,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       brokerId: null,
       dispatcherId: null,
       driverId: null,
-      truckId: null
+      truckId: null,
+      truckOwnerId: null
     });
     this.dashboardState.resetFilters();
   }
@@ -322,6 +359,12 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     if (!driverId) return 'N/A';
     const driver = this.driverMap.get(driverId);
     return driver ? driver.name : driverId.substring(0, 8);
+  }
+
+  getTruckOwnerDisplay(ownerId: string): string {
+    if (!ownerId) return 'N/A';
+    const owner = this.truckOwnerMap.get(ownerId);
+    return owner ? owner.name : ownerId.substring(0, 8);
   }
 
   getBrokerDisplay(brokerId: string): string {
@@ -475,6 +518,27 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   clearDispatcherFilter(): void {
     this.filterForm.patchValue({ dispatcherId: null });
+    this.onFilterChange();
+  }
+
+  private _filterTruckOwners(value: string | any): any[] {
+    if (typeof value === 'object') return this.truckOwners;
+    const filterValue = (value || '').toString().toLowerCase();
+    return this.truckOwners.filter(owner => {
+      const name = owner.name.toLowerCase();
+      const words = name.split(' ');
+      return words.some(word => word.startsWith(filterValue)) || name.includes(filterValue);
+    });
+  }
+
+  displayTruckOwner = (ownerId: string | null): string => {
+    if (!ownerId) return '';
+    const owner = this.truckOwnerMap.get(ownerId);
+    return owner ? owner.name : '';
+  };
+
+  clearTruckOwnerFilter(): void {
+    this.filterForm.patchValue({ truckOwnerId: null });
     this.onFilterChange();
   }
 

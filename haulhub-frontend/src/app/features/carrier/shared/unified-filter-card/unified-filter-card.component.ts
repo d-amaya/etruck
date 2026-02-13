@@ -68,6 +68,11 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
     // Detect if current dates match a preset
     this.activePreset = this.filterService.activePreset;
 
+    // Push current dates to dashboard state (ensures API uses correct dates after navigation)
+    if (currentFilter.startDate && currentFilter.endDate) {
+      this.filterService.updateDateFilter(currentFilter.startDate, currentFilter.endDate);
+    }
+
     // Listen to form changes and update service
     this.filterForm.valueChanges
       .pipe(

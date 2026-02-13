@@ -67,6 +67,20 @@
         </mat-autocomplete>
       </mat-form-field>
 
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Truck Owner</mat-label>
+        <input type="text" matInput formControlName="truckOwnerId" [matAutocomplete]="truckOwnerAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('truckOwnerId')?.value" matSuffix mat-icon-button (click)="clearTruckOwnerFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #truckOwnerAuto="matAutocomplete" [displayWith]="displayTruckOwner" (optionSelected)="onFilterChange()">
+          <mat-option [value]="null">All Truck Owners</mat-option>
+          <mat-option *ngFor="let owner of filteredTruckOwners | async" [value]="owner.userId">
+            {{ owner.name }}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+
       <div class="spacer"></div>
 
       <div class="action-buttons-group">
@@ -140,6 +154,14 @@
         <th mat-header-cell *matHeaderCellDef>Driver</th>
         <td mat-cell *matCellDef="let trip">
           {{ getDriverDisplay(trip.driverId) }}
+        </td>
+      </ng-container>
+
+      <!-- Truck Owner Column -->
+      <ng-container matColumnDef="truckOwnerName">
+        <th mat-header-cell *matHeaderCellDef>Truck Owner</th>
+        <td mat-cell *matCellDef="let trip">
+          {{ getTruckOwnerDisplay(trip.truckOwnerId) }}
         </td>
       </ng-container>
 

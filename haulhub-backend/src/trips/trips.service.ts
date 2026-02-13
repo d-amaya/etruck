@@ -2524,6 +2524,11 @@ export class TripsService {
       filtered = filtered.filter(trip => trip.driverId === filters.driverId);
     }
 
+    // Filter by truck owner
+    if (filters.truckOwnerId) {
+      filtered = filtered.filter(trip => trip.truckOwnerId === filters.truckOwnerId);
+    }
+
     // Filter by driver name (case-insensitive)
     if (filters.driverName) {
       filtered = this.applyDriverNameFilter(filtered, filters.driverName);

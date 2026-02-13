@@ -181,7 +181,7 @@
                   </thead>
                   <tbody>
                     <tr *ngFor="let broker of brokerAnalyticsData.brokers">
-                      <td><strong>{{ broker.brokerName }}</strong></td>
+                      <td>{{ broker.brokerName }}</td>
                       <td>{{ broker.tripCount }}</td>
                       <td>{{ broker.completedTrips }}</td>
                       <td>{{ formatCurrency(broker.totalRevenue) }}</td>
@@ -214,11 +214,6 @@
           <mat-card class="chart-card">
             <mat-card-content>
               <div *ngIf="fuelEfficiencyChartData">
-                <div class="chart-data-preview" style="margin-bottom: 16px;">
-                  <p><strong>Fleet Average MPG:</strong> {{ fuelEfficiencyChartData.fleetAvgMPG | number:'1.2-2' }} mpg</p>
-                  <p><strong>Best Performer:</strong> {{ fuelEfficiencyChartData.bestVehicle }} ({{ fuelEfficiencyChartData.bestMPG | number:'1.2-2' }} mpg)</p>
-                  <p><strong>Vehicles Tracked:</strong> {{ fuelEfficiencyChartData.vehicleCount }}</p>
-                </div>
                 
                 <div class="data-table" *ngIf="fuelEfficiencyChartData.vehicles && fuelEfficiencyChartData.vehicles.length > 0">
                   <div class="column-descriptions">
@@ -237,7 +232,7 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let vehicle of fuelEfficiencyChartData.vehicles">
-                        <td><strong>{{ vehicle.vehicleId }}</strong></td>
+                        <td>{{ vehicle.vehicleId }}</td>
                         <td>{{ vehicle.tripCount }}</td>
                         <td>{{ vehicle.totalMiles | number:'1.0-0' }} mi</td>
                         <td>{{ vehicle.totalGallons | number:'1.1-1' }} gal</td>

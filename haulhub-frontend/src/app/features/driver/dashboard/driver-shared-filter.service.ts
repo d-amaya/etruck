@@ -5,6 +5,8 @@ import { DriverDashboardStateService, DriverDashboardFilters } from './driver-da
   providedIn: 'root'
 })
 export class DriverSharedFilterService {
+  activePreset: string | null = 'currentWeek';
+
   constructor(private dashboardState: DriverDashboardStateService) {}
 
   updateFilters(filters: Partial<DriverDashboardFilters>): void {

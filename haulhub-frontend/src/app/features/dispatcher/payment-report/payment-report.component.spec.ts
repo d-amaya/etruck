@@ -70,6 +70,7 @@ describe('PaymentReportComponent', () => {
       'getPaymentReport', 
       'getBrokers',
       'getTrucksByCarrier',
+      'getTrailersByCarrier',
       'getDriversByCarrier',
       'getTruckOwnersByCarrier'
     ]);
@@ -85,6 +86,7 @@ describe('PaymentReportComponent', () => {
     tripServiceSpy.getDriversByCarrier.and.returnValue(of([
       { userId: 'driver1', name: 'John Doe', email: 'john@example.com' }
     ]));
+    tripServiceSpy.getTrailersByCarrier.and.returnValue(of([]));
     tripServiceSpy.getTruckOwnersByCarrier.and.returnValue(of([
       { userId: 'owner1', name: 'Owner One', email: 'owner1@example.com' }
     ]));

@@ -189,6 +189,196 @@ export class AnalyticsService {
     }
   }
 
+  async getUnifiedAnalytics(userId: string, userRole: string, startDate?: Date, endDate?: Date) {
+    try {
+      const isCarrier = userRole === 'Carrier';
+      const indexName = isCarrier ? 'GSI1' : 'GSI2';
+      const pkPrefix = isCarrier ? 'CARRIER' : 'DISPATCHER';
+      const skAttribute = isCarrier ? 'GSI1SK' : 'GSI2SK';
+
+      const dynamodbClient = this.tripsService['awsService'].getDynamoDBClient();
+      const tripsTableName = this.tripsService['tripsTableName'];
+      const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
+
+      let keyConditionExpression = `${indexName}PK = :userPK`;
+      const expressionAttributeValues: any = {
+        ':userPK': `${pkPrefix}#${userId}`,
+      };
+
+      if (startDate && endDate) {
+        keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
+        expressionAttributeValues[':startDate'] = this.formatDateForGSI(startDate, true);
+        expressionAttributeValues[':endDate'] = this.formatDateForGSI(endDate, false);
+      }
+
+      const allTrips: any[] = [];
+      let lastKey: any = undefined;
+      do {
+        const cmd = new QueryCommand({
+          TableName: tripsTableName,
+          IndexName: indexName,
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ExclusiveStartKey: lastKey,
+        });
+        const result = await dynamodbClient.send(cmd);
+        allTrips.push(...(result.Items || []).map(item => this.tripsService['mapItemToTrip'](item)));
+        lastKey = result.LastEvaluatedKey;
+      } while (lastKey);
+
+      const trips = allTrips;
+
+      // Trip Analytics
+      const totalTrips = trips.length;
+      const completedTrips = trips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+      const totalRevenue = trips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+      const totalFuelCost = trips.reduce((s, t) => {
+        if (t.fuelCost) return s + t.fuelCost;
+        if (t.fuelGasAvgCost && t.fuelGasAvgGallxMil) return s + ((t.mileageOrder + t.mileageEmpty) * t.fuelGasAvgGallxMil * t.fuelGasAvgCost);
+        return s;
+      }, 0);
+      const totalExpenses = trips.reduce((s, t) => s + (t.driverPayment || 0) + (t.truckOwnerPayment || 0) + (t.lumperValue || 0) + (t.detentionValue || 0), 0) + totalFuelCost;
+      const totalDistance = trips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
+
+      const tripAnalytics: TripAnalytics = {
+        totalTrips,
+        completedTrips,
+        totalRevenue,
+        totalExpenses,
+        totalProfit: totalRevenue - totalExpenses,
+        averageDistance: totalTrips > 0 ? totalDistance / totalTrips : 0,
+        averageRevenue: totalTrips > 0 ? totalRevenue / totalTrips : 0,
+        onTimeDeliveryRate: totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0,
+        fuelEfficiency: totalDistance > 0 ? totalFuelCost / totalDistance : 0,
+      };
+
+      // Driver Performance
+      const driverMap = new Map<string, any[]>();
+      trips.forEach(t => {
+        if (!driverMap.has(t.driverId)) driverMap.set(t.driverId, []);
+        driverMap.get(t.driverId)!.push(t);
+      });
+      const driverPerformance: DriverPerformance[] = Array.from(driverMap.entries()).map(([driverId, dTrips]) => {
+        const completed = dTrips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+        const dist = dTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
+        const rev = dTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+        return {
+          driverId, driverName: driverId,
+          totalTrips: dTrips.length, completedTrips: completed,
+          totalDistance: dist, totalRevenue: rev,
+          averageRevenue: dTrips.length > 0 ? rev / dTrips.length : 0,
+          onTimeDeliveryRate: dTrips.length > 0 ? (completed / dTrips.length) * 100 : 0,
+        };
+      });
+
+      // Vehicle Utilization
+      const truckMap = new Map<string, any[]>();
+      trips.forEach(t => {
+        if (!truckMap.has(t.truckId)) truckMap.set(t.truckId, []);
+        truckMap.get(t.truckId)!.push(t);
+      });
+      const vehicleUtilization: VehicleUtilization[] = Array.from(truckMap.entries()).map(([vehicleId, vTrips]) => {
+        const dist = vTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
+        const rev = vTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+        return {
+          vehicleId, vehicleName: vehicleId,
+          totalTrips: vTrips.length, totalDistance: dist, totalRevenue: rev,
+          utilizationRate: 0, averageRevenuePerTrip: vTrips.length > 0 ? rev / vTrips.length : 0,
+        };
+      });
+
+      // Broker Analytics
+      const brokerMap = new Map<string, any[]>();
+      trips.forEach(t => {
+        if (!brokerMap.has(t.brokerId)) brokerMap.set(t.brokerId, []);
+        brokerMap.get(t.brokerId)!.push(t);
+      });
+      const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerId, bTrips]) => {
+        const rev = bTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+        return { brokerId, brokerName: brokerId, totalTrips: bTrips.length, totalRevenue: rev, averageRevenue: bTrips.length > 0 ? rev / bTrips.length : 0 };
+      });
+
+      // Fuel Analytics (with per-vehicle breakdown)
+      const tripsWithFuel = trips.filter(t => t.fuelGasAvgCost && t.fuelGasAvgGallxMil);
+      const vehicleFuelMap = new Map<string, any[]>();
+      tripsWithFuel.forEach(t => {
+        if (!vehicleFuelMap.has(t.truckId)) vehicleFuelMap.set(t.truckId, []);
+        vehicleFuelMap.get(t.truckId)!.push(t);
+      });
+      const vehicleFuelEfficiency = Array.from(vehicleFuelMap.entries()).map(([vehicleId, vTrips]) => {
+        const vDist = vTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
+        const vGallons = vTrips.reduce((s, t) => s + ((t.mileageOrder || 0) + (t.mileageEmpty || 0)) * (t.fuelGasAvgGallxMil || 0), 0);
+        const vCost = vTrips.reduce((s, t) => s + ((t.mileageOrder || 0) + (t.mileageEmpty || 0)) * (t.fuelGasAvgGallxMil || 0) * (t.fuelGasAvgCost || 0), 0);
+        const avgGPM = vDist > 0 ? vGallons / vDist : 0;
+        return {
+          vehicleId, totalTrips: vTrips.length, totalDistance: vDist,
+          totalGallons: vGallons, totalFuelCost: vCost,
+          averageGallonsPerMile: avgGPM, averageMPG: avgGPM > 0 ? 1 / avgGPM : 0,
+        };
+      }).sort((a, b) => b.averageMPG - a.averageMPG);
+
+      const totalGallons = tripsWithFuel.reduce((s, t) => s + ((t.mileageOrder || 0) + (t.mileageEmpty || 0)) * (t.fuelGasAvgGallxMil || 0), 0);
+      const avgGPM = totalDistance > 0 ? totalGallons / totalDistance : 0;
+      const avgFuelPrice = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
+
+      const fuelAnalytics = {
+        totalFuelCost,
+        averageFuelCostPerMile: totalDistance > 0 ? totalFuelCost / totalDistance : 0,
+        averageFuelCostPerTrip: totalTrips > 0 ? totalFuelCost / totalTrips : 0,
+        averageFuelCost: totalTrips > 0 ? totalFuelCost / totalTrips : 0,
+        averageFuelPrice: avgFuelPrice,
+        averageGallonsPerMile: avgGPM,
+        totalGallonsUsed: totalGallons,
+        totalTripsWithFuelData: tripsWithFuel.length,
+        tripsWithFuelData: tripsWithFuel.length,
+        totalTrips,
+        vehicleFuelEfficiency,
+      };
+
+      // Dispatcher Performance (carrier only)
+      let dispatcherPerformance: DispatcherPerformance[] = [];
+      if (isCarrier) {
+        const dispMap = new Map<string, any[]>();
+        trips.forEach(t => {
+          if (!dispMap.has(t.dispatcherId)) dispMap.set(t.dispatcherId, []);
+          dispMap.get(t.dispatcherId)!.push(t);
+        });
+        dispatcherPerformance = Array.from(dispMap.entries()).map(([dispatcherId, dTrips]) => {
+          const completed = dTrips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+          const rev = dTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+          const exp = dTrips.reduce((s, t) => s + (t.driverPayment || 0) + (t.truckOwnerPayment || 0) + (t.lumperValue || 0) + (t.detentionValue || 0), 0);
+          const profit = rev - exp;
+          return {
+            dispatcherId, dispatcherName: dispatcherId,
+            totalTrips: dTrips.length, completedTrips: completed,
+            totalRevenue: rev, totalProfit: profit,
+            averageProfit: dTrips.length > 0 ? profit / dTrips.length : 0,
+            completionRate: dTrips.length > 0 ? (completed / dTrips.length) * 100 : 0,
+          };
+        });
+      }
+
+      return {
+        tripAnalytics,
+        driverPerformance,
+        vehicleUtilization,
+        brokerAnalytics,
+        fuelAnalytics,
+        dispatcherPerformance,
+      };
+    } catch (error) {
+      console.error('Error in getUnifiedAnalytics:', error);
+      return {
+        tripAnalytics: { totalTrips: 0, completedTrips: 0, totalRevenue: 0, totalExpenses: 0, totalProfit: 0, averageDistance: 0, averageRevenue: 0, onTimeDeliveryRate: 0, fuelEfficiency: 0 },
+        driverPerformance: [],
+        vehicleUtilization: [],
+        brokerAnalytics: [],
+        fuelAnalytics: { totalFuelCost: 0, averageFuelCostPerMile: 0, averageFuelCostPerTrip: 0, tripsWithFuelData: 0, totalTrips: 0 },
+        dispatcherPerformance: [],
+      };
+    }
+  }
+
   async getTripAnalytics(userId: string, userRole: string, startDate?: Date, endDate?: Date): Promise<TripAnalytics> {
     try {
       // Determine which GSI to use based on user role

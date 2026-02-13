@@ -13,6 +13,7 @@ export interface CarrierDashboardFilters {
   truckId: string | null;
   driverId: string | null;
   dispatcherId: string | null;
+  truckOwnerId: string | null;
 }
 
 export interface PaginationState {
@@ -31,6 +32,7 @@ const defaultFilters: CarrierDashboardFilters = {
   truckId: null,
   driverId: null,
   dispatcherId: null,
+  truckOwnerId: null,
 };
 
 const defaultPagination: PaginationState = {

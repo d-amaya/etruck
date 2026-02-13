@@ -17,6 +17,7 @@ import { takeUntil, distinctUntilChanged } from 'rxjs/operators';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
+import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
 import { CarrierUnifiedFilterCardComponent } from '../shared/unified-filter-card/unified-filter-card.component';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import jsPDF from 'jspdf';
@@ -115,12 +116,26 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
     private analyticsService: AnalyticsService,
     private authService: AuthService,
     private filterService: CarrierFilterService,
+    private assetCache: CarrierAssetCacheService,
     private snackBar: MatSnackBar
   ) {}
+
+  private driverMap = new Map<string, any>();
+  private truckMap = new Map<string, any>();
+  private brokerMap = new Map<string, any>();
+  private dispatcherMap = new Map<string, any>();
 
   ngOnInit(): void {
     // Initialize empty KPI cards
     this.initializeKPICards();
+
+    // Load asset maps for name resolution
+    this.assetCache.loadAssets().subscribe(cache => {
+      this.driverMap = cache.drivers;
+      this.truckMap = cache.trucks;
+      this.brokerMap = cache.brokers;
+      this.dispatcherMap = cache.dispatchers;
+    });
     
     // Subscribe to date filter changes with distinctUntilChanged to prevent duplicate calls
     this.filterService.dateFilter$
@@ -218,153 +233,80 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
       }
     }
 
-    // Load trip analytics (backend uses authenticated user context)
-    this.loadTripAnalytics();
+    // Load all analytics in a single API call
+    this.loadUnifiedAnalytics();
   }
 
-  private loadTripAnalytics(): void {
-    // Backend automatically uses authenticated user's context
-    this.analyticsService.getTripAnalytics(this.startDate || undefined, this.endDate || undefined)
+  private loadUnifiedAnalytics(): void {
+    // Check cache first (5-min TTL)
+    const cached = this.filterService.getCachedAnalytics(this.startDate, this.endDate);
+    if (cached) {
+      this.processUnifiedAnalyticsData(cached);
+      this.isLoading = false;
+      this.isLoadingAnalytics = false;
+      return;
+    }
+
+    this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
-          this.processTripAnalytics(data);
-          this.loadFleetUtilizationData();
-          this.loadBrokerAnalyticsData();
-          this.loadFuelEfficiencyData();
-          this.loadDispatcherPerformanceData();
+          this.filterService.setCachedAnalytics(this.startDate, this.endDate, data);
+          this.processUnifiedAnalyticsData(data);
           this.isLoading = false;
           this.isLoadingAnalytics = false;
         },
         error: (error) => {
-          console.error('[Carrier Analytics] Error loading trip analytics:', error);
+          console.error('[Carrier Analytics] Error loading unified analytics:', error);
           this.error = 'Failed to load analytics data. Please try again.';
           this.isLoading = false;
           this.isLoadingAnalytics = false;
-          
-          this.snackBar.open('Error loading analytics data', 'Close', {
-            duration: 5000
-          });
+          this.snackBar.open('Error loading analytics data', 'Close', { duration: 5000 });
         }
       });
   }
 
-  private loadFleetUtilizationData(): void {
-    // Load driver performance (backend uses authenticated user context)
-    this.analyticsService.getDriverPerformance(this.startDate || undefined, this.endDate || undefined)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          this.driverPerformanceData = data;
-        },
-        error: (error) => {
-          console.error('[Carrier Analytics] Error loading driver performance:', error);
-        }
-      });
-
-    // Load vehicle utilization (backend uses authenticated user context)
-    this.analyticsService.getVehicleUtilization(this.startDate || undefined, this.endDate || undefined)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          this.vehicleUtilizationData = data;
-        },
-        error: (error) => {
-          console.error('[Carrier Analytics] Error loading vehicle utilization:', error);
-        }
-      });
-  }
-
-  private loadBrokerAnalyticsData(): void {
-    this.analyticsService.getBrokerAnalytics(this.startDate || undefined, this.endDate || undefined)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          this.brokerAnalyticsData = data;
-        },
-        error: (error) => {
-          console.error('[Carrier Analytics] Error loading broker analytics:', error);
-        }
-      });
-  }
-
-  private loadDispatcherPerformanceData(): void {
-    this.analyticsService.getDispatcherPerformance(this.startDate || undefined, this.endDate || undefined)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          this.dispatcherPerformanceData = data;
-        },
-        error: (error) => {
-          console.error('[Carrier Analytics] Error loading dispatcher performance:', error);
-        }
-      });
-  }
-
-  private loadFuelEfficiencyData(): void {
-    // Load real fuel analytics data (backend uses authenticated user context)
-    this.analyticsService.getFuelAnalytics(this.startDate || undefined, this.endDate || undefined)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          if (data.totalTripsWithFuelData > 0) {
-            this.fuelCostChartData = {
-              avgCost: data.averageFuelCost,
-              totalCost: data.totalFuelCost,
-              tripCount: data.totalTripsWithFuelData,
-              totalGallons: data.totalGallonsUsed,
-              avgFuelPrice: data.averageFuelPrice
-            };
-
-            const bestVehicle = data.vehicleFuelEfficiency.length > 0 ? data.vehicleFuelEfficiency[0] : null;
-            
-            this.fuelEfficiencyChartData = {
-              fleetAvg: data.averageGallonsPerMile,
-              fleetAvgMPG: data.averageGallonsPerMile > 0 ? 1 / data.averageGallonsPerMile : 0,
-              bestVehicle: bestVehicle ? bestVehicle.vehicleId : 'N/A',
-              bestEfficiency: bestVehicle ? bestVehicle.averageGallonsPerMile : 0,
-              bestMPG: bestVehicle ? bestVehicle.averageMPG : 0,
-              vehicleCount: data.vehicleFuelEfficiency.length,
-              vehicles: data.vehicleFuelEfficiency
-            };
-            
-            // Build fuel cost trend chart data
-            if (data.monthlyFuelData && data.monthlyFuelData.length > 0) {
-              const labels = data.monthlyFuelData.map((m: any) => m.month);
-              const fuelCostData = data.monthlyFuelData.map((m: any) => m.fuelCost);
-              
-              this.fuelCostTrendData = {
-                labels,
-                datasets: [
-                  {
-                    label: 'Fuel Cost',
-                    data: fuelCostData,
-                    backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                    borderColor: 'rgba(255, 152, 0, 1)'
-                  }
-                ]
-              };
-              
-              // If we're already on the Fuel Efficiency tab, create chart now
-              if (this.selectedTabIndex === 3) {
-                setTimeout(() => {
-                  this.createFuelCostChart();
-                }, 300);
-              }
-            }
-          } else {
-            // No fuel data available
-            this.fuelCostChartData = null;
-            this.fuelEfficiencyChartData = null;
-            this.fuelCostTrendData = null;
-          }
-        },
-        error: (error) => {
-          console.error('[Carrier Analytics] Error loading fuel data:', error);
-          this.fuelCostChartData = null;
-          this.fuelEfficiencyChartData = null;
-        }
-      });
+  private processUnifiedAnalyticsData(data: any): void {
+    this.processTripAnalytics(data.tripAnalytics);
+    this.driverPerformanceData = (data.driverPerformance || []).map((d: any) => ({
+      ...d, driverName: this.driverMap.get(d.driverId)?.name || d.driverId?.substring(0, 8)
+    }));
+    this.vehicleUtilizationData = (data.vehicleUtilization || []).map((v: any) => ({
+      ...v, vehicleName: this.truckMap.get(v.vehicleId)?.plate || v.vehicleId?.substring(0, 8)
+    }));
+    this.brokerAnalyticsData = {
+      brokers: (data.brokerAnalytics || []).map((b: any) => ({
+        ...b, brokerName: this.brokerMap.get(b.brokerId)?.brokerName || b.brokerId?.substring(0, 8)
+      }))
+    };
+    this.dispatcherPerformanceData = (data.dispatcherPerformance || []).map((d: any) => ({
+      ...d, dispatcherName: this.dispatcherMap.get(d.dispatcherId)?.name || d.dispatcherId?.substring(0, 8)
+    }));
+    if (data.fuelAnalytics && data.fuelAnalytics.tripsWithFuelData > 0) {
+      this.fuelCostChartData = {
+        avgCost: data.fuelAnalytics.averageFuelCost,
+        totalCost: data.fuelAnalytics.totalFuelCost,
+        tripCount: data.fuelAnalytics.totalTripsWithFuelData,
+        totalGallons: data.fuelAnalytics.totalGallonsUsed,
+        avgFuelPrice: data.fuelAnalytics.averageFuelPrice
+      };
+      const bestVehicle = data.fuelAnalytics.vehicleFuelEfficiency?.length > 0 ? data.fuelAnalytics.vehicleFuelEfficiency[0] : null;
+      this.fuelEfficiencyChartData = {
+        fleetAvg: data.fuelAnalytics.averageGallonsPerMile,
+        fleetAvgMPG: data.fuelAnalytics.averageGallonsPerMile > 0 ? 1 / data.fuelAnalytics.averageGallonsPerMile : 0,
+        bestVehicle: bestVehicle ? (this.truckMap.get(bestVehicle.vehicleId)?.plate || bestVehicle.vehicleId?.substring(0, 8)) : 'N/A',
+        bestEfficiency: bestVehicle ? bestVehicle.averageGallonsPerMile : 0,
+        bestMPG: bestVehicle ? bestVehicle.averageMPG : 0,
+        vehicleCount: data.fuelAnalytics.vehicleFuelEfficiency?.length || 0,
+        vehicles: (data.fuelAnalytics.vehicleFuelEfficiency || []).map((v: any) => ({
+          ...v,
+          vehicleId: this.truckMap.get(v.vehicleId)?.plate || v.vehicleId?.substring(0, 8),
+          tripCount: v.totalTrips,
+          totalMiles: v.totalDistance,
+          totalCost: v.totalFuelCost,
+        }))
+      };
+    }
   }
 
   private createFuelCostChart(): void {

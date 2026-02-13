@@ -7,6 +7,8 @@ export interface AssetCache {
   trucks: Map<string, any>;
   trailers: Map<string, any>;
   drivers: Map<string, any>;
+  brokers: Map<string, any>;
+  truckOwners: Map<string, any>;
   truckPlates: Map<string, string>; // plate -> truckId
   trailerPlates: Map<string, string>; // plate -> trailerId
   driverLicenses: Map<string, string>; // license -> userId
@@ -58,13 +60,17 @@ export class AssetCacheService {
     return forkJoin({
       trucks: this.tripService.getTrucksByCarrier().pipe(catchError(() => of([]))),
       trailers: this.tripService.getTrailersByCarrier().pipe(catchError(() => of([]))),
-      drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([])))
+      drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([]))),
+      brokers: this.tripService.getBrokers().pipe(catchError(() => of([]))),
+      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([])))
     }).pipe(
-      tap(({ trucks, trailers, drivers }) => {
+      tap(({ trucks, trailers, drivers, brokers, truckOwners }) => {
         const cache: AssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),
           drivers: new Map(drivers.map(d => [d.userId, d])),
+          brokers: new Map(brokers.map(b => [b.brokerId, b])),
+          truckOwners: new Map(truckOwners.map(o => [o.userId, o])),
           truckPlates: new Map(trucks.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.truckId])),
           trailerPlates: new Map(trailers.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.trailerId])),
           driverLicenses: new Map(drivers.filter(d => d.isActive && d.nationalId).map(d => [d.nationalId!.toUpperCase(), d.userId])),
@@ -207,13 +213,17 @@ export class AssetCacheService {
     return forkJoin({
       trucks: this.tripService.getTrucksByCarrier().pipe(catchError(() => of([]))),
       trailers: this.tripService.getTrailersByCarrier().pipe(catchError(() => of([]))),
-      drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([])))
+      drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([]))),
+      brokers: this.tripService.getBrokers().pipe(catchError(() => of([]))),
+      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([])))
     }).pipe(
-      tap(({ trucks, trailers, drivers }) => {
+      tap(({ trucks, trailers, drivers, brokers, truckOwners }) => {
         const cache: AssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),
           drivers: new Map(drivers.map(d => [d.userId, d])),
+          brokers: new Map(brokers.map(b => [b.brokerId, b])),
+          truckOwners: new Map(truckOwners.map(o => [o.userId, o])),
           truckPlates: new Map(trucks.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.truckId])),
           trailerPlates: new Map(trailers.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.trailerId])),
           driverLicenses: new Map(drivers.filter(d => d.isActive && d.nationalId).map(d => [d.nationalId!.toUpperCase(), d.userId])),
@@ -252,6 +262,8 @@ export class AssetCacheService {
       trucks: new Map(),
       trailers: new Map(),
       drivers: new Map(),
+      brokers: new Map(),
+      truckOwners: new Map(),
       truckPlates: new Map(),
       trailerPlates: new Map(),
       driverLicenses: new Map(),
@@ -265,6 +277,8 @@ export class AssetCacheService {
         trucks: Array.from(cache.trucks.entries()),
         trailers: Array.from(cache.trailers.entries()),
         drivers: Array.from(cache.drivers.entries()),
+        brokers: Array.from(cache.brokers.entries()),
+        truckOwners: Array.from(cache.truckOwners.entries()),
         truckPlates: Array.from(cache.truckPlates.entries()),
         trailerPlates: Array.from(cache.trailerPlates.entries()),
         driverLicenses: Array.from(cache.driverLicenses.entries()),
@@ -285,6 +299,8 @@ export class AssetCacheService {
           trucks: new Map(serialized.trucks),
           trailers: new Map(serialized.trailers),
           drivers: new Map(serialized.drivers),
+          brokers: new Map(serialized.brokers || []),
+          truckOwners: new Map(serialized.truckOwners || []),
           truckPlates: new Map(serialized.truckPlates),
           trailerPlates: new Map(serialized.trailerPlates),
           driverLicenses: new Map(serialized.driverLicenses),

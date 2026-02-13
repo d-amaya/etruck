@@ -103,6 +103,7 @@ describe('TripTableComponent', () => {
         brokerId: null,
         truckId: null,
         driverId: null,
+        truckOwnerId: null,
       }),
       pagination$: of({ page: 0, pageSize: 25 }),
       filtersAndPagination$: of([
@@ -112,6 +113,7 @@ describe('TripTableComponent', () => {
           brokerId: null,
           truckId: null,
           driverId: null,
+          truckOwnerId: null,
         },
         { page: 0, pageSize: 25 }
       ]),
@@ -124,6 +126,7 @@ describe('TripTableComponent', () => {
       brokerId: null,
       truckId: null,
       driverId: null,
+      truckOwnerId: null,
     });
     
     sharedFilterServiceSpy = jasmine.createSpyObj('SharedFilterService', [
@@ -136,6 +139,7 @@ describe('TripTableComponent', () => {
         brokerId: null,
         truckId: null,
         driverId: null,
+        truckOwnerId: null,
       })
     });
     sharedFilterServiceSpy.getCurrentFilters.and.returnValue({
@@ -144,6 +148,7 @@ describe('TripTableComponent', () => {
       brokerId: null,
       truckId: null,
       driverId: null,
+      truckOwnerId: null,
     });
     
     pdfExportServiceSpy = jasmine.createSpyObj('PdfExportService', ['exportDashboard']);

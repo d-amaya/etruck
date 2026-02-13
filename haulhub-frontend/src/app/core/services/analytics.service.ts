@@ -102,6 +102,17 @@ export class AnalyticsService {
     return endOfDay ? `${y}-${m}-${day}T23:59:59.999Z` : `${y}-${m}-${day}T00:00:00.000Z`;
   }
 
+  getUnifiedAnalytics(startDate?: Date, endDate?: Date): Observable<any> {
+    let params = new HttpParams();
+    if (startDate) {
+      params = params.set('startDate', this.toUTCDateString(startDate));
+    }
+    if (endDate) {
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
+    }
+    return this.http.get<any>(`${this.apiUrl}/unified`, { params });
+  }
+
   getFleetOverview(): Observable<FleetOverview> {
     return this.http.get<FleetOverview>(`${this.apiUrl}/fleet-overview`);
   }

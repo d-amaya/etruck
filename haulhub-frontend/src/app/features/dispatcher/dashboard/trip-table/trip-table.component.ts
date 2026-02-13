@@ -60,7 +60,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'dropoffLocation',
     'brokerName',
     'truckId',
-    'trailerId',
+    'truckOwnerId',
     'driverName',
     'revenue',
     'expenses',
@@ -81,10 +81,12 @@ export class TripTableComponent implements OnInit, OnDestroy {
   brokers: Broker[] = [];
   trucks: any[] = [];
   drivers: any[] = [];
+  truckOwners: any[] = [];
   
   // Filtered observables for autocomplete
   filteredTrucks!: Observable<any[]>;
   filteredDrivers!: Observable<any[]>;
+  filteredTruckOwners!: Observable<any[]>;
   
   // Asset lookup maps for filter validation and conversion
   private truckPlateToIdMap = new Map<string, string>(); // plate -> truckId
@@ -94,6 +96,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private trailerMap = new Map<string, any>(); // trailerId -> trailer (for display)
   private driverMap = new Map<string, any>(); // driverId -> driver (for display)
   private brokerMap = new Map<string, any>(); // brokerId -> broker (for display)
+  private truckOwnerMap = new Map<string, any>(); // truckOwnerId -> truckOwner (for display)
   
   // Autocomplete suggestions
   truckPlates: string[] = [];
@@ -125,7 +128,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
       status: [null],
       brokerId: [null],
       truckId: [null],
-      driverId: [null]
+      driverId: [null],
+      truckOwnerId: [null]
     });
   }
 
@@ -154,6 +158,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
         a.name.localeCompare(b.name)
       );
       
+      this.truckOwnerMap = cache.truckOwners;
+      this.truckOwners = Array.from(cache.truckOwners.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+      
       this.truckPlates = Array.from(cache.truckPlates.keys());
       this.trailerPlates = Array.from(cache.trailerPlates.keys());
       this.driverLicenses = Array.from(cache.driverLicenses.keys());
@@ -169,6 +178,22 @@ export class TripTableComponent implements OnInit, OnDestroy {
         startWith(''),
         map(value => this._filterDrivers(value || ''))
       );
+
+      // Setup autocomplete filtering for truck owners
+      this.filteredTruckOwners = this.filterForm.get('truckOwnerId')!.valueChanges.pipe(
+        startWith(''),
+        map(value => this._filterTruckOwners(value || ''))
+      );
+
+      // Restore filter form from state after assets load
+      const currentFilters = this.sharedFilterService.getCurrentFilters();
+      this.filterForm.patchValue({
+        status: currentFilters.status,
+        brokerId: currentFilters.brokerId,
+        truckId: currentFilters.truckId || '',
+        driverId: currentFilters.driverId || '',
+        truckOwnerId: currentFilters.truckOwnerId || ''
+      }, { emitEvent: false });
     });
     
     // Load brokers for filter dropdown and sort alphabetically
@@ -183,15 +208,6 @@ export class TripTableComponent implements OnInit, OnDestroy {
           this.brokerMap.set(broker.brokerId, broker);
         });
       });
-
-    // Initialize filter form with current filter values
-    const currentFilters = this.sharedFilterService.getCurrentFilters();
-    this.filterForm.patchValue({
-      status: currentFilters.status,
-      brokerId: currentFilters.brokerId,
-      truckId: currentFilters.truckId || '',
-      driverId: currentFilters.driverId || ''
-    }, { emitEvent: false });
 
     // Subscribe to the combined filters and pagination observable
     this.dashboardState.filtersAndPagination$.pipe(
@@ -233,6 +249,13 @@ export class TripTableComponent implements OnInit, OnDestroy {
    */
   getDriverName(driverId: string): string {
     return this.driverMap.get(driverId)?.name || driverId.substring(0, 8);
+  }
+
+  /**
+   * Get truck owner name from ID
+   */
+  getTruckOwnerName(truckOwnerId: string): string {
+    return this.truckOwnerMap.get(truckOwnerId)?.name || truckOwnerId.substring(0, 8);
   }
 
   /**
@@ -327,6 +350,20 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Filter truck owners for autocomplete (by name)
+   */
+  private _filterTruckOwners(value: string | any): any[] {
+    if (typeof value === 'object') {
+      return this.truckOwners;
+    }
+    
+    const filterValue = (value || '').toString().toLowerCase();
+    return this.truckOwners.filter(owner =>
+      owner.name.toLowerCase().includes(filterValue)
+    );
+  }
+
+  /**
    * Clear truck filter
    */
   clearTruckFilter(): void {
@@ -339,6 +376,14 @@ export class TripTableComponent implements OnInit, OnDestroy {
    */
   clearDriverFilter(): void {
     this.filterForm.patchValue({ driverId: null }, { emitEvent: false });
+    this.applyFilters();
+  }
+
+  /**
+   * Clear truck owner filter
+   */
+  clearTruckOwnerFilter(): void {
+    this.filterForm.patchValue({ truckOwnerId: null }, { emitEvent: false });
     this.applyFilters();
   }
 
@@ -358,6 +403,15 @@ export class TripTableComponent implements OnInit, OnDestroy {
     if (!driverId) return '';
     const driver = this.driverMap.get(driverId);
     return driver ? driver.name : '';
+  };
+
+  /**
+   * Display function for truck owner autocomplete - shows name instead of UUID
+   */
+  displayTruckOwner = (truckOwnerId: string | null): string => {
+    if (!truckOwnerId) return '';
+    const owner = this.truckOwnerMap.get(truckOwnerId);
+    return owner ? owner.name : '';
   };
 
   /**
@@ -397,6 +451,13 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number, assets?: any, chartAggregates?: any }> {
+    // Check cache first — avoid redundant API calls when switching views
+    const cached = this.dashboardState.getCachedTrips(filters, pagination);
+    if (cached) {
+      this.loading = false;
+      return of(cached);
+    }
+
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
 
@@ -450,6 +511,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
         
         return { trips: sortedTrips, total, chartAggregates: response.chartAggregates };
       }),
+      tap(result => {
+        this.dashboardState.setCachedTrips(filters, pagination, result);
+      }),
       catchError(error => {
         this.loading = false;
         
@@ -499,6 +563,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
     if (filters.driverId) {
       apiFilters.driverId = filters.driverId;
+    }
+    if (filters.truckOwnerId) {
+      apiFilters.truckOwnerId = filters.truckOwnerId;
     }
 
     return apiFilters;
@@ -724,7 +791,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
       status: null,
       brokerId: null,
       truckId: null,
-      driverId: null
+      driverId: null,
+      truckOwnerId: null
     });
     
     // Also clear the form fields visually
@@ -732,7 +800,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
       status: null,
       brokerId: null,
       truckId: null,
-      driverId: null
+      driverId: null,
+      truckOwnerId: null
     });
     
     // Manually reset the paginator UI to page 0
@@ -768,11 +837,19 @@ export class TripTableComponent implements OnInit, OnDestroy {
       driverId = null;
     }
     
+    // Validate truck owner selection - only apply if it's a valid UUID or null
+    let truckOwnerId = formValue.truckOwnerId;
+    if (truckOwnerId && typeof truckOwnerId === 'string' && !this.isValidUUID(truckOwnerId)) {
+      console.log('Invalid truck owner selection, ignoring:', truckOwnerId);
+      truckOwnerId = null;
+    }
+    
     const filtersToApply = {
       status: formValue.status,
       brokerId: formValue.brokerId,
       truckId: truckId,
-      driverId: driverId
+      driverId: driverId,
+      truckOwnerId: truckOwnerId
     };
     
     this.sharedFilterService.updateFilters(filtersToApply);

@@ -288,6 +288,9 @@ export class AuthService {
       localStorage.removeItem(this.USER_DATA_KEY);
       localStorage.removeItem(this.ACCESS_TOKEN_KEY);
       localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+      localStorage.removeItem('etrucky_dispatcher_asset_cache');
+      localStorage.removeItem('etrucky_carrier_asset_cache');
+      localStorage.removeItem('etrucky_driver_asset_cache');
     } catch (error) {
       console.error('Error clearing user data:', error);
     }

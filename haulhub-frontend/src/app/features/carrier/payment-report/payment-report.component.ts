@@ -12,6 +12,7 @@ import { takeUntil } from 'rxjs/operators';
 import { TripService } from '../../../core/services/trip.service';
 import { DispatcherPaymentReport } from '@haulhub/shared';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
+import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -56,7 +57,8 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   constructor(
     private tripService: TripService,
     private snackBar: MatSnackBar,
-    private filterService: CarrierFilterService
+    private filterService: CarrierFilterService,
+    private assetCache: CarrierAssetCacheService
   ) {}
 
   ngOnInit(): void {
@@ -70,32 +72,11 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   }
 
   private loadAssetMaps(): void {
-    this.tripService.getTrucksByCarrier().subscribe({
-      next: (trucks) => {
-        trucks.forEach(truck => this.truckMap.set(truck.truckId, truck));
-      },
-      error: (error) => console.error('Error loading trucks:', error)
-    });
-    
-    this.tripService.getDriversByCarrier().subscribe({
-      next: (drivers) => {
-        drivers.forEach(driver => this.driverMap.set(driver.userId, driver));
-      },
-      error: (error) => console.error('Error loading drivers:', error)
-    });
-    
-    this.tripService.getBrokers().subscribe({
-      next: (brokers) => {
-        brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
-      },
-      error: (error) => console.error('Error loading brokers:', error)
-    });
-    
-    this.tripService.getTruckOwnersByCarrier().subscribe({
-      next: (owners) => {
-        owners.forEach(owner => this.truckOwnerMap.set(owner.userId, owner));
-      },
-      error: (error) => console.error('Error loading truck owners:', error)
+    this.assetCache.loadAssets().subscribe(cache => {
+      this.truckMap = cache.trucks;
+      this.driverMap = cache.drivers;
+      cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
+      cache.truckOwners.forEach((o, id) => this.truckOwnerMap.set(id, o));
     });
   }
 
@@ -143,8 +124,18 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   }
 
   loadReport(): void {
-    this.loading = true;
     const filters = this.filterService.getCurrentFilter();
+
+    // Check cache first (5-min TTL)
+    const cached = this.filterService.getCachedPaymentReport(filters.startDate, filters.endDate);
+    if (cached) {
+      this.report = cached as DispatcherPaymentReport;
+      this.enrichGroupedData();
+      this.loading = false;
+      return;
+    }
+
+    this.loading = true;
     
     this.tripService.getPaymentReport({
       startDate: filters.startDate ? `${filters.startDate.getFullYear()}-${String(filters.startDate.getMonth()+1).padStart(2,'0')}-${String(filters.startDate.getDate()).padStart(2,'0')}` : undefined,
@@ -152,6 +143,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: (report) => {
         this.report = report as DispatcherPaymentReport;
+        this.filterService.setCachedPaymentReport(filters.startDate, filters.endDate, report);
         this.enrichGroupedData();
         this.loading = false;
       },

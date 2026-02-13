@@ -26,7 +26,17 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.setDefaultDateRange();
+    // Sync form with current filter state
+    const currentFilters = this.filterService.getCurrentFilters();
+    if (currentFilters.dateRange.startDate && currentFilters.dateRange.endDate) {
+      this.filterForm.patchValue({
+        startDate: currentFilters.dateRange.startDate,
+        endDate: currentFilters.dateRange.endDate
+      }, { emitEvent: false });
+    } else {
+      this.setDefaultDateRange();
+    }
+    this.activePreset = this.filterService.activePreset;
     
     this.filterForm.valueChanges.pipe(
       debounceTime(300),
@@ -77,6 +87,7 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
     }
 
     this.activePreset = preset;
+    this.filterService.activePreset = preset;
     this.filterForm.patchValue({
       startDate,
       endDate
@@ -100,7 +111,6 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
     }
 
     this.dateRangeError = null;
-    this.detectActivePreset(startDate, endDate);
 
     this.filterService.updateFilters({
       dateRange: {
@@ -108,30 +118,5 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
         endDate
       }
     });
-  }
-
-  private detectActivePreset(startDate: Date, endDate: Date): void {
-    const today = new Date();
-    const startDiffDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const endDiffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const startIsToday = Math.abs(startDate.getTime() - today.getTime()) < (24 * 60 * 60 * 1000);
-    const endIsToday = Math.abs(endDate.getTime() - today.getTime()) < (24 * 60 * 60 * 1000);
-    
-    if (startIsToday && endDiffDays >= 6 && endDiffDays <= 8) {
-      this.activePreset = 'nextWeek';
-    } else if (startIsToday && endDiffDays >= 28 && endDiffDays <= 32) {
-      this.activePreset = 'nextMonth';
-    } else if (endIsToday) {
-      if (startDiffDays >= 28 && startDiffDays <= 32) {
-        this.activePreset = 'lastMonth';
-      } else if (startDiffDays >= 88 && startDiffDays <= 95) {
-        this.activePreset = 'last3Months';
-      } else {
-        this.activePreset = '';
-      }
-    } else {
-      this.activePreset = '';
-    }
   }
 }

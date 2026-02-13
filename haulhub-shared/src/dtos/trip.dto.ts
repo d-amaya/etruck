@@ -471,6 +471,10 @@ export class TripFilters {
   driverName?: string;
 
   @IsOptional()
+  @IsString()
+  truckOwnerId?: string;
+
+  @IsOptional()
   @IsEnum(TripStatus)
   orderStatus?: TripStatus;
 

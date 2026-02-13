@@ -16,6 +16,18 @@ import { UserRole } from '@haulhub/shared';
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  @Get('unified')
+  @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
+  async getUnifiedAnalytics(
+    @CurrentUser() user: CurrentUserData,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return await this.analyticsService.getUnifiedAnalytics(user.userId, user.role, start, end);
+  }
+
   @Get('fleet-overview')
   @Roles(UserRole.Dispatcher, UserRole.Carrier, UserRole.Admin)
   async getFleetOverview(@CurrentUser() user: CurrentUserData) {

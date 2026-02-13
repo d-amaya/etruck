@@ -84,6 +84,13 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     // Determine which preset is active on init
     this.updateActivePreset();
 
+    // Push current dates to dashboard state (ensures API uses correct dates after navigation)
+    if (currentFilters.dateRange.startDate && currentFilters.dateRange.endDate) {
+      this.sharedFilterService.updateFilters({
+        dateRange: currentFilters.dateRange
+      });
+    }
+
     this.filterForm.valueChanges
       .pipe(
         debounceTime(300),

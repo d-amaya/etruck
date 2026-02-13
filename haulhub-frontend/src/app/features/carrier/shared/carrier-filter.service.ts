@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { CarrierDashboardStateService } from './carrier-dashboard-state.service';
+import { CarrierDashboardFilters, PaginationState } from './carrier-dashboard-state.service';
 
 export type ViewMode = 'table' | 'analytics' | 'payments';
 
@@ -23,6 +24,12 @@ export class CarrierFilterService {
   dateFilter$: Observable<CarrierDateFilter> = this.dateFilterSubject.asObservable();
   viewMode$: Observable<ViewMode> = this.viewModeSubject.asObservable();
   activePreset: string | null = 'currentWeek';
+
+  // Response caches with 5-minute TTL
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000;
+  private analyticsCache: { data: any; startTime: number | null; endTime: number | null; fetchedAt: number } | null = null;
+  private paymentCache: { data: any; startTime: number | null; endTime: number | null; fetchedAt: number } | null = null;
+  private tripsCache: { data: any; key: string; fetchedAt: number } | null = null;
 
   constructor(private dashboardState: CarrierDashboardStateService) {}
 
@@ -95,5 +102,61 @@ export class CarrierFilterService {
 
   clearFilter(): void {
     this.updateDateFilter(null, null);
+  }
+
+  // --- View response caching (5-min TTL) ---
+
+  private dateKey(d: Date | null): number | null {
+    return d ? d.getTime() : null;
+  }
+
+  private isCacheValid(cache: { startTime: number | null; endTime: number | null; fetchedAt: number }, start: Date | null, end: Date | null): boolean {
+    return cache.startTime === this.dateKey(start) &&
+           cache.endTime === this.dateKey(end) &&
+           (Date.now() - cache.fetchedAt) < this.CACHE_TTL_MS;
+  }
+
+  getCachedAnalytics(start: Date | null, end: Date | null): any | null {
+    return this.analyticsCache && this.isCacheValid(this.analyticsCache, start, end) ? this.analyticsCache.data : null;
+  }
+
+  setCachedAnalytics(start: Date | null, end: Date | null, data: any): void {
+    this.analyticsCache = { data, startTime: this.dateKey(start), endTime: this.dateKey(end), fetchedAt: Date.now() };
+  }
+
+  getCachedPaymentReport(start: Date | null, end: Date | null): any | null {
+    return this.paymentCache && this.isCacheValid(this.paymentCache, start, end) ? this.paymentCache.data : null;
+  }
+
+  setCachedPaymentReport(start: Date | null, end: Date | null, data: any): void {
+    this.paymentCache = { data, startTime: this.dateKey(start), endTime: this.dateKey(end), fetchedAt: Date.now() };
+  }
+
+  getCachedTrips(filters: CarrierDashboardFilters, pagination: PaginationState): any | null {
+    if (!this.tripsCache) return null;
+    const key = JSON.stringify({
+      s: filters.dateRange.startDate?.getTime(), e: filters.dateRange.endDate?.getTime(),
+      st: filters.status, b: filters.brokerId, t: filters.truckId,
+      d: filters.driverId, di: filters.dispatcherId, o: filters.truckOwnerId,
+      p: pagination.page, ps: pagination.pageSize
+    });
+    return this.tripsCache.key === key && (Date.now() - this.tripsCache.fetchedAt) < this.CACHE_TTL_MS
+      ? this.tripsCache.data : null;
+  }
+
+  setCachedTrips(filters: CarrierDashboardFilters, pagination: PaginationState, data: any): void {
+    const key = JSON.stringify({
+      s: filters.dateRange.startDate?.getTime(), e: filters.dateRange.endDate?.getTime(),
+      st: filters.status, b: filters.brokerId, t: filters.truckId,
+      d: filters.driverId, di: filters.dispatcherId, o: filters.truckOwnerId,
+      p: pagination.page, ps: pagination.pageSize
+    });
+    this.tripsCache = { data, key, fetchedAt: Date.now() };
+  }
+
+  invalidateViewCaches(): void {
+    this.analyticsCache = null;
+    this.paymentCache = null;
+    this.tripsCache = null;
   }
 }

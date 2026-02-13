@@ -15,6 +15,7 @@ export interface DashboardFilters {
   brokerId: string | null;
   truckId: string | null;
   driverId: string | null;
+  truckOwnerId: string | null;
 }
 
 export interface PaymentSummary {
@@ -49,11 +50,8 @@ export interface ErrorState {
   providedIn: 'root'
 })
 export class DashboardStateService {
-  private readonly FILTERS_STORAGE_KEY = 'etrucky_dispatcher_filters';
-  private readonly PAGINATION_STORAGE_KEY = 'etrucky_dispatcher_pagination';
-
-  private filtersSubject = new BehaviorSubject<DashboardFilters>(this.loadFiltersFromStorage());
-  private paginationSubject = new BehaviorSubject<PaginationState>(this.loadPaginationFromStorage());
+  private filtersSubject = new BehaviorSubject<DashboardFilters>(this.getDefaultFilters());
+  private paginationSubject = new BehaviorSubject<PaginationState>({ page: 0, pageSize: 10, pageTokens: [] });
   private loadingSubject = new BehaviorSubject<LoadingState>({
     isLoading: false,
     isInitialLoad: false,
@@ -114,6 +112,11 @@ export class DashboardStateService {
   private refreshPaymentSummarySubject = new Subject<void>();
   public refreshPaymentSummary$: Observable<void> = this.refreshPaymentSummarySubject.asObservable();
 
+  // Response caches for Analytics and Payments views (avoid redundant API calls on view switch)
+  private analyticsCache: { data: any; startTime: number | null; endTime: number | null } | null = null;
+  private paymentCache: { data: any; startTime: number | null; endTime: number | null } | null = null;
+  private tripsCache: { data: any; key: string } | null = null;
+
   constructor(
     private tripService: TripService,
     private authService: AuthService,
@@ -139,9 +142,6 @@ export class DashboardStateService {
       this.paginationSubject.next(newPagination);
     });
     
-    this.saveFiltersToStorage(newFilters);
-    this.savePaginationToStorage(newPagination);
-    
     // Show filter update loading state
     this.setLoadingState(true, false, true);
     this.clearError();
@@ -152,39 +152,27 @@ export class DashboardStateService {
     
     // If page size changed, reset to page 0 and clear pagination tokens
     if (pagination.pageSize !== undefined && pagination.pageSize !== currentPagination.pageSize) {
-      const newPagination = {
+      this.paginationSubject.next({
         ...currentPagination,
         ...pagination,
         page: 0,
         pageTokens: [],
         lastEvaluatedKey: undefined
-      };
-      this.paginationSubject.next(newPagination);
-      this.savePaginationToStorage(newPagination);
+      });
     } else {
-      const newPagination = { ...currentPagination, ...pagination };
-      this.paginationSubject.next(newPagination);
-      this.savePaginationToStorage(newPagination);
+      this.paginationSubject.next({ ...currentPagination, ...pagination });
     }
   }
 
   updatePaginationSilent(pagination: Partial<PaginationState>): void {
     const currentPagination = this.paginationSubject.value;
     const newPagination = { ...currentPagination, ...pagination };
-    // Update the value directly without emitting to prevent triggering new queries
     (this.paginationSubject as any)._value = newPagination;
-    this.savePaginationToStorage(newPagination);
   }
 
   clearFilters(): void {
-    const defaultFilters = this.getDefaultFilters();
-    const defaultPagination = { page: 0, pageSize: 10, pageTokens: [] };
-    
-    this.filtersSubject.next(defaultFilters);
-    this.paginationSubject.next(defaultPagination);
-    
-    this.saveFiltersToStorage(defaultFilters);
-    this.savePaginationToStorage(defaultPagination);
+    this.filtersSubject.next(this.getDefaultFilters());
+    this.paginationSubject.next({ page: 0, pageSize: 10, pageTokens: [] });
   }
 
   getActiveFilterCount(): number {
@@ -195,6 +183,7 @@ export class DashboardStateService {
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
     if (filters.driverId) count++;
+    if (filters.truckOwnerId) count++;
     return count;
   }
 
@@ -218,7 +207,67 @@ export class DashboardStateService {
    * Trigger payment summary refresh after data mutations (delete, create, update)
    */
   triggerPaymentSummaryRefresh(): void {
+    this.invalidateViewCaches();
     this.refreshPaymentSummarySubject.next();
+  }
+
+  // --- View response caching ---
+
+  private dateKey(d: Date | null): number | null {
+    return d ? d.getTime() : null;
+  }
+
+  getCachedAnalytics(start: Date | null, end: Date | null): any | null {
+    if (!this.analyticsCache) return null;
+    if (this.analyticsCache.startTime === this.dateKey(start) && this.analyticsCache.endTime === this.dateKey(end)) {
+      return this.analyticsCache.data;
+    }
+    return null;
+  }
+
+  setCachedAnalytics(start: Date | null, end: Date | null, data: any): void {
+    this.analyticsCache = { data, startTime: this.dateKey(start), endTime: this.dateKey(end) };
+  }
+
+  getCachedPaymentReport(start: Date | null, end: Date | null): any | null {
+    if (!this.paymentCache) return null;
+    if (this.paymentCache.startTime === this.dateKey(start) && this.paymentCache.endTime === this.dateKey(end)) {
+      return this.paymentCache.data;
+    }
+    return null;
+  }
+
+  setCachedPaymentReport(start: Date | null, end: Date | null, data: any): void {
+    this.paymentCache = { data, startTime: this.dateKey(start), endTime: this.dateKey(end) };
+  }
+
+  private tripsKey(filters: DashboardFilters, pagination: PaginationState): string {
+    return JSON.stringify({
+      s: filters.dateRange.startDate?.getTime(),
+      e: filters.dateRange.endDate?.getTime(),
+      st: filters.status,
+      b: filters.brokerId,
+      t: filters.truckId,
+      d: filters.driverId,
+      o: filters.truckOwnerId,
+      p: pagination.page,
+      ps: pagination.pageSize
+    });
+  }
+
+  getCachedTrips(filters: DashboardFilters, pagination: PaginationState): any | null {
+    if (!this.tripsCache) return null;
+    return this.tripsCache.key === this.tripsKey(filters, pagination) ? this.tripsCache.data : null;
+  }
+
+  setCachedTrips(filters: DashboardFilters, pagination: PaginationState, data: any): void {
+    this.tripsCache = { data, key: this.tripsKey(filters, pagination) };
+  }
+
+  invalidateViewCaches(): void {
+    this.analyticsCache = null;
+    this.paymentCache = null;
+    this.tripsCache = null;
   }
 
   /**
@@ -314,7 +363,8 @@ export class DashboardStateService {
       status: null,
       brokerId: null,
       truckId: null,
-      driverId: null
+      driverId: null,
+      truckOwnerId: null
     };
   }
 
@@ -391,82 +441,8 @@ export class DashboardStateService {
   private setupLogoutListener(): void {
     this.authService.currentUser$.subscribe(user => {
       if (!user) {
-        // User logged out, clear session storage
-        this.clearSessionStorage();
+        this.invalidateViewCaches();
       }
     });
-  }
-
-  private loadFiltersFromStorage(): DashboardFilters {
-    // Always start fresh - don't load from storage
-    // This ensures hard refresh clears all filters
-    return this.getDefaultFilters();
-    
-    /* Original code that persisted filters:
-    try {
-      const stored = sessionStorage.getItem(this.FILTERS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Convert date strings back to Date objects
-        if (parsed.dateRange) {
-          if (parsed.dateRange.startDate) {
-            parsed.dateRange.startDate = new Date(parsed.dateRange.startDate);
-          }
-          if (parsed.dateRange.endDate) {
-            parsed.dateRange.endDate = new Date(parsed.dateRange.endDate);
-          }
-        }
-        return { ...this.getDefaultFilters(), ...parsed };
-      }
-    } catch (error) {
-      console.warn('Failed to load filters from session storage:', error);
-    }
-    return this.getDefaultFilters();
-    */
-  }
-
-  private saveFiltersToStorage(filters: DashboardFilters): void {
-    try {
-      sessionStorage.setItem(this.FILTERS_STORAGE_KEY, JSON.stringify(filters));
-    } catch (error) {
-      console.warn('Failed to save filters to session storage:', error);
-    }
-  }
-
-  private loadPaginationFromStorage(): PaginationState {
-    // Always start fresh - don't load from storage
-    // This ensures hard refresh resets pagination
-    return { page: 0, pageSize: 10, pageTokens: [] };
-    
-    /* Original code that persisted pagination:
-    try {
-      const stored = sessionStorage.getItem(this.PAGINATION_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Always reset to page 0 on load to avoid showing stale page numbers
-        return { page: 0, pageSize: parsed.pageSize || 10, pageTokens: [] };
-      }
-    } catch (error) {
-      console.warn('Failed to load pagination from session storage:', error);
-    }
-    return { page: 0, pageSize: 10, pageTokens: [] };
-    */
-  }
-
-  private savePaginationToStorage(pagination: PaginationState): void {
-    try {
-      sessionStorage.setItem(this.PAGINATION_STORAGE_KEY, JSON.stringify(pagination));
-    } catch (error) {
-      console.warn('Failed to save pagination to session storage:', error);
-    }
-  }
-
-  private clearSessionStorage(): void {
-    try {
-      sessionStorage.removeItem(this.FILTERS_STORAGE_KEY);
-      sessionStorage.removeItem(this.PAGINATION_STORAGE_KEY);
-    } catch (error) {
-      console.warn('Failed to clear session storage:', error);
-    }
   }
 }

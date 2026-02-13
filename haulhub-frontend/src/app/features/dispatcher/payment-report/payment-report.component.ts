@@ -19,6 +19,7 @@ import { TripService } from '../../../core/services/trip.service';
 import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
 import { SharedFilterService } from '../dashboard/shared-filter.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
+import { AssetCacheService } from '../dashboard/asset-cache.service';
 import { Input } from '@angular/core';
 
 @Component({
@@ -72,7 +73,8 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     private snackBar: MatSnackBar,
     private router: Router,
     private sharedFilterService: SharedFilterService,
-    private dashboardStateService: DashboardStateService
+    private dashboardStateService: DashboardStateService,
+    private assetCache: AssetCacheService
   ) {
     this.filterForm = this.fb.group({
       startDate: [null],
@@ -83,52 +85,25 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Load asset maps for enrichment
     this.loadAssetMaps();
-    
+
     // Subscribe to shared filter changes
     this.sharedFilterService.filters$
       .pipe(takeUntil(this.destroy$))
       .subscribe(filters => {
-        // Update form with shared filter values
         this.filterForm.patchValue({
           startDate: filters.dateRange.startDate,
           endDate: filters.dateRange.endDate
         }, { emitEvent: false });
-        
-        // Load report with new filters
         this.loadReport();
       });
   }
 
-  /**
-   * Load asset maps from API for enrichment
-   */
   private loadAssetMaps(): void {
-    this.tripService.getTrucksByCarrier().subscribe({
-      next: (trucks) => {
-        trucks.forEach(truck => this.truckMap.set(truck.truckId, truck));
-      },
-      error: (error) => console.error('Error loading trucks:', error)
-    });
-    
-    this.tripService.getDriversByCarrier().subscribe({
-      next: (drivers) => {
-        drivers.forEach(driver => this.driverMap.set(driver.userId, driver));
-      },
-      error: (error) => console.error('Error loading drivers:', error)
-    });
-    
-    this.tripService.getBrokers().subscribe({
-      next: (brokers) => {
-        brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
-      },
-      error: (error) => console.error('Error loading brokers:', error)
-    });
-    
-    this.tripService.getTruckOwnersByCarrier().subscribe({
-      next: (owners) => {
-        owners.forEach(owner => this.truckOwnerMap.set(owner.userId, owner));
-      },
-      error: (error) => console.error('Error loading truck owners:', error)
+    this.assetCache.loadAssets().subscribe(cache => {
+      cache.trucks.forEach((t, id) => this.truckMap.set(id, t));
+      cache.drivers.forEach((d, id) => this.driverMap.set(id, d));
+      cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
+      cache.truckOwners.forEach((o, id) => this.truckOwnerMap.set(id, o));
     });
   }
 
@@ -198,9 +173,25 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
 
     // Don't add groupBy - fetch all grouped data at once
 
+    // Check cache first — avoid redundant API calls when switching views
+    const cached = this.dashboardStateService.getCachedPaymentReport(
+      sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate
+    );
+    if (cached) {
+      this.report = cached as DispatcherPaymentReport;
+      this.enrichGroupedData();
+      this.loading = false;
+      this.dashboardStateService.setLoadingState(false);
+      this.dashboardStateService.clearError();
+      return;
+    }
+
     this.tripService.getPaymentReport(filters).subscribe({
       next: (report) => {
         this.report = report as DispatcherPaymentReport;
+        this.dashboardStateService.setCachedPaymentReport(
+          sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate, report
+        );
         this.enrichGroupedData();
         this.loading = false;
         // Always complete loading (trip-table does this too)
@@ -221,6 +212,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   }
 
   onFilterSubmit(): void {
+    this.dashboardStateService.invalidateViewCaches();
     this.loadReport();
   }
 
@@ -234,6 +226,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       endDate: lastDay
     });
     
+    this.dashboardStateService.invalidateViewCaches();
     this.loadReport();
   }
 

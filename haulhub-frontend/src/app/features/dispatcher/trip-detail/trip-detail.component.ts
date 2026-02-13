@@ -9,6 +9,9 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { TripService } from '../../../core/services';
 import { AuthService } from '../../../core/services/auth.service';
+import { AssetCacheService } from '../dashboard/asset-cache.service';
+import { DashboardStateService } from '../dashboard/dashboard-state.service';
+import { CarrierAssetCacheService } from '../../carrier/shared/carrier-asset-cache.service';
 import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
 
 @Component({
@@ -42,7 +45,10 @@ export class TripDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private tripService: TripService,
-    private authService: AuthService
+    private authService: AuthService,
+    private assetCache: AssetCacheService,
+    private carrierAssetCache: CarrierAssetCacheService,
+    private dashboardState: DashboardStateService
   ) {}
 
   ngOnInit(): void {
@@ -62,58 +68,28 @@ export class TripDetailComponent implements OnInit {
   }
 
   /**
-   * Load asset maps from localStorage
+   * Load asset maps from cache service
    */
   private loadAssetMapsFromStorage(): void {
-    try {
-      const truckData = localStorage.getItem('carrier_truck_map');
-      const trailerData = localStorage.getItem('carrier_trailer_map');
-      const driverData = localStorage.getItem('carrier_driver_map');
-      
-      if (truckData) {
-        const truckEntries = JSON.parse(truckData);
-        // This is plate -> truckId map, we need to reverse it or load full truck data
-        // For now, we'll load trucks via API
-      }
-    } catch (error) {
-      console.error('Error loading asset maps from localStorage:', error);
-    }
-    
-    // Load full asset details from API
-    this.loadAssetDetails();
-  }
+    const role = this.authService.userRole;
 
-  /**
-   * Load full asset details for display
-   */
-  private loadAssetDetails(): void {
-    this.tripService.getTrucksByCarrier().subscribe({
-      next: (trucks) => {
-        trucks.forEach(truck => this.truckMap.set(truck.truckId, truck));
-      },
-      error: (error) => console.error('Error loading trucks:', error)
-    });
-
-    this.tripService.getBrokers().subscribe({
-      next: (brokers) => {
+    if (role === UserRole.Carrier) {
+      this.carrierAssetCache.loadAssets().subscribe(cache => {
+        this.truckMap = cache.trucks;
+        this.trailerMap = cache.trailers;
+        this.driverMap = cache.drivers;
+        cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
+      });
+    } else {
+      this.assetCache.loadAssets().subscribe(cache => {
+        this.truckMap = cache.trucks;
+        this.trailerMap = cache.trailers;
+        this.driverMap = cache.drivers;
+      });
+      this.dashboardState.brokers$.subscribe(brokers => {
         brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
-      },
-      error: (error) => console.error('Error loading brokers:', error)
-    });
-    
-    this.tripService.getTrailersByCarrier().subscribe({
-      next: (trailers) => {
-        trailers.forEach(trailer => this.trailerMap.set(trailer.trailerId, trailer));
-      },
-      error: (error) => console.error('Error loading trailers:', error)
-    });
-    
-    this.tripService.getDriversByCarrier().subscribe({
-      next: (drivers) => {
-        drivers.forEach(driver => this.driverMap.set(driver.userId, driver));
-      },
-      error: (error) => console.error('Error loading drivers:', error)
-    });
+      });
+    }
   }
 
   private loadTrip(tripId: string): void {

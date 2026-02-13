@@ -77,6 +77,14 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
       this.trailers = Array.from(cache.trailers.values()).sort((a, b) => a.plate.localeCompare(b.plate));
       this.dispatchers = Array.from(cache.dispatchers.values()).sort((a, b) => a.name.localeCompare(b.name));
       
+      // Restore filter form from state after assets load
+      const currentFilters = this.filterService.getCurrentFilters();
+      this.filterForm.patchValue({
+        status: currentFilters.status || null,
+        truckId: currentFilters.truckId || '',
+        dispatcherId: currentFilters.dispatcherId || ''
+      }, { emitEvent: false });
+
       // Now that assets are loaded, subscribe to trips
       this.subscribeToTrips();
     });

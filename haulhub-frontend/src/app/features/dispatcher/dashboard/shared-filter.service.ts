@@ -12,6 +12,7 @@ export interface DashboardFilters {
   brokerId: string | null;
   truckId: string | null;
   driverId: string | null;
+  truckOwnerId: string | null;
 }
 
 export type ViewMode = 'table' | 'analytics' | 'payments';
@@ -32,7 +33,8 @@ export class SharedFilterService {
     status: null,
     brokerId: null,
     truckId: null,
-    driverId: null
+    driverId: null,
+    truckOwnerId: null
   };
 
   private filtersSubject = new BehaviorSubject<DashboardFilters>(this.defaultFilters);
@@ -105,7 +107,8 @@ export class SharedFilterService {
         status: filters.status !== undefined ? filters.status : currentFilters.status,
         brokerId: filters.brokerId !== undefined ? filters.brokerId : currentFilters.brokerId,
         truckId: filters.truckId !== undefined ? filters.truckId : currentFilters.truckId,
-        driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId
+        driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId,
+        truckOwnerId: filters.truckOwnerId !== undefined ? filters.truckOwnerId : currentFilters.truckOwnerId
       });
       
       // Update local subject to keep it in sync (but this won't trigger dashboard updates)
@@ -131,7 +134,8 @@ export class SharedFilterService {
     return filters1.status === filters2.status &&
            filters1.brokerId === filters2.brokerId &&
            filters1.truckId === filters2.truckId &&
-           filters1.driverId === filters2.driverId;
+           filters1.driverId === filters2.driverId &&
+           filters1.truckOwnerId === filters2.truckOwnerId;
   }
 
   /**
@@ -164,6 +168,7 @@ export class SharedFilterService {
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
     if (filters.driverId) count++;
+    if (filters.truckOwnerId) count++;
 
     return count;
   }

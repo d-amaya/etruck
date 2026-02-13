@@ -149,6 +149,7 @@ xdescribe('Dashboard Integration Tests', () => {
     brokerId: null,
     truckId: null,
     driverId: null,
+    truckOwnerId: null,
   };
 
   const defaultPagination: PaginationState = {

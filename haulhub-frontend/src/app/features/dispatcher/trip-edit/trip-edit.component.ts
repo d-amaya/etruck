@@ -13,6 +13,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TripService, AuthService } from '../../../core/services';
+import { AssetCacheService } from '../dashboard/asset-cache.service';
+import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { Broker, CreateTripDto, Trip, TripStatus, calculateTripProfit, calculateFuelCost } from '@haulhub/shared';
 
 @Component({
@@ -56,7 +58,9 @@ export class TripEditComponent implements OnInit {
     private tripService: TripService,
     private authService: AuthService,
     private router: Router,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private assetCache: AssetCacheService,
+    private dashboardState: DashboardStateService
   ) {}
 
   ngOnInit(): void {
@@ -75,58 +79,20 @@ export class TripEditComponent implements OnInit {
   
   private loadAssets(): void {
     this.loadingAssets = true;
-    
-    // Load trucks, trailers, and drivers from API
-    // Backend uses carrierId from JWT token
-    this.tripService.getTrucksByCarrier().subscribe({
-      next: (trucks) => {
-        this.trucks = trucks.filter((t: any) => t.isActive);
-        this.checkAssetsLoaded();
-      },
-      error: (error) => {
-        console.error('Error loading trucks:', error);
-        this.snackBar.open('Failed to load trucks. Please try again.', 'Close', {
-          duration: 5000
-        });
-        this.checkAssetsLoaded();
-      }
-    });
-    
-    this.tripService.getTrailersByCarrier().subscribe({
-      next: (trailers) => {
-        this.trailers = trailers.filter((t: any) => t.isActive);
-        this.checkAssetsLoaded();
-      },
-      error: (error) => {
-        console.error('Error loading trailers:', error);
-        this.snackBar.open('Failed to load trailers. Please try again.', 'Close', {
-          duration: 5000
-        });
-        this.checkAssetsLoaded();
-      }
-    });
-    
-    this.tripService.getDriversByCarrier().subscribe({
-      next: (drivers) => {
-        this.drivers = drivers.filter((d: any) => d.isActive);
-        this.checkAssetsLoaded();
-      },
-      error: (error) => {
-        console.error('Error loading drivers:', error);
-        this.snackBar.open('Failed to load drivers. Please try again.', 'Close', {
-          duration: 5000
-        });
-        this.checkAssetsLoaded();
-      }
+    this.assetCache.loadAssets().subscribe(cache => {
+      this.trucks = Array.from(cache.trucks.values()).filter((t: any) => t.isActive);
+      this.trailers = Array.from(cache.trailers.values()).filter((t: any) => t.isActive);
+      this.drivers = Array.from(cache.drivers.values()).filter((d: any) => d.isActive);
+      this.loadingAssets = false;
     });
   }
-  
-  private assetsLoadedCount = 0;
-  private checkAssetsLoaded(): void {
-    this.assetsLoadedCount++;
-    if (this.assetsLoadedCount >= 3) {
-      this.loadingAssets = false;
-    }
+
+  private loadBrokers(): void {
+    this.loadingBrokers = true;
+    this.dashboardState.brokers$.subscribe(brokers => {
+      this.brokers = brokers.filter(b => b.isActive);
+      this.loadingBrokers = false;
+    });
   }
 
   private initializeForm(): void {
@@ -233,23 +199,6 @@ export class TripEditComponent implements OnInit {
     const avgGallPerMile = parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0;
     const cost = (avgCost > 0 && avgGallPerMile > 0) ? mileageTotal * avgGallPerMile * avgCost : 0;
     this.tripForm.get('estimatedFuelCost')?.setValue(cost.toFixed(2), { emitEvent: false });
-  }
-
-  private loadBrokers(): void {
-    this.loadingBrokers = true;
-    this.tripService.getBrokers().subscribe({
-      next: (brokers) => {
-        this.brokers = brokers.filter(b => b.isActive);
-        this.loadingBrokers = false;
-      },
-      error: (error) => {
-        console.error('Error loading brokers:', error);
-        this.snackBar.open('Failed to load brokers. Please try again.', 'Close', {
-          duration: 5000
-        });
-        this.loadingBrokers = false;
-      }
-    });
   }
 
   private loadTrip(tripId: string): void {
@@ -448,6 +397,7 @@ export class TripEditComponent implements OnInit {
         this.snackBar.open('Trip updated successfully!', 'Close', {
           duration: 3000
         });
+        this.dashboardState.invalidateViewCaches();
         this.router.navigate(['/dispatcher/dashboard']);
       },
       error: (error) => {
