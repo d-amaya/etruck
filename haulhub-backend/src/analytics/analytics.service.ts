@@ -80,9 +80,9 @@ export class AnalyticsService {
   private formatDateForGSI(date: Date, isStart: boolean): string {
     const dateCopy = new Date(date);
     if (isStart) {
-      dateCopy.setHours(0, 0, 0, 0);
+      dateCopy.setUTCHours(0, 0, 0, 0);
     } else {
-      dateCopy.setHours(23, 59, 59, 999);
+      dateCopy.setUTCHours(23, 59, 59, 999);
     }
     return dateCopy.toISOString().split('.')[0] + 'Z#' + (isStart ? '' : 'ZZZZ');
   }
@@ -402,17 +402,17 @@ export class AnalyticsService {
       // Add date range to KeyConditionExpression
       if (startDate && endDate) {
         keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -513,17 +513,17 @@ export class AnalyticsService {
       // Add date range to KeyConditionExpression
       if (startDate && endDate) {
         keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -638,17 +638,17 @@ export class AnalyticsService {
       // Add date range to KeyConditionExpression
       if (startDate && endDate) {
         keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -760,18 +760,18 @@ export class AnalyticsService {
       if (startDate && endDate) {
         keyConditionExpression += ' AND GSI2SK BETWEEN :startDate AND :endDate';
         // Start of day for startDate
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         // End of day for endDate
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ' AND GSI2SK >= :startDate';
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ' AND GSI2SK <= :endDate';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -1004,17 +1004,17 @@ export class AnalyticsService {
       // Add date range to KeyConditionExpression
       if (startDate && endDate) {
         keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -1229,17 +1229,17 @@ export class AnalyticsService {
       // Add date range to KeyConditionExpression
       if (startDate && endDate) {
         keyConditionExpression += ` AND ${skAttribute} BETWEEN :startDate AND :endDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ` AND ${skAttribute} >= :startDate`;
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ` AND ${skAttribute} <= :endDate`;
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       
@@ -1351,17 +1351,17 @@ export class AnalyticsService {
       
       if (startDate && endDate) {
         keyConditionExpression += ' AND GSI1SK BETWEEN :startDate AND :endDate';
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':startDate'] = startISO;
         expressionAttributeValues[':endDate'] = endISO;
       } else if (startDate) {
         keyConditionExpression += ' AND GSI1SK >= :startDate';
-        const startISO = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
+        const startISO = new Date(new Date(startDate).setUTCHours(0, 0, 0, 0)).toISOString().split('.')[0] + 'Z#';
         expressionAttributeValues[':startDate'] = startISO;
       } else if (endDate) {
         keyConditionExpression += ' AND GSI1SK <= :endDate';
-        const endISO = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
+        const endISO = new Date(new Date(endDate).setUTCHours(23, 59, 59, 999)).toISOString().split('.')[0] + 'Z#ZZZZ';
         expressionAttributeValues[':endDate'] = endISO;
       }
       

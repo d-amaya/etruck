@@ -121,22 +121,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   private brokerMap = new Map<string, any>();
 
   ngOnInit(): void {
-    // Load asset maps for name resolution
-    this.assetCache.loadAssets().subscribe(cache => {
-      this.driverMap = cache.drivers;
-      this.truckMap = cache.trucks;
-      this.brokerMap = cache.brokers;
-    });
-
-    // Subscribe to shared filter changes
-    this.sharedFilterService.filters$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(filters => {
-        this.startDate = filters.dateRange.startDate;
-        this.endDate = filters.dateRange.endDate;
-        this.loadAllAnalytics();
-      });
-    
     // Initialize empty KPI cards to show structure while loading
     this.kpiCards = [
       {
@@ -172,6 +156,22 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
         color: 'primary'
       }
     ];
+
+    // Load asset maps for name resolution
+    this.assetCache.loadAssets().subscribe(cache => {
+      this.driverMap = cache.drivers;
+      this.truckMap = cache.trucks;
+      this.brokerMap = cache.brokers;
+    });
+
+    // Subscribe to shared filter changes
+    this.sharedFilterService.filters$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(filters => {
+        this.startDate = filters.dateRange.startDate;
+        this.endDate = filters.dateRange.endDate;
+        this.loadAllAnalytics();
+      });
   }
 
   ngAfterViewInit(): void {
