@@ -296,17 +296,19 @@ export class DashboardStateService {
   }
 
   private getDefaultFilters(): DashboardFilters {
-    // Set default date range to last 30 days (1 month ago)
+    // Set default date range to current week (Monday - Sunday)
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+
     const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - 30);
+    startDate.setDate(startDate.getDate() - diff);
     startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(today);
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 6);
     endDate.setHours(23, 59, 59, 999);
-    
+
     return {
       dateRange: { startDate, endDate },
       status: null,

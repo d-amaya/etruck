@@ -12,7 +12,7 @@ import { DriverSharedFilterService } from '../driver-shared-filter.service';
 export class DriverFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   dateRangeError: string | null = null;
-  activePreset: string = 'lastYear';
+  activePreset: string | null = 'lastMonth';
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -42,39 +42,35 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
   }
 
   setDefaultDateRange(): void {
-    const today = new Date();
-    const lastYear = new Date(today);
-    lastYear.setFullYear(today.getFullYear() - 1);
-
-    this.filterForm.patchValue({
-      startDate: lastYear,
-      endDate: today
-    }, { emitEvent: false });
-
-    this.filterService.updateFilters({
-      dateRange: {
-        startDate: lastYear,
-        endDate: today
-      }
-    });
+    this.applyPreset('currentWeek');
   }
 
   applyPreset(preset: string): void {
     const today = new Date();
     let startDate: Date;
+    let endDate: Date;
 
     switch (preset) {
-      case 'last3Months':
-        startDate = new Date(today);
-        startDate.setMonth(today.getMonth() - 3);
-        break;
       case 'lastMonth':
         startDate = new Date(today);
-        startDate.setMonth(today.getMonth() - 1);
+        startDate.setDate(startDate.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
         break;
-      case 'lastYear':
+      case 'currentWeek':
         startDate = new Date(today);
-        startDate.setFullYear(today.getFullYear() - 1);
+        const day = startDate.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        startDate.setDate(startDate.getDate() - diff);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'currentMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
       default:
         return;
@@ -83,7 +79,7 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
     this.activePreset = preset;
     this.filterForm.patchValue({
       startDate,
-      endDate: today
+      endDate
     });
   }
 
@@ -116,18 +112,21 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
 
   private detectActivePreset(startDate: Date, endDate: Date): void {
     const today = new Date();
-    const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const startDiffDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const endDiffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Check if endDate is today (within 1 day)
-    const isToday = Math.abs(endDate.getTime() - today.getTime()) < (24 * 60 * 60 * 1000);
+    const startIsToday = Math.abs(startDate.getTime() - today.getTime()) < (24 * 60 * 60 * 1000);
+    const endIsToday = Math.abs(endDate.getTime() - today.getTime()) < (24 * 60 * 60 * 1000);
     
-    if (isToday) {
-      if (diffDays >= 28 && diffDays <= 32) {
+    if (startIsToday && endDiffDays >= 6 && endDiffDays <= 8) {
+      this.activePreset = 'nextWeek';
+    } else if (startIsToday && endDiffDays >= 28 && endDiffDays <= 32) {
+      this.activePreset = 'nextMonth';
+    } else if (endIsToday) {
+      if (startDiffDays >= 28 && startDiffDays <= 32) {
         this.activePreset = 'lastMonth';
-      } else if (diffDays >= 88 && diffDays <= 95) {
+      } else if (startDiffDays >= 88 && startDiffDays <= 95) {
         this.activePreset = 'last3Months';
-      } else if (diffDays >= 360 && diffDays <= 370) {
-        this.activePreset = 'lastYear';
       } else {
         this.activePreset = '';
       }

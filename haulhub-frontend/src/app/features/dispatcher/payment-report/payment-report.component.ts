@@ -187,11 +187,13 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     const filters: PaymentReportFilters = {};
     
     if (sharedFilters.dateRange.startDate) {
-      filters.startDate = sharedFilters.dateRange.startDate.toISOString();
+      const d = sharedFilters.dateRange.startDate;
+      filters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
     }
     
     if (sharedFilters.dateRange.endDate) {
-      filters.endDate = sharedFilters.dateRange.endDate.toISOString();
+      const d = sharedFilters.dateRange.endDate;
+      filters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
     }
 
     // Don't add groupBy - fetch all grouped data at once

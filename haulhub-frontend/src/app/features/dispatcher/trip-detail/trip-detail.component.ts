@@ -36,6 +36,7 @@ export class TripDetailComponent implements OnInit {
   private truckMap = new Map<string, any>();
   private trailerMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
+  private brokerMap = new Map<string, any>();
 
   constructor(
     private route: ActivatedRoute,
@@ -91,6 +92,13 @@ export class TripDetailComponent implements OnInit {
         trucks.forEach(truck => this.truckMap.set(truck.truckId, truck));
       },
       error: (error) => console.error('Error loading trucks:', error)
+    });
+
+    this.tripService.getBrokers().subscribe({
+      next: (brokers) => {
+        brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
+      },
+      error: (error) => console.error('Error loading brokers:', error)
     });
     
     this.tripService.getTrailersByCarrier().subscribe({
@@ -198,7 +206,6 @@ export class TripDetailComponent implements OnInit {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -230,6 +237,12 @@ export class TripDetailComponent implements OnInit {
   /**
    * Get truck plate from map
    */
+  getBrokerName(): string {
+    if (!this.trip) return 'N/A';
+    const broker = this.brokerMap.get(this.trip.brokerId);
+    return broker?.brokerName || this.trip.brokerId;
+  }
+
   getTruckPlate(): string {
     if (!this.trip) return 'N/A';
     const truck = this.truckMap.get(this.trip.truckId);

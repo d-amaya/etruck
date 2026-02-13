@@ -84,6 +84,7 @@ export class TripsController {
       user.role as UserRole,
       dto.orderStatus,
       dto.notes,
+      dto.deliveryTimestamp,
     );
   }
 

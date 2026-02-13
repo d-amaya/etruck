@@ -142,8 +142,8 @@ describe('PaymentReportComponent', () => {
 
     expect(tripServiceSpy.getPaymentReport).toHaveBeenCalledWith(
       jasmine.objectContaining({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2024-01-31T23:59:59.999Z',
         groupBy: 'dispatcher'
       })
     );

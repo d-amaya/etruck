@@ -99,10 +99,12 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     };
 
     if (filters.dateRange.startDate) {
-      apiFilters.startDate = filters.dateRange.startDate.toISOString();
+      const d = filters.dateRange.startDate;
+      apiFilters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
     }
     if (filters.dateRange.endDate) {
-      apiFilters.endDate = filters.dateRange.endDate.toISOString();
+      const d = filters.dateRange.endDate;
+      apiFilters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
     }
 
     // Explicitly NOT including: status, brokerId, lorryId, driverName

@@ -66,6 +66,8 @@ describe('TripService', () => {
       mileageOrder: 200,
       mileageEmpty: 20,
       mileageTotal: 220,
+      fuelGasAvgCost: 3.50,
+      fuelGasAvgGallxMil: 0.15,
       notes: ''
     };
 

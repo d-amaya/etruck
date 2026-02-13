@@ -95,6 +95,13 @@ export class AnalyticsService {
 
   constructor(private http: HttpClient) {}
 
+  private toUTCDateString(d: Date, endOfDay = false): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return endOfDay ? `${y}-${m}-${day}T23:59:59.999Z` : `${y}-${m}-${day}T00:00:00.000Z`;
+  }
+
   getFleetOverview(): Observable<FleetOverview> {
     return this.http.get<FleetOverview>(`${this.apiUrl}/fleet-overview`);
   }
@@ -102,10 +109,10 @@ export class AnalyticsService {
   getTripAnalytics(startDate?: Date, endDate?: Date): Observable<TripAnalytics> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<TripAnalytics>(`${this.apiUrl}/trip-analytics`, { params });
   }
@@ -113,10 +120,10 @@ export class AnalyticsService {
   getDriverPerformance(startDate?: Date, endDate?: Date): Observable<DriverPerformance[]> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<DriverPerformance[]>(`${this.apiUrl}/driver-performance`, { params });
   }
@@ -124,10 +131,10 @@ export class AnalyticsService {
   getVehicleUtilization(startDate?: Date, endDate?: Date): Observable<VehicleUtilization[]> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<VehicleUtilization[]>(`${this.apiUrl}/vehicle-utilization`, { params });
   }
@@ -135,10 +142,10 @@ export class AnalyticsService {
   getRevenueAnalytics(startDate?: Date, endDate?: Date): Observable<RevenueAnalytics> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<RevenueAnalytics>(`${this.apiUrl}/revenue-analytics`, { params });
   }
@@ -150,10 +157,10 @@ export class AnalyticsService {
   getBrokerAnalytics(startDate?: Date, endDate?: Date): Observable<any> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<any>(`${this.apiUrl}/broker-analytics`, { params });
   }
@@ -161,10 +168,10 @@ export class AnalyticsService {
   getFuelAnalytics(startDate?: Date, endDate?: Date): Observable<any> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
   }
@@ -173,10 +180,10 @@ export class AnalyticsService {
   getCarrierTripAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<TripAnalytics> {
     let params = new HttpParams().set('carrierId', carrierId);
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<TripAnalytics>(`${this.apiUrl}/trip-analytics`, { params });
   }
@@ -184,10 +191,10 @@ export class AnalyticsService {
   getCarrierDriverPerformance(carrierId: string, startDate?: Date, endDate?: Date): Observable<DriverPerformance[]> {
     let params = new HttpParams().set('carrierId', carrierId);
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<DriverPerformance[]>(`${this.apiUrl}/driver-performance`, { params });
   }
@@ -195,10 +202,10 @@ export class AnalyticsService {
   getCarrierVehicleUtilization(carrierId: string, startDate?: Date, endDate?: Date): Observable<VehicleUtilization[]> {
     let params = new HttpParams().set('carrierId', carrierId);
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<VehicleUtilization[]>(`${this.apiUrl}/vehicle-utilization`, { params });
   }
@@ -206,10 +213,10 @@ export class AnalyticsService {
   getCarrierBrokerAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<any> {
     let params = new HttpParams().set('carrierId', carrierId);
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<any>(`${this.apiUrl}/broker-analytics`, { params });
   }
@@ -217,10 +224,10 @@ export class AnalyticsService {
   getCarrierFuelAnalytics(carrierId: string, startDate?: Date, endDate?: Date): Observable<any> {
     let params = new HttpParams().set('carrierId', carrierId);
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<any>(`${this.apiUrl}/fuel-analytics`, { params });
   }
@@ -228,10 +235,10 @@ export class AnalyticsService {
   getDispatcherPerformance(startDate?: Date, endDate?: Date): Observable<any[]> {
     let params = new HttpParams();
     if (startDate) {
-      params = params.set('startDate', startDate.toISOString());
+      params = params.set('startDate', this.toUTCDateString(startDate));
     }
     if (endDate) {
-      params = params.set('endDate', endDate.toISOString());
+      params = params.set('endDate', this.toUTCDateString(endDate, true));
     }
     return this.http.get<any[]>(`${this.apiUrl}/dispatcher-performance`, { params });
   }

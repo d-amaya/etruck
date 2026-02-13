@@ -77,7 +77,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   // Date Range Filter
   startDate: Date | null = null;
   endDate: Date | null = null;
-  maxDate: Date = new Date();
+  maxDate: Date | null = null; // No maximum date - allow future dates
   
   // KPI Cards
   kpiCards: KPICard[] = [];

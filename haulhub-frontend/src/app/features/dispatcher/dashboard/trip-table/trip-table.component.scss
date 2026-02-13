@@ -463,14 +463,30 @@
       .action-btn {
         width: 36px;
         height: 36px;
-        line-height: 36px;
+        padding: 0 !important;
         transition: all 0.2s ease;
         color: #1976d2 !important;
+
+        ::ng-deep .mat-mdc-button-touch-target {
+          width: 36px;
+          height: 36px;
+        }
+
+        ::ng-deep .mat-mdc-button-persistent-ripple {
+          width: 36px;
+          height: 36px;
+          left: 0;
+          top: 0;
+        }
 
         mat-icon {
           font-size: 20px;
           width: 20px;
           height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto;
         }
 
         &:hover {

@@ -134,10 +134,12 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     };
 
     if (filters.dateRange.startDate) {
-      apiFilters.startDate = filters.dateRange.startDate.toISOString();
+      const d = filters.dateRange.startDate;
+      apiFilters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
     }
     if (filters.dateRange.endDate) {
-      apiFilters.endDate = filters.dateRange.endDate.toISOString();
+      const d = filters.dateRange.endDate;
+      apiFilters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
     }
     if (filters.status) {
       apiFilters.orderStatus = filters.status;
@@ -203,14 +205,18 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
 
       dialogRef.afterClosed().subscribe(result => {
         if (result) {
-          this.updateTripStatus(trip.tripId, result.status, result.notes);
+          this.updateTripStatus(trip.tripId, result.status, result.notes, result.deliveryTimestamp);
         }
       });
     });
   }
 
-  updateTripStatus(tripId: string, status: string, notes: string): void {
-    this.tripService.updateTripStatus(tripId, { orderStatus: status as any, notes }).subscribe({
+  updateTripStatus(tripId: string, status: string, notes: string, deliveryTimestamp?: string): void {
+    const statusDto: any = { orderStatus: status as any, notes };
+    if (deliveryTimestamp) {
+      statusDto.deliveryTimestamp = deliveryTimestamp;
+    }
+    this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: () => {
         const filters = this.filterService.getCurrentFilters();
         const pagination = this.dashboardState.getCurrentPagination();

@@ -99,11 +99,13 @@ export class PaymentReportComponent implements OnInit {
     };
 
     if (formValue.startDate) {
-      filters.startDate = new Date(formValue.startDate).toISOString();
+      const d = new Date(formValue.startDate);
+      filters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
     }
 
     if (formValue.endDate) {
-      filters.endDate = new Date(formValue.endDate).toISOString();
+      const d = new Date(formValue.endDate);
+      filters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
     }
 
     return filters;

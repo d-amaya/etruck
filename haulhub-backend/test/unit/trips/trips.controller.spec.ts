@@ -229,12 +229,13 @@ describe('TripsController', () => {
 
       expect(result).toEqual(updatedTrip);
       expect(service.updateTripStatus).toHaveBeenCalledWith(
-        'trip-123',
-        mockDispatcherUser.userId,
-        UserRole.Dispatcher,
-        TripStatus.PickedUp,
-        undefined,
-      );
+              'trip-123',
+              mockDispatcherUser.userId,
+              UserRole.Dispatcher,
+              TripStatus.PickedUp,
+              undefined,
+              undefined,
+            );
     });
 
     it('should update trip status for driver', async () => {
@@ -252,12 +253,13 @@ describe('TripsController', () => {
 
       expect(result).toEqual(updatedTrip);
       expect(service.updateTripStatus).toHaveBeenCalledWith(
-        'trip-123',
-        'DRV-001',
-        UserRole.Driver,
-        TripStatus.PickedUp,
-        undefined,
-      );
+              'trip-123',
+              'DRV-001',
+              UserRole.Driver,
+              TripStatus.PickedUp,
+              undefined,
+              undefined,
+            );
     });
 
     it('should pass correct status to service', async () => {
@@ -268,12 +270,13 @@ describe('TripsController', () => {
       await controller.updateTripStatus(mockDispatcherUser, 'trip-123', deliveredStatusDto);
 
       expect(service.updateTripStatus).toHaveBeenCalledWith(
-        'trip-123',
-        'dispatcher-123',
-        UserRole.Dispatcher,
-        TripStatus.Delivered,
-        undefined,
-      );
+              'trip-123',
+              'dispatcher-123',
+              UserRole.Dispatcher,
+              TripStatus.Delivered,
+              undefined,
+              undefined,
+            );
     });
 
     it('should handle Paid status update', async () => {
@@ -289,12 +292,13 @@ describe('TripsController', () => {
 
       expect(result.orderStatus).toBe(TripStatus.Paid);
       expect(service.updateTripStatus).toHaveBeenCalledWith(
-        'trip-123',
-        'dispatcher-123',
-        UserRole.Dispatcher,
-        TripStatus.Paid,
-        undefined,
-      );
+              'trip-123',
+              'dispatcher-123',
+              UserRole.Dispatcher,
+              TripStatus.Paid,
+              undefined,
+              undefined,
+            );
     });
   });
 

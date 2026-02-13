@@ -17,13 +17,15 @@ export class DriverSharedFilterService {
 
   resetFilters(): void {
     const today = new Date();
-    const lastYear = new Date(today);
-    lastYear.setFullYear(today.getFullYear() - 1);
+    const lastMonth = new Date(today);
+    lastMonth.setDate(today.getDate() - 30);
+    const nextMonth = new Date(today);
+    nextMonth.setDate(today.getDate() + 30);
     
     this.dashboardState.updateFilters({
       dateRange: {
-        startDate: lastYear,
-        endDate: today
+        startDate: lastMonth,
+        endDate: nextMonth
       },
       status: null,
       truckId: null,

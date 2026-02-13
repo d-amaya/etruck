@@ -220,8 +220,8 @@ export class TripsService {
       
       // Timestamps
       scheduledTimestamp: dto.scheduledTimestamp,
-      pickupTimestamp: null,
-      deliveryTimestamp: null,
+      pickupTimestamp: dto.pickupTimestamp || null,
+      deliveryTimestamp: dto.deliveryTimestamp || null,
       
       // Pickup location details
       pickupCompany: dto.pickupCompany || '',
@@ -515,6 +515,18 @@ export class TripsService {
       expressionAttributeValues[':notes'] = dto.notes;
     }
 
+    if (dto.pickupTimestamp !== undefined) {
+      updateExpressions.push('#pickupTimestamp = :pickupTimestamp');
+      expressionAttributeNames['#pickupTimestamp'] = 'pickupTimestamp';
+      expressionAttributeValues[':pickupTimestamp'] = dto.pickupTimestamp;
+    }
+
+    if (dto.deliveryTimestamp !== undefined) {
+      updateExpressions.push('#deliveryTimestamp = :deliveryTimestamp');
+      expressionAttributeNames['#deliveryTimestamp'] = 'deliveryTimestamp';
+      expressionAttributeValues[':deliveryTimestamp'] = dto.deliveryTimestamp;
+    }
+
     // Handle orderStatus updates (with automatic timestamp management)
     if (dto.orderStatus !== undefined) {
       updateExpressions.push('#orderStatus = :orderStatus');
@@ -522,7 +534,7 @@ export class TripsService {
       expressionAttributeValues[':orderStatus'] = dto.orderStatus;
 
       // Automatically set pickupTimestamp when status changes to "Picked Up"
-      if (dto.orderStatus === TripStatus.PickedUp && !existingTrip.pickupTimestamp) {
+      if (dto.orderStatus === TripStatus.PickedUp && !existingTrip.pickupTimestamp && dto.pickupTimestamp === undefined) {
         const pickupTime = new Date().toISOString();
         updateExpressions.push('#pickupTimestamp = :pickupTimestamp');
         expressionAttributeNames['#pickupTimestamp'] = 'pickupTimestamp';
@@ -530,7 +542,7 @@ export class TripsService {
       }
 
       // Automatically set deliveryTimestamp when status changes to "Delivered"
-      if (dto.orderStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp) {
+      if (dto.orderStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp && dto.deliveryTimestamp === undefined) {
         const deliveryTime = new Date().toISOString();
         updateExpressions.push('#deliveryTimestamp = :deliveryTimestamp');
         expressionAttributeNames['#deliveryTimestamp'] = 'deliveryTimestamp';
@@ -791,6 +803,7 @@ export class TripsService {
     userRole: UserRole,
     newStatus: TripStatus,
     notes?: string,
+    deliveryTimestamp?: string,
   ): Promise<Trip> {
     // First, get the existing trip
     let existingTrip: Trip;
@@ -827,7 +840,7 @@ export class TripsService {
     if (newStatus === TripStatus.Delivered && !existingTrip.deliveryTimestamp) {
       updateExpressions.push('#deliveryTimestamp = :deliveryTimestamp');
       expressionAttributeNames['#deliveryTimestamp'] = 'deliveryTimestamp';
-      expressionAttributeValues[':deliveryTimestamp'] = new Date().toISOString().split('.')[0] + 'Z';
+      expressionAttributeValues[':deliveryTimestamp'] = deliveryTimestamp || new Date().toISOString().split('.')[0] + 'Z';
     }
     
     // Record pickupTimestamp when status changes to Picked Up

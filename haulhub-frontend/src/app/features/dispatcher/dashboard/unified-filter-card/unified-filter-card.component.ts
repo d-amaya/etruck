@@ -38,7 +38,6 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   private presetJustSet = false;
 
   maxDate: Date | null = null; // No maximum date - allow future dates
-  minDate = new Date();
 
   private destroy$ = new Subject<void>();
 
@@ -46,9 +45,6 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private sharedFilterService: SharedFilterService
   ) {
-    // Allow dates from 1 year ago onwards (no future limit)
-    this.minDate.setFullYear(this.minDate.getFullYear() - 1);
-
     this.filterForm = this.fb.group({
       startDate: [null],
       endDate: [null]
@@ -114,32 +110,30 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
 
   setDatePreset(preset: string): void {
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
     let startDate: Date;
     let endDate: Date;
 
     switch (preset) {
-      case 'week':
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(today);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-      case 'month':
-        // Last Month: 30 days ago to today
+      case 'lastMonth':
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(today);
         endDate.setHours(23, 59, 59, 999);
         break;
-      case 'year':
+      case 'currentWeek':
         startDate = new Date(today);
-        startDate.setFullYear(startDate.getFullYear() - 1);
+        const day = startDate.getDay();
+        const diff = day === 0 ? 6 : day - 1; // Monday as start of week
+        startDate.setDate(startDate.getDate() - diff);
         startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(today);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
         endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'currentMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
       default:
         return;
@@ -156,7 +150,7 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   }
 
   private updateActivePreset(): void {
-    const presets = ['week', 'month', 'year'];
+    const presets = ['lastMonth', 'currentWeek', 'currentMonth'];
     this.activePreset = null;
     
     for (const preset of presets) {
@@ -173,7 +167,6 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     
     if (!startDate || !endDate) return false;
 
-    // Helper to compare dates by day only (ignore time)
     const isSameDay = (date1: Date, date2: Date): boolean => {
       return date1.getFullYear() === date2.getFullYear() &&
              date1.getMonth() === date2.getMonth() &&
@@ -185,21 +178,22 @@ export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
     let expectedEnd: Date;
 
     switch (preset) {
-      case 'week':
-        expectedStart = new Date(today);
-        expectedStart.setDate(expectedStart.getDate() - 7);
-        expectedEnd = new Date(today);
-        break;
-      case 'month':
-        // Last Month: 30 days ago to today
+      case 'lastMonth':
         expectedStart = new Date(today);
         expectedStart.setDate(expectedStart.getDate() - 30);
         expectedEnd = new Date(today);
         break;
-      case 'year':
+      case 'currentWeek':
         expectedStart = new Date(today);
-        expectedStart.setFullYear(expectedStart.getFullYear() - 1);
-        expectedEnd = new Date(today);
+        const dayOfWeek = expectedStart.getDay();
+        const mondayDiff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        expectedStart.setDate(expectedStart.getDate() - mondayDiff);
+        expectedEnd = new Date(expectedStart);
+        expectedEnd.setDate(expectedEnd.getDate() + 6);
+        break;
+      case 'currentMonth':
+        expectedStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        expectedEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         break;
       default:
         return false;

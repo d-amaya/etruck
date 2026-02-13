@@ -147,8 +147,8 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     const filters = this.filterService.getCurrentFilter();
     
     this.tripService.getPaymentReport({
-      startDate: filters.startDate?.toISOString().split('T')[0],
-      endDate: filters.endDate?.toISOString().split('T')[0]
+      startDate: filters.startDate ? `${filters.startDate.getFullYear()}-${String(filters.startDate.getMonth()+1).padStart(2,'0')}-${String(filters.startDate.getDate()).padStart(2,'0')}` : undefined,
+      endDate: filters.endDate ? `${filters.endDate.getFullYear()}-${String(filters.endDate.getMonth()+1).padStart(2,'0')}-${String(filters.endDate.getDate()).padStart(2,'0')}` : undefined
     }).subscribe({
       next: (report) => {
         this.report = report as DispatcherPaymentReport;

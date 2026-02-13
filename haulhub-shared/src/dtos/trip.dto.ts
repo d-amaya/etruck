@@ -149,15 +149,13 @@ export class CreateTripDto {
   @IsString()
   driverName?: string;
 
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  fuelGasAvgCost?: number;
+  fuelGasAvgCost!: number;
 
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  fuelGasAvgGallxMil?: number;
+  fuelGasAvgGallxMil!: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -437,6 +435,10 @@ export class UpdateTripStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsDateString()
+  deliveryTimestamp?: string;
 }
 
 export class TripFilters {

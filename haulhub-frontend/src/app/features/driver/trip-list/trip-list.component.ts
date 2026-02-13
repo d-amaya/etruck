@@ -215,13 +215,16 @@ export class TripListComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: StatusUpdateDialogResult | undefined) => {
       if (result) {
-        this.updateTripStatus(trip.tripId, result.status);
+        this.updateTripStatus(trip.tripId, result.status, result.deliveryTimestamp);
       }
     });
   }
 
-  private updateTripStatus(tripId: string, status: TripStatus): void {
+  private updateTripStatus(tripId: string, status: TripStatus, deliveryTimestamp?: string): void {
     const statusDto: UpdateTripStatusDto = { orderStatus: status };
+    if (deliveryTimestamp) {
+      statusDto.deliveryTimestamp = deliveryTimestamp;
+    }
     
     this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: (updatedTrip) => {

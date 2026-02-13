@@ -43,7 +43,7 @@ export class TripCreateComponent implements OnInit {
   loading = false;
   loadingBrokers = true;
   loadingAssets = true;
-  minDate!: Date;
+  today = new Date();
 
   constructor(
     private fb: FormBuilder,
@@ -54,10 +54,6 @@ export class TripCreateComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Set minimum date to 1 month ago
-    this.minDate = new Date();
-    this.minDate.setMonth(this.minDate.getMonth() - 1);
-    
     this.initializeForm();
     this.loadBrokers();
     this.loadAssets();
@@ -127,11 +123,7 @@ export class TripCreateComponent implements OnInit {
       // Order Information
       orderConfirmation: ['', [Validators.required, Validators.minLength(3)]],
       
-      // Location Information
-      pickupLocation: ['', [Validators.required, Validators.minLength(3)]],
-      dropoffLocation: ['', [Validators.required, Validators.minLength(3)]],
-      
-      // Schedule Information - Single datetime picker
+      // Schedule Information - Date only
       scheduledTimestamp: ['', Validators.required],
       
       // Broker Information
@@ -154,23 +146,26 @@ export class TripCreateComponent implements OnInit {
       truckOwnerPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverPayment: ['', [Validators.required, Validators.min(0.01)]],
       
-      // Enhanced Pickup Details
-      pickupCompany: [''],
+      // Pickup Details (Required)
+      pickupCompany: ['', Validators.required],
       pickupPhone: [''],
-      pickupAddress: [''],
-      pickupCity: [''],
-      pickupState: [''],
-      pickupZip: [''],
+      pickupAddress: ['', Validators.required],
+      pickupCity: ['', Validators.required],
+      pickupState: ['', Validators.required],
+      pickupZip: ['', Validators.required],
+      pickupDate: ['', Validators.required],
+      pickupTime: ['', Validators.required],
       pickupNotes: [''],
       
-      // Enhanced Delivery Details
-      deliveryCompany: [''],
+      // Delivery Details (Required)
+      deliveryCompany: ['', Validators.required],
       deliveryPhone: [''],
-      deliveryAddress: [''],
-      deliveryCity: [''],
-      deliveryState: [''],
-      deliveryZip: [''],
-      deliveryDatetime: [''],
+      deliveryAddress: ['', Validators.required],
+      deliveryCity: ['', Validators.required],
+      deliveryState: ['', Validators.required],
+      deliveryZip: ['', Validators.required],
+      deliveryDate: ['', Validators.required],
+      deliveryTime: ['', Validators.required],
       deliveryNotes: [''],
       
       // Additional Fees
@@ -178,8 +173,9 @@ export class TripCreateComponent implements OnInit {
       detentionValue: [0, Validators.min(0)],
       
       // Fuel Management
-      fuelGasAvgCost: ['', Validators.min(0)],
-      fuelGasAvgGallxMil: ['', Validators.min(0)],
+      fuelGasAvgCost: ['', [Validators.required, Validators.min(0)]],
+      fuelGasAvgGallxMil: ['', [Validators.required, Validators.min(0)]],
+      estimatedFuelCost: [{ value: '', disabled: true }],
       
       // Notes
       notes: ['']
@@ -188,6 +184,25 @@ export class TripCreateComponent implements OnInit {
     // Auto-calculate total miles when loaded or empty miles change
     this.tripForm.get('mileageOrder')?.valueChanges.subscribe(() => this.calculateTotalMiles());
     this.tripForm.get('mileageEmpty')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    
+    // Auto-calculate fuel cost when inputs change
+    this.tripForm.get('fuelGasAvgCost')?.valueChanges.subscribe(() => this.updateFuelCost());
+    this.tripForm.get('fuelGasAvgGallxMil')?.valueChanges.subscribe(() => this.updateFuelCost());
+
+    // Clear pickup/delivery dates if they violate ordering
+    this.tripForm.get('scheduledTimestamp')?.valueChanges.subscribe(val => {
+      const pickup = this.tripForm.get('pickupDate')?.value;
+      if (val && pickup && new Date(pickup) < new Date(val)) {
+        this.tripForm.get('pickupDate')?.reset();
+        this.tripForm.get('deliveryDate')?.reset();
+      }
+    });
+    this.tripForm.get('pickupDate')?.valueChanges.subscribe(val => {
+      const delivery = this.tripForm.get('deliveryDate')?.value;
+      if (val && delivery && new Date(delivery) < new Date(val)) {
+        this.tripForm.get('deliveryDate')?.reset();
+      }
+    });
   }
   
   private calculateTotalMiles(): void {
@@ -195,6 +210,15 @@ export class TripCreateComponent implements OnInit {
     const mileageEmpty = parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0;
     const mileageTotal = mileageOrder + mileageEmpty;
     this.tripForm.get('mileageTotal')?.setValue(mileageTotal, { emitEvent: false });
+    this.updateFuelCost();
+  }
+
+  private updateFuelCost(): void {
+    const mileageTotal = parseFloat(this.tripForm.get('mileageTotal')?.value) || 0;
+    const avgCost = parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0;
+    const avgGallPerMile = parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0;
+    const cost = (avgCost > 0 && avgGallPerMile > 0) ? mileageTotal * avgGallPerMile * avgCost : 0;
+    this.tripForm.get('estimatedFuelCost')?.setValue(cost.toFixed(2), { emitEvent: false });
   }
 
   private loadBrokers(): void {
@@ -237,25 +261,22 @@ export class TripCreateComponent implements OnInit {
       return;
     }
     
-    // Convert datetime to ISO 8601 format (without milliseconds)
+    // Convert scheduled date to ISO 8601 (date only, start of day)
     const scheduledDate = new Date(formValue.scheduledTimestamp);
+    scheduledDate.setHours(0, 0, 0, 0);
     const scheduledTimestamp = scheduledDate.toISOString().split('.')[0] + 'Z';
     
-    // Validate that the datetime is in the future
-    if (scheduledDate <= new Date()) {
-      this.snackBar.open('Scheduled pickup time must be in the future.', 'Close', {
-        duration: 3000,
-        panelClass: ['error-snackbar']
-      });
-      return;
-    }
+    // Convert pickup date+time to ISO 8601
+    const pickupDate = new Date(formValue.pickupDate);
+    const [pickupH, pickupM] = (formValue.pickupTime || '00:00').split(':');
+    pickupDate.setHours(parseInt(pickupH), parseInt(pickupM), 0, 0);
+    const pickupTimestamp = pickupDate.toISOString().split('.')[0] + 'Z';
     
-    // Convert delivery datetime if provided
-    let deliveryTimestamp: string | undefined;
-    if (formValue.deliveryDatetime) {
-      const deliveryDate = new Date(formValue.deliveryDatetime);
-      deliveryTimestamp = deliveryDate.toISOString().split('.')[0] + 'Z';
-    }
+    // Convert delivery date+time to ISO 8601
+    const deliveryDate = new Date(formValue.deliveryDate);
+    const [deliveryH, deliveryM] = (formValue.deliveryTime || '00:00').split(':');
+    deliveryDate.setHours(parseInt(deliveryH), parseInt(deliveryM), 0, 0);
+    const deliveryTimestamp = deliveryDate.toISOString().split('.')[0] + 'Z';
     
     // Get truckOwnerId from selected truck
     const selectedTruck = this.trucks.find(t => t.truckId === formValue.truckId);
@@ -273,6 +294,8 @@ export class TripCreateComponent implements OnInit {
       // Order information
       orderConfirmation: formValue.orderConfirmation.trim(),
       scheduledTimestamp: scheduledTimestamp,
+      pickupTimestamp: pickupTimestamp,
+      deliveryTimestamp: deliveryTimestamp,
       brokerId: formValue.brokerId,
       
       // Entity relationships
@@ -292,34 +315,35 @@ export class TripCreateComponent implements OnInit {
       truckOwnerPayment: parseFloat(formValue.truckOwnerPayment),
       driverPayment: parseFloat(formValue.driverPayment),
       
-      // Legacy fields for backward compatibility
-      pickupLocation: formValue.pickupLocation.trim(),
-      dropoffLocation: formValue.dropoffLocation.trim(),
+      // Pickup details
+      pickupLocation: `${formValue.pickupCity.trim()}, ${formValue.pickupState.trim()}`,
+      pickupCompany: formValue.pickupCompany.trim(),
+      pickupAddress: formValue.pickupAddress.trim(),
+      pickupCity: formValue.pickupCity.trim(),
+      pickupState: formValue.pickupState.trim(),
+      pickupZip: formValue.pickupZip.trim(),
+      
+      // Delivery details
+      dropoffLocation: `${formValue.deliveryCity.trim()}, ${formValue.deliveryState.trim()}`,
+      deliveryCompany: formValue.deliveryCompany.trim(),
+      deliveryAddress: formValue.deliveryAddress.trim(),
+      deliveryCity: formValue.deliveryCity.trim(),
+      deliveryState: formValue.deliveryState.trim(),
+      deliveryZip: formValue.deliveryZip.trim(),
+
+      // Fuel management
+      fuelGasAvgCost: parseFloat(formValue.fuelGasAvgCost),
+      fuelGasAvgGallxMil: parseFloat(formValue.fuelGasAvgGallxMil),
     };
 
     // Add optional fields if provided
-    if (formValue.pickupCompany?.trim()) tripData.pickupCompany = formValue.pickupCompany.trim();
     if (formValue.pickupPhone?.trim()) tripData.pickupPhone = formValue.pickupPhone.trim();
-    if (formValue.pickupAddress?.trim()) tripData.pickupAddress = formValue.pickupAddress.trim();
-    if (formValue.pickupCity?.trim()) tripData.pickupCity = formValue.pickupCity.trim();
-    if (formValue.pickupState?.trim()) tripData.pickupState = formValue.pickupState.trim();
-    if (formValue.pickupZip?.trim()) tripData.pickupZip = formValue.pickupZip.trim();
     if (formValue.pickupNotes?.trim()) tripData.pickupNotes = formValue.pickupNotes.trim();
-    
-    if (formValue.deliveryCompany?.trim()) tripData.deliveryCompany = formValue.deliveryCompany.trim();
     if (formValue.deliveryPhone?.trim()) tripData.deliveryPhone = formValue.deliveryPhone.trim();
-    if (formValue.deliveryAddress?.trim()) tripData.deliveryAddress = formValue.deliveryAddress.trim();
-    if (formValue.deliveryCity?.trim()) tripData.deliveryCity = formValue.deliveryCity.trim();
-    if (formValue.deliveryState?.trim()) tripData.deliveryState = formValue.deliveryState.trim();
-    if (formValue.deliveryZip?.trim()) tripData.deliveryZip = formValue.deliveryZip.trim();
-    if (deliveryTimestamp) tripData.deliveryTimestamp = deliveryTimestamp;
     if (formValue.deliveryNotes?.trim()) tripData.deliveryNotes = formValue.deliveryNotes.trim();
-    
     if (formValue.notes?.trim()) tripData.notes = formValue.notes.trim();
     if (formValue.lumperValue) tripData.lumperValue = parseFloat(formValue.lumperValue);
     if (formValue.detentionValue) tripData.detentionValue = parseFloat(formValue.detentionValue);
-    if (formValue.fuelGasAvgCost) tripData.fuelGasAvgCost = parseFloat(formValue.fuelGasAvgCost);
-    if (formValue.fuelGasAvgGallxMil) tripData.fuelGasAvgGallxMil = parseFloat(formValue.fuelGasAvgGallxMil);
     
     this.loading = true;
     this.tripService.createTrip(tripData).subscribe({

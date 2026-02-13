@@ -19,14 +19,14 @@
           <div class="date-inputs">
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>From</mat-label>
-              <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+              <input matInput [matDatepicker]="startPicker" formControlName="startDate" (dateChange)="activePreset = null">
               <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
               <mat-datepicker #startPicker></mat-datepicker>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>To</mat-label>
-              <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+              <input matInput [matDatepicker]="endPicker" formControlName="endDate" (dateChange)="activePreset = null">
               <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
               <mat-datepicker #endPicker></mat-datepicker>
             </mat-form-field>
@@ -34,15 +34,15 @@
             <div class="date-presets">
               <button mat-button type="button" (click)="applyPreset('lastMonth')"
                       [class.active]="activePreset === 'lastMonth'">
-                Last Month
+                Last 30 Days
               </button>
-              <button mat-button type="button" (click)="applyPreset('last3Months')"
-                      [class.active]="activePreset === 'last3Months'">
-                Last 3 Months
+              <button mat-button type="button" (click)="applyPreset('currentWeek')"
+                      [class.active]="activePreset === 'currentWeek'">
+                Current Week
               </button>
-              <button mat-button type="button" (click)="applyPreset('lastYear')"
-                      [class.active]="activePreset === 'lastYear'">
-                Last Year
+              <button mat-button type="button" (click)="applyPreset('currentMonth')"
+                      [class.active]="activePreset === 'currentMonth'">
+                Current Month
               </button>
             </div>
           </div>

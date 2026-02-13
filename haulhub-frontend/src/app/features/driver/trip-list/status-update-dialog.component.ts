@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { Trip, TripStatus } from '@haulhub/shared';
@@ -14,6 +15,7 @@ export interface StatusUpdateDialogData {
 
 export interface StatusUpdateDialogResult {
   status: TripStatus;
+  deliveryTimestamp?: string;
 }
 
 @Component({
@@ -26,7 +28,8 @@ export interface StatusUpdateDialogResult {
     MatButtonModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatIconModule
+    MatIconModule,
+    MatInputModule
   ],
   template: `
     <h2 mat-dialog-title>
@@ -52,6 +55,16 @@ export interface StatusUpdateDialogResult {
           <mat-icon matPrefix>info</mat-icon>
           <mat-error *ngIf="statusForm.get('status')?.hasError('required')">
             Please select a status
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field *ngIf="statusForm.get('status')?.value === deliveredStatus" 
+                        appearance="outline" class="full-width">
+          <mat-label>Delivery Date & Time</mat-label>
+          <input matInput type="datetime-local" formControlName="deliveryTimestamp">
+          <mat-hint>When the delivery was completed</mat-hint>
+          <mat-error *ngIf="statusForm.get('deliveryTimestamp')?.hasError('required')">
+            Delivery date & time is required
           </mat-error>
         </mat-form-field>
       </form>
@@ -129,6 +142,7 @@ export class StatusUpdateDialogComponent {
     TripStatus.InTransit,
     TripStatus.Delivered
   ];
+  deliveredStatus = TripStatus.Delivered;
 
   constructor(
     private fb: FormBuilder,
@@ -136,11 +150,24 @@ export class StatusUpdateDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: StatusUpdateDialogData
   ) {
     this.statusForm = this.fb.group({
-      status: ['', Validators.required]
+      status: ['', Validators.required],
+      deliveryTimestamp: ['']
     });
 
     // Set default value based on current status
     this.setDefaultStatus();
+
+    // Add/remove deliveryTimestamp validation when status changes
+    this.statusForm.get('status')?.valueChanges.subscribe(status => {
+      const ctrl = this.statusForm.get('deliveryTimestamp')!;
+      if (status === TripStatus.Delivered) {
+        ctrl.setValidators(Validators.required);
+      } else {
+        ctrl.clearValidators();
+        ctrl.setValue('');
+      }
+      ctrl.updateValueAndValidity();
+    });
   }
 
   private setDefaultStatus(): void {
@@ -186,6 +213,9 @@ export class StatusUpdateDialogComponent {
       const result: StatusUpdateDialogResult = {
         status: this.statusForm.value.status
       };
+      if (this.statusForm.value.deliveryTimestamp) {
+        result.deliveryTimestamp = new Date(this.statusForm.value.deliveryTimestamp).toISOString().split('.')[0] + 'Z';
+      }
       this.dialogRef.close(result);
     }
   }

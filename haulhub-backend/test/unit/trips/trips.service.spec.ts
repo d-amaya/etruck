@@ -119,6 +119,8 @@ describe('TripsService', () => {
       truckOwnerRate: 3.95,
       dispatcherRate: 0.52,
       fuelCost: 200.0,
+      fuelGasAvgCost: 3.50,
+      fuelGasAvgGallxMil: 0.15,
       notes: 'Test trip',
     };
 
@@ -247,7 +249,7 @@ describe('TripsService', () => {
       
       brokersService.getBrokerById.mockRejectedValueOnce(new NotFoundException('Broker not found'));
 
-      await expect(service.createTrip('dispatcher-123', validCreateTripDto)).rejects.toThrow(
+      await expect(service.createTrip('dispatcher-123', validCreateTripDto as any)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -264,7 +266,7 @@ describe('TripsService', () => {
       // Mock carrier validation to fail with DynamoDB error
       mockDynamoDBClient.send.mockRejectedValueOnce(new Error('DynamoDB error'));
 
-      await expect(service.createTrip('dispatcher-123', validCreateTripDto)).rejects.toThrow(
+      await expect(service.createTrip('dispatcher-123', validCreateTripDto as any)).rejects.toThrow(
         InternalServerErrorException,
       );
     });
@@ -1547,7 +1549,7 @@ describe('TripsService', () => {
       });
 
       await expect(
-        service.createTrip('dispatcher-123', validCreateTripDto),
+        service.createTrip('dispatcher-123', validCreateTripDto as any),
       ).rejects.toThrow('Dispatcher does not belong to the specified carrier');
     });
 
@@ -1583,7 +1585,7 @@ describe('TripsService', () => {
       });
 
       await expect(
-        service.createTrip('dispatcher-123', validCreateTripDto),
+        service.createTrip('dispatcher-123', validCreateTripDto as any),
       ).rejects.toThrow('Driver does not belong to the specified carrier');
     });
 
@@ -1630,7 +1632,7 @@ describe('TripsService', () => {
       });
 
       await expect(
-        service.createTrip('dispatcher-123', validCreateTripDto),
+        service.createTrip('dispatcher-123', validCreateTripDto as any),
       ).rejects.toThrow('Truck does not belong to the specified carrier');
     });
 
@@ -1687,7 +1689,7 @@ describe('TripsService', () => {
       });
 
       await expect(
-        service.createTrip('dispatcher-123', validCreateTripDto),
+        service.createTrip('dispatcher-123', validCreateTripDto as any),
       ).rejects.toThrow('Trailer does not belong to the specified carrier');
     });
   });
@@ -1729,7 +1731,8 @@ describe('TripsService', () => {
         truckOwnerRate: 3.95,
         dispatcherRate: 0.52,
         fuelCost: 200.0,
-        notes: 'Test trip',
+        fuelGasAvgCost: 3.50,
+        fuelGasAvgGallxMil: 0.15,        notes: 'Test trip',
       };
 
       brokersService.getBrokerById.mockResolvedValueOnce({
@@ -1757,7 +1760,7 @@ describe('TripsService', () => {
       // Mock trip creation
       mockDynamoDBClient.send.mockResolvedValueOnce({});
 
-      const result = await service.createTrip(dispatcherId, createDto);
+      const result = await service.createTrip(dispatcherId, createDto as any);
 
       expect(result.scheduledTimestamp).toBeDefined();
       expect(result.pickupTimestamp).toBeNull();
@@ -1866,7 +1869,8 @@ describe('TripsService', () => {
         truckOwnerRate: 3.95,
         dispatcherRate: 0.52,
         fuelCost: 200.0,
-        notes: 'Test trip',
+        fuelGasAvgCost: 3.50,
+        fuelGasAvgGallxMil: 0.15,        notes: 'Test trip',
       };
 
       brokersService.getBrokerById.mockResolvedValueOnce({
@@ -1894,7 +1898,7 @@ describe('TripsService', () => {
       // Mock trip creation
       mockDynamoDBClient.send.mockResolvedValueOnce({});
 
-      const result = await service.createTrip(dispatcherId, createDto);
+      const result = await service.createTrip(dispatcherId, createDto as any);
 
       // Verify ISO 8601 format without milliseconds (YYYY-MM-DDTHH:mm:ssZ)
       const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;

@@ -25,7 +25,7 @@
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>From</mat-label>
               <input matInput [matDatepicker]="startPicker" formControlName="startDate"
-                     [max]="filterForm.get('endDate')?.value || maxDate">
+                     [max]="filterForm.get('endDate')?.value" (dateChange)="settingPreset = false; activePreset = null">
               <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
               <mat-datepicker #startPicker></mat-datepicker>
             </mat-form-field>
@@ -33,27 +33,31 @@
             <mat-form-field appearance="outline" class="date-field">
               <mat-label>To</mat-label>
               <input matInput [matDatepicker]="endPicker" formControlName="endDate"
-                     [min]="filterForm.get('startDate')?.value"
-                     [max]="maxDate">
+                     [min]="filterForm.get('startDate')?.value" (dateChange)="settingPreset = false; activePreset = null">
               <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
               <mat-datepicker #endPicker></mat-datepicker>
             </mat-form-field>
 
             <div class="date-presets">
-              <button mat-button type="button" (click)="setPreset('week')"
-                      [class.active]="activePreset === 'week'">
-                Last Week
+              <button mat-button type="button" (click)="setPreset('lastMonth')"
+                      [class.active]="activePreset === 'lastMonth'">
+                Last 30 Days
               </button>
-              <button mat-button type="button" (click)="setPreset('month')"
-                      [class.active]="activePreset === 'month'">
-                Last Month
+              <button mat-button type="button" (click)="setPreset('currentWeek')"
+                      [class.active]="activePreset === 'currentWeek'">
+                Current Week
               </button>
-              <button mat-button type="button" (click)="setPreset('year')"
-                      [class.active]="activePreset === 'year'">
-                Last Year
+              <button mat-button type="button" (click)="setPreset('currentMonth')"
+                      [class.active]="activePreset === 'currentMonth'">
+                Current Month
               </button>
             </div>
           </div>
+        </div>
+
+        <div *ngIf="dateRangeError" class="date-range-error">
+          <mat-icon>error</mat-icon>
+          <span>{{ dateRangeError }}</span>
         </div>
       </div>
     </form>

@@ -14,45 +14,24 @@
         <div class="form-section">
           <h3>Basic Information</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Order Confirmation Number</mat-label>
               <input matInput formControlName="orderConfirmation" placeholder="Enter order confirmation number">
-              <mat-hint>Unique identifier for this trip</mat-hint>
               <mat-error>{{ getErrorMessage('orderConfirmation') }}</mat-error>
             </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Pickup Location</mat-label>
-              <input matInput formControlName="pickupLocation" placeholder="Enter pickup address">
-              <mat-error>{{ getErrorMessage('pickupLocation') }}</mat-error>
-            </mat-form-field>
 
             <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Dropoff Location</mat-label>
-              <input matInput formControlName="dropoffLocation" placeholder="Enter dropoff address">
-              <mat-error>{{ getErrorMessage('dropoffLocation') }}</mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Scheduled Pickup Date & Time</mat-label>
-              <input matInput type="datetime-local" formControlName="scheduledTimestamp" 
-                     placeholder="Select date and time">
-              <mat-hint>Select when the pickup is scheduled</mat-hint>
+              <mat-label>Scheduled Date</mat-label>
+              <input matInput [matDatepicker]="scheduledPicker" formControlName="scheduledTimestamp" [max]="today">
+              <mat-datepicker-toggle matSuffix [for]="scheduledPicker"></mat-datepicker-toggle>
+              <mat-datepicker #scheduledPicker></mat-datepicker>
               <mat-error>{{ getErrorMessage('scheduledTimestamp') }}</mat-error>
             </mat-form-field>
           </div>
-        </div>
 
-        <!-- Broker Information -->
-        <div class="form-section">
-          <h3>Broker</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Select Broker</mat-label>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Broker</mat-label>
               <mat-select formControlName="brokerId" [disabled]="loadingBrokers">
                 <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
                   {{ broker.brokerName }}
@@ -61,12 +40,19 @@
               <mat-hint *ngIf="loadingBrokers">Loading brokers...</mat-hint>
               <mat-error>{{ getErrorMessage('brokerId') }}</mat-error>
             </mat-form-field>
-          </div>
-        </div>
 
-        <!-- Vehicle Assignment -->
-        <div class="form-section">
-          <h3>Vehicle Assignment</h3>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Driver</mat-label>
+              <mat-select formControlName="driverId" [disabled]="loadingAssets">
+                <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
+                  {{ driver.name }} - {{ driver.email }}
+                </mat-option>
+              </mat-select>
+              <mat-hint *ngIf="loadingAssets">Loading drivers...</mat-hint>
+              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
+            </mat-form-field>
+          </div>
+
           <div class="form-row">
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Truck</mat-label>
@@ -92,86 +78,64 @@
           </div>
         </div>
 
-        <!-- Driver Assignment -->
+        <!-- Financial & Cost Details -->
         <div class="form-section">
-          <h3>Driver Assignment</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Driver</mat-label>
-              <mat-select formControlName="driverId" [disabled]="loadingAssets">
-                <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
-                  {{ driver.name }} - {{ driver.email }}
-                </mat-option>
-              </mat-select>
-              <mat-hint *ngIf="loadingAssets">Loading drivers...</mat-hint>
-              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- Mileage & Fuel Management -->
-        <div class="form-section">
-          <h3>Mileage & Fuel Management</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Loaded Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="mileageOrder" placeholder="0.0">
-              <mat-hint>Miles driven with cargo</mat-hint>
-              <mat-error>{{ getErrorMessage('mileageOrder') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Empty Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="mileageEmpty" placeholder="0.0">
-              <mat-hint>Deadhead miles</mat-hint>
-              <mat-error>{{ getErrorMessage('mileageEmpty') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Total Miles</mat-label>
-              <input matInput type="number" formControlName="mileageTotal" readonly>
-              <mat-hint>Auto-calculated</mat-hint>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Avg Fuel Cost ($/gallon)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="fuelGasAvgCost" placeholder="0.00">
-              <mat-hint>Average fuel price (optional)</mat-hint>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Avg Gallons Per Mile</mat-label>
-              <input matInput type="number" step="0.001" formControlName="fuelGasAvgGallxMil" placeholder="0.000">
-              <mat-hint>Fuel efficiency (optional)</mat-hint>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- Financial Details (Enhanced) -->
-        <div class="form-section">
-          <h3>Financial Details</h3>
+          <h3>Financial & Cost Details</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Broker Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="brokerPayment" placeholder="0.00">
-              <mat-hint>Amount broker will pay</mat-hint>
               <mat-error>{{ getErrorMessage('brokerPayment') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Truck Owner Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="truckOwnerPayment" placeholder="0.00">
-              <mat-hint>Amount to pay truck owner</mat-hint>
               <mat-error>{{ getErrorMessage('truckOwnerPayment') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Driver Payment ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="driverPayment" placeholder="0.00">
-              <mat-hint>Amount to pay driver</mat-hint>
               <mat-error>{{ getErrorMessage('driverPayment') }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Loaded Miles</mat-label>
+              <input matInput type="number" step="0.1" formControlName="mileageOrder" placeholder="0.0">
+              <mat-error>{{ getErrorMessage('mileageOrder') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Empty Miles</mat-label>
+              <input matInput type="number" step="0.1" formControlName="mileageEmpty" placeholder="0.0">
+              <mat-error>{{ getErrorMessage('mileageEmpty') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Total Miles</mat-label>
+              <input matInput type="number" formControlName="mileageTotal" readonly>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Avg Fuel Cost ($/gallon)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="fuelGasAvgCost" placeholder="0.00">
+              <mat-error>{{ getErrorMessage('fuelGasAvgCost') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Avg Gallons Per Mile</mat-label>
+              <input matInput type="number" step="0.001" formControlName="fuelGasAvgGallxMil" placeholder="0.000">
+              <mat-error>{{ getErrorMessage('fuelGasAvgGallxMil') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Estimated Fuel Cost ($)</mat-label>
+              <input matInput formControlName="estimatedFuelCost" readonly>
             </mat-form-field>
           </div>
 
@@ -179,46 +143,55 @@
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Lumper Fees ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="lumperValue" placeholder="0.00">
-              <mat-hint>Loading/unloading fees</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Detention Fees ($)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="detentionValue" placeholder="0.00">
+            </mat-form-field>
+          </div>
+
+          <div class="profit-display" [ngClass]="calculateProfit() >= 0 ? 'profit-positive' : 'profit-negative'">
+            <span class="profit-label">{{ getProfitLabel() }}</span>
+            <span class="profit-amount">{{ formatProfitAmount() }}</span>
+          </div>
+        </div>
+
+        <!-- Pickup Details -->
+        <div class="form-section">
+          <h3>Pickup Details</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Pickup Date</mat-label>
+              <input matInput [matDatepicker]="pickupPicker" formControlName="pickupDate" [min]="tripForm.get('scheduledTimestamp')?.value">
+              <mat-datepicker-toggle matSuffix [for]="pickupPicker"></mat-datepicker-toggle>
+              <mat-datepicker #pickupPicker></mat-datepicker>
+              <mat-error>{{ getErrorMessage('pickupDate') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="time-width">
+              <mat-label>Pickup Time</mat-label>
+              <input matInput type="time" formControlName="pickupTime">
+              <mat-error>{{ getErrorMessage('pickupTime') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Company Name</mat-label>
+              <input matInput formControlName="pickupCompany" placeholder="Pickup company">
+              <mat-error>{{ getErrorMessage('pickupCompany') }}</mat-error>
             </mat-form-field>
           </div>
 
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Detention Fees ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="detentionValue" placeholder="0.00">
-              <mat-hint>Delay charges</mat-hint>
-            </mat-form-field>
-          </div>
-
-          <!-- Calculated Profit Display -->
-          <div class="profit-display">
-            <span class="profit-label">{{ getProfitLabel() }}</span>
-            <span class="profit-value" [ngClass]="calculateProfit() >= 0 ? 'profit-positive' : 'profit-negative'">
-              {{ formatProfitAmount() }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Enhanced Pickup Details -->
-        <div class="form-section">
-          <h3>Pickup Details (Optional)</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Company Name</mat-label>
-              <input matInput formControlName="pickupCompany" placeholder="Pickup company">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Phone Number</mat-label>
               <input matInput formControlName="pickupPhone" placeholder="(555) 123-4567">
             </mat-form-field>
-          </div>
 
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="two-thirds-width">
               <mat-label>Address</mat-label>
               <input matInput formControlName="pickupAddress" placeholder="Street address">
+              <mat-error>{{ getErrorMessage('pickupAddress') }}</mat-error>
             </mat-form-field>
           </div>
 
@@ -226,16 +199,19 @@
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>City</mat-label>
               <input matInput formControlName="pickupCity" placeholder="City">
+              <mat-error>{{ getErrorMessage('pickupCity') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>State</mat-label>
               <input matInput formControlName="pickupState" placeholder="State" maxlength="2">
+              <mat-error>{{ getErrorMessage('pickupState') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>ZIP Code</mat-label>
               <input matInput formControlName="pickupZip" placeholder="12345">
+              <mat-error>{{ getErrorMessage('pickupZip') }}</mat-error>
             </mat-form-field>
           </div>
 
@@ -248,25 +224,41 @@
           </div>
         </div>
 
-        <!-- Enhanced Delivery Details -->
+        <!-- Delivery Details -->
         <div class="form-section">
-          <h3>Delivery Details (Optional)</h3>
+          <h3>Delivery Details</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Company Name</mat-label>
-              <input matInput formControlName="deliveryCompany" placeholder="Delivery company">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Delivery Date</mat-label>
+              <input matInput [matDatepicker]="deliveryPicker" formControlName="deliveryDate" [min]="tripForm.get('pickupDate')?.value">
+              <mat-datepicker-toggle matSuffix [for]="deliveryPicker"></mat-datepicker-toggle>
+              <mat-datepicker #deliveryPicker></mat-datepicker>
+              <mat-error>{{ getErrorMessage('deliveryDate') }}</mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Phone Number</mat-label>
-              <input matInput formControlName="deliveryPhone" placeholder="(555) 123-4567">
+            <mat-form-field appearance="outline" class="time-width">
+              <mat-label>Delivery Time</mat-label>
+              <input matInput type="time" formControlName="deliveryTime">
+              <mat-error>{{ getErrorMessage('deliveryTime') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Company Name</mat-label>
+              <input matInput formControlName="deliveryCompany" placeholder="Delivery company">
+              <mat-error>{{ getErrorMessage('deliveryCompany') }}</mat-error>
             </mat-form-field>
           </div>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Phone Number</mat-label>
+              <input matInput formControlName="deliveryPhone" placeholder="(555) 123-4567">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="two-thirds-width">
               <mat-label>Address</mat-label>
               <input matInput formControlName="deliveryAddress" placeholder="Street address">
+              <mat-error>{{ getErrorMessage('deliveryAddress') }}</mat-error>
             </mat-form-field>
           </div>
 
@@ -274,25 +266,19 @@
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>City</mat-label>
               <input matInput formControlName="deliveryCity" placeholder="City">
+              <mat-error>{{ getErrorMessage('deliveryCity') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>State</mat-label>
               <input matInput formControlName="deliveryState" placeholder="State" maxlength="2">
+              <mat-error>{{ getErrorMessage('deliveryState') }}</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>ZIP Code</mat-label>
               <input matInput formControlName="deliveryZip" placeholder="12345">
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Delivery Date & Time</mat-label>
-              <input matInput type="datetime-local" formControlName="deliveryDatetime" 
-                     placeholder="Select date and time">
-              <mat-hint>Optional - when delivery is expected</mat-hint>
+              <mat-error>{{ getErrorMessage('deliveryZip') }}</mat-error>
             </mat-form-field>
           </div>
 
@@ -301,18 +287,6 @@
               <mat-label>Delivery Notes</mat-label>
               <textarea matInput formControlName="deliveryNotes" rows="2" 
                         placeholder="Special instructions or notes"></textarea>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- General Notes -->
-        <div class="form-section">
-          <h3>Additional Notes</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Trip Notes</mat-label>
-              <textarea matInput formControlName="notes" rows="3" 
-                        placeholder="Any additional information about this trip"></textarea>
             </mat-form-field>
           </div>
         </div>

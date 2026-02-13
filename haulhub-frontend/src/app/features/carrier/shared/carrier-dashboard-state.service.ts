@@ -23,8 +23,8 @@ export interface PaginationState {
 
 const defaultFilters: CarrierDashboardFilters = {
   dateRange: {
-    startDate: (() => { const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d; })(),
-    endDate: (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })(),
+    startDate: (() => { const today = new Date(); const day = today.getDay(); const diff = day === 0 ? 6 : day - 1; const d = new Date(today); d.setDate(d.getDate() - diff); d.setHours(0, 0, 0, 0); return d; })(),
+    endDate: (() => { const today = new Date(); const day = today.getDay(); const diff = day === 0 ? 6 : day - 1; const d = new Date(today); d.setDate(d.getDate() - diff + 6); d.setHours(23, 59, 59, 999); return d; })(),
   },
   status: null,
   brokerId: null,

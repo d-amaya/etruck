@@ -39,8 +39,9 @@ import { Router } from '@angular/router';
 export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   activePreset: string | null = 'month';
-  maxDate = new Date();
-  private settingPreset = false;
+  maxDate: Date | null = null; // No maximum date - allow future dates
+  dateRangeError: string | null = null;
+  settingPreset = false;
   
   private destroy$ = new Subject<void>();
 
@@ -57,8 +58,15 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Apply default preset on init
-    this.setPreset('month');
+    // Sync form with current filter state (defaults to current week from service)
+    const currentFilter = this.filterService.getCurrentFilter();
+    this.filterForm.patchValue({
+      startDate: currentFilter.startDate,
+      endDate: currentFilter.endDate
+    }, { emitEvent: false });
+
+    // Detect if current dates match a preset
+    this.activePreset = this.filterService.activePreset;
 
     // Listen to form changes and update service
     this.filterForm.valueChanges
@@ -68,15 +76,25 @@ export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
       )
       .subscribe(value => {
         if (value.startDate && value.endDate && !this.settingPreset) {
+          // Validate date range doesn't exceed 1 year
+          const diffMs = Math.abs(value.endDate.getTime() - value.startDate.getTime());
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDays > 365) {
+            this.dateRangeError = 'Date range cannot exceed 1 year';
+            return;
+          }
+          this.dateRangeError = null;
           this.filterService.updateDateFilter(value.startDate, value.endDate);
           this.activePreset = null;
+          this.filterService.activePreset = null;
         }
       });
   }
 
-  setPreset(preset: 'week' | 'month' | 'quarter' | 'year'): void {
+  setPreset(preset: 'lastMonth' | 'currentWeek' | 'currentMonth'): void {
     this.settingPreset = true;
     this.activePreset = preset;
+    this.filterService.activePreset = preset;
     this.filterService.setPreset(preset);
     
     const filter = this.filterService.getCurrentFilter();

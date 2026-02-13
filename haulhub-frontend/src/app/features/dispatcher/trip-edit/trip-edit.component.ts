@@ -48,6 +48,7 @@ export class TripEditComponent implements OnInit {
   loadingAssets = true;
   error?: string;
   statusOptions = Object.values(TripStatus);
+  today = new Date();
 
   constructor(
     private fb: FormBuilder,
@@ -130,10 +131,6 @@ export class TripEditComponent implements OnInit {
 
   private initializeForm(): void {
     this.tripForm = this.fb.group({
-      // Location Information
-      pickupLocation: ['', [Validators.required, Validators.minLength(3)]],
-      dropoffLocation: ['', [Validators.required, Validators.minLength(3)]],
-      
       // Status
       status: ['', Validators.required],
       
@@ -141,7 +138,7 @@ export class TripEditComponent implements OnInit {
       scheduledTimestamp: [{ value: '', disabled: true }, Validators.required],
       
       // Broker Information
-      brokerId: ['', Validators.required],
+      brokerId: [{ value: '', disabled: true }, Validators.required],
       orderConfirmation: [''],
       
       // Vehicle Assignment - DISABLED: Cannot be changed after creation (affects GSI keys)
@@ -163,23 +160,26 @@ export class TripEditComponent implements OnInit {
       driverPayment: ['', [Validators.required, Validators.min(0.01)]],
       driverRate: ['', Validators.min(0)],
       
-      // Enhanced Pickup Details
-      pickupCompany: [''],
+      // Pickup Details (Required)
+      pickupCompany: ['', Validators.required],
       pickupPhone: [''],
-      pickupAddress: [''],
-      pickupCity: [''],
-      pickupState: [''],
-      pickupZip: [''],
+      pickupAddress: ['', Validators.required],
+      pickupCity: ['', Validators.required],
+      pickupState: ['', Validators.required],
+      pickupZip: ['', Validators.required],
+      pickupDate: ['', Validators.required],
+      pickupTime: ['', Validators.required],
       pickupNotes: [''],
       
-      // Enhanced Delivery Details
-      deliveryCompany: [''],
+      // Delivery Details (Required)
+      deliveryCompany: ['', Validators.required],
       deliveryPhone: [''],
-      deliveryAddress: [''],
-      deliveryCity: [''],
-      deliveryState: [''],
-      deliveryZip: [''],
-      deliveryDatetime: [''],
+      deliveryAddress: ['', Validators.required],
+      deliveryCity: ['', Validators.required],
+      deliveryState: ['', Validators.required],
+      deliveryZip: ['', Validators.required],
+      deliveryDate: ['', Validators.required],
+      deliveryTime: ['', Validators.required],
       deliveryNotes: [''],
       
       // Additional Fees
@@ -187,8 +187,9 @@ export class TripEditComponent implements OnInit {
       detentionValue: [0, Validators.min(0)],
       
       // Fuel Management
-      fuelGasAvgCost: ['', Validators.min(0)],
-      fuelGasAvgGallxMil: ['', Validators.min(0)],
+      fuelGasAvgCost: ['', [Validators.required, Validators.min(0)]],
+      fuelGasAvgGallxMil: ['', [Validators.required, Validators.min(0)]],
+      estimatedFuelCost: [{ value: '', disabled: true }],
       
       // Notes
       notes: ['']
@@ -197,6 +198,25 @@ export class TripEditComponent implements OnInit {
     // Auto-calculate total miles when loaded or empty miles change
     this.tripForm.get('mileageOrder')?.valueChanges.subscribe(() => this.calculateTotalMiles());
     this.tripForm.get('mileageEmpty')?.valueChanges.subscribe(() => this.calculateTotalMiles());
+    
+    // Auto-calculate fuel cost when inputs change
+    this.tripForm.get('fuelGasAvgCost')?.valueChanges.subscribe(() => this.updateFuelCost());
+    this.tripForm.get('fuelGasAvgGallxMil')?.valueChanges.subscribe(() => this.updateFuelCost());
+
+    // Clear pickup/delivery dates if they violate ordering
+    this.tripForm.get('scheduledTimestamp')?.valueChanges.subscribe(val => {
+      const pickup = this.tripForm.get('pickupDate')?.value;
+      if (val && pickup && new Date(pickup) < new Date(val)) {
+        this.tripForm.get('pickupDate')?.reset();
+        this.tripForm.get('deliveryDate')?.reset();
+      }
+    });
+    this.tripForm.get('pickupDate')?.valueChanges.subscribe(val => {
+      const delivery = this.tripForm.get('deliveryDate')?.value;
+      if (val && delivery && new Date(delivery) < new Date(val)) {
+        this.tripForm.get('deliveryDate')?.reset();
+      }
+    });
   }
   
   private calculateTotalMiles(): void {
@@ -204,6 +224,15 @@ export class TripEditComponent implements OnInit {
     const mileageEmpty = parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0;
     const mileageTotal = mileageOrder + mileageEmpty;
     this.tripForm.get('mileageTotal')?.setValue(mileageTotal, { emitEvent: false });
+    this.updateFuelCost();
+  }
+
+  private updateFuelCost(): void {
+    const mileageTotal = parseFloat(this.tripForm.get('mileageTotal')?.value) || 0;
+    const avgCost = parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0;
+    const avgGallPerMile = parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0;
+    const cost = (avgCost > 0 && avgGallPerMile > 0) ? mileageTotal * avgGallPerMile * avgCost : 0;
+    this.tripForm.get('estimatedFuelCost')?.setValue(cost.toFixed(2), { emitEvent: false });
   }
 
   private loadBrokers(): void {
@@ -240,32 +269,30 @@ export class TripEditComponent implements OnInit {
   }
 
   private populateForm(trip: any): void {
-    // Convert scheduledTimestamp to datetime-local format
+    // Convert scheduledTimestamp to date format for mat-datepicker
     const scheduledDate = new Date(trip.scheduledTimestamp);
-    const scheduledDatetimeLocal = this.formatDatetimeLocal(scheduledDate);
     
-    // Parse delivery datetime if available
-    let deliveryDatetimeLocal;
-    if (trip.deliveryTimestamp) {
-      const deliveryDate = new Date(trip.deliveryTimestamp);
-      deliveryDatetimeLocal = this.formatDatetimeLocal(deliveryDate);
+    // Parse pickup date+time if available
+    let pickupDateVal: Date | null = null;
+    let pickupTimeVal = '';
+    if (trip.pickupTimestamp) {
+      const d = new Date(trip.pickupTimestamp);
+      pickupDateVal = d;
+      pickupTimeVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     }
     
-    // Debug: Log the trip data once
-    console.log('Trip data for edit:', {
-      fuelGasAvgCost: trip.fuelGasAvgCost,
-      fuelGasAvgGallxMil: trip.fuelGasAvgGallxMil,
-      mileageTotal: trip.mileageTotal,
-      fuelCost: trip.fuelCost,
-      calculatedFuel: trip.mileageTotal * trip.fuelGasAvgGallxMil * trip.fuelGasAvgCost
-    });
+    // Parse delivery date+time if available
+    let deliveryDateVal: Date | null = null;
+    let deliveryTimeVal = '';
+    if (trip.deliveryTimestamp) {
+      const d = new Date(trip.deliveryTimestamp);
+      deliveryDateVal = d;
+      deliveryTimeVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
     
     this.tripForm.patchValue({
-      // Basic info - construct location strings from city/state
-      pickupLocation: trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '',
-      dropoffLocation: trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '',
       status: trip.orderStatus,
-      scheduledTimestamp: scheduledDatetimeLocal,
+      scheduledTimestamp: scheduledDate,
       brokerId: trip.brokerId,
       orderConfirmation: trip.orderConfirmation || '',
       
@@ -294,6 +321,8 @@ export class TripEditComponent implements OnInit {
       pickupCity: trip.pickupCity || '',
       pickupState: trip.pickupState || '',
       pickupZip: trip.pickupZip || '',
+      pickupDate: pickupDateVal,
+      pickupTime: pickupTimeVal,
       pickupNotes: trip.pickupNotes || '',
       
       // Delivery details
@@ -303,7 +332,8 @@ export class TripEditComponent implements OnInit {
       deliveryCity: trip.deliveryCity || '',
       deliveryState: trip.deliveryState || '',
       deliveryZip: trip.deliveryZip || '',
-      deliveryDatetime: deliveryDatetimeLocal || '',
+      deliveryDate: deliveryDateVal,
+      deliveryTime: deliveryTimeVal,
       deliveryNotes: trip.deliveryNotes || '',
       
       // Additional fees
@@ -316,7 +346,7 @@ export class TripEditComponent implements OnInit {
       
       // Notes
       notes: trip.notes || ''
-    });
+    }, { emitEvent: false });
     
     // Trigger total miles calculation
     this.calculateTotalMiles();
@@ -342,16 +372,28 @@ export class TripEditComponent implements OnInit {
 
     const formValue = this.tripForm.getRawValue(); // Get all values including disabled fields
     
-    // Convert delivery datetime if provided
+    // Convert pickup date+time to ISO 8601
+    let pickupTimestamp: string | undefined;
+    if (formValue.pickupDate && formValue.pickupTime) {
+      const d = new Date(formValue.pickupDate);
+      const [h, m] = formValue.pickupTime.split(':');
+      d.setHours(parseInt(h), parseInt(m), 0, 0);
+      pickupTimestamp = d.toISOString().split('.')[0] + 'Z';
+    }
+    
+    // Convert delivery date+time to ISO 8601
     let deliveryTimestamp: string | undefined;
-    if (formValue.deliveryDatetime) {
-      deliveryTimestamp = new Date(formValue.deliveryDatetime).toISOString();
+    if (formValue.deliveryDate && formValue.deliveryTime) {
+      const d = new Date(formValue.deliveryDate);
+      const [h, m] = formValue.deliveryTime.split(':');
+      d.setHours(parseInt(h), parseInt(m), 0, 0);
+      deliveryTimestamp = d.toISOString().split('.')[0] + 'Z';
     }
 
     const tripData: any = {
       // Basic trip info
-      pickupLocation: formValue.pickupLocation.trim(),
-      dropoffLocation: formValue.dropoffLocation.trim(),
+      pickupLocation: `${formValue.pickupCity?.trim()}, ${formValue.pickupState?.trim()}`,
+      dropoffLocation: `${formValue.deliveryCity?.trim()}, ${formValue.deliveryState?.trim()}`,
       orderStatus: formValue.status,
       brokerId: formValue.brokerId,
       orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
@@ -375,6 +417,7 @@ export class TripEditComponent implements OnInit {
       pickupCity: formValue.pickupCity?.trim() || undefined,
       pickupState: formValue.pickupState?.trim() || undefined,
       pickupZip: formValue.pickupZip?.trim() || undefined,
+      pickupTimestamp: pickupTimestamp,
       pickupNotes: formValue.pickupNotes?.trim() || undefined,
       
       // Enhanced delivery details

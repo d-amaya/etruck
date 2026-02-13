@@ -11,6 +11,7 @@ import { DriverAssetCacheService } from '../../driver-asset-cache.service';
 export class DriverTripEditDialogComponent {
   editForm: FormGroup;
   statusOptions = ['Scheduled', 'Picked Up', 'In Transit', 'Delivered'];
+  deliveredStatus = 'Delivered';
 
   constructor(
     private fb: FormBuilder,
@@ -20,7 +21,20 @@ export class DriverTripEditDialogComponent {
   ) {
     this.editForm = this.fb.group({
       status: [data.trip.orderStatus || data.trip.status, Validators.required],
-      notes: [data.trip.notes || '']
+      notes: [data.trip.notes || ''],
+      deliveryTimestamp: ['']
+    });
+
+    // Add/remove deliveryTimestamp validation when status changes
+    this.editForm.get('status')?.valueChanges.subscribe(status => {
+      const ctrl = this.editForm.get('deliveryTimestamp')!;
+      if (status === 'Delivered') {
+        ctrl.setValidators(Validators.required);
+      } else {
+        ctrl.clearValidators();
+        ctrl.setValue('');
+      }
+      ctrl.updateValueAndValidity();
     });
   }
 
@@ -42,7 +56,14 @@ export class DriverTripEditDialogComponent {
 
   onSave(): void {
     if (this.editForm.valid) {
-      this.dialogRef.close(this.editForm.value);
+      const result: any = {
+        status: this.editForm.value.status,
+        notes: this.editForm.value.notes
+      };
+      if (this.editForm.value.deliveryTimestamp) {
+        result.deliveryTimestamp = new Date(this.editForm.value.deliveryTimestamp).toISOString().split('.')[0] + 'Z';
+      }
+      this.dialogRef.close(result);
     }
   }
 }

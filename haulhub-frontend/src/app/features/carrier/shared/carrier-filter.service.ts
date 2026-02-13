@@ -22,20 +22,26 @@ export class CarrierFilterService {
 
   dateFilter$: Observable<CarrierDateFilter> = this.dateFilterSubject.asObservable();
   viewMode$: Observable<ViewMode> = this.viewModeSubject.asObservable();
+  activePreset: string | null = 'currentWeek';
 
   constructor(private dashboardState: CarrierDashboardStateService) {}
 
   private getDefaultStartDate(): Date {
-    const date = new Date();
-    date.setDate(date.getDate() - 30); // Last 30 days
-    date.setHours(0, 0, 0, 0);
-    return date;
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() - diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
   }
 
   private getDefaultEndDate(): Date {
-    const date = new Date();
-    date.setHours(23, 59, 59, 999);
-    return date;
+    const start = this.getDefaultStartDate();
+    const sunday = new Date(start);
+    sunday.setDate(sunday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return sunday;
   }
 
   getCurrentFilter(): CarrierDateFilter {
@@ -55,32 +61,36 @@ export class CarrierFilterService {
     this.dashboardState.updateFilters({ dateRange: { startDate, endDate } });
   }
 
-  setPreset(preset: 'week' | 'month' | 'quarter' | 'year'): void {
+  setPreset(preset: 'lastMonth' | 'currentWeek' | 'currentMonth'): void {
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
     let startDate: Date;
+    let endDate: Date;
 
     switch (preset) {
-      case 'week':
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 7);
-        break;
-      case 'month':
+      case 'lastMonth':
         startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
         break;
-      case 'quarter':
+      case 'currentWeek':
         startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 90);
+        const day = startDate.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        startDate.setDate(startDate.getDate() - diff);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
         break;
-      case 'year':
-        startDate = new Date(today);
-        startDate.setFullYear(startDate.getFullYear() - 1);
+      case 'currentMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
     }
 
-    startDate.setHours(0, 0, 0, 0);
-    this.updateDateFilter(startDate, today);
+    this.updateDateFilter(startDate, endDate);
   }
 
   clearFilter(): void {
