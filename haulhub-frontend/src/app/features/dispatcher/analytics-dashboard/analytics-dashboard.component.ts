@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { ExcelExportService } from '../../../core/services/excel-export.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -52,6 +54,7 @@ interface ChartData {
     MatCardModule,
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
     MatTabsModule,
     MatFormFieldModule,
@@ -112,6 +115,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
   constructor(
     private analyticsService: AnalyticsService,
+    private excelExportService: ExcelExportService,
     private sharedFilterService: SharedFilterService,
     private dashboardStateService: DashboardStateService,
     private assetCache: AssetCacheService,
@@ -500,11 +504,11 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Driver', 'Trips', 'Completed', 'Distance', 'Earnings', 'Rate']],
+        head: [['Driver', 'Trips', 'Completed', 'Distance', 'Earnings', 'Completion Rate']],
         body: this.driverPerformanceData.map(d => [
           d.driverName, d.totalTrips.toString(), d.completedTrips.toString(),
-          `${d.totalDistance.toFixed(0)} mi`, this.formatCurrency(d.totalRevenue),
-          `${d.onTimeDeliveryRate.toFixed(0)}%`
+          `${d.totalDistance.toFixed(0)} mi`, this.formatCurrency(d.totalEarnings),
+          `${d.completionRate.toFixed(0)}%`
         ]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -538,6 +542,46 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
     doc.save(`dispatcher-analytics-${new Date().toISOString().split('T')[0]}.pdf`);
     this.snackBar.open('Analytics exported to PDF successfully', 'Close', { duration: 3000 });
+  }
+
+  onExportCSV(): void {
+    const sheets: any[] = [];
+    if (this.brokerAnalyticsData?.brokers?.length > 0) {
+      sheets.push({
+        name: 'Broker Performance',
+        headers: ['Broker Name', 'Total Trips', 'Completed', 'Total Revenue', 'Avg Revenue/Trip', 'Total Distance', 'Completion Rate'],
+        rows: this.brokerAnalyticsData.brokers.map((b: any) => [
+          b.brokerName, b.tripCount || 0, b.completedTrips || 0,
+          b.totalRevenue?.toFixed(2) || 0, b.averageRevenue?.toFixed(2) || 0,
+          b.totalDistance || 0, `${(b.completionRate || 0).toFixed(0)}%`
+        ])
+      });
+    }
+    if (this.driverPerformanceData?.length > 0) {
+      sheets.push({
+        name: 'Driver Performance',
+        headers: ['Driver Name', 'Total Trips', 'Completed', 'Total Distance', 'Total Earnings', 'Avg Earnings/Trip', 'Completion Rate'],
+        rows: this.driverPerformanceData.map((d: any) => [
+          d.driverName, d.totalTrips || 0, d.completedTrips || 0,
+          d.totalDistance || 0, d.totalEarnings?.toFixed(2) || 0, d.averageEarningsPerTrip?.toFixed(2) || 0,
+          `${(d.completionRate || 0).toFixed(0)}%`
+        ])
+      });
+    }
+    if (this.vehicleUtilizationData?.length > 0) {
+      sheets.push({
+        name: 'Vehicle Utilization',
+        headers: ['Truck', 'Total Trips', 'Total Distance', 'Total Revenue', 'Utilization Rate', 'Avg Revenue/Trip'],
+        rows: this.vehicleUtilizationData.map((v: any) => [
+          v.vehicleName, v.totalTrips || 0, v.totalDistance || 0,
+          v.totalRevenue?.toFixed(2) || 0, `${(v.utilizationRate || 0).toFixed(1)}%`, v.averageRevenuePerTrip?.toFixed(2) || 0
+        ])
+      });
+    }
+    if (sheets.length > 0) {
+      this.excelExportService.exportToExcel('dispatcher-analytics', sheets, this.startDate, this.endDate);
+      this.snackBar.open('Analytics exported to Excel successfully', 'Close', { duration: 3000 });
+    }
   }
 
   onTabChange(index: number): void {

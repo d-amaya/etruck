@@ -2,10 +2,18 @@
   <!-- Export Button -->
   <div class="page-header">
     <div class="header-actions">
-      <button mat-raised-button color="primary" (click)="onExportData()" [disabled]="loading || !report">
+      <button mat-raised-button color="primary" [matMenuTriggerFor]="exportMenu" [disabled]="loading || !report">
         <mat-icon>download</mat-icon>
-        Export PDF
+        Export
       </button>
+      <mat-menu #exportMenu="matMenu">
+        <button mat-menu-item (click)="onExportData()">
+          <mat-icon>picture_as_pdf</mat-icon> Export PDF
+        </button>
+        <button mat-menu-item (click)="onExportCSV()">
+          <mat-icon>grid_on</mat-icon> Export Excel
+        </button>
+      </mat-menu>
     </div>
   </div>
 

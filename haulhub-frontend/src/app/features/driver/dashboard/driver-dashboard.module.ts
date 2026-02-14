@@ -17,6 +17,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 
 import { DriverDashboardComponent } from './dashboard.component';
 import { DriverFilterCardComponent } from './driver-filter-card/driver-filter-card.component';
@@ -57,7 +58,8 @@ const routes: Routes = [
     MatChipsModule,
     MatDialogModule,
     MatProgressSpinnerModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatMenuModule
   ]
 })
 export class DriverDashboardModule {}

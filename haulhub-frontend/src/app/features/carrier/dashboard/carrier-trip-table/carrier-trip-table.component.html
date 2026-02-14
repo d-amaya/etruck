@@ -84,11 +84,19 @@
       <div class="spacer"></div>
 
       <div class="action-buttons-group">
-        <button mat-icon-button (click)="exportPDF()" type="button"
-                [matTooltip]="'Export to PDF'"
+        <button mat-icon-button [matMenuTriggerFor]="exportMenu" type="button"
+                [matTooltip]="'Export'"
                 class="action-btn export-btn">
           <mat-icon>download</mat-icon>
         </button>
+        <mat-menu #exportMenu="matMenu">
+          <button mat-menu-item (click)="exportPDF()">
+            <mat-icon>picture_as_pdf</mat-icon> Export PDF
+          </button>
+          <button mat-menu-item (click)="exportCSV()">
+            <mat-icon>grid_on</mat-icon> Export Excel
+          </button>
+        </mat-menu>
         
         <button mat-icon-button (click)="clearAllFilters()" type="button"
                 [matTooltip]="'Clear all filters'"

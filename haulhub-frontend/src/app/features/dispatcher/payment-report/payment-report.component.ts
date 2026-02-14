@@ -7,6 +7,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { ExcelExportService } from '../../../core/services/excel-export.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatTableModule } from '@angular/material/table';
@@ -35,6 +37,7 @@ import { Input } from '@angular/core';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatTableModule,
@@ -73,6 +76,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private tripService: TripService,
     private snackBar: MatSnackBar,
+    private excelExportService: ExcelExportService,
     private router: Router,
     private sharedFilterService: SharedFilterService,
     private dashboardStateService: DashboardStateService,
@@ -387,6 +391,42 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
 
     doc.save(`dispatcher-payments-${new Date().toISOString().split('T')[0]}.pdf`);
     this.snackBar.open('Payment report exported to PDF successfully', 'Close', { duration: 3000 });
+  }
+
+  onExportCSV(): void {
+    if (!this.report) return;
+    const sheets: any[] = [];
+    if (this.report.groupedByBroker) {
+      sheets.push({
+        name: 'By Broker',
+        headers: ['Broker Name', 'Total Payment', 'Trip Count'],
+        rows: Object.entries(this.report.groupedByBroker).map(([brokerId, data]: [string, any]) => [
+          this.brokerMap.get(brokerId)?.brokerName || brokerId, data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
+        ])
+      });
+    }
+    if (this.enrichedDriverData?.length > 0) {
+      sheets.push({
+        name: 'By Driver',
+        headers: ['Driver Name', 'Total Payment', 'Trip Count'],
+        rows: this.enrichedDriverData.map((d: any) => [
+          d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
+        ])
+      });
+    }
+    if (this.enrichedTruckOwnerData?.length > 0) {
+      sheets.push({
+        name: 'By Truck Owner',
+        headers: ['Truck Owner', 'Total Payment', 'Trip Count'],
+        rows: this.enrichedTruckOwnerData.map((o: any) => [
+          o.ownerName || o.truckOwnerId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
+        ])
+      });
+    }
+    if (sheets.length > 0) {
+      const f = this.filterForm.value;
+      this.excelExportService.exportToExcel('dispatcher-payments', sheets, f.startDate, f.endDate);
+    }
   }
 
   goBack(): void {

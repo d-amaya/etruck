@@ -26,10 +26,14 @@ export interface LoadingState {
   loadingMessage: string;
 }
 
+const now = new Date();
+const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
 const defaultFilters: DriverDashboardFilters = {
   dateRange: {
-    startDate: null,
-    endDate: null
+    startDate: monthStart,
+    endDate: monthEnd
   },
   status: null,
   truckId: null,

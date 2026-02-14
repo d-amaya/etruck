@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TripService } from './trip.service';
+import { AssetCacheService } from '../../features/dispatcher/dashboard/asset-cache.service';
 import { DashboardStateService, DashboardFilters } from '../../features/dispatcher/dashboard/dashboard-state.service';
 import { Trip, TripStatus, TripFilters, calculateTripProfit } from '@haulhub/shared';
 import { Observable } from 'rxjs';
@@ -12,7 +13,8 @@ import { Observable } from 'rxjs';
 export class PdfExportService {
   constructor(
     private tripService: TripService,
-    private dashboardState: DashboardStateService
+    private dashboardState: DashboardStateService,
+    private assetCache: AssetCacheService
   ) {}
 
   exportDashboard(): void {
@@ -47,6 +49,11 @@ export class PdfExportService {
     const truckMap = new Map(assets.trucks.map(t => [t.truckId, t.plate]));
     const driverMap = new Map(assets.drivers.map(d => [d.userId, d.name]));
     const trailerMap = new Map(assets.trailers.map(t => [t.trailerId, t.plate]));
+    const truckOwnerMap = new Map<string, string>();
+    const cache = this.assetCache.currentCache;
+    if (cache?.truckOwners) {
+      cache.truckOwners.forEach((o: any, id: string) => truckOwnerMap.set(id, o.name || o.corpName || id));
+    }
 
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -182,31 +189,33 @@ export class PdfExportService {
       yPosition += 6;
 
       const tripTableData = trips.map(trip => {
-        const profit = this.calculateProfit(trip);
+        const expenses = (trip.driverPayment || 0) + (trip.dispatcherPayment || 0) + (trip.truckOwnerPayment || 0) + (trip.fuelCost || 0) + (trip.lumperValue || 0) + (trip.detentionValue || 0);
+        const profit = (trip.brokerPayment || 0) - expenses;
         const pickupLocation = trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '';
         const dropoffLocation = trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '';
         const brokerName = brokerMap.get(trip.brokerId) || trip.brokerId.substring(0, 8);
         const truckPlate = truckMap.get(trip.truckId) || trip.truckId.substring(0, 8);
+        const ownerName = truckOwnerMap.get(trip.truckOwnerId) || trip.truckOwnerId?.substring(0, 8) || '';
         const driverName = driverMap.get(trip.driverId) || trip.driverId.substring(0, 8);
         
         return [
+          this.getStatusLabel(trip.orderStatus as any),
           this.formatDate(trip.scheduledTimestamp),
           this.truncateText(pickupLocation, 20),
           this.truncateText(dropoffLocation, 20),
           this.truncateText(brokerName, 18),
           this.truncateText(truckPlate, 14),
+          this.truncateText(ownerName, 16),
           this.truncateText(driverName, 18),
-          this.getStatusLabel(trip.orderStatus as any),
           this.formatCurrency(trip.brokerPayment),
-          this.formatCurrency(trip.driverPayment),
-          this.formatCurrency(trip.truckOwnerPayment),
+          this.formatCurrency(expenses),
           this.formatCurrency(profit)
         ];
       });
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Driver', 'Status', 'Broker Pay', 'Driver Pay', 'Owner Pay', 'Profit']],
+        head: [['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Truck Owner', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss']],
         body: tripTableData,
         theme: 'striped',
         headStyles: { 
@@ -222,14 +231,14 @@ export class PdfExportService {
           overflow: 'linebreak'
         },
         columnStyles: {
-          0: { cellWidth: 20 },
-          1: { cellWidth: 26 },
+          0: { cellWidth: 18, halign: 'center' },
+          1: { cellWidth: 20 },
           2: { cellWidth: 26 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 16 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 18, halign: 'center' },
-          7: { cellWidth: 20, halign: 'right' },
+          3: { cellWidth: 26 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 16 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 },
           8: { cellWidth: 20, halign: 'right' },
           9: { cellWidth: 20, halign: 'right' },
           10: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
@@ -248,7 +257,7 @@ export class PdfExportService {
           }
           
           // Color status column
-          if (data.column.index === 6 && data.section === 'body') {
+          if (data.column.index === 0 && data.section === 'body') {
             const status = data.cell.text[0];
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fontSize = 7;
@@ -396,6 +405,9 @@ export class PdfExportService {
     }
     if (filters.driverId) {
       apiFilters.driverId = filters.driverId;
+    }
+    if (filters.truckOwnerId) {
+      apiFilters.truckOwnerId = filters.truckOwnerId;
     }
 
     return apiFilters;

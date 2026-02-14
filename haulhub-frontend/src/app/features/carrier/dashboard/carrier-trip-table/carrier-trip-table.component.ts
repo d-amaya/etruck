@@ -11,6 +11,8 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
+import { ExcelExportService } from '../../../../core/services/excel-export.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -35,6 +37,7 @@ import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-c
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
+    MatMenuModule,
     MatFormFieldModule,
     MatSelectModule,
     MatInputModule,
@@ -103,7 +106,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     private filterService: CarrierFilterService,
     private assetCache: CarrierAssetCacheService,
     private dashboardState: CarrierDashboardStateService,
-    private router: Router
+    private router: Router,
+    private excelExportService: ExcelExportService
   ) {
     this.filterForm = this.fb.group({
       status: [null],
@@ -542,7 +546,47 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.onFilterChange();
   }
 
+  private buildExportFilters(): any {
+    const filters = this.dashboardState.getCurrentFilters();
+    const apiFilters: any = {};
+    if (filters.dateRange?.startDate) apiFilters.startDate = filters.dateRange.startDate.toISOString();
+    if (filters.dateRange?.endDate) apiFilters.endDate = filters.dateRange.endDate.toISOString();
+    if (filters.status) apiFilters.orderStatus = filters.status;
+    if (filters.brokerId) apiFilters.brokerId = filters.brokerId;
+    if (filters.dispatcherId) apiFilters.dispatcherId = filters.dispatcherId;
+    if (filters.driverId) apiFilters.driverId = filters.driverId;
+    if (filters.truckId) apiFilters.truckId = filters.truckId;
+    if (filters.truckOwnerId) apiFilters.truckOwnerId = filters.truckOwnerId;
+    return apiFilters;
+  }
+
+  private buildExportRow(trip: any): any[] {
+    return [
+      this.getStatusLabel(trip.orderStatus || 'Scheduled'),
+      this.formatDate(trip.scheduledTimestamp),
+      `${trip.pickupCity || ''}, ${trip.pickupState || ''}`,
+      `${trip.deliveryCity || ''}, ${trip.deliveryState || ''}`,
+      this.getDispatcherDisplay(trip.dispatcherId),
+      this.getBrokerDisplay(trip.brokerId),
+      this.getTruckDisplay(trip.truckId),
+      this.getDriverDisplay(trip.driverId),
+      trip.brokerPayment || 0,
+      this.calculateExpenses(trip),
+      this.calculateProfit(trip)
+    ];
+  }
+
   exportPDF(): void {
+    const apiFilters = this.buildExportFilters();
+    this.carrierService.getTrips(apiFilters).subscribe({
+      next: (res: any) => {
+        const allTrips = res.trips || res || [];
+        this.generatePDF(allTrips);
+      }
+    });
+  }
+
+  private generatePDF(allTrips: any[]): void {
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
     const primaryBlue: [number, number, number] = [25, 118, 210];
@@ -570,7 +614,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     // Filters section
     const filters = this.dashboardState.getCurrentFilters();
     const filterParts = [];
-    if (filters.dateRange.startDate && filters.dateRange.endDate) {
+    if (filters.dateRange?.startDate && filters.dateRange?.endDate) {
       filterParts.push(`Date: ${this.formatDate(filters.dateRange.startDate.toISOString())} - ${this.formatDate(filters.dateRange.endDate.toISOString())}`);
     }
     if (filters.status) filterParts.push(`Status: ${filters.status}`);
@@ -598,7 +642,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       const cardGap = 10;
       
       this.drawSummaryCard(doc, 14, yPosition, cardWidth, cardHeight, 
-        'Total Trips', this.trips.length.toString(), primaryBlue);
+        'Total Trips', allTrips.length.toString(), primaryBlue);
       this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPosition, cardWidth, cardHeight,
         'Total Revenue', this.formatCurrency(payment.totalBrokerPayments), profitGreen);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPosition, cardWidth, cardHeight,
@@ -612,23 +656,12 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     }
     
     // Table
-    const tableData = this.trips.map(trip => [
-      this.getStatusLabel(trip.orderStatus || 'Scheduled'),
-      this.formatDate(trip.scheduledTimestamp),
-      `${trip.pickupCity}, ${trip.pickupState}`,
-      `${trip.deliveryCity}, ${trip.deliveryState}`,
-      this.getDispatcherDisplay(trip.dispatcherId),
-      this.getBrokerDisplay(trip.brokerId),
-      this.getTruckDisplay(trip.truckId),
-      this.getDriverDisplay(trip.driverId),
-      this.formatCurrency(trip.brokerPayment || 0),
-      this.formatCurrency(this.calculateExpenses(trip)),
-      this.formatCurrency(this.calculateProfit(trip))
-    ]);
+    const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit'];
+    const tableData = allTrips.map(trip => this.buildExportRow(trip).map((v, i) => i >= 8 ? this.formatCurrency(v) : v));
     
     autoTable(doc, {
       startY: yPosition,
-      head: [['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit']],
+      head: [headers],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -641,6 +674,19 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     });
     
     doc.save(`carrier-dashboard-${new Date().toISOString().split('T')[0]}.pdf`);
+  }
+
+  exportCSV(): void {
+    const apiFilters = this.buildExportFilters();
+    this.carrierService.getTrips(apiFilters).subscribe({
+      next: (res: any) => {
+        const allTrips = res.trips || res || [];
+        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit'];
+        const rows = allTrips.map((t: any) => this.buildExportRow(t));
+        const df = this.filterService.getCurrentFilter();
+        this.excelExportService.exportToExcel('carrier-trips-export', [{ name: 'Trips', headers, rows }], df.startDate, df.endDate);
+      }
+    });
   }
 
   private drawSummaryCard(doc: jsPDF, x: number, y: number, width: number, height: number, label: string, value: string, color: [number, number, number]): void {

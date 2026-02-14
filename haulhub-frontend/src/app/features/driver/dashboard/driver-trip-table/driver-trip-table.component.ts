@@ -9,6 +9,7 @@ import { DriverAssetCacheService } from '../driver-asset-cache.service';
 import { DriverDashboardStateService } from '../driver-dashboard-state.service';
 import { DriverSharedFilterService } from '../driver-shared-filter.service';
 import { DriverPdfExportService } from '../driver-pdf-export.service';
+import { ExcelExportService } from '../../../../core/services/excel-export.service';
 
 @Component({
   selector: 'app-driver-trip-table',
@@ -46,6 +47,7 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     private filterService: DriverSharedFilterService,
     private dialog: MatDialog,
     private pdfExportService: DriverPdfExportService,
+    private excelExportService: ExcelExportService,
     private fb: FormBuilder
   ) {
     this.filterForm = this.fb.group({
@@ -253,6 +255,27 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
 
   exportPDF(): void {
     this.pdfExportService.exportDashboard();
+  }
+
+  exportCSV(): void {
+    const filters: any = {};
+    const currentFilters = this.filterService.getCurrentFilters();
+    if (currentFilters.dateRange.startDate) filters.startDate = currentFilters.dateRange.startDate.toISOString();
+    if (currentFilters.dateRange.endDate) filters.endDate = currentFilters.dateRange.endDate.toISOString();
+    if (currentFilters.status) filters.orderStatus = currentFilters.status;
+
+    this.tripService.getTrips(filters).subscribe({
+      next: (res) => {
+        const allTrips = res.trips || [];
+        const headers = ['Order #', 'Status', 'Scheduled', 'Truck', 'Pickup', 'Delivery', 'Miles', 'Driver Payment'];
+        const rows = allTrips.map((t: any) => [
+          t.orderConfirmation || '', t.orderStatus || '', t.scheduledTimestamp || '',
+          this.getTruckDisplay(t.truckId), `${t.pickupCity || ''} ${t.pickupState || ''}`, `${t.deliveryCity || ''} ${t.deliveryState || ''}`,
+          t.mileageTotal || 0, t.driverPayment || 0
+        ]);
+        this.excelExportService.exportToExcel('driver-trips-export', [{ name: 'Trips', headers, rows }], currentFilters.dateRange.startDate, currentFilters.dateRange.endDate);
+      }
+    });
   }
 
   getTruckDisplay = (truckId: string): string => {

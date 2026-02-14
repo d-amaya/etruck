@@ -5,6 +5,8 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { ExcelExportService } from '../../../core/services/excel-export.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
@@ -26,6 +28,7 @@ import autoTable from 'jspdf-autotable';
     MatTabsModule,
     MatProgressSpinnerModule,
     MatIconModule,
+    MatMenuModule,
     MatButtonModule,
     MatSnackBarModule
   ],
@@ -57,6 +60,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   constructor(
     private tripService: TripService,
     private snackBar: MatSnackBar,
+    private excelExportService: ExcelExportService,
     private filterService: CarrierFilterService,
     private assetCache: CarrierAssetCacheService
   ) {}
@@ -296,6 +300,42 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     this.snackBar.open('Payment report exported to PDF successfully', 'Close', {
       duration: 3000
     });
+  }
+
+  onExportCSV(): void {
+    if (!this.report) return;
+    const sheets: any[] = [];
+    if (this.report.groupedByBroker) {
+      sheets.push({
+        name: 'By Broker',
+        headers: ['Broker Name', 'Total Payment', 'Trip Count'],
+        rows: Object.entries(this.report.groupedByBroker).map(([brokerId, data]: [string, any]) => [
+          this.getBrokerName(brokerId), data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
+        ])
+      });
+    }
+    if (this.enrichedDriverData?.length > 0) {
+      sheets.push({
+        name: 'By Driver',
+        headers: ['Driver Name', 'Total Payment', 'Trip Count'],
+        rows: this.enrichedDriverData.map((d: any) => [
+          d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
+        ])
+      });
+    }
+    if (this.enrichedTruckOwnerData?.length > 0) {
+      sheets.push({
+        name: 'By Truck Owner',
+        headers: ['Truck Owner', 'Total Payment', 'Trip Count'],
+        rows: this.enrichedTruckOwnerData.map((o: any) => [
+          o.ownerName || o.truckOwnerId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
+        ])
+      });
+    }
+    if (sheets.length > 0) {
+      const f = this.filterService.getCurrentFilter();
+      this.excelExportService.exportToExcel('carrier-payments', sheets, f.startDate, f.endDate);
+    }
   }
 
   private drawSummaryCard(doc: jsPDF, x: number, y: number, width: number, height: number, label: string, value: string, color: [number, number, number]): void {

@@ -23,19 +23,35 @@
         <mat-icon>refresh</mat-icon>
         Refresh
       </button>
-      <button mat-raised-button (click)="onExportData()">
+      <button mat-raised-button [matMenuTriggerFor]="exportMenu">
         <mat-icon>download</mat-icon>
         Export
       </button>
+      <mat-menu #exportMenu="matMenu">
+        <button mat-menu-item (click)="onExportData()">
+          <mat-icon>picture_as_pdf</mat-icon> Export PDF
+        </button>
+        <button mat-menu-item (click)="onExportCSV()">
+          <mat-icon>grid_on</mat-icon> Export Excel
+        </button>
+      </mat-menu>
     </div>
   </div>
 
   <!-- Export Button (visible when wrapped in dashboard) -->
   <div class="export-header" *ngIf="isWrapped" style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
-    <button mat-raised-button color="primary" (click)="onExportData()">
+    <button mat-raised-button color="primary" [matMenuTriggerFor]="exportMenuWrapped">
       <mat-icon>download</mat-icon>
-      Export PDF
+      Export
     </button>
+    <mat-menu #exportMenuWrapped="matMenu">
+      <button mat-menu-item (click)="onExportData()">
+        <mat-icon>picture_as_pdf</mat-icon> Export PDF
+      </button>
+      <button mat-menu-item (click)="onExportCSV()">
+        <mat-icon>grid_on</mat-icon> Export Excel
+      </button>
+    </mat-menu>
   </div>
 
   <!-- Loading State -->
@@ -143,13 +159,13 @@
                       <td>{{ driver.totalTrips }}</td>
                       <td>{{ driver.completedTrips }}</td>
                       <td>{{ driver.totalDistance | number:'1.0-0' }} mi</td>
-                      <td>{{ formatCurrency(driver.totalRevenue) }}</td>
-                      <td>{{ formatCurrency(driver.averageRevenue) }}</td>
+                      <td>{{ formatCurrency(driver.totalEarnings) }}</td>
+                      <td>{{ formatCurrency(driver.averageEarningsPerTrip) }}</td>
                       <td>
-                        <span class="completion-badge" [class.high]="driver.onTimeDeliveryRate >= 90"
-                              [class.medium]="driver.onTimeDeliveryRate >= 70 && driver.onTimeDeliveryRate < 90"
-                              [class.low]="driver.onTimeDeliveryRate < 70">
-                          {{ driver.onTimeDeliveryRate | number:'1.0-0' }}%
+                        <span class="completion-badge" [class.high]="driver.completionRate >= 90"
+                              [class.medium]="driver.completionRate >= 70 && driver.completionRate < 90"
+                              [class.low]="driver.completionRate < 70">
+                          {{ driver.completionRate | number:'1.0-0' }}%
                         </span>
                       </td>
                     </tr>

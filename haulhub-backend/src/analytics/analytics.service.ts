@@ -42,9 +42,9 @@ export interface DriverPerformance {
   totalTrips: number;
   completedTrips: number;
   totalDistance: number;
-  totalRevenue: number;
-  averageRevenue: number;
-  onTimeDeliveryRate: number;
+  totalEarnings: number;
+  averageEarningsPerTrip: number;
+  completionRate: number;
 }
 
 export interface VehicleUtilization {
@@ -261,13 +261,13 @@ export class AnalyticsService {
       const driverPerformance: DriverPerformance[] = Array.from(driverMap.entries()).map(([driverId, dTrips]) => {
         const completed = dTrips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
         const dist = dTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
-        const rev = dTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+        const earnings = dTrips.reduce((s, t) => s + (t.driverPayment || 0), 0);
         return {
           driverId, driverName: driverId,
           totalTrips: dTrips.length, completedTrips: completed,
-          totalDistance: dist, totalRevenue: rev,
-          averageRevenue: dTrips.length > 0 ? rev / dTrips.length : 0,
-          onTimeDeliveryRate: dTrips.length > 0 ? (completed / dTrips.length) * 100 : 0,
+          totalDistance: dist, totalEarnings: earnings,
+          averageEarningsPerTrip: dTrips.length > 0 ? earnings / dTrips.length : 0,
+          completionRate: dTrips.length > 0 ? (completed / dTrips.length) * 100 : 0,
         };
       });
 
@@ -277,13 +277,18 @@ export class AnalyticsService {
         if (!truckMap.has(t.truckId)) truckMap.set(t.truckId, []);
         truckMap.get(t.truckId)!.push(t);
       });
+      const totalDaysInRange = startDate && endDate
+        ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+        : 30;
       const vehicleUtilization: VehicleUtilization[] = Array.from(truckMap.entries()).map(([vehicleId, vTrips]) => {
         const dist = vTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
         const rev = vTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
+        const activeDays = new Set(vTrips.map(t => t.scheduledTimestamp?.split('T')[0]).filter(Boolean)).size;
         return {
           vehicleId, vehicleName: vehicleId,
           totalTrips: vTrips.length, totalDistance: dist, totalRevenue: rev,
-          utilizationRate: 0, averageRevenuePerTrip: vTrips.length > 0 ? rev / vTrips.length : 0,
+          utilizationRate: Math.min(100, (activeDays / totalDaysInRange) * 100),
+          averageRevenuePerTrip: vTrips.length > 0 ? rev / vTrips.length : 0,
         };
       });
 
@@ -590,11 +595,10 @@ export class AnalyticsService {
         ).length;
         
         const totalDistance = data.trips.reduce((sum, trip) => sum + trip.mileageOrder, 0);
-        const totalRevenue = data.trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
-        const averageRevenue = totalTrips > 0 ? totalRevenue / totalTrips : 0;
+        const totalEarnings = data.trips.reduce((sum, trip) => sum + trip.driverPayment, 0);
+        const averageEarningsPerTrip = totalTrips > 0 ? totalEarnings / totalTrips : 0;
         
-        // On-time delivery rate (completed vs total)
-        const onTimeDeliveryRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
+        const completionRate = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
         
         // Get driver details
         const driver = driverDetailsMap.get(driverId);
@@ -606,14 +610,14 @@ export class AnalyticsService {
           totalTrips,
           completedTrips,
           totalDistance,
-          totalRevenue,
-          averageRevenue,
-          onTimeDeliveryRate,
+          totalEarnings,
+          averageEarningsPerTrip,
+          completionRate,
         });
       }
       
-      // Sort by total revenue descending
-      performance.sort((a, b) => b.totalRevenue - a.totalRevenue);
+      // Sort by total earnings descending
+      performance.sort((a, b) => b.totalEarnings - a.totalEarnings);
       
       return performance;
     } catch (error) {

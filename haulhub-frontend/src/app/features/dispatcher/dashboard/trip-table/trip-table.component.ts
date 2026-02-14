@@ -9,6 +9,7 @@ import { MatPaginatorModule, PageEvent, MatPaginator } from '@angular/material/p
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
@@ -23,6 +24,7 @@ import { DashboardStateService, DashboardFilters, PaginationState } from '../das
 import { SharedFilterService } from '../shared-filter.service';
 import { AssetCacheService } from '../asset-cache.service';
 import { PdfExportService } from '../../../../core/services/pdf-export.service';
+import { ExcelExportService } from '../../../../core/services/excel-export.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AccessibilityService } from '../../../../core/services/accessibility.service';
 import { DashboardChartsWidgetComponent } from '../dashboard-charts-widget/dashboard-charts-widget.component';
@@ -38,6 +40,7 @@ import { DashboardChartsWidgetComponent } from '../dashboard-charts-widget/dashb
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
+    MatMenuModule,
     MatDialogModule,
     MatSnackBarModule,
     MatChipsModule,
@@ -119,6 +122,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     private sharedFilterService: SharedFilterService,
     private assetCache: AssetCacheService,
     private pdfExportService: PdfExportService,
+    private excelExportService: ExcelExportService,
     private router: Router,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
@@ -812,6 +816,49 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   exportPDF(): void {
     this.pdfExportService.exportDashboard();
+  }
+
+  exportCSV(): void {
+    this.snackBar.open('Exporting all trips...', '', { duration: 2000 });
+    const filters = this.dashboardState.getCurrentFilters();
+    const apiFilters: any = {};
+    if (filters.dateRange.startDate) apiFilters.startDate = filters.dateRange.startDate.toISOString();
+    if (filters.dateRange.endDate) apiFilters.endDate = filters.dateRange.endDate.toISOString();
+    if (filters.status) apiFilters.orderStatus = filters.status;
+    if (filters.brokerId) apiFilters.brokerId = filters.brokerId;
+    if (filters.truckId) apiFilters.truckId = filters.truckId;
+    if (filters.driverId) apiFilters.driverId = filters.driverId;
+    if (filters.truckOwnerId) apiFilters.truckOwnerId = filters.truckOwnerId;
+
+    this.tripService.getDashboardExport(apiFilters).subscribe({
+      next: (data) => {
+        const allTrips = data.trips || [];
+        const brokerMap = new Map((data.assets?.brokers || []).map((b: any) => [b.brokerId, b.brokerName]));
+        const driverMap = new Map((data.assets?.drivers || []).map((d: any) => [d.userId, d.name]));
+        const truckMap = new Map((data.assets?.trucks || []).map((t: any) => [t.truckId, t.plate]));
+        const headers = ['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Truck Owner', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss'];
+        const rows = allTrips.map((t: any) => {
+          const expenses = (t.driverPayment || 0) + (t.dispatcherPayment || 0) + (t.truckOwnerPayment || 0) + (t.fuelCost || 0) + (t.lumperValue || 0) + (t.detentionValue || 0);
+          const profit = (t.brokerPayment || 0) - expenses;
+          const ownerName = this.getTruckOwnerName(t.truckOwnerId);
+          return [
+            t.orderStatus || '',
+            t.scheduledTimestamp?.split('T')[0] || '',
+            `${t.pickupCity || ''}, ${t.pickupState || ''}`,
+            `${t.deliveryCity || ''}, ${t.deliveryState || ''}`,
+            brokerMap.get(t.brokerId) || t.brokerId,
+            truckMap.get(t.truckId) || t.truckId,
+            ownerName,
+            driverMap.get(t.driverId) || t.driverId,
+            t.brokerPayment || 0,
+            expenses,
+            profit
+          ];
+        });
+        this.excelExportService.exportToExcel('trips-export', [{ name: 'Trips', headers, rows }], filters.dateRange.startDate, filters.dateRange.endDate);
+      },
+      error: () => this.snackBar.open('Failed to export Excel', 'Close', { duration: 3000 })
+    });
   }
 
   /**
