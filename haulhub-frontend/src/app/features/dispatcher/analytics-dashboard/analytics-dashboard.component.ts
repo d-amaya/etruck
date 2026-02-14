@@ -19,6 +19,8 @@ import { SharedFilterService } from '../dashboard/shared-filter.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { AssetCacheService } from '../dashboard/asset-cache.service';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 Chart.register(...registerables);
 
@@ -419,10 +421,123 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   }
 
   onExportData(): void {
-    // TODO: Implement data export functionality
-    this.snackBar.open('Export functionality coming soon', 'Close', {
-      duration: 3000
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const primaryBlue: [number, number, number] = [25, 118, 210];
+    const profitGreen: [number, number, number] = [46, 125, 50];
+    const lossRed: [number, number, number] = [211, 47, 47];
+
+    let yPos = 20;
+
+    // Header banner
+    doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('eTrucky', 14, 22);
+    doc.setFontSize(16);
+    doc.text('Dispatcher Analytics Report', pageWidth / 2, 22, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 22, { align: 'right' });
+
+    yPos = 50;
+
+    // KPI Summary Cards
+    const cardWidth = (pageWidth - 28 - 15) / 4;
+    const cardHeight = 25;
+    const cardGap = 5;
+    this.kpiCards.forEach((kpi, i) => {
+      const x = 14 + (cardWidth + cardGap) * i;
+      const color = kpi.color === 'success' ? profitGreen : kpi.color === 'warn' ? lossRed : primaryBlue;
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'F');
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(x, yPos, cardWidth, 3, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(kpi.title, x + cardWidth / 2, yPos + 12, { align: 'center' });
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(kpi.value, x + cardWidth / 2, yPos + 20, { align: 'center' });
     });
+
+    yPos += cardHeight + 15;
+
+    // Vehicle Performance
+    if (this.vehicleUtilizationData?.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Vehicle Performance', 14, yPos);
+      yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Truck', 'Trips', 'Distance', 'Revenue', 'Utilization', 'Avg/Trip']],
+        body: this.vehicleUtilizationData.map(v => [
+          v.vehicleName, v.totalTrips.toString(), `${v.totalDistance.toFixed(0)} mi`,
+          this.formatCurrency(v.totalRevenue), `${v.utilizationRate.toFixed(1)}%`,
+          this.formatCurrency(v.averageRevenuePerTrip)
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'center' }, 5: { halign: 'right' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Driver Performance
+    if (this.driverPerformanceData?.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Driver Performance', 14, yPos);
+      yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Driver', 'Trips', 'Completed', 'Distance', 'Earnings', 'Rate']],
+        body: this.driverPerformanceData.map(d => [
+          d.driverName, d.totalTrips.toString(), d.completedTrips.toString(),
+          `${d.totalDistance.toFixed(0)} mi`, this.formatCurrency(d.totalRevenue),
+          `${d.onTimeDeliveryRate.toFixed(0)}%`
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 4: { halign: 'right' }, 5: { halign: 'center' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Broker Performance
+    if (this.brokerAnalyticsData?.brokers?.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Broker Performance', 14, yPos);
+      yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Broker', 'Trips', 'Completed', 'Revenue', 'Avg/Trip']],
+        body: this.brokerAnalyticsData.brokers.map((b: any) => [
+          b.brokerName, (b.tripCount || 0).toString(), (b.completedTrips || 0).toString(),
+          this.formatCurrency(b.totalRevenue || 0), this.formatCurrency(b.averageRevenue || 0)
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+      });
+    }
+
+    doc.save(`dispatcher-analytics-${new Date().toISOString().split('T')[0]}.pdf`);
+    this.snackBar.open('Analytics exported to PDF successfully', 'Close', { duration: 3000 });
   }
 
   onTabChange(index: number): void {

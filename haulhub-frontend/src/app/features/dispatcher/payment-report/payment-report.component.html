@@ -1,4 +1,12 @@
 <div class="payment-report-container">
+  <!-- Export Button (visible when wrapped in dashboard) -->
+  <div class="export-header" *ngIf="isWrapped" style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+    <button mat-raised-button color="primary" (click)="onExportData()" [disabled]="loading || !report">
+      <mat-icon>download</mat-icon>
+      Export PDF
+    </button>
+  </div>
+
   <!-- Filter Form (hidden by wrapper) -->
   <form [formGroup]="filterForm" (ngSubmit)="onFilterSubmit()" class="filter-form">
     <div class="filter-row">

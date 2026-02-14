@@ -17,6 +17,8 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TripService } from '../../../core/services/trip.service';
 import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { SharedFilterService } from '../dashboard/shared-filter.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { AssetCacheService } from '../dashboard/asset-cache.service';
@@ -287,6 +289,104 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     // - Detention fees
     // These are returned as totalAdditionalFees in the report
     return this.report.totalAdditionalFees || 0;
+  }
+
+  onExportData(): void {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const primaryBlue: [number, number, number] = [25, 118, 210];
+    const profitGreen: [number, number, number] = [46, 125, 50];
+    const lossRed: [number, number, number] = [211, 47, 47];
+
+    let yPos = 20;
+
+    // Header banner
+    doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('eTrucky', 14, 22);
+    doc.setFontSize(16);
+    doc.text('Dispatcher Payment Report', pageWidth / 2, 22, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 22, { align: 'right' });
+
+    yPos = 50;
+
+    // Summary Cards
+    const cardWidth = (pageWidth - 28 - 10) / 3;
+    const cardHeight = 25;
+    const cardGap = 5;
+    const drawCard = (x: number, label: string, value: string, color: [number, number, number]) => {
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'F');
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(x, yPos, cardWidth, 3, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
+      doc.text(label, x + cardWidth / 2, yPos + 12, { align: 'center' });
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(value, x + cardWidth / 2, yPos + 20, { align: 'center' });
+    };
+    drawCard(14, 'Broker Payments', this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
+    drawCard(14 + cardWidth + cardGap, 'Driver Payments', this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
+    drawCard(14 + (cardWidth + cardGap) * 2, 'Truck Owner Payments', this.formatCurrency(this.report?.totalTruckOwnerPayments || 0), lossRed);
+
+    yPos += cardHeight + 15;
+
+    // By Broker
+    const brokerData = this.getBrokerGroupedData();
+    if (brokerData.length > 0) {
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Payments by Broker', 14, yPos); yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Broker', 'Total Payment', 'Trips']],
+        body: brokerData.map(b => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // By Driver
+    if (this.enrichedDriverData.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Payments by Driver', 14, yPos); yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Driver', 'Total Payment', 'Trips']],
+        body: this.enrichedDriverData.map(d => [d.driverName, this.formatCurrency(d.totalPayment), d.tripCount.toString()]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // By Truck Owner
+    if (this.enrichedTruckOwnerData.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Payments by Truck Owner', 14, yPos); yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Truck Owner', 'Total Payment', 'Trips']],
+        body: this.enrichedTruckOwnerData.map(o => [o.ownerName, this.formatCurrency(o.totalPayment), o.tripCount.toString()]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
+      });
+    }
+
+    doc.save(`dispatcher-payments-${new Date().toISOString().split('T')[0]}.pdf`);
+    this.snackBar.open('Payment report exported to PDF successfully', 'Close', { duration: 3000 });
   }
 
   goBack(): void {

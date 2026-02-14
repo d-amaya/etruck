@@ -30,6 +30,14 @@
     </div>
   </div>
 
+  <!-- Export Button (visible when wrapped in dashboard) -->
+  <div class="export-header" *ngIf="isWrapped" style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+    <button mat-raised-button color="primary" (click)="onExportData()">
+      <mat-icon>download</mat-icon>
+      Export PDF
+    </button>
+  </div>
+
   <!-- Loading State -->
   <div *ngIf="isLoading && !isWrapped" class="loading-container">
     <mat-spinner></mat-spinner>
