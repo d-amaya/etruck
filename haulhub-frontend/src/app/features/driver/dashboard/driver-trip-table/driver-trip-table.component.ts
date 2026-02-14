@@ -230,7 +230,11 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
       next: () => {
         const filters = this.filterService.getCurrentFilters();
         const pagination = this.dashboardState.getCurrentPagination();
-        this.loadTrips(filters, pagination).subscribe();
+        this.loadTrips(filters, pagination).subscribe(result => {
+          if (result.chartAggregates) {
+            this.dashboardState.updateDashboardData(result);
+          }
+        });
       },
       error: (error) => {
         console.error('Failed to update trip status:', error);
@@ -267,11 +271,16 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     this.tripService.getTrips(filters).subscribe({
       next: (res) => {
         const allTrips = res.trips || [];
-        const headers = ['Order #', 'Status', 'Scheduled', 'Truck', 'Pickup', 'Delivery', 'Miles', 'Driver Payment'];
+        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Trailer', 'Payment'];
         const rows = allTrips.map((t: any) => [
-          t.orderConfirmation || '', t.orderStatus || '', t.scheduledTimestamp || '',
-          this.getTruckDisplay(t.truckId), `${t.pickupCity || ''} ${t.pickupState || ''}`, `${t.deliveryCity || ''} ${t.deliveryState || ''}`,
-          t.mileageTotal || 0, t.driverPayment || 0
+          t.orderStatus || '',
+          t.scheduledTimestamp?.split('T')[0] || '',
+          `${t.pickupCity || ''}, ${t.pickupState || ''}`,
+          `${t.deliveryCity || ''}, ${t.deliveryState || ''}`,
+          this.getDispatcherDisplay(t.dispatcherId),
+          this.getTruckDisplay(t.truckId),
+          this.getTrailerDisplay(t.trailerId),
+          t.driverPayment || 0
         ]);
         this.excelExportService.exportToExcel('driver-trips-export', [{ name: 'Trips', headers, rows }], currentFilters.dateRange.startDate, currentFilters.dateRange.endDate);
       }

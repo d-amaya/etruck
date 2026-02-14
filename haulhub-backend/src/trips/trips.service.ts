@@ -3961,6 +3961,8 @@ export class TripsService {
       
       // Notes
       notes: trip.notes,
+      pickupNotes: trip.pickupNotes,
+      deliveryNotes: trip.deliveryNotes,
     };
   }
 

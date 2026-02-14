@@ -21,7 +21,6 @@ export class DriverTripEditDialogComponent {
   ) {
     this.editForm = this.fb.group({
       status: [data.trip.orderStatus || data.trip.status, Validators.required],
-      notes: [data.trip.notes || ''],
       deliveryTimestamp: ['']
     });
 
@@ -57,8 +56,7 @@ export class DriverTripEditDialogComponent {
   onSave(): void {
     if (this.editForm.valid) {
       const result: any = {
-        status: this.editForm.value.status,
-        notes: this.editForm.value.notes
+        status: this.editForm.value.status
       };
       if (this.editForm.value.deliveryTimestamp) {
         result.deliveryTimestamp = new Date(this.editForm.value.deliveryTimestamp).toISOString().split('.')[0] + 'Z';
