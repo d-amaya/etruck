@@ -82,6 +82,7 @@ export class UserDialogComponent {
     if (this.data.role === 'DRIVER') {
       return this.fb.group({
         ...baseFields,
+        rate: ['', [Validators.required, Validators.min(0.01)]],
         corpName: ['', Validators.required],
         dob: ['', Validators.required],
         cdlClass: ['', Validators.required],
@@ -93,12 +94,13 @@ export class UserDialogComponent {
     } else if (this.data.role === 'TRUCK_OWNER') {
       return this.fb.group({
         ...baseFields,
+        rate: ['', [Validators.required, Validators.min(0.01)]],
         company: ['', Validators.required]
       });
     } else {
       return this.fb.group({
         ...baseFields,
-        rate: ['']
+        rate: ['', [Validators.required, Validators.min(0.01)]]
       });
     }
   }
