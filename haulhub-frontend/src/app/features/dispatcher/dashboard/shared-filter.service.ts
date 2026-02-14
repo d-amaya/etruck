@@ -55,27 +55,23 @@ export class SharedFilterService {
   }
 
   /**
-   * Get default start date (Monday of current week)
+   * Get default start date (1st of current month)
    */
   private getDefaultStartDate(): Date {
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    const monday = new Date(today);
-    monday.setDate(monday.getDate() - diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    return start;
   }
 
   /**
    * Get default end date (Sunday of current week)
    */
   private getDefaultEndDate(): Date {
-    const start = this.getDefaultStartDate();
-    const sunday = new Date(start);
-    sunday.setDate(sunday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return sunday;
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
+    return end;
   }
 
   /**

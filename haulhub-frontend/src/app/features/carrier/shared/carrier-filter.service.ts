@@ -23,7 +23,7 @@ export class CarrierFilterService {
 
   dateFilter$: Observable<CarrierDateFilter> = this.dateFilterSubject.asObservable();
   viewMode$: Observable<ViewMode> = this.viewModeSubject.asObservable();
-  activePreset: string | null = 'currentWeek';
+  activePreset: string | null = 'currentMonth';
 
   // Response caches with 5-minute TTL
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
@@ -35,20 +35,16 @@ export class CarrierFilterService {
 
   private getDefaultStartDate(): Date {
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    const monday = new Date(today);
-    monday.setDate(monday.getDate() - diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    return start;
   }
 
   private getDefaultEndDate(): Date {
-    const start = this.getDefaultStartDate();
-    const sunday = new Date(start);
-    sunday.setDate(sunday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return sunday;
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
+    return end;
   }
 
   getCurrentFilter(): CarrierDateFilter {

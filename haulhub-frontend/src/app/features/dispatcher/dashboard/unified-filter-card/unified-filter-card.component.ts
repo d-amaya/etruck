@@ -34,7 +34,7 @@ import { ViewModeSelectorComponent } from '../view-mode-selector/view-mode-selec
 export class UnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   dateRangeError: string | null = null;
-  activePreset: string | null = null;
+  activePreset: string | null = 'currentMonth';
   private presetJustSet = false;
 
   maxDate: Date | null = null; // No maximum date - allow future dates

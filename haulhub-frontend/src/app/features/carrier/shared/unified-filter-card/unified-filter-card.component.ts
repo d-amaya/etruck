@@ -38,7 +38,7 @@ import { Router } from '@angular/router';
 })
 export class CarrierUnifiedFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
-  activePreset: string | null = 'month';
+  activePreset: string | null = 'currentMonth';
   maxDate: Date | null = null; // No maximum date - allow future dates
   dateRangeError: string | null = null;
   settingPreset = false;

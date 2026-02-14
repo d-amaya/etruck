@@ -345,17 +345,12 @@ export class DashboardStateService {
   }
 
   private getDefaultFilters(): DashboardFilters {
-    // Set default date range to current week (Monday - Sunday)
+    // Set default date range to current month
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - diff);
+    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 6);
+    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     endDate.setHours(23, 59, 59, 999);
 
     return {

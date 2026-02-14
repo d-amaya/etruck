@@ -63,10 +63,9 @@ export class PaymentReportComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Load report with default date range (last 30 days)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
+    // Load report with default date range (current month)
+    const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const endDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
     
     this.filterForm.patchValue({
       startDate,

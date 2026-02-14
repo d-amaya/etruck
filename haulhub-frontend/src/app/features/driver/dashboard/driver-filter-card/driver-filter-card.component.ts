@@ -12,7 +12,7 @@ import { DriverSharedFilterService } from '../driver-shared-filter.service';
 export class DriverFilterCardComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   dateRangeError: string | null = null;
-  activePreset: string | null = 'lastMonth';
+  activePreset: string | null = 'currentMonth';
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -52,7 +52,7 @@ export class DriverFilterCardComponent implements OnInit, OnDestroy {
   }
 
   setDefaultDateRange(): void {
-    this.applyPreset('currentWeek');
+    this.applyPreset('currentMonth');
   }
 
   applyPreset(preset: string): void {
