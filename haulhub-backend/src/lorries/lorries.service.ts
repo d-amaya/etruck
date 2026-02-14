@@ -674,6 +674,7 @@ export class LorriesService {
       cdlState: item.cdlState,
       nationalId: item.ss,
       isActive: item.isActive,
+      rate: item.rate, // $/mile
     }));
   }
 
@@ -703,6 +704,7 @@ export class LorriesService {
       email: item.email,
       phone: item.phone,
       isActive: item.isActive,
+      rate: item.rate, // % of broker payment
     }));
   }
 
@@ -737,6 +739,7 @@ export class LorriesService {
       phone: item.phone,
       corpName: item.corpName,
       isActive: item.isActive,
+      rate: item.rate, // % of broker payment
     }));
   }
 

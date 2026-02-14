@@ -15,7 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TripService, AuthService } from '../../../core/services';
 import { AssetCacheService } from '../dashboard/asset-cache.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
-import { Broker, CreateTripDto, Trip, TripStatus, calculateTripProfit, calculateFuelCost } from '@haulhub/shared';
+import { Broker, Trip, TripStatus } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-edit',
@@ -52,6 +52,11 @@ export class TripEditComponent implements OnInit {
   statusOptions = Object.values(TripStatus);
   today = new Date();
 
+  // Names for rate labels
+  dispatcherName = '';
+  driverName = '';
+  truckOwnerName = '';
+
   constructor(
     private fb: FormBuilder,
     private route: ActivatedRoute,
@@ -84,7 +89,22 @@ export class TripEditComponent implements OnInit {
       this.trailers = Array.from(cache.trailers.values()).filter((t: any) => t.isActive);
       this.drivers = Array.from(cache.drivers.values()).filter((d: any) => d.isActive);
       this.loadingAssets = false;
+
+      // Resolve names if trip is already loaded
+      if (this.trip) {
+        const currentUser = this.authService.currentUserValue;
+        this.dispatcherName = (currentUser && this.trip.dispatcherId === currentUser.userId)
+          ? currentUser.fullName : 'Unknown';
+        this.resolveNames(this.trip, cache);
+      }
     });
+  }
+
+  private resolveNames(trip: any, cache: any): void {
+    const driver = cache.drivers?.get(trip.driverId);
+    this.driverName = driver?.name || '';
+    const truckOwner = cache.truckOwners?.get(trip.truckOwnerId);
+    this.truckOwnerName = truckOwner?.name || '';
   }
 
   private loadBrokers(): void {
@@ -97,36 +117,33 @@ export class TripEditComponent implements OnInit {
 
   private initializeForm(): void {
     this.tripForm = this.fb.group({
-      // Status
       status: ['', Validators.required],
-      
-      // Schedule Information - DISABLED: Cannot be changed after creation (affects GSI keys)
       scheduledTimestamp: [{ value: '', disabled: true }, Validators.required],
-      
-      // Broker Information
       brokerId: [{ value: '', disabled: true }, Validators.required],
       orderConfirmation: [''],
-      
-      // Vehicle Assignment - DISABLED: Cannot be changed after creation (affects GSI keys)
       truckId: [{ value: '', disabled: true }, Validators.required],
       trailerId: [{ value: '', disabled: true }, Validators.required],
-      
-      // Driver Assignment - DISABLED: Cannot be changed after creation (affects GSI keys)
       driverId: [{ value: '', disabled: true }, Validators.required],
-      
-      // Mileage Tracking (Enhanced)
+
+      // Mileage
       mileageOrder: ['', [Validators.required, Validators.min(0)]],
       mileageEmpty: ['', [Validators.required, Validators.min(0)]],
-      mileageTotal: [{ value: '', disabled: true }], // Auto-calculated
-      
-      // Financial Details (Enhanced)
-      orderRate: ['', [Validators.required, Validators.min(0.01)]],
+      mileageTotal: [{ value: '', disabled: true }],
+
+      // Broker Payment
       brokerPayment: ['', [Validators.required, Validators.min(0.01)]],
-      truckOwnerPayment: ['', [Validators.required, Validators.min(0.01)]],
-      driverPayment: ['', [Validators.required, Validators.min(0.01)]],
-      driverRate: ['', Validators.min(0)],
-      
-      // Pickup Details (Required)
+
+      // Rate fields (editable — snapshotted from trip record)
+      dispatcherRate: ['', [Validators.min(0)]],
+      driverRate: ['', [Validators.min(0)]],
+      truckOwnerRate: ['', [Validators.min(0)]],
+
+      // Calculated payment fields (disabled)
+      dispatcherPayment: [{ value: '', disabled: true }],
+      driverPayment: [{ value: '', disabled: true }],
+      truckOwnerPayment: [{ value: '', disabled: true }],
+
+      // Pickup
       pickupCompany: ['', Validators.required],
       pickupPhone: [''],
       pickupAddress: ['', Validators.required],
@@ -136,8 +153,8 @@ export class TripEditComponent implements OnInit {
       pickupDate: ['', Validators.required],
       pickupTime: ['', Validators.required],
       pickupNotes: [''],
-      
-      // Delivery Details (Required)
+
+      // Delivery
       deliveryCompany: ['', Validators.required],
       deliveryPhone: [''],
       deliveryAddress: ['', Validators.required],
@@ -147,36 +164,31 @@ export class TripEditComponent implements OnInit {
       deliveryDate: ['', Validators.required],
       deliveryTime: ['', Validators.required],
       deliveryNotes: [''],
-      
-      // Additional Fees
+
+      // Fees
       lumperValue: [0, Validators.min(0)],
       detentionValue: [0, Validators.min(0)],
-      
-      // Fuel Management
+
+      // Fuel
       fuelGasAvgCost: ['', [Validators.required, Validators.min(0)]],
       fuelGasAvgGallxMil: ['', [Validators.required, Validators.min(0)]],
       estimatedFuelCost: [{ value: '', disabled: true }],
-      
-      // Notes
+
       notes: ['']
     });
     
-    // Auto-calculate total miles when loaded or empty miles change
     this.tripForm.get('mileageOrder')?.valueChanges.subscribe(() => this.calculateTotalMiles());
     this.tripForm.get('mileageEmpty')?.valueChanges.subscribe(() => this.calculateTotalMiles());
-    
-    // Auto-calculate fuel cost when inputs change
     this.tripForm.get('fuelGasAvgCost')?.valueChanges.subscribe(() => this.updateFuelCost());
     this.tripForm.get('fuelGasAvgGallxMil')?.valueChanges.subscribe(() => this.updateFuelCost());
 
-    // Clear pickup/delivery dates if they violate ordering
-    this.tripForm.get('scheduledTimestamp')?.valueChanges.subscribe(val => {
-      const pickup = this.tripForm.get('pickupDate')?.value;
-      if (val && pickup && new Date(pickup) < new Date(val)) {
-        this.tripForm.get('pickupDate')?.reset();
-        this.tripForm.get('deliveryDate')?.reset();
-      }
-    });
+    // Recalculate payments when broker payment or rates change
+    this.tripForm.get('brokerPayment')?.valueChanges.subscribe(() => this.recalculatePayments());
+    this.tripForm.get('dispatcherRate')?.valueChanges.subscribe(() => this.recalculatePayments());
+    this.tripForm.get('driverRate')?.valueChanges.subscribe(() => this.recalculatePayments());
+    this.tripForm.get('truckOwnerRate')?.valueChanges.subscribe(() => this.recalculatePayments());
+
+    // Date ordering
     this.tripForm.get('pickupDate')?.valueChanges.subscribe(val => {
       const delivery = this.tripForm.get('deliveryDate')?.value;
       if (val && delivery && new Date(delivery) < new Date(val)) {
@@ -184,13 +196,29 @@ export class TripEditComponent implements OnInit {
       }
     });
   }
+
+  private recalculatePayments(): void {
+    const brokerPayment = parseFloat(this.tripForm.get('brokerPayment')?.value) || 0;
+    const mileageTotal = parseFloat(this.tripForm.get('mileageTotal')?.value) || 0;
+    const dispatcherRate = parseFloat(this.tripForm.get('dispatcherRate')?.value) || 0;
+    const driverRate = parseFloat(this.tripForm.get('driverRate')?.value) || 0;
+    const truckOwnerRate = parseFloat(this.tripForm.get('truckOwnerRate')?.value) || 0;
+
+    const dp = Math.round((dispatcherRate / 100) * brokerPayment * 100) / 100;
+    const drp = Math.round(driverRate * mileageTotal * 100) / 100;
+    const top = Math.round((truckOwnerRate / 100) * brokerPayment * 100) / 100;
+
+    this.tripForm.get('dispatcherPayment')?.setValue(dp.toFixed(2), { emitEvent: false });
+    this.tripForm.get('driverPayment')?.setValue(drp.toFixed(2), { emitEvent: false });
+    this.tripForm.get('truckOwnerPayment')?.setValue(top.toFixed(2), { emitEvent: false });
+  }
   
   private calculateTotalMiles(): void {
     const mileageOrder = parseFloat(this.tripForm.get('mileageOrder')?.value) || 0;
     const mileageEmpty = parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0;
-    const mileageTotal = mileageOrder + mileageEmpty;
-    this.tripForm.get('mileageTotal')?.setValue(mileageTotal, { emitEvent: false });
+    this.tripForm.get('mileageTotal')?.setValue(mileageOrder + mileageEmpty, { emitEvent: false });
     this.updateFuelCost();
+    this.recalculatePayments();
   }
 
   private updateFuelCost(): void {
@@ -208,9 +236,17 @@ export class TripEditComponent implements OnInit {
         this.trip = trip;
         this.populateForm(trip);
         this.loading = false;
+
+        // Show dispatcher name only if it matches the current user
+        const currentUser = this.authService.currentUserValue;
+        this.dispatcherName = (currentUser && trip.dispatcherId === currentUser.userId)
+          ? currentUser.fullName : 'Unknown';
+
+        // Resolve driver/truck owner names from cache
+        const cache = this.assetCache.currentCache;
+        if (cache) this.resolveNames(trip, cache);
       },
       error: (error) => {
-        console.error('Error loading trip:', error);
         this.error = error.error?.message || 'Failed to load trip details';
         this.loading = false;
       }
@@ -218,10 +254,8 @@ export class TripEditComponent implements OnInit {
   }
 
   private populateForm(trip: any): void {
-    // Convert scheduledTimestamp to date format for mat-datepicker
     const scheduledDate = new Date(trip.scheduledTimestamp);
     
-    // Parse pickup date+time if available
     let pickupDateVal: Date | null = null;
     let pickupTimeVal = '';
     if (trip.pickupTimestamp) {
@@ -230,7 +264,6 @@ export class TripEditComponent implements OnInit {
       pickupTimeVal = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     }
     
-    // Parse delivery date+time if available
     let deliveryDateVal: Date | null = null;
     let deliveryTimeVal = '';
     if (trip.deliveryTimestamp) {
@@ -244,26 +277,18 @@ export class TripEditComponent implements OnInit {
       scheduledTimestamp: scheduledDate,
       brokerId: trip.brokerId,
       orderConfirmation: trip.orderConfirmation || '',
-      
-      // Vehicle assignment
       truckId: trip.truckId,
       trailerId: trip.trailerId,
-      
-      // Driver assignment
       driverId: trip.driverId,
-      
-      // Mileage
       mileageOrder: trip.mileageOrder || 0,
       mileageEmpty: trip.mileageEmpty || 0,
-      
-      // Financial details
-      orderRate: trip.orderRate || trip.brokerPayment || 0,
       brokerPayment: trip.brokerPayment,
-      truckOwnerPayment: trip.truckOwnerPayment || 0,
-      driverPayment: trip.driverPayment,
+
+      // Rate snapshots from trip record
+      dispatcherRate: trip.dispatcherRate || '',
       driverRate: trip.driverRate || '',
-      
-      // Pickup details
+      truckOwnerRate: trip.truckOwnerRate || '',
+
       pickupCompany: trip.pickupCompany || '',
       pickupPhone: trip.pickupPhone || '',
       pickupAddress: trip.pickupAddress || '',
@@ -273,8 +298,6 @@ export class TripEditComponent implements OnInit {
       pickupDate: pickupDateVal,
       pickupTime: pickupTimeVal,
       pickupNotes: trip.pickupNotes || '',
-      
-      // Delivery details
       deliveryCompany: trip.deliveryCompany || '',
       deliveryPhone: trip.deliveryPhone || '',
       deliveryAddress: trip.deliveryAddress || '',
@@ -284,128 +307,94 @@ export class TripEditComponent implements OnInit {
       deliveryDate: deliveryDateVal,
       deliveryTime: deliveryTimeVal,
       deliveryNotes: trip.deliveryNotes || '',
-      
-      // Additional fees
       lumperValue: trip.lumperValue || 0,
       detentionValue: trip.detentionValue || 0,
-      
-      // Fuel management
       fuelGasAvgCost: trip.fuelGasAvgCost || '',
       fuelGasAvgGallxMil: trip.fuelGasAvgGallxMil || '',
-      
-      // Notes
       notes: trip.notes || ''
     }, { emitEvent: false });
     
-    // Trigger total miles calculation
     this.calculateTotalMiles();
-  }
-  
-  private formatDatetimeLocal(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    this.recalculatePayments();
   }
 
   onSubmit(): void {
     if (this.tripForm.invalid || !this.trip) {
       this.markFormGroupTouched(this.tripForm);
-      this.snackBar.open('Please fill in all required fields correctly.', 'Close', {
-        duration: 3000
-      });
+      this.snackBar.open('Please fill in all required fields correctly.', 'Close', { duration: 3000 });
       return;
     }
 
-    const formValue = this.tripForm.getRawValue(); // Get all values including disabled fields
+    const fv = this.tripForm.getRawValue();
     
-    // Convert pickup date+time to ISO 8601
     let pickupTimestamp: string | undefined;
-    if (formValue.pickupDate && formValue.pickupTime) {
-      const d = new Date(formValue.pickupDate);
-      const [h, m] = formValue.pickupTime.split(':');
+    if (fv.pickupDate && fv.pickupTime) {
+      const d = new Date(fv.pickupDate);
+      const [h, m] = fv.pickupTime.split(':');
       d.setHours(parseInt(h), parseInt(m), 0, 0);
       pickupTimestamp = d.toISOString().split('.')[0] + 'Z';
     }
     
-    // Convert delivery date+time to ISO 8601
     let deliveryTimestamp: string | undefined;
-    if (formValue.deliveryDate && formValue.deliveryTime) {
-      const d = new Date(formValue.deliveryDate);
-      const [h, m] = formValue.deliveryTime.split(':');
+    if (fv.deliveryDate && fv.deliveryTime) {
+      const d = new Date(fv.deliveryDate);
+      const [h, m] = fv.deliveryTime.split(':');
       d.setHours(parseInt(h), parseInt(m), 0, 0);
       deliveryTimestamp = d.toISOString().split('.')[0] + 'Z';
     }
 
     const tripData: any = {
-      // Basic trip info
-      pickupLocation: `${formValue.pickupCity?.trim()}, ${formValue.pickupState?.trim()}`,
-      dropoffLocation: `${formValue.deliveryCity?.trim()}, ${formValue.deliveryState?.trim()}`,
-      orderStatus: formValue.status,
-      brokerId: formValue.brokerId,
-      orderConfirmation: formValue.orderConfirmation?.trim() || undefined,
-      
-      // Mileage tracking (enhanced)
-      mileageOrder: parseFloat(formValue.mileageOrder),
-      mileageEmpty: parseFloat(formValue.mileageEmpty),
-      mileageTotal: parseFloat(formValue.mileageTotal),
-      
-      // Financial details (enhanced)
-      orderRate: parseFloat(formValue.orderRate),
-      brokerPayment: parseFloat(formValue.brokerPayment),
-      truckOwnerPayment: parseFloat(formValue.truckOwnerPayment),
-      driverPayment: parseFloat(formValue.driverPayment),
-      driverRate: formValue.driverRate ? parseFloat(formValue.driverRate) : undefined,
-      
-      // Enhanced pickup details
-      pickupCompany: formValue.pickupCompany?.trim() || undefined,
-      pickupPhone: formValue.pickupPhone?.trim() || undefined,
-      pickupAddress: formValue.pickupAddress?.trim() || undefined,
-      pickupCity: formValue.pickupCity?.trim() || undefined,
-      pickupState: formValue.pickupState?.trim() || undefined,
-      pickupZip: formValue.pickupZip?.trim() || undefined,
-      pickupTimestamp: pickupTimestamp,
-      pickupNotes: formValue.pickupNotes?.trim() || undefined,
-      
-      // Enhanced delivery details
-      deliveryCompany: formValue.deliveryCompany?.trim() || undefined,
-      deliveryPhone: formValue.deliveryPhone?.trim() || undefined,
-      deliveryAddress: formValue.deliveryAddress?.trim() || undefined,
-      deliveryCity: formValue.deliveryCity?.trim() || undefined,
-      deliveryState: formValue.deliveryState?.trim() || undefined,
-      deliveryZip: formValue.deliveryZip?.trim() || undefined,
-      deliveryTimestamp: deliveryTimestamp,
-      deliveryNotes: formValue.deliveryNotes?.trim() || undefined,
-      
-      // Additional fees
-      lumperValue: parseFloat(formValue.lumperValue) || 0,
-      detentionValue: parseFloat(formValue.detentionValue) || 0,
-      
-      // Fuel management
-      fuelGasAvgCost: formValue.fuelGasAvgCost ? parseFloat(formValue.fuelGasAvgCost) : undefined,
-      fuelGasAvgGallxMil: formValue.fuelGasAvgGallxMil ? parseFloat(formValue.fuelGasAvgGallxMil) : undefined,
-      
-      // Notes
-      notes: formValue.notes?.trim() || undefined
+      orderStatus: fv.status,
+      brokerId: fv.brokerId,
+      orderConfirmation: fv.orderConfirmation?.trim() || undefined,
+      mileageOrder: parseFloat(fv.mileageOrder),
+      mileageEmpty: parseFloat(fv.mileageEmpty),
+      mileageTotal: parseFloat(fv.mileageTotal),
+      brokerPayment: parseFloat(fv.brokerPayment),
+      // Rate snapshots
+      dispatcherRate: parseFloat(fv.dispatcherRate) || 0,
+      driverRate: parseFloat(fv.driverRate) || 0,
+      truckOwnerRate: parseFloat(fv.truckOwnerRate) || 0,
+      // Calculated payments
+      dispatcherPayment: parseFloat(fv.dispatcherPayment) || 0,
+      driverPayment: parseFloat(fv.driverPayment) || 0,
+      truckOwnerPayment: parseFloat(fv.truckOwnerPayment) || 0,
+      // Locations
+      pickupLocation: `${fv.pickupCity?.trim()}, ${fv.pickupState?.trim()}`,
+      dropoffLocation: `${fv.deliveryCity?.trim()}, ${fv.deliveryState?.trim()}`,
+      pickupCompany: fv.pickupCompany?.trim(),
+      pickupPhone: fv.pickupPhone?.trim() || undefined,
+      pickupAddress: fv.pickupAddress?.trim(),
+      pickupCity: fv.pickupCity?.trim(),
+      pickupState: fv.pickupState?.trim(),
+      pickupZip: fv.pickupZip?.trim(),
+      pickupTimestamp,
+      pickupNotes: fv.pickupNotes?.trim() || undefined,
+      deliveryCompany: fv.deliveryCompany?.trim(),
+      deliveryPhone: fv.deliveryPhone?.trim() || undefined,
+      deliveryAddress: fv.deliveryAddress?.trim(),
+      deliveryCity: fv.deliveryCity?.trim(),
+      deliveryState: fv.deliveryState?.trim(),
+      deliveryZip: fv.deliveryZip?.trim(),
+      deliveryTimestamp,
+      deliveryNotes: fv.deliveryNotes?.trim() || undefined,
+      lumperValue: parseFloat(fv.lumperValue) || 0,
+      detentionValue: parseFloat(fv.detentionValue) || 0,
+      fuelGasAvgCost: fv.fuelGasAvgCost ? parseFloat(fv.fuelGasAvgCost) : undefined,
+      fuelGasAvgGallxMil: fv.fuelGasAvgGallxMil ? parseFloat(fv.fuelGasAvgGallxMil) : undefined,
+      notes: fv.notes?.trim() || undefined
     };
 
     this.submitting = true;
     this.tripService.updateTrip(this.trip.tripId, tripData).subscribe({
       next: () => {
-        this.snackBar.open('Trip updated successfully!', 'Close', {
-          duration: 3000
-        });
+        this.snackBar.open('Trip updated successfully!', 'Close', { duration: 3000 });
         this.dashboardState.invalidateViewCaches();
         this.router.navigate(['/dispatcher/dashboard']);
       },
       error: (error) => {
-        console.error('Error updating trip:', error);
         const errorMessage = error.error?.message || 'Failed to update trip. Please try again.';
-        this.snackBar.open(errorMessage, 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(errorMessage, 'Close', { duration: 5000 });
         this.submitting = false;
       }
     });
@@ -416,73 +405,44 @@ export class TripEditComponent implements OnInit {
   }
 
   private markFormGroupTouched(formGroup: FormGroup): void {
-    Object.keys(formGroup.controls).forEach(key => {
-      const control = formGroup.get(key);
-      control?.markAsTouched();
-    });
+    Object.keys(formGroup.controls).forEach(key => formGroup.get(key)?.markAsTouched());
   }
 
   getErrorMessage(fieldName: string): string {
     const control = this.tripForm.get(fieldName);
-    if (!control || !control.errors || !control.touched) {
-      return '';
-    }
-
-    if (control.errors['required']) {
-      return 'This field is required';
-    }
-    if (control.errors['minlength']) {
-      return `Minimum length is ${control.errors['minlength'].requiredLength} characters`;
-    }
-    if (control.errors['min']) {
-      return `Value must be at least ${control.errors['min'].min}`;
-    }
+    if (!control || !control.errors || !control.touched) return '';
+    if (control.errors['required']) return 'This field is required';
+    if (control.errors['minlength']) return `Minimum length is ${control.errors['minlength'].requiredLength} characters`;
+    if (control.errors['min']) return `Value must be at least ${control.errors['min'].min}`;
     return 'Invalid value';
   }
 
   getStatusLabel(status: TripStatus): string {
-    switch (status) {
-      case TripStatus.Scheduled:
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-        return 'Picked Up';
-      case TripStatus.InTransit:
-        return 'In Transit';
-      case TripStatus.Delivered:
-        return 'Delivered';
-      case TripStatus.Paid:
-        return 'Paid';
-      case TripStatus.Canceled:
-        return 'Canceled';
-      default:
-        return status;
-    }
+    const labels: Record<string, string> = {
+      [TripStatus.Scheduled]: 'Scheduled',
+      [TripStatus.PickedUp]: 'Picked Up',
+      [TripStatus.InTransit]: 'In Transit',
+      [TripStatus.Delivered]: 'Delivered',
+      [TripStatus.Paid]: 'Paid',
+      [TripStatus.Canceled]: 'Canceled',
+    };
+    return labels[status] || status;
   }
 
   calculateProfit(): number {
-    // Create a temporary trip object from form values using new schema field names
-    const tempTrip: Partial<Trip> = {
-      brokerPayment: parseFloat(this.tripForm.get('brokerPayment')?.value) || 0,
-      truckOwnerPayment: parseFloat(this.tripForm.get('truckOwnerPayment')?.value) || 0,
-      driverPayment: parseFloat(this.tripForm.get('driverPayment')?.value) || 0,
-      lumperValue: parseFloat(this.tripForm.get('lumperValue')?.value) || 0,
-      detentionValue: parseFloat(this.tripForm.get('detentionValue')?.value) || 0,
-      fuelGasAvgCost: parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0,
-      fuelGasAvgGallxMil: parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0,
-      mileageOrder: parseFloat(this.tripForm.get('mileageOrder')?.value) || 0,
-      mileageEmpty: parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0,
-      mileageTotal: (parseFloat(this.tripForm.get('mileageOrder')?.value) || 0) + (parseFloat(this.tripForm.get('mileageEmpty')?.value) || 0),
-      fuelCost: 0 // Will be calculated by calculateFuelCost
-    };
-    
-    return calculateTripProfit(tempTrip as Trip);
-  }
-
-  formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    const brokerPayment = parseFloat(this.tripForm.get('brokerPayment')?.value) || 0;
+    const dp = parseFloat(this.tripForm.getRawValue().dispatcherPayment) || 0;
+    const drp = parseFloat(this.tripForm.getRawValue().driverPayment) || 0;
+    const top = parseFloat(this.tripForm.getRawValue().truckOwnerPayment) || 0;
+    const lumper = parseFloat(this.tripForm.get('lumperValue')?.value) || 0;
+    const detention = parseFloat(this.tripForm.get('detentionValue')?.value) || 0;
+    let fuelCost = 0;
+    const avgCost = parseFloat(this.tripForm.get('fuelGasAvgCost')?.value) || 0;
+    const avgGall = parseFloat(this.tripForm.get('fuelGasAvgGallxMil')?.value) || 0;
+    if (avgCost > 0 && avgGall > 0) {
+      fuelCost = (parseFloat(this.tripForm.get('mileageTotal')?.value) || 0) * avgGall * avgCost;
+    }
+    return brokerPayment - dp - drp - top - fuelCost - lumper - detention;
   }
 
   getProfitLabel(): string {
@@ -490,8 +450,6 @@ export class TripEditComponent implements OnInit {
   }
 
   formatProfitAmount(): string {
-    const profit = this.calculateProfit();
-    return this.formatCurrency(Math.abs(profit));
+    return `$${Math.abs(this.calculateProfit()).toFixed(2)}`;
   }
-
 }

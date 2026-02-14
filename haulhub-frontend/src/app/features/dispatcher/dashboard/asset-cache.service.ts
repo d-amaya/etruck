@@ -21,6 +21,10 @@ export interface AssetCache {
 export class AssetCacheService {
   private cacheSubject = new BehaviorSubject<AssetCache | null>(null);
   public cache$: Observable<AssetCache | null> = this.cacheSubject.asObservable();
+
+  get currentCache(): AssetCache | null {
+    return this.cacheSubject.value;
+  }
   private loading = false;
   private refreshing = false;
   private readonly CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -62,9 +66,9 @@ export class AssetCacheService {
       trailers: this.tripService.getTrailersByCarrier().pipe(catchError(() => of([]))),
       drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([]))),
       brokers: this.tripService.getBrokers().pipe(catchError(() => of([]))),
-      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([])))
+      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([]))),
     }).pipe(
-      tap(({ trucks, trailers, drivers, brokers, truckOwners }) => {
+      tap(({ trucks, trailers, drivers, brokers, truckOwners}) => {
         const cache: AssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),
@@ -215,9 +219,9 @@ export class AssetCacheService {
       trailers: this.tripService.getTrailersByCarrier().pipe(catchError(() => of([]))),
       drivers: this.tripService.getDriversByCarrier().pipe(catchError(() => of([]))),
       brokers: this.tripService.getBrokers().pipe(catchError(() => of([]))),
-      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([])))
+      truckOwners: this.tripService.getTruckOwnersByCarrier().pipe(catchError(() => of([]))),
     }).pipe(
-      tap(({ trucks, trailers, drivers, brokers, truckOwners }) => {
+      tap(({ trucks, trailers, drivers, brokers, truckOwners}) => {
         const cache: AssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),

@@ -42,8 +42,13 @@ export interface CreateUserDto {
   ein: string;
   ss: string; // National ID / Social Security
 
-  // Dispatcher-specific
-  rate?: number; // Commission rate (%)
+  // Rate (required for all non-carrier roles)
+  // DISPATCHER: commission % of broker payment (e.g. 4.5)
+  // DRIVER: $/mile (e.g. 0.53)
+  // TRUCK_OWNER: % of broker payment (e.g. 12)
+  rate: number;
+
+  // Dispatcher-specific (no extra fields beyond rate)
 
   // Driver-specific
   corpName?: string;
@@ -114,7 +119,7 @@ export interface User {
 
   // Role-specific fields
   company?: string; // CARRIER only
-  rate?: number; // DISPATCHER (commission %) or DRIVER (per mile)
+  rate?: number; // DISPATCHER (commission %), DRIVER ($/mile), TRUCK_OWNER (% of broker payment)
   corpName?: string; // DRIVER only
   dob?: string; // DRIVER only (ISO date)
   cdlClass?: string; // DRIVER only (A, B, C)
@@ -478,15 +483,13 @@ export class UsersService {
       throw new BadRequestException('Invalid email format');
     }
 
+    // Rate is required for all roles
+    if (dto.rate === undefined || dto.rate === null || isNaN(Number(dto.rate)) || Number(dto.rate) <= 0) {
+      throw new BadRequestException('rate is required and must be a positive number');
+    }
+
     // Role-specific validation
-    if (dto.role === 'DISPATCHER') {
-      if (dto.rate !== undefined && dto.rate !== null) {
-        // Validate rate is a valid number
-        if (isNaN(Number(dto.rate))) {
-          throw new BadRequestException('rate must be a valid number');
-        }
-      }
-    } else if (dto.role === 'DRIVER') {
+    if (dto.role === 'DRIVER') {
       const driverFields = ['cdlClass'];
       for (const field of driverFields) {
         if (!dto[field as keyof CreateUserDto]) {

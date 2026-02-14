@@ -182,8 +182,10 @@ describe('TripsService', () => {
         updatedAt: '2024-01-01T00:00:00.000Z',
       });
 
-      // Mock carrier validation (4 DynamoDB calls)
-      mockCarrierValidation();
+      // Mock user rate lookups (3 calls: dispatcher, driver, truck owner)
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 4.5 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 0.53 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 10 } });
 
       // Mock trip creation
       mockDynamoDBClient.send.mockResolvedValueOnce({});
@@ -204,10 +206,14 @@ describe('TripsService', () => {
       });
       expect(result.tripId).toBeDefined();
       expect(result.scheduledTimestamp).toBeDefined();
-      expect(result.pickupTimestamp).toBeNull();
-      expect(result.deliveryTimestamp).toBeNull();
-      // Broker name fetch removed - no longer stored in Trip table
-      expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1); // Only creation (validation removed)
+      expect(result.dispatcherRate).toBe(0.52);
+      expect(result.driverRate).toBe(2.11);
+      expect(result.truckOwnerRate).toBe(3.95);
+      expect(result.dispatcherPayment).toBeGreaterThan(0);
+      expect(result.driverPayment).toBeGreaterThan(0);
+      expect(result.truckOwnerPayment).toBeGreaterThan(0);
+      // 3 rate lookups + 1 creation
+      expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(4);
     });
 
     it('should throw BadRequestException for missing required fields', async () => {
@@ -234,8 +240,8 @@ describe('TripsService', () => {
       );
     });
 
-    it('should throw BadRequestException for zero payment amounts', async () => {
-      const invalidDto = { ...validCreateTripDto, driverPayment: 0 };
+    it('should throw BadRequestException for zero broker payment', async () => {
+      const invalidDto = { ...validCreateTripDto, brokerPayment: 0 };
 
       await expect(service.createTrip('dispatcher-123', invalidDto)).rejects.toThrow(
         BadRequestException,
@@ -255,15 +261,12 @@ describe('TripsService', () => {
     });
 
     it('should throw InternalServerErrorException on DynamoDB error', async () => {
-      brokersService.getBrokerById.mockResolvedValueOnce({
-        brokerId: 'broker-123',
-        brokerName: 'Test Broker',
-        isActive: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      });
+      // Mock user rate lookups succeed
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 4.5 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 0.53 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 10 } });
       
-      // Mock carrier validation to fail with DynamoDB error
+      // Mock trip creation fails
       mockDynamoDBClient.send.mockRejectedValueOnce(new Error('DynamoDB error'));
 
       await expect(service.createTrip('dispatcher-123', validCreateTripDto as any)).rejects.toThrow(
@@ -274,17 +277,10 @@ describe('TripsService', () => {
     it('should create a trip successfully even when truck is not registered', async () => {
       const dispatcherId = 'dispatcher-123';
 
-      // Mock broker lookup via BrokersService
-      brokersService.getBrokerById.mockResolvedValueOnce({
-        brokerId: 'broker-123',
-        brokerName: 'TQL (Total Quality Logistics)',
-        isActive: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      });
-
-      // Mock carrier validation (4 DynamoDB calls)
-      mockCarrierValidation();
+      // Mock user rate lookups
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 4.5 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 0.53 } });
+      mockDynamoDBClient.send.mockResolvedValueOnce({ Item: { rate: 10 } });
 
       // Mock trip creation
       mockDynamoDBClient.send.mockResolvedValueOnce({});
@@ -297,9 +293,8 @@ describe('TripsService', () => {
         orderStatus: TripStatus.Scheduled,
       });
       expect(result.tripId).toBeDefined();
-      // Broker name fetch removed - no longer stored in Trip table
-      // Should call DynamoDB 1 time: creation only (validation removed)
-      expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(1);
+      // 3 rate lookups + 1 creation
+      expect(mockDynamoDBClient.send).toHaveBeenCalledTimes(4);
     });
   });
 

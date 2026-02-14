@@ -48,15 +48,36 @@ export class CreateTripDto {
   @IsPositive()
   brokerPayment!: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @IsPositive()
-  truckOwnerPayment!: number;
+  truckOwnerPayment?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @IsPositive()
-  driverPayment!: number;
+  driverPayment?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  dispatcherPayment?: number;
+
+  // Rate snapshots (copied from user records at trip creation)
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  driverRate?: number; // $/mile
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  dispatcherRate?: number; // % of broker payment
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  truckOwnerRate?: number; // % of broker payment
 
   @IsOptional()
   @Type(() => Number)

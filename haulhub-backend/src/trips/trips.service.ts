@@ -181,22 +181,33 @@ export class TripsService {
     // Validate required fields
     this.validateCreateTripDto(dto);
 
-    // Validate scheduled datetime is in the future
+    // Validate scheduled datetime
     const scheduledDate = new Date(dto.scheduledTimestamp);
     if (isNaN(scheduledDate.getTime())) {
       throw new BadRequestException('Invalid scheduledTimestamp format');
     }
 
-    // Validate payments are positive numbers
     if (dto.brokerPayment <= 0) {
       throw new BadRequestException('brokerPayment must be a positive number');
     }
-    if (dto.truckOwnerPayment <= 0) {
-      throw new BadRequestException('truckOwnerPayment must be a positive number');
-    }
-    if (dto.driverPayment <= 0) {
-      throw new BadRequestException('driverPayment must be a positive number');
-    }
+
+    // Fetch user rates from DynamoDB for rate snapshot
+    const [dispatcherUser, driverUser, truckOwnerUser] = await Promise.all([
+      this.fetchUserRate(dispatcherId),
+      this.fetchUserRate(dto.driverId),
+      dto.truckOwnerId ? this.fetchUserRate(dto.truckOwnerId) : Promise.resolve(null),
+    ]);
+
+    // Use DTO rates if provided (override), otherwise use user's default rate
+    const dispatcherRate = dto.dispatcherRate ?? dispatcherUser?.rate ?? 0;
+    const driverRate = dto.driverRate ?? driverUser?.rate ?? 0;
+    const truckOwnerRate = dto.truckOwnerRate ?? truckOwnerUser?.rate ?? 0;
+
+    // Calculate payments from rates
+    const mileageTotal = dto.mileageTotal || 0;
+    const driverPayment = dto.driverPayment ?? Math.round(driverRate * mileageTotal * 100) / 100;
+    const dispatcherPayment = dto.dispatcherPayment ?? Math.round((dispatcherRate / 100) * dto.brokerPayment * 100) / 100;
+    const truckOwnerPayment = dto.truckOwnerPayment ?? Math.round((truckOwnerRate / 100) * dto.brokerPayment * 100) / 100;
 
     const tripId = uuidv4();
     const now = new Date().toISOString();
@@ -246,20 +257,20 @@ export class TripsService {
       mileageOrder: dto.mileageOrder || 0,
       mileageTotal: dto.mileageTotal || 0,
       
-      // Rates
+      // Rates (snapshot from user records)
       brokerRate: 0,
-      driverRate: 0,
-      truckOwnerRate: 0,
-      dispatcherRate: 0,
+      driverRate,
+      truckOwnerRate,
+      dispatcherRate,
       factoryRate: 0,
       orderRate: 0,
       orderAverage: 0,
       
-      // Payments
+      // Payments (calculated from rates)
       brokerPayment: dto.brokerPayment,
-      driverPayment: dto.driverPayment,
-      truckOwnerPayment: dto.truckOwnerPayment,
-      dispatcherPayment: 0,
+      driverPayment,
+      truckOwnerPayment,
+      dispatcherPayment,
       
       // Advances
       brokerAdvance: 0,
@@ -643,6 +654,26 @@ export class TripsService {
   }
 
   /**
+   * Fetch a user's rate from DynamoDB
+   */
+  private async fetchUserRate(userId: string): Promise<{ rate: number } | null> {
+    try {
+      const result = await this.awsService.getDynamoDBClient().send(
+        new GetCommand({
+          TableName: this.configService.usersTableName,
+          Key: { PK: `USER#${userId}`, SK: 'METADATA' },
+          ProjectionExpression: '#r',
+          ExpressionAttributeNames: { '#r': 'rate' },
+        }),
+      );
+      return result.Item ? { rate: result.Item.rate ?? 0 } : null;
+    } catch (error) {
+      console.error(`Error fetching rate for user ${userId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Validate CreateTripDto
    */
   private validateCreateTripDto(dto: CreateTripDto): void {
@@ -655,8 +686,6 @@ export class TripsService {
       'carrierId',
       'driverId',
       'brokerPayment',
-      'truckOwnerPayment',
-      'driverPayment',
     ];
 
     for (const field of requiredFields) {

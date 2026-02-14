@@ -107,6 +107,10 @@ export class AuthService {
     return this.currentUserValue?.carrierId || null;
   }
 
+  get userId(): string | null {
+    return this.currentUserValue?.userId || null;
+  }
+
   /**
    * Register a new user
    * Note: Registration does not automatically log the user in.
@@ -128,6 +132,8 @@ export class AuthService {
    * Login user
    */
   login(loginDto: LoginDto): Observable<AuthResponse> {
+    // Clear any stale data from previous sessions
+    this.clearUserData();
     return this.http.post<AuthResponse>(
       `${this.baseUrl}/auth/login`,
       loginDto

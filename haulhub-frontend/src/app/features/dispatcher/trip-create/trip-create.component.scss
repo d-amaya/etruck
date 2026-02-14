@@ -16,101 +16,60 @@
     mat-card-header {
       margin-bottom: 24px;
 
-      mat-card-title {
-        margin-bottom: 8px;
-        
-        h1 {
-          margin: 0;
-          font-size: 28px;
-          font-weight: 500;
-          color: #1976d2;
-        }
-      }
-
-      mat-card-subtitle {
-        font-size: 14px;
-        color: rgba(0, 0, 0, 0.6);
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 500;
+        color: #1976d2;
       }
     }
 
-    mat-card-content {
-      form {
-        .form-section {
-          margin-bottom: 32px;
-          padding-bottom: 24px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    mat-card-content form {
+      .form-section {
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 
-          &:last-of-type {
-            border-bottom: none;
-          }
+        &:last-of-type { border-bottom: none; }
 
-          h3 {
-            font-size: 18px;
-            font-weight: 500;
-            margin: 0 0 16px 0;
-            color: #1976d2;
-          }
-
-          .form-row {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 16px;
-
-            &:last-child {
-              margin-bottom: 0;
-            }
-
-            mat-form-field {
-              &.full-width {
-                flex: 1;
-              }
-
-              &.half-width {
-                flex: 1;
-                min-width: 0;
-              }
-
-              &.third-width {
-                flex: 1;
-                min-width: 0;
-              }
-
-              &.two-thirds-width {
-                flex: 2;
-                min-width: 0;
-              }
-
-              &.time-width {
-                flex: 0 0 120px;
-                min-width: 0;
-              }
-
-              &.quarter-width {
-                flex: 1;
-                min-width: 0;
-              }
-            }
-          }
+        h3 {
+          font-size: 18px;
+          font-weight: 500;
+          margin: 0 0 16px 0;
+          color: #1976d2;
         }
 
-        .form-actions {
+        .form-row {
           display: flex;
-          justify-content: flex-end;
           gap: 16px;
-          margin-top: 32px;
-          padding-top: 24px;
-          border-top: none;
+          margin-bottom: 16px;
+          &:last-child { margin-bottom: 0; }
+        }
 
-          button {
-            min-width: 120px;
-            position: relative;
+        mat-form-field {
+          &.full-width { flex: 1; }
+          &.half-width { flex: 1; min-width: 0; }
+          &.third-width { flex: 1; min-width: 0; }
+          &.quarter-width { flex: 1; min-width: 0; }
+          &.small-width { flex: 0 0 100px; min-width: 0; }
+          &.compact-field { flex: 0 0 150px; min-width: 0; }
+        }
+      }
 
-            .button-spinner {
-              position: absolute;
-              left: 50%;
-              top: 50%;
-              transform: translate(-50%, -50%);
-            }
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+        margin-top: 32px;
+
+        button {
+          min-width: 120px;
+          position: relative;
+          .button-spinner {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
           }
         }
       }
@@ -118,7 +77,13 @@
   }
 }
 
-// Profit display
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
 .profit-display {
   display: flex;
   justify-content: space-between;
@@ -131,60 +96,55 @@
   background-color: #f8f9fa;
   border: 1px solid #e0e0e0;
 
-  .profit-label {
-    font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
-  }
-
-  .profit-amount {
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  &.profit-positive .profit-amount {
-    color: #2e7d32;
-  }
-
-  &.profit-negative .profit-amount {
-    color: #c62828;
-  }
+  .profit-label { font-size: 13px; color: rgba(0, 0, 0, 0.6); }
+  .profit-amount { font-size: 14px; font-weight: 600; }
+  &.profit-positive .profit-amount { color: #2e7d32; }
+  &.profit-negative .profit-amount { color: #c62828; }
 }
 
-// Responsive design
 @media (max-width: 768px) {
   .trip-create-container {
     padding: 16px;
-
-    mat-card {
-      mat-card-content {
-        form {
-          .form-section {
-            .form-row {
-              flex-direction: column;
-              gap: 0;
-
-              mat-form-field {
-                width: 100%;
-              }
-            }
-          }
-
-          .form-actions {
-            flex-direction: column-reverse;
-
-            button {
-              width: 100%;
-            }
-          }
-        }
+    mat-card mat-card-content form {
+      .form-section .form-row {
+        flex-direction: column;
+        gap: 0;
+        mat-form-field { width: 100%; }
+      }
+      .form-actions {
+        flex-direction: column-reverse;
+        button { width: 100%; }
       }
     }
   }
 }
 
-// Print styles
-@media print {
-  .form-actions {
-    display: none;
-  }
+// Income/cost field highlights
+::ng-deep .income-field .mat-mdc-text-field-wrapper {
+  background-color: rgba(46, 125, 50, 0.06) !important;
+}
+::ng-deep .income-field .mdc-notched-outline__leading,
+::ng-deep .income-field .mdc-notched-outline__notch,
+::ng-deep .income-field .mdc-notched-outline__trailing {
+  border-color: rgba(46, 125, 50, 0.4) !important;
+}
+::ng-deep .income-field .mdc-floating-label {
+  color: #2e7d32 !important;
+}
+::ng-deep .income-field input {
+  color: #2e7d32 !important;
+}
+::ng-deep .cost-field .mat-mdc-text-field-wrapper {
+  background-color: rgba(198, 40, 40, 0.06) !important;
+}
+::ng-deep .cost-field .mdc-notched-outline__leading,
+::ng-deep .cost-field .mdc-notched-outline__notch,
+::ng-deep .cost-field .mdc-notched-outline__trailing {
+  border-color: rgba(198, 40, 40, 0.4) !important;
+}
+::ng-deep .cost-field .mdc-floating-label {
+  color: #c62828 !important;
+}
+::ng-deep .cost-field input {
+  color: #c62828 !important;
 }
