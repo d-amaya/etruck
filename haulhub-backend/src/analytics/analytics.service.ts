@@ -295,7 +295,14 @@ export class AnalyticsService {
       });
       const brokerAnalytics = Array.from(brokerMap.entries()).map(([brokerId, bTrips]) => {
         const rev = bTrips.reduce((s, t) => s + (t.brokerPayment || 0), 0);
-        return { brokerId, brokerName: brokerId, totalTrips: bTrips.length, totalRevenue: rev, averageRevenue: bTrips.length > 0 ? rev / bTrips.length : 0 };
+        const dist = bTrips.reduce((s, t) => s + (t.mileageOrder || 0) + (t.mileageEmpty || 0), 0);
+        const completed = bTrips.filter(t => t.orderStatus === 'Delivered' || t.orderStatus === 'Paid').length;
+        return {
+          brokerId, brokerName: brokerId,
+          tripCount: bTrips.length, totalRevenue: rev, averageRevenue: bTrips.length > 0 ? rev / bTrips.length : 0,
+          totalDistance: dist, completedTrips: completed,
+          completionRate: bTrips.length > 0 ? (completed / bTrips.length) * 100 : 0,
+        };
       });
 
       // Fuel Analytics (with per-vehicle breakdown)
