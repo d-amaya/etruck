@@ -266,9 +266,9 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
                 expect(driverPerf.totalTrips).toBeDefined();
                 expect(driverPerf.completedTrips).toBeDefined();
                 expect(driverPerf.totalDistance).toBeDefined();
-                expect(driverPerf.totalRevenue).toBeDefined();
-                expect(driverPerf.averageRevenue).toBeDefined();
-                expect(driverPerf.onTimeDeliveryRate).toBeDefined();
+                expect(driverPerf.totalEarnings).toBeDefined();
+                expect(driverPerf.averageEarningsPerTrip).toBeDefined();
+                expect(driverPerf.completionRate).toBeDefined();
 
                 // Verify all values are of correct type
                 expect(typeof driverPerf.driverId).toBe('string');
@@ -276,24 +276,24 @@ describe('Analytics Report Data Completeness (Property-Based)', () => {
                 expect(typeof driverPerf.totalTrips).toBe('number');
                 expect(typeof driverPerf.completedTrips).toBe('number');
                 expect(typeof driverPerf.totalDistance).toBe('number');
-                expect(typeof driverPerf.totalRevenue).toBe('number');
-                expect(typeof driverPerf.averageRevenue).toBe('number');
-                expect(typeof driverPerf.onTimeDeliveryRate).toBe('number');
+                expect(typeof driverPerf.totalEarnings).toBe('number');
+                expect(typeof driverPerf.averageEarningsPerTrip).toBe('number');
+                expect(typeof driverPerf.completionRate).toBe('number');
 
                 // Verify calculation accuracy: averageRevenue = totalRevenue / totalTrips
                 if (driverPerf.totalTrips > 0) {
-                  const expectedAvgRevenue = driverPerf.totalRevenue / driverPerf.totalTrips;
-                  expect(driverPerf.averageRevenue).toBeCloseTo(expectedAvgRevenue, 2);
+                  const expectedAvgRevenue = driverPerf.totalEarnings / driverPerf.totalTrips;
+                  expect(driverPerf.averageEarningsPerTrip).toBeCloseTo(expectedAvgRevenue, 2);
                 }
 
                 // Verify non-negative values
                 expect(driverPerf.totalTrips).toBeGreaterThanOrEqual(0);
                 expect(driverPerf.completedTrips).toBeGreaterThanOrEqual(0);
                 expect(driverPerf.totalDistance).toBeGreaterThanOrEqual(0);
-                expect(driverPerf.totalRevenue).toBeGreaterThanOrEqual(0);
-                expect(driverPerf.averageRevenue).toBeGreaterThanOrEqual(0);
-                expect(driverPerf.onTimeDeliveryRate).toBeGreaterThanOrEqual(0);
-                expect(driverPerf.onTimeDeliveryRate).toBeLessThanOrEqual(100);
+                expect(driverPerf.totalEarnings).toBeGreaterThanOrEqual(0);
+                expect(driverPerf.averageEarningsPerTrip).toBeGreaterThanOrEqual(0);
+                expect(driverPerf.completionRate).toBeGreaterThanOrEqual(0);
+                expect(driverPerf.completionRate).toBeLessThanOrEqual(100);
               }
             }
           }

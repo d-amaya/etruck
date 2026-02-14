@@ -286,7 +286,7 @@ describe('AnalyticsService', () => {
       expect(result[0].totalTrips).toBe(2);
       expect(result[0].completedTrips).toBe(2);
       expect(result[0].totalDistance).toBe(250);
-      expect(result[0].totalRevenue).toBe(1200);
+      expect(result[0].totalEarnings).toBe(1200);
     });
   });
 
