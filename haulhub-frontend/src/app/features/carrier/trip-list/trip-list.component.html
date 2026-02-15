@@ -167,7 +167,7 @@
             <div class="action-buttons">
               <button mat-icon-button class="action-btn view-btn" 
                       (click)="onViewDetails(trip)"
-                      [matTooltip]="'View trip details'">
+                      [matTooltip]="'View order details'">
                 <mat-icon>visibility</mat-icon>
               </button>
             </div>
@@ -191,8 +191,8 @@
     <!-- Empty State -->
     <div class="empty-state" *ngIf="!loading && trips.length === 0">
       <mat-icon>inbox</mat-icon>
-      <h3>No trips found</h3>
-      <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all trips.</p>
+      <h3>No orders found</h3>
+      <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all orders.</p>
       <p *ngIf="!hasActiveFilters()">No trips have been created yet.</p>
     </div>
 

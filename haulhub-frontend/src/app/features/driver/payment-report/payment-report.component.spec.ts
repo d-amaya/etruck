@@ -219,7 +219,7 @@ describe('PaymentReportComponent', () => {
 
     const compiled = fixture.nativeElement;
     const noDataMessage = compiled.querySelector('.no-data p');
-    expect(noDataMessage?.textContent).toContain('No trips found');
+    expect(noDataMessage?.textContent).toContain('No orders found');
   });
 
   it('should calculate average payment per trip correctly', () => {

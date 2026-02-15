@@ -130,10 +130,10 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     // Initialize empty KPI cards to show structure while loading
     this.kpiCards = [
       {
-        title: 'Trips',
+        title: 'Orders',
         value: '0',
         change: 0,
-        changeLabel: 'total trips',
+        changeLabel: 'total orders',
         icon: 'local_shipping',
         color: 'accent'
       },
@@ -376,7 +376,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     // Build KPI cards with real data
     this.kpiCards = [
       {
-        title: 'Trips',
+        title: 'Orders',
         value: `${data.totalTrips || 0}`,
         change: data.onTimeDeliveryRate || 0,
         changeLabel: 'completion rate',
@@ -480,7 +480,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Truck', 'Trips', 'Distance', 'Revenue', 'Utilization', 'Avg/Trip']],
+        head: [['Truck', 'Orders', 'Distance', 'Revenue', 'Utilization', 'Avg/Order']],
         body: this.vehicleUtilizationData.map(v => [
           v.vehicleName, v.totalTrips.toString(), `${v.totalDistance.toFixed(0)} mi`,
           this.formatCurrency(v.totalRevenue), `${v.utilizationRate.toFixed(1)}%`,
@@ -504,7 +504,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Driver', 'Trips', 'Completed', 'Distance', 'Earnings', 'Completion Rate']],
+        head: [['Driver', 'Orders', 'Completed', 'Distance', 'Earnings', 'Completion Rate']],
         body: this.driverPerformanceData.map(d => [
           d.driverName, d.totalTrips.toString(), d.completedTrips.toString(),
           `${d.totalDistance.toFixed(0)} mi`, this.formatCurrency(d.totalEarnings),
@@ -528,7 +528,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Broker', 'Trips', 'Completed', 'Revenue', 'Avg/Trip']],
+        head: [['Broker', 'Orders', 'Completed', 'Revenue', 'Avg/Order']],
         body: this.brokerAnalyticsData.brokers.map((b: any) => [
           b.brokerName, (b.tripCount || 0).toString(), (b.completedTrips || 0).toString(),
           this.formatCurrency(b.totalRevenue || 0), this.formatCurrency(b.averageRevenue || 0)
@@ -549,7 +549,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     if (this.brokerAnalyticsData?.brokers?.length > 0) {
       sheets.push({
         name: 'Broker Performance',
-        headers: ['Broker Name', 'Total Trips', 'Completed', 'Total Revenue', 'Avg Revenue/Trip', 'Total Distance', 'Completion Rate'],
+        headers: ['Broker Name', 'Total Orders', 'Completed', 'Total Revenue', 'Avg Revenue/Order', 'Total Distance', 'Completion Rate'],
         rows: this.brokerAnalyticsData.brokers.map((b: any) => [
           b.brokerName, b.tripCount || 0, b.completedTrips || 0,
           b.totalRevenue?.toFixed(2) || 0, b.averageRevenue?.toFixed(2) || 0,
@@ -560,7 +560,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     if (this.driverPerformanceData?.length > 0) {
       sheets.push({
         name: 'Driver Performance',
-        headers: ['Driver Name', 'Total Trips', 'Completed', 'Total Distance', 'Total Earnings', 'Avg Earnings/Trip', 'Completion Rate'],
+        headers: ['Driver Name', 'Total Orders', 'Completed', 'Total Distance', 'Total Earnings', 'Avg Earnings/Order', 'Completion Rate'],
         rows: this.driverPerformanceData.map((d: any) => [
           d.driverName, d.totalTrips || 0, d.completedTrips || 0,
           d.totalDistance || 0, d.totalEarnings?.toFixed(2) || 0, d.averageEarningsPerTrip?.toFixed(2) || 0,
@@ -571,7 +571,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     if (this.vehicleUtilizationData?.length > 0) {
       sheets.push({
         name: 'Vehicle Utilization',
-        headers: ['Truck', 'Total Trips', 'Total Distance', 'Total Revenue', 'Utilization Rate', 'Avg Revenue/Trip'],
+        headers: ['Truck', 'Total Orders', 'Total Distance', 'Total Revenue', 'Utilization Rate', 'Avg Revenue/Order'],
         rows: this.vehicleUtilizationData.map((v: any) => [
           v.vehicleName, v.totalTrips || 0, v.totalDistance || 0,
           v.totalRevenue?.toFixed(2) || 0, `${(v.utilizationRate || 0).toFixed(1)}%`, v.averageRevenuePerTrip?.toFixed(2) || 0

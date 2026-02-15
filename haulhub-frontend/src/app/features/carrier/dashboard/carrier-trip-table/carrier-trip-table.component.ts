@@ -604,7 +604,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     doc.setTextColor(255, 255, 255);
     doc.text('eTrucky', 14, 22);
     doc.setFontSize(16);
-    doc.text('Carrier Dashboard Report', pageWidth / 2, 22, { align: 'center' });
+    doc.text('Carrier Orders Report', pageWidth / 2, 22, { align: 'center' });
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 22, { align: 'right' });
@@ -642,7 +642,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       const cardGap = 10;
       
       this.drawSummaryCard(doc, 14, yPosition, cardWidth, cardHeight, 
-        'Total Trips', allTrips.length.toString(), primaryBlue);
+        'Total Orders', allTrips.length.toString(), primaryBlue);
       this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPosition, cardWidth, cardHeight,
         'Total Revenue', this.formatCurrency(payment.totalBrokerPayments), profitGreen);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPosition, cardWidth, cardHeight,
@@ -684,7 +684,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
         const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit'];
         const rows = allTrips.map((t: any) => this.buildExportRow(t));
         const df = this.filterService.getCurrentFilter();
-        this.excelExportService.exportToExcel('carrier-trips-export', [{ name: 'Trips', headers, rows }], df.startDate, df.endDate);
+        this.excelExportService.exportToExcel('carrier-orders-export', [{ name: 'Orders', headers, rows }], df.startDate, df.endDate);
       }
     });
   }

@@ -3,7 +3,7 @@
     <mat-card-header>
       <div class="header-row">
         <div>
-          <mat-card-title><h1>Edit Trip</h1></mat-card-title>
+          <mat-card-title><h1>Edit Order</h1></mat-card-title>
         </div>
         <button mat-button (click)="onCancel()">
           <mat-icon>arrow_back</mat-icon>
@@ -16,7 +16,7 @@
       <div class="info-alert">
         <mat-icon>info</mat-icon>
         <div class="info-content">
-          <strong>Note:</strong> Scheduled date, truck, trailer, and driver cannot be changed after trip creation.
+          <strong>Note:</strong> Scheduled date, truck, trailer, and driver cannot be changed after order creation.
         </div>
       </div>
 
@@ -48,7 +48,7 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
-              <mat-label>Trip Status</mat-label>
+              <mat-label>Order Status</mat-label>
               <mat-select formControlName="status">
                 <mat-option *ngFor="let status of statusOptions" [value]="status">
                   {{ getStatusLabel(status) }}

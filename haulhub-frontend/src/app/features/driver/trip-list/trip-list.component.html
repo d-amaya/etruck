@@ -1,10 +1,10 @@
 <div class="trip-list-container">
   <div class="page-header">
-    <h1>My Trips</h1>
+    <h1>My Orders</h1>
     <div class="header-summary">
       <div class="summary-item">
         <mat-icon>local_shipping</mat-icon>
-        <span>{{ trips.length }} Trips</span>
+        <span>{{ trips.length }} Orders</span>
       </div>
       <div class="summary-item">
         <mat-icon>route</mat-icon>
@@ -84,7 +84,7 @@
     <mat-card-content>
       <div *ngIf="trips.length === 0" class="no-trips">
         <mat-icon>info</mat-icon>
-        <p>No trips found</p>
+        <p>No orders found</p>
         <p class="hint">Try adjusting your filters or check back later for new assignments</p>
       </div>
 

@@ -150,7 +150,7 @@ export class TripListComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error loading trips:', error);
+        console.error('Error loading orders:', error);
         this.loading = false;
       }
     });

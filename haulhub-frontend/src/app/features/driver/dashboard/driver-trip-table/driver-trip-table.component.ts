@@ -282,7 +282,7 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
           this.getTrailerDisplay(t.trailerId),
           t.driverPayment || 0
         ]);
-        this.excelExportService.exportToExcel('driver-trips-export', [{ name: 'Trips', headers, rows }], currentFilters.dateRange.startDate, currentFilters.dateRange.endDate);
+        this.excelExportService.exportToExcel('driver-orders-export', [{ name: 'Orders', headers, rows }], currentFilters.dateRange.startDate, currentFilters.dateRange.endDate);
       }
     });
   }

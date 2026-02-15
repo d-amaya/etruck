@@ -3,7 +3,7 @@
     <mat-card-header>
       <div class="header-row">
         <div>
-          <mat-card-title><h1>Create New Trip</h1></mat-card-title>
+          <mat-card-title><h1>Create New Order</h1></mat-card-title>
         </div>
         <button mat-button (click)="onCancel()">
           <mat-icon>arrow_back</mat-icon>
@@ -334,7 +334,7 @@
           <button mat-raised-button color="primary" type="submit"
                   [disabled]="loading || loadingBrokers || loadingAssets">
             <mat-spinner *ngIf="loading" diameter="20" class="button-spinner"></mat-spinner>
-            <span *ngIf="!loading">Create Trip</span>
+            <span *ngIf="!loading">Create Order</span>
           </button>
         </div>
       </form>

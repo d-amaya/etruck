@@ -109,7 +109,7 @@ export class DriverPdfExportService {
 
     // Card 1: Total Trips
     this.drawSummaryCard(doc, 14, cardY, cardWidth, cardHeight, 
-      'Total Trips', visibleTripCount.toString(), primaryBlue);
+      'Total Orders', visibleTripCount.toString(), primaryBlue);
 
     // Card 2: Total Driver Payment
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
@@ -117,7 +117,7 @@ export class DriverPdfExportService {
 
     // Card 3: Average Payment per Trip
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,
-      'Avg Payment/Trip', this.formatCurrency(visibleAvgPayment), profitGreen);
+      'Avg Payment/Order', this.formatCurrency(visibleAvgPayment), profitGreen);
 
     yPosition = cardY + cardHeight + 15;
 
@@ -125,7 +125,7 @@ export class DriverPdfExportService {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-    doc.text('Trip Status Breakdown', 14, yPosition);
+    doc.text('Order Status Breakdown', 14, yPosition);
     yPosition += 6;
 
     // Recalculate status summary from visible trips
@@ -175,7 +175,7 @@ export class DriverPdfExportService {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text(`Trip Details (${trips.length} trips)`, 14, yPosition);
+      doc.text(`Order Details (${trips.length} orders)`, 14, yPosition);
       yPosition += 6;
 
       const tripTableData = trips.map(trip => {

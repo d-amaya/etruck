@@ -312,7 +312,7 @@ describe('TripTableComponent', () => {
   it('should show filter message when no trips with active filters', () => {
     component.hasActiveFilters = true;
     const message = component.getEmptyStateMessage();
-    expect(message).toContain('No trips found matching your filters');
+    expect(message).toContain('No orders found matching your filters');
   });
 
   it('should navigate to create trip', () => {

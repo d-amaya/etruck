@@ -526,8 +526,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
           return of({ trips: [], total: 0 });
         }
         
-        console.error('Error loading trips:', error);
-        this.snackBar.open('Error loading trips. Please try again.', 'Close', {
+        console.error('Error loading orders:', error);
+        this.snackBar.open('Error loading orders. Please try again.', 'Close', {
           duration: 5000
         });
         return of({ trips: [], total: 0 });
@@ -586,11 +586,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
     try {
       this.router.navigate(['/dispatcher/trips', trip.tripId]).catch(err => {
         console.error('Navigation error:', err);
-        this.snackBar.open('Error navigating to trip details', 'Close', { duration: 3000 });
+        this.snackBar.open('Error navigating to order details', 'Close', { duration: 3000 });
       });
     } catch (error) {
       console.error('Error in viewTrip:', error);
-      this.snackBar.open('Error viewing trip', 'Close', { duration: 3000 });
+      this.snackBar.open('Error viewing order', 'Close', { duration: 3000 });
     }
   }
 
@@ -598,11 +598,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
     try {
       this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']).catch(err => {
         console.error('Navigation error:', err);
-        this.snackBar.open('Error navigating to edit trip', 'Close', { duration: 3000 });
+        this.snackBar.open('Error navigating to edit order', 'Close', { duration: 3000 });
       });
     } catch (error) {
       console.error('Error in editTrip:', error);
-      this.snackBar.open('Error editing trip', 'Close', { duration: 3000 });
+      this.snackBar.open('Error editing order', 'Close', { duration: 3000 });
     }
   }
 
@@ -613,7 +613,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       const dialogRef = this.dialog.open(ConfirmDialogComponent, {
         width: '400px',
         data: {
-          title: 'Delete Trip',
+          title: 'Delete Order',
           message: `Are you sure you want to delete this trip from ${pickupLoc} to ${deliveryLoc}?`,
           confirmText: 'Delete',
           cancelText: 'Cancel'
@@ -641,7 +641,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
         this.dashboardState.triggerPaymentSummaryRefresh();
 
         this.snackBar.open(
-          'Trip deleted successfully',
+          'Order deleted successfully',
           'Close',
           { duration: 3000 }
         );
@@ -661,7 +661,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   getEmptyStateMessage(): string {
     if (this.hasActiveFilters) {
-      return 'No trips found matching your filters. Try adjusting your filters or clear them to see all trips.';
+      return 'No orders found matching your filters. Try adjusting your filters or clear them to see all orders.';
     }
     return 'You haven\'t created any trips yet.';
   }
@@ -819,7 +819,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   exportCSV(): void {
-    this.snackBar.open('Exporting all trips...', '', { duration: 2000 });
+    this.snackBar.open('Exporting all orders...', '', { duration: 2000 });
     const filters = this.dashboardState.getCurrentFilters();
     const apiFilters: any = {};
     if (filters.dateRange.startDate) apiFilters.startDate = filters.dateRange.startDate.toISOString();
@@ -855,7 +855,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
             profit
           ];
         });
-        this.excelExportService.exportToExcel('trips-export', [{ name: 'Trips', headers, rows }], filters.dateRange.startDate, filters.dateRange.endDate);
+        this.excelExportService.exportToExcel('orders-export', [{ name: 'Orders', headers, rows }], filters.dateRange.startDate, filters.dateRange.endDate);
       },
       error: () => this.snackBar.open('Failed to export Excel', 'Close', { duration: 3000 })
     });

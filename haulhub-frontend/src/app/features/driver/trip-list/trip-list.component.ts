@@ -121,7 +121,7 @@ export class TripListComponent implements OnInit {
         this.loading = false;
       },
       error: (error) => {
-        console.error('Error loading trips:', error);
+        console.error('Error loading orders:', error);
         this.loading = false;
       }
     });
@@ -234,7 +234,7 @@ export class TripListComponent implements OnInit {
           this.trips[index] = updatedTrip;
         }
         
-        this.snackBar.open('Trip status updated successfully', 'Close', {
+        this.snackBar.open('Order status updated successfully', 'Close', {
           duration: 3000,
           horizontalPosition: 'end',
           verticalPosition: 'top'

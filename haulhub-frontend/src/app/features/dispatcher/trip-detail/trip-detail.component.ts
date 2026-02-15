@@ -62,7 +62,7 @@ export class TripDetailComponent implements OnInit {
     if (tripId) {
       this.loadTrip(tripId);
     } else {
-      this.error = 'No trip ID provided';
+      this.error = 'No order ID provided';
       this.loading = false;
     }
   }
@@ -101,7 +101,7 @@ export class TripDetailComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading trip:', error);
-        this.error = error.error?.message || 'Failed to load trip details';
+        this.error = error.error?.message || 'Failed to load order details';
         this.loading = false;
       }
     });

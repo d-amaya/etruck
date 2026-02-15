@@ -57,17 +57,17 @@
             <mat-card-content>
               <div *ngIf="dispatcherPerformanceData && dispatcherPerformanceData.length > 0" class="data-table">
                 <div class="column-descriptions">
-                  <p><strong>Completion Rate:</strong> Percentage of trips successfully completed. <strong>Avg Profit/Trip:</strong> Average profit per trip managed by this dispatcher.</p>
+                  <p><strong>Completion Rate:</strong> Percentage of orders successfully completed. <strong>Avg Profit/Order:</strong> Average profit per order managed by this dispatcher.</p>
                 </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
                       <th>Dispatcher Name</th>
-                      <th>Total Trips</th>
+                      <th>Total Orders</th>
                       <th>Completed</th>
                       <th>Total Revenue</th>
                       <th>Total Profit</th>
-                      <th>Avg Profit/Trip</th>
+                      <th>Avg Profit/Order</th>
                       <th>Completion Rate</th>
                     </tr>
                   </thead>
@@ -111,17 +111,17 @@
             <mat-card-content>
               <div *ngIf="driverPerformanceData && driverPerformanceData.length > 0" class="data-table">
                 <div class="column-descriptions">
-                  <p><strong>Completion Rate:</strong> Percentage of trips successfully completed on time. <strong>Avg Earnings/Trip:</strong> Average payment received per trip.</p>
+                  <p><strong>Completion Rate:</strong> Percentage of orders successfully completed on time. <strong>Avg Earnings/Order:</strong> Average payment received per order.</p>
                 </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
                       <th>Driver Name</th>
-                      <th>Total Trips</th>
+                      <th>Total Orders</th>
                       <th>Completed</th>
                       <th>Total Distance</th>
                       <th>Total Earnings</th>
-                      <th>Avg Earnings/Trip</th>
+                      <th>Avg Earnings/Order</th>
                       <th>Completion Rate</th>
                     </tr>
                   </thead>
@@ -161,16 +161,16 @@
             <mat-card-content>
               <div *ngIf="brokerAnalyticsData && brokerAnalyticsData.brokers && brokerAnalyticsData.brokers.length > 0" class="data-table">
                 <div class="column-descriptions">
-                  <p><strong>Completion Rate:</strong> Percentage of trips from this broker that were successfully completed. <strong>Avg Revenue/Trip:</strong> Average payment received per trip from this broker.</p>
+                  <p><strong>Completion Rate:</strong> Percentage of orders from this broker that were successfully completed. <strong>Avg Revenue/Order:</strong> Average payment received per order from this broker.</p>
                 </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
                       <th>Broker Name</th>
-                      <th>Total Trips</th>
+                      <th>Total Orders</th>
                       <th>Completed</th>
                       <th>Total Revenue</th>
-                      <th>Avg Revenue/Trip</th>
+                      <th>Avg Revenue/Order</th>
                       <th>Total Distance</th>
                       <th>Completion Rate</th>
                     </tr>
@@ -211,17 +211,17 @@
             <mat-card-content>
               <div *ngIf="vehicleUtilizationData && vehicleUtilizationData.length > 0" class="data-table">
                 <div class="column-descriptions">
-                  <p><strong>Utilization Rate:</strong> Percentage of days the vehicle was actively used for trips. <strong>Avg Revenue/Trip:</strong> Average revenue earned per trip for this vehicle.</p>
+                  <p><strong>Utilization Rate:</strong> Percentage of days the vehicle was actively used for orders. <strong>Avg Revenue/Order:</strong> Average revenue earned per order for this vehicle.</p>
                 </div>
                 <table class="analytics-table">
                   <thead>
                     <tr>
                       <th>Truck</th>
-                      <th>Total Trips</th>
+                      <th>Total Orders</th>
                       <th>Total Distance</th>
                       <th>Total Revenue</th>
                       <th>Utilization Rate</th>
-                      <th>Avg Revenue/Trip</th>
+                      <th>Avg Revenue/Order</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -261,7 +261,7 @@
                 
                 <div class="data-table" *ngIf="fuelEfficiencyChartData.vehicles && fuelEfficiencyChartData.vehicles.length > 0">
                   <div class="column-descriptions">
-                    <p><strong>Avg MPG:</strong> Average miles per gallon fuel efficiency for this vehicle. <strong>Total Gallons:</strong> Total fuel consumed across all trips.</p>
+                    <p><strong>Avg MPG:</strong> Average miles per gallon fuel efficiency for this vehicle. <strong>Total Gallons:</strong> Total fuel consumed across all orders.</p>
                   </div>
                   <table class="analytics-table">
                     <thead>

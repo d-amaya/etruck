@@ -346,7 +346,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.text('Payments by Broker', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Broker', 'Total Payment', 'Trips']],
+        head: [['Broker', 'Total Payment', 'Orders']],
         body: brokerData.map(b => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -363,7 +363,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.text('Payments by Driver', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Driver', 'Total Payment', 'Trips']],
+        head: [['Driver', 'Total Payment', 'Orders']],
         body: this.enrichedDriverData.map(d => [d.driverName, this.formatCurrency(d.totalPayment), d.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -380,7 +380,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.text('Payments by Truck Owner', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Truck Owner', 'Total Payment', 'Trips']],
+        head: [['Truck Owner', 'Total Payment', 'Orders']],
         body: this.enrichedTruckOwnerData.map(o => [o.ownerName, this.formatCurrency(o.totalPayment), o.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -399,7 +399,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     if (this.report.groupedByBroker) {
       sheets.push({
         name: 'By Broker',
-        headers: ['Broker Name', 'Total Payment', 'Trip Count'],
+        headers: ['Broker Name', 'Total Payment', 'Order Count'],
         rows: Object.entries(this.report.groupedByBroker).map(([brokerId, data]: [string, any]) => [
           this.brokerMap.get(brokerId)?.brokerName || brokerId, data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
         ])
@@ -408,7 +408,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     if (this.enrichedDriverData?.length > 0) {
       sheets.push({
         name: 'By Driver',
-        headers: ['Driver Name', 'Total Payment', 'Trip Count'],
+        headers: ['Driver Name', 'Total Payment', 'Order Count'],
         rows: this.enrichedDriverData.map((d: any) => [
           d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
         ])
@@ -417,7 +417,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     if (this.enrichedTruckOwnerData?.length > 0) {
       sheets.push({
         name: 'By Truck Owner',
-        headers: ['Truck Owner', 'Total Payment', 'Trip Count'],
+        headers: ['Truck Owner', 'Total Payment', 'Order Count'],
         rows: this.enrichedTruckOwnerData.map((o: any) => [
           o.ownerName || o.truckOwnerId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
         ])

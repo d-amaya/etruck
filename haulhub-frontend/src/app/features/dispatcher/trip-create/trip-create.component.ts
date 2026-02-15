@@ -258,7 +258,7 @@ export class TripCreateComponent implements OnInit {
     
     const carrierId = this.authService.carrierId;
     if (!carrierId) {
-      this.snackBar.open('Unable to create trip: Carrier ID not found. Please log in again.', 'Close', {
+      this.snackBar.open('Unable to create order: Carrier ID not found. Please log in again.', 'Close', {
         duration: 5000,
         panelClass: ['error-snackbar']
       });
@@ -341,7 +341,7 @@ export class TripCreateComponent implements OnInit {
     this.loading = true;
     this.tripService.createTrip(tripData).subscribe({
       next: () => {
-        this.snackBar.open('Trip created successfully!', 'Close', {
+        this.snackBar.open('Order created successfully!', 'Close', {
           duration: 3000,
           panelClass: ['success-snackbar']
         });

@@ -106,7 +106,7 @@ describe('TripListComponent', () => {
     component.onUpdateStatus(mockTrip);
 
     expect(mockSnackBar.open).toHaveBeenCalledWith(
-      'Trip status updated successfully',
+      'Order status updated successfully',
       'Close',
       jasmine.objectContaining({ duration: 3000 })
     );

@@ -54,7 +54,7 @@
           <div class="summary-details">
             <div class="summary-label">Total Earnings</div>
             <div class="summary-value">{{ formatCurrency(report.totalDriverPayments) }}</div>
-            <div class="summary-subtitle">{{ report.tripCount }} trips</div>
+            <div class="summary-subtitle">{{ report.tripCount }} orders</div>
           </div>
         </mat-card-content>
       </mat-card>
@@ -67,7 +67,7 @@
           <div class="summary-details">
             <div class="summary-label">Total Distance</div>
             <div class="summary-value">{{ formatDistance(report.totalDistance) }}</div>
-            <div class="summary-subtitle">Across all trips</div>
+            <div class="summary-subtitle">Across all orders</div>
           </div>
         </mat-card-content>
       </mat-card>
@@ -78,7 +78,7 @@
             <mat-icon>local_shipping</mat-icon>
           </div>
           <div class="summary-details">
-            <div class="summary-label">Total Trips</div>
+            <div class="summary-label">Total Orders</div>
             <div class="summary-value">{{ report.tripCount }}</div>
             <div class="summary-subtitle">In selected period</div>
           </div>
@@ -193,7 +193,7 @@
 
           <div *ngIf="report.trips.length === 0" class="no-data">
             <mat-icon>info</mat-icon>
-            <p>No trips found for the selected period</p>
+            <p>No orders found for the selected period</p>
           </div>
         </div>
       </mat-card-content>

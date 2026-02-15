@@ -85,11 +85,11 @@ export class AccessibilityService {
    */
   getStatusAriaLabel(status: string): string {
     const statusLabels: { [key: string]: string } = {
-      'SCHEDULED': 'Trip is scheduled',
-      'PICKED_UP': 'Trip has been picked up',
-      'IN_TRANSIT': 'Trip is in transit',
-      'DELIVERED': 'Trip has been delivered',
-      'PAID': 'Trip has been paid'
+      'SCHEDULED': 'Order is scheduled',
+      'PICKED_UP': 'Order has been picked up',
+      'IN_TRANSIT': 'Order is in transit',
+      'DELIVERED': 'Order has been delivered',
+      'PAID': 'Order has been paid'
     };
     return statusLabels[status] || `Trip status is ${status}`;
   }
@@ -100,8 +100,8 @@ export class AccessibilityService {
   getActionAriaLabel(action: string, tripId: string, destination?: string): string {
     const actionLabels: { [key: string]: string } = {
       'view': `View details for trip ${tripId}${destination ? ` to ${destination}` : ''}`,
-      'edit': `Edit trip ${tripId}${destination ? ` to ${destination}` : ''}`,
-      'delete': `Delete trip ${tripId}${destination ? ` to ${destination}` : ''}`
+      'edit': `Edit order ${tripId}${destination ? ` to ${destination}` : ''}`,
+      'delete': `Delete order ${tripId}${destination ? ` to ${destination}` : ''}`
     };
     return actionLabels[action] || `${action} trip ${tripId}`;
   }

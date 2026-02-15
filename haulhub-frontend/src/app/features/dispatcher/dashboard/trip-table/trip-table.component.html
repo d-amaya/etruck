@@ -1,4 +1,4 @@
-<div class="trip-table-container" role="region" aria-label="Trip list">
+<div class="trip-table-container" role="region" aria-label="Order list">
   <!-- Dashboard Charts Widget -->
   <app-dashboard-charts-widget></app-dashboard-charts-widget>
 
@@ -91,7 +91,7 @@
         </mat-menu>
 
         <button mat-icon-button (click)="createTrip()" type="button"
-                [matTooltip]="'Create new trip'"
+                [matTooltip]="'Create new order'"
                 class="action-btn create-btn">
           <mat-icon>add</mat-icon>
         </button>
@@ -230,21 +230,21 @@
             <button mat-icon-button class="action-btn view-btn" 
                     (click)="viewTrip(trip)"
                     (touchend)="viewTrip(trip); $event.preventDefault()"
-                    [matTooltip]="'View trip details'"
+                    [matTooltip]="'View order details'"
                     [attr.aria-label]="getActionAriaLabel('view', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">visibility</mat-icon>
             </button>
             <button mat-icon-button class="action-btn edit-btn" 
                     (click)="editTrip(trip)"
                     (touchend)="editTrip(trip); $event.preventDefault()"
-                    [matTooltip]="'Edit trip'"
+                    [matTooltip]="'Edit order'"
                     [attr.aria-label]="getActionAriaLabel('edit', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">edit</mat-icon>
             </button>
             <button mat-icon-button class="action-btn delete-btn" 
                     (click)="deleteTrip(trip)"
                     (touchend)="deleteTrip(trip); $event.preventDefault()"
-                    [matTooltip]="'Delete trip'"
+                    [matTooltip]="'Delete order'"
                     [attr.aria-label]="getActionAriaLabel('delete', trip.tripId, trip.dropoffLocation)">
               <mat-icon aria-hidden="true">delete</mat-icon>
             </button>
@@ -258,7 +258,7 @@
           class="trip-row"
           role="row"
           [attr.aria-rowindex]="i + 2"
-          [attr.aria-label]="'Trip from ' + row.pickupLocation + ' to ' + row.dropoffLocation + ' on ' + formatDate(row.scheduledTimestamp)"></tr>
+          [attr.aria-label]="'Order from ' + row.pickupLocation + ' to ' + row.dropoffLocation + ' on ' + formatDate(row.scheduledTimestamp)"></tr>
     </table>
 
     <!-- Pagination -->
@@ -277,7 +277,7 @@
   <div class="empty-state" *ngIf="!loading && trips.length === 0" 
        role="status" aria-live="polite">
     <mat-icon aria-hidden="true">inbox</mat-icon>
-    <h3>No trips found</h3>
+    <h3>No orders found</h3>
     <p>{{ getEmptyStateMessage() }}</p>
     <button mat-raised-button color="primary" (click)="createTrip()" *ngIf="!hasActiveFilters"
             [attr.aria-label]="'Create your first trip to get started'">

@@ -77,7 +77,7 @@ export class TripEditComponent implements OnInit {
     if (tripId) {
       this.loadTrip(tripId);
     } else {
-      this.error = 'No trip ID provided';
+      this.error = 'No order ID provided';
       this.loading = false;
     }
   }
@@ -247,7 +247,7 @@ export class TripEditComponent implements OnInit {
         if (cache) this.resolveNames(trip, cache);
       },
       error: (error) => {
-        this.error = error.error?.message || 'Failed to load trip details';
+        this.error = error.error?.message || 'Failed to load order details';
         this.loading = false;
       }
     });
@@ -388,7 +388,7 @@ export class TripEditComponent implements OnInit {
     this.submitting = true;
     this.tripService.updateTrip(this.trip.tripId, tripData).subscribe({
       next: () => {
-        this.snackBar.open('Trip updated successfully!', 'Close', { duration: 3000 });
+        this.snackBar.open('Order updated successfully!', 'Close', { duration: 3000 });
         this.dashboardState.invalidateViewCaches();
         this.router.navigate(['/dispatcher/dashboard']);
       },

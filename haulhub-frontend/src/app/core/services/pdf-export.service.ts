@@ -113,7 +113,7 @@ export class PdfExportService {
 
     // Card 1: Total Trips
     this.drawSummaryCard(doc, 14, cardY, cardWidth, cardHeight, 
-      'Total Trips', trips.length.toString(), primaryBlue);
+      'Total Orders', trips.length.toString(), primaryBlue);
 
     // Card 2: Total Revenue
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
@@ -141,7 +141,7 @@ export class PdfExportService {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-    doc.text('Trip Status Breakdown', 14, yPosition);
+    doc.text('Order Status Breakdown', 14, yPosition);
     yPosition += 6;
 
     const summaryData = [
@@ -185,7 +185,7 @@ export class PdfExportService {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text(`Trip Details (${trips.length} trips)`, 14, yPosition);
+      doc.text(`Order Details (${trips.length} orders)`, 14, yPosition);
       yPosition += 6;
 
       const tripTableData = trips.map(trip => {

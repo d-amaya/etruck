@@ -2,7 +2,7 @@
   <mat-card class="header-card">
     <mat-card-header>
       <mat-card-title>
-        <h1>My Trips</h1>
+        <h1>My Orders</h1>
       </mat-card-title>
       <div class="header-actions">
         <button mat-raised-button color="accent" (click)="onBackToDashboard()">
@@ -124,8 +124,8 @@
 
       <div class="no-trips" *ngIf="!loading && trips.length === 0">
         <mat-icon>inbox</mat-icon>
-        <h3>No trips found</h3>
-        <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all trips.</p>
+        <h3>No orders found</h3>
+        <p *ngIf="hasActiveFilters()">Try adjusting your filters or clear them to see all orders.</p>
         <p *ngIf="!hasActiveFilters()">Create your first trip to get started.</p>
         <button mat-raised-button color="primary" (click)="onCreateTrip()">
           <mat-icon>add</mat-icon>
@@ -221,7 +221,7 @@
                 </button>
                 <button mat-menu-item (click)="onEditTrip(trip)">
                   <mat-icon>edit</mat-icon>
-                  <span>Edit Trip</span>
+                  <span>Edit Order</span>
                 </button>
                 <button mat-menu-item (click)="onUpdateStatus(trip)">
                   <mat-icon>update</mat-icon>

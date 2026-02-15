@@ -1,7 +1,7 @@
 <mat-card>
   <mat-card-header>
     <mat-card-title>
-      <h2>My Trips</h2>
+      <h2>My Orders</h2>
     </mat-card-title>
   </mat-card-header>
 
@@ -79,7 +79,7 @@
     <!-- No Trips Message -->
     <div *ngIf="!loading && hasApprovedVehicles() && trips.length === 0" class="empty-state">
       <mat-icon>assignment</mat-icon>
-      <p>No trips found</p>
+      <p>No orders found</p>
       <p class="subtitle" *ngIf="hasActiveFilters()">Try adjusting your filters</p>
     </div>
 
