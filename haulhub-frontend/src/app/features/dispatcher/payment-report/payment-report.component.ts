@@ -333,7 +333,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(color[0], color[1], color[2]);
       doc.text(value, x + cardWidth / 2, yPos + 20, { align: 'center' });
     };
-    drawCard(14, 'Broker Payments', this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
+    drawCard(14, 'Order Rate', this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
     drawCard(14 + cardWidth + cardGap, 'Driver Payments', this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
     drawCard(14 + (cardWidth + cardGap) * 2, 'Truck Owner Payments', this.formatCurrency(this.report?.totalTruckOwnerPayments || 0), lossRed);
 

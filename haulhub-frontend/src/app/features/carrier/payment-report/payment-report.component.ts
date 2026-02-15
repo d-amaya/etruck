@@ -214,7 +214,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     const cardHeight = 25;
     const cardGap = 5;
     
-    this.drawSummaryCard(doc, 14, yPos, cardWidth, cardHeight, 'Broker Payments', 
+    this.drawSummaryCard(doc, 14, yPos, cardWidth, cardHeight, 'Order Rate', 
       this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPos, cardWidth, cardHeight, 'Driver Payments',
       this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
