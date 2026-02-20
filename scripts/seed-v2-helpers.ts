@@ -188,8 +188,8 @@ async function seedDispatchers(): Promise<UserRecord[]> {
       accountStatus: 'active', rate: d.rate,
       ein: genEIN(), ss: genSSN(),
       city: d.city, state: d.state, phone: `(555) 200-000${i + 1}`,
-      subscribedCarrierIds: [], // filled after carriers created
-      subscribedAdminIds: [],   // filled after wiring
+      subscribedCarrierIds: new Set<string>(), // filled after carriers created
+      subscribedAdminIds: new Set<string>(),   // filled after wiring
       isActive: true,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       createdBy: 'seed', lastModifiedBy: 'seed',

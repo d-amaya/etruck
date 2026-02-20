@@ -37,8 +37,8 @@ async function wireSubscriptions(
       await ddb.send(new UpdateCommand({
         TableName: T.users,
         Key: { PK: `USER#${dispatchers[di].userId}`, SK: 'METADATA' },
-        UpdateExpression: 'SET subscribedAdminIds = list_append(if_not_exists(subscribedAdminIds, :empty), :id)',
-        ExpressionAttributeValues: { ':id': [admins[ai].userId], ':empty': [] },
+        UpdateExpression: 'ADD subscribedAdminIds :id',
+        ExpressionAttributeValues: { ':id': new Set([admins[ai].userId]) },
       }));
     }
     console.log(`  ✅ Admin ${admins[ai].name} → Dispatchers: ${dis.map(d => dispatchers[d].name).join(', ')}`);
@@ -58,8 +58,8 @@ async function wireSubscriptions(
     await ddb.send(new UpdateCommand({
       TableName: T.users,
       Key: { PK: `USER#${dispatchers[di].userId}`, SK: 'METADATA' },
-      UpdateExpression: 'SET subscribedCarrierIds = :ids',
-      ExpressionAttributeValues: { ':ids': carrierIds },
+      UpdateExpression: 'ADD subscribedCarrierIds :ids',
+      ExpressionAttributeValues: { ':ids': new Set(carrierIds) },
     }));
     console.log(`  ✅ Dispatcher ${dispatchers[di].name} → Carriers: ${cis.map(c => carriers[c].name).join(', ')}`);
   }
