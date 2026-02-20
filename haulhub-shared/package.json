@@ -9,7 +9,8 @@
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "clean:src": "find src -name '*.js' -o -name '*.d.ts' -o -name '*.js.map' -o -name '*.d.ts.map' | xargs rm -f",
-    "prebuild": "npm run clean:src"
+    "prebuild": "npm run clean:src",
+    "test": "jest --no-cache"
   },
   "keywords": [
     "haulhub",

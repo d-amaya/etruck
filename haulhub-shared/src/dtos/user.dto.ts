@@ -14,8 +14,3 @@ export class UpdateProfileDto {
   })
   phoneNumber?: string;
 }
-
-export class VerifyUserDto {
-  decision!: 'Verified' | 'Rejected';
-  reason?: string;
-}

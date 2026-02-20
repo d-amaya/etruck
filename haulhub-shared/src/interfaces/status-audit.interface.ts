@@ -1,44 +1,30 @@
-import { TripStatus } from '../enums/trip-status.enum';
+import { OrderStatus } from '../enums/order-status.enum';
 
-/**
- * Represents a single status change event in the audit trail
- * Requirements: 11.2 - Status change audit trails with timestamps and user information
- */
 export interface StatusAuditEntry {
   auditId: string;
-  tripId: string;
-  previousStatus: TripStatus;
-  newStatus: TripStatus;
-  changedBy: string; // User ID who made the change
-  changedByName: string; // User name for display
-  changedAt: string; // ISO timestamp
-  reason?: string; // Optional reason for status change
-  notes?: string; // Additional notes about the change
-  automaticChange: boolean; // Whether this was an automated workflow change
+  orderId: string;
+  previousStatus: OrderStatus;
+  newStatus: OrderStatus;
+  changedBy: string;
+  changedByName: string;
+  changedAt: string;
+  reason?: string;
+  notes?: string;
 }
 
-/**
- * Represents the complete audit trail for a trip
- */
 export interface StatusAuditTrail {
-  tripId: string;
+  orderId: string;
   entries: StatusAuditEntry[];
   createdAt: string;
   updatedAt: string;
 }
 
-/**
- * DTO for creating a status change with audit information
- */
 export interface StatusChangeRequest {
-  newStatus: TripStatus;
+  newStatus: OrderStatus;
   reason?: string;
   notes?: string;
 }
 
-/**
- * Workflow validation result
- */
 export interface StatusTransitionValidation {
   isValid: boolean;
   errorMessage?: string;

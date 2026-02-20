@@ -1,86 +1,71 @@
+export interface OrderPaymentDetail {
+  orderId: string;
+  adminId: string;
+  dispatcherId: string;
+  carrierId: string;
+  driverId: string;
+  brokerId: string;
+  truckId: string;
+  trailerId: string;
+  scheduledTimestamp: string;
+  pickupCity: string;
+  deliveryCity: string;
+  orderRate: number;
+  adminPayment: number;
+  dispatcherPayment: number;
+  carrierPayment: number;
+  driverPayment: number;
+  fuelCost: number;
+  lumperValue: number;
+  detentionValue: number;
+  mileageOrder: number;
+  orderStatus: string;
+}
+
 export interface PaymentReportFilters {
   startDate?: string;
   endDate?: string;
   brokerId?: string;
   truckId?: string;
-  lorryId?: string; // Legacy - maps to truckId
   driverId?: string;
   dispatcherId?: string;
-  groupBy?: 'broker' | 'driver' | 'truck' | 'truckOwner' | 'dispatcher';
+  carrierId?: string;
+  adminId?: string;
 }
 
-export interface TripPaymentDetail {
-  tripId: string;
-  dispatcherId: string;
-  scheduledTimestamp: string;
-  pickupLocation: string;
-  dropoffLocation: string;
-  brokerId: string;
-  truckId: string;
-  truckOwnerId: string;
-  driverId: string;
-  brokerPayment: number;
-  truckOwnerPayment: number;
-  driverPayment: number;
-  mileageOrder?: number;
-  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-  lumperValue?: number;
-  detentionValue?: number;
-  orderStatus: string;
+export interface AdminPaymentReport {
+  totalOrderRate: number;
+  totalAdminPayment: number;
+  totalLumperValue: number;
+  totalDetentionValue: number;
+  profit: number; // adminPayment - lumper - detention
+  orderCount: number;
+  orders: OrderPaymentDetail[];
 }
 
 export interface DispatcherPaymentReport {
-  totalBrokerPayments: number;
-  totalDriverPayments: number;
-  totalTruckOwnerPayments: number;
-  // Additional Fees (Requirements 7.1, 7.2, 7.3, 7.4, 7.5)
-  totalLumperValue?: number;
-  totalDetentionValue?: number;
-  totalAdditionalFees?: number;
-  profit: number;
-  tripCount: number;
-  trips: TripPaymentDetail[];
-  groupedByBroker?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
-  groupedByDriver?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
-  groupedByTruck?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
-  groupedByTruckOwner?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
+  totalOrderRate: number;
+  totalDispatcherPayment: number;
+  profit: number; // dispatcherPayment
+  orderCount: number;
+  orders: OrderPaymentDetail[];
+}
+
+export interface CarrierPaymentReport {
+  totalCarrierPayment: number;
+  totalDriverPayment: number;
+  totalFuelCost: number;
+  profit: number; // carrierPayment - driverPayment - fuelCost
+  orderCount: number;
+  orders: OrderPaymentDetail[];
 }
 
 export interface DriverPaymentReport {
-  totalDriverPayments: number;
+  totalDriverPayment: number;
   totalDistance: number;
-  tripCount: number;
-  trips: TripPaymentDetail[];
-  groupedByDispatcher?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
+  profit: number; // driverPayment
+  orderCount: number;
+  orders: OrderPaymentDetail[];
 }
 
-export interface TruckOwnerPaymentReport {
-  totalTruckOwnerPayments: number;
-  tripCount: number;
-  trips: TripPaymentDetail[];
-  groupedByTruck?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
-  groupedByDispatcher?: Record<string, {
-    totalPayment: number;
-    tripCount: number;
-  }>;
-}
-
-export type PaymentReport = DispatcherPaymentReport | DriverPaymentReport | TruckOwnerPaymentReport;
+export type PaymentReport = AdminPaymentReport | DispatcherPaymentReport | CarrierPaymentReport | DriverPaymentReport;

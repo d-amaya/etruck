@@ -1,5 +1,3 @@
-import { VehicleVerificationStatus } from '../enums/vehicle-verification-status.enum';
-
 export interface TrailerDocumentMetadata {
   documentId: string;
   fileName: string;
@@ -10,17 +8,18 @@ export interface TrailerDocumentMetadata {
 
 export interface Trailer {
   trailerId: string;
-  ownerId: string;
+  carrierId: string;
   name: string;
   vin: string;
   year: number;
   brand: string;
   color: string;
-  licensePlate: string;
-  verificationStatus: VehicleVerificationStatus;
-  verificationDocuments: TrailerDocumentMetadata[];
+  plate: string;
   isActive: boolean;
+  documents?: TrailerDocumentMetadata[];
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
 }

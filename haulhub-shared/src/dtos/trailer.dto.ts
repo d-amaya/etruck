@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString, IsNumber, Min, Max, IsBoolean, IsOptional } from 'class-validator';
 
-export class RegisterTrailerDto {
+export class CreateTrailerDto {
   @IsString()
   @IsNotEmpty({ message: 'Trailer name is required' })
   name!: string;
@@ -24,25 +24,12 @@ export class RegisterTrailerDto {
 
   @IsString()
   @IsNotEmpty({ message: 'License plate is required' })
-  licensePlate!: string;
-
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean = true;
-
-  @IsString()
-  @IsOptional()
-  notes?: string;
+  plate!: string;
 }
 
 export class UpdateTrailerDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @IsString()
-  @IsOptional()
-  vin?: string;
+  @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() vin?: string;
 
   @IsNumber()
   @Min(1900, { message: 'Year must be 1900 or later' })
@@ -50,30 +37,11 @@ export class UpdateTrailerDto {
   @IsOptional()
   year?: number;
 
-  @IsString()
-  @IsOptional()
-  brand?: string;
-
-  @IsString()
-  @IsOptional()
-  color?: string;
-
-  @IsString()
-  @IsOptional()
-  licensePlate?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
-
-  @IsString()
-  @IsOptional()
-  notes?: string;
-}
-
-export class VerifyTrailerDto {
-  decision!: 'Approved' | 'Rejected' | 'NeedsMoreEvidence';
-  reason?: string;
+  @IsString() @IsOptional() brand?: string;
+  @IsString() @IsOptional() color?: string;
+  @IsString() @IsOptional() plate?: string;
+  @IsBoolean() @IsOptional() isActive?: boolean;
+  @IsString() @IsOptional() notes?: string;
 }
 
 export class UpdateTrailerStatusDto {

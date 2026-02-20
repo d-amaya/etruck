@@ -1,5 +1,5 @@
 import { UserRole } from '../enums/user-role.enum';
-import { VerificationStatus } from '../enums/verification-status.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 
 export interface User {
   userId: string;
@@ -7,9 +7,16 @@ export interface User {
   fullName: string;
   phoneNumber: string;
   role: UserRole;
-  verificationStatus: VerificationStatus;
-  driverLicenseNumber?: string; // Required for Driver role, used to match with trips
-  rate?: number; // DISPATCHER: commission % | DRIVER: $/mile | TRUCK_OWNER: % of broker payment
+  accountStatus: AccountStatus;
+  carrierId?: string;
+  driverLicenseNumber?: string;
+  rate?: number;
+  subscribedCarrierIds?: string[];
+  subscribedAdminIds?: string[];
+  isActive?: boolean;
+  claimedAt?: string;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
 }

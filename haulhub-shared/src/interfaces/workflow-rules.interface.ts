@@ -1,92 +1,66 @@
-import { TripStatus } from '../enums/trip-status.enum';
+import { OrderStatus } from '../enums/order-status.enum';
+import { UserRole } from '../enums/user-role.enum';
 
-/**
- * Defines valid status transitions in the workflow
- * Requirements: 11.3 - Workflow automation rules and validations
- */
 export interface StatusTransitionRule {
-  fromStatus: TripStatus;
-  toStatus: TripStatus;
-  requiresApproval: boolean;
-  allowedRoles: string[]; // User roles that can perform this transition
-  automaticTriggers?: AutomaticTrigger[];
+  fromStatus: OrderStatus;
+  toStatus: OrderStatus;
+  allowedRoles: UserRole[];
 }
 
-/**
- * Defines conditions that automatically trigger status changes
- */
-export interface AutomaticTrigger {
-  condition: string; // Description of the condition
-  targetStatus: TripStatus;
-  checkInterval?: number; // How often to check (in minutes)
-}
-
-/**
- * Workflow configuration for the system
- */
 export interface WorkflowConfiguration {
   transitions: StatusTransitionRule[];
-  defaultStatus: TripStatus;
-  finalStatuses: TripStatus[]; // Statuses that cannot be changed
-  enableAutomation: boolean;
+  defaultStatus: OrderStatus;
+  finalStatuses: OrderStatus[];
 }
 
 /**
- * Standard workflow rules for HaulHub
+ * v2 status transition rules per design Section 5.
+ * Forward flow: Scheduled → PickingUp → Transit → Delivered → WaitingRC → ReadyToPay
+ * Cancel: Scheduled → Canceled (Dispatcher only)
  */
-export const DEFAULT_WORKFLOW_RULES: StatusTransitionRule[] = [
-  // Scheduled -> PickedUp (driver picks up load)
+export const ORDER_WORKFLOW_RULES: StatusTransitionRule[] = [
+  // Forward flow
   {
-    fromStatus: TripStatus.Scheduled,
-    toStatus: TripStatus.PickedUp,
-    requiresApproval: false,
-    allowedRoles: ['dispatcher', 'driver', 'admin']
-  },
-  // PickedUp -> InTransit (driver starts journey)
-  {
-    fromStatus: TripStatus.PickedUp,
-    toStatus: TripStatus.InTransit,
-    requiresApproval: false,
-    allowedRoles: ['dispatcher', 'driver', 'admin']
-  },
-  // InTransit -> Delivered (driver delivers load)
-  {
-    fromStatus: TripStatus.InTransit,
-    toStatus: TripStatus.Delivered,
-    requiresApproval: false,
-    allowedRoles: ['dispatcher', 'driver', 'admin']
-  },
-  // Delivered -> Paid (payment processed)
-  {
-    fromStatus: TripStatus.Delivered,
-    toStatus: TripStatus.Paid,
-    requiresApproval: false,
-    allowedRoles: ['dispatcher', 'admin']
-  },
-  // Scheduled -> Canceled (trip canceled)
-  {
-    fromStatus: TripStatus.Scheduled,
-    toStatus: TripStatus.Canceled,
-    requiresApproval: true,
-    allowedRoles: ['dispatcher', 'admin']
-  },
-  // Rollback transitions (require approval)
-  {
-    fromStatus: TripStatus.PickedUp,
-    toStatus: TripStatus.Scheduled,
-    requiresApproval: true,
-    allowedRoles: ['admin']
+    fromStatus: OrderStatus.Scheduled,
+    toStatus: OrderStatus.PickingUp,
+    allowedRoles: [UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver]
   },
   {
-    fromStatus: TripStatus.InTransit,
-    toStatus: TripStatus.PickedUp,
-    requiresApproval: true,
-    allowedRoles: ['admin']
+    fromStatus: OrderStatus.PickingUp,
+    toStatus: OrderStatus.Transit,
+    allowedRoles: [UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver]
   },
   {
-    fromStatus: TripStatus.Delivered,
-    toStatus: TripStatus.InTransit,
-    requiresApproval: true,
-    allowedRoles: ['admin']
+    fromStatus: OrderStatus.Transit,
+    toStatus: OrderStatus.Delivered,
+    allowedRoles: [UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver]
+  },
+  {
+    fromStatus: OrderStatus.Delivered,
+    toStatus: OrderStatus.WaitingRC,
+    allowedRoles: [UserRole.Dispatcher, UserRole.Carrier]
+  },
+  {
+    fromStatus: OrderStatus.WaitingRC,
+    toStatus: OrderStatus.ReadyToPay,
+    allowedRoles: [UserRole.Dispatcher]
+  },
+  // Cancel
+  {
+    fromStatus: OrderStatus.Scheduled,
+    toStatus: OrderStatus.Canceled,
+    allowedRoles: [UserRole.Dispatcher]
   }
 ];
+
+export function isTransitionAllowed(
+  fromStatus: OrderStatus,
+  toStatus: OrderStatus,
+  role: UserRole
+): boolean {
+  return ORDER_WORKFLOW_RULES.some(
+    rule => rule.fromStatus === fromStatus &&
+            rule.toStatus === toStatus &&
+            rule.allowedRoles.includes(role)
+  );
+}

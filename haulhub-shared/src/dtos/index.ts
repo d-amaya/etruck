@@ -1,6 +1,5 @@
 export * from './auth.dto';
-export * from './trip.dto';
-export * from './lorry.dto';
+export * from './order.dto';
 export * from './truck.dto';
 export * from './trailer.dto';
 export * from './user.dto';
