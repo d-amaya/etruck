@@ -20,7 +20,8 @@ import { TripService } from '../../../core/services';
 import { CarrierService, User } from '../../../core/services/carrier.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierUnifiedFilterCardComponent } from '../shared/unified-filter-card/unified-filter-card.component';
-import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, calculateTripProfit } from '../../../core/services/trip.service';
+import { Broker } from '@haulhub/shared';
 
 @Component({
   selector: 'app-carrier-trip-list',

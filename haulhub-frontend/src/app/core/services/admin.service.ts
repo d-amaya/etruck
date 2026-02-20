@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
-import { Lorry, User, Broker, VerifyLorryDto, VerifyUserDto } from '@haulhub/shared';
+import { Broker } from '@haulhub/shared';
 
 export interface DashboardSummary {
   pendingUserCount: number;
@@ -28,38 +28,24 @@ export class AdminService {
   /**
    * Get pending lorry verifications
    */
-  getPendingLorries(): Observable<Lorry[]> {
-    return this.apiService.get<Lorry[]>('/admin/lorries/pending');
+  getPendingLorries(): Observable<any[]> {
+    return this.apiService.get<any[]>('/admin/lorries/pending');
   }
 
-  /**
-   * Verify a lorry (approve/reject/request more evidence)
-   */
-  verifyLorry(lorryId: string, decision: 'Approved' | 'Rejected' | 'NeedsMoreEvidence', reason?: string): Observable<Lorry> {
-    const dto: VerifyLorryDto = { decision, reason };
-    return this.apiService.patch<Lorry>(`/admin/lorries/${lorryId}/verify`, dto);
+  verifyLorry(lorryId: string, decision: string, reason?: string): Observable<any> {
+    return this.apiService.patch<any>(`/admin/lorries/${lorryId}/verify`, { decision, reason });
   }
 
-  /**
-   * Get presigned URL to view a lorry document
-   */
   getDocumentViewUrl(lorryId: string, documentId: string): Observable<PresignedUrlResponse> {
     return this.apiService.get<PresignedUrlResponse>(`/lorries/${lorryId}/documents/${documentId}`);
   }
 
-  /**
-   * Get pending user verifications
-   */
-  getPendingUsers(): Observable<User[]> {
-    return this.apiService.get<User[]>('/admin/users/pending');
+  getPendingUsers(): Observable<any[]> {
+    return this.apiService.get<any[]>('/admin/users/pending');
   }
 
-  /**
-   * Verify a user (verify/reject)
-   */
-  verifyUser(userId: string, decision: 'Verified' | 'Rejected', reason?: string): Observable<User> {
-    const dto: VerifyUserDto = { decision, reason };
-    return this.apiService.patch<User>(`/admin/users/${userId}/verify`, dto);
+  verifyUser(userId: string, decision: string, reason?: string): Observable<any> {
+    return this.apiService.patch<any>(`/admin/users/${userId}/verify`, { decision, reason });
   }
 
   /**

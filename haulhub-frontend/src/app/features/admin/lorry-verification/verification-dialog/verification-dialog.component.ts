@@ -6,7 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
-import { Lorry } from '@haulhub/shared';
+type Lorry = any;
 
 export interface VerificationDialogData {
   lorry: Lorry;

@@ -80,8 +80,8 @@ export class AssetManagementComponent implements OnInit {
   truckOwners: any[] = [];
 
   // Trucks
-  trucks: Truck[] = [];
-  filteredTrucks: Truck[] = [];
+  trucks: any[] = [];
+  filteredTrucks: any[] = [];
   selectedOwnerId: string = '';
   truckSearchTerm: string = '';
 
@@ -136,7 +136,7 @@ export class AssetManagementComponent implements OnInit {
       this.truckOwners = assets.truckOwners;
       this.trucks = assets.trucks.map(truck => ({
         ...truck,
-        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId)
+        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId || "")
       }));
       this.trailers = assets.trailers;
       
@@ -225,7 +225,7 @@ export class AssetManagementComponent implements OnInit {
       
       this.trucks = response.trucks.map(truck => ({
         ...truck,
-        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId)
+        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId || "")
       }));
       this.applyTruckFilters();
     } catch (err: any) {

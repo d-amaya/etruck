@@ -8,7 +8,9 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AdminService } from '../../../core/services/admin.service';
-import { Lorry, LorryVerificationStatus } from '@haulhub/shared';
+const LorryVerificationStatus = { Approved: 'Approved', Pending: 'Pending', Rejected: 'Rejected', NeedsMoreEvidence: 'NeedsMoreEvidence' } as const;
+type LorryVerificationStatus = typeof LorryVerificationStatus[keyof typeof LorryVerificationStatus];
+type Lorry = any;
 import { VerificationDialogComponent } from './verification-dialog/verification-dialog.component';
 import { DocumentViewerDialogComponent } from './document-viewer-dialog/document-viewer-dialog.component';
 

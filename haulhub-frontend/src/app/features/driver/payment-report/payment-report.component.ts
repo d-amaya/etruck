@@ -13,7 +13,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
 import { TripService } from '../../../core/services';
-import { DriverPaymentReport, PaymentReportFilters, TripPaymentDetail } from '@haulhub/shared';
+import { DriverPaymentReport, PaymentReportFilters, TripPaymentDetail } from '../../../core/services/trip.service';
 
 @Component({
   selector: 'app-driver-payment-report',
@@ -94,7 +94,7 @@ export class PaymentReportComponent implements OnInit {
   private buildFilters(): PaymentReportFilters {
     const formValue = this.filterForm.value;
     const filters: PaymentReportFilters = {
-      groupBy: 'dispatcher'
+      // groupBy: 'dispatcher'
     };
 
     if (formValue.startDate) {
@@ -127,7 +127,7 @@ export class PaymentReportComponent implements OnInit {
       return [];
     }
     
-    return Object.entries(this.report.groupedByDispatcher).map(([dispatcherId, data]) => ({
+    return Object.entries((this.report as any).groupedByDispatcher).map(([dispatcherId, data]: any) => ({
       dispatcherId,
       data
     }));

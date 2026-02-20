@@ -7,8 +7,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { DashboardStateService, DashboardFilters } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
-import { TripService } from '../../../../core/services';
-import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateTripExpenses, calculateFuelCost } from '@haulhub/shared';
+import { OrderService } from '../../../../core/services';
+import { Order, OrderStatus, OrderFilters, calcDispatcherProfit, calculateFuelCost } from '@haulhub/shared';
 
 Chart.register(...registerables);
 
@@ -34,7 +34,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   private destroy$ = new Subject<void>();
   private charts: Chart[] = [];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   loading = true;
 
   // Math utility for template
@@ -51,7 +51,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   constructor(
     private dashboardState: DashboardStateService,
     private sharedFilterService: SharedFilterService,
-    private tripService: TripService
+    private orderService: OrderService
   ) {}
 
   ngOnInit(): void {
@@ -74,27 +74,27 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
           this.loading = true;
           const currentFilters = this.dashboardState.getCurrentFilters();
           const apiFilters = this.buildApiFiltersForCharts(currentFilters);
-          return this.tripService.getTrips(apiFilters);
+          return this.orderService.getOrders(apiFilters);
         })
       )
       .subscribe({
-        next: (response) => {
-          this.trips = response.trips || [];
+        next: (response: any) => {
+          this.trips = response.orders || [];
           this.loading = false;
           this.calculateChartData();
           // Render charts after a delay to ensure view is ready
           setTimeout(() => this.tryRenderCharts(), 200);
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('[Charts Widget] Error loading trips for charts after refresh:', error);
           this.loading = false;
         }
       });
   }
 
-  private buildApiFiltersForCharts(filters: DashboardFilters): TripFilters {
+  private buildApiFiltersForCharts(filters: DashboardFilters): OrderFilters {
     // Only use date range for charts, ignore other filters
-    const apiFilters: TripFilters = {
+    const apiFilters: OrderFilters = {
       limit: 1000 // Get up to 1000 trips for chart calculations
     };
 
@@ -168,12 +168,12 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
 
     this.trips.forEach(trip => {
       // Revenue and expenses
-      totalRevenue += trip.brokerPayment || 0;
-      const expenses = calculateTripExpenses(trip);
+      totalRevenue += trip.orderRate || 0;
+      const expenses = calcDispatcherProfit(trip);
       totalExpenses += expenses;
 
       driverPay += trip.driverPayment || 0;
-      ownerPay += trip.truckOwnerPayment || 0;
+      ownerPay += trip.carrierPayment || 0;
       
       // Calculate fuel cost
       if (trip.fuelGasAvgCost && trip.fuelGasAvgGallxMil) {
@@ -190,7 +190,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       // Broker performance - DISABLED: Using backend aggregates instead
       // if (trip.brokerId) {
       //   const broker = brokerMap.get(trip.brokerId) || { revenue: 0, count: 0 };
-      //   broker.revenue += trip.brokerPayment || 0;
+      //   broker.revenue += trip.orderRate || 0;
       //   broker.count += 1;
       //   brokerMap.set(trip.brokerId, broker);
       // }
@@ -447,22 +447,22 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
 
   private getStatusColor(status: string): string {
     switch (status) {
-      case TripStatus.Scheduled: return '#2196f3';
-      case TripStatus.PickedUp: return '#ff9800';
-      case TripStatus.InTransit: return '#9c27b0';
-      case TripStatus.Delivered: return '#4caf50';
-      case TripStatus.Paid: return '#009688';
+      case OrderStatus.Scheduled: return '#2196f3';
+      case OrderStatus.PickingUp: return '#ff9800';
+      case OrderStatus.Transit: return '#9c27b0';
+      case OrderStatus.Delivered: return '#4caf50';
+      case OrderStatus.ReadyToPay: return '#009688';
       default: return '#757575';
     }
   }
 
   private getStatusLabel(status: string): string {
     switch (status) {
-      case TripStatus.Scheduled: return 'Scheduled';
-      case TripStatus.PickedUp: return 'Picked Up';
-      case TripStatus.InTransit: return 'In Transit';
-      case TripStatus.Delivered: return 'Delivered';
-      case TripStatus.Paid: return 'Paid';
+      case OrderStatus.Scheduled: return 'Scheduled';
+      case OrderStatus.PickingUp: return 'Picked Up';
+      case OrderStatus.Transit: return 'In Transit';
+      case OrderStatus.Delivered: return 'Delivered';
+      case OrderStatus.ReadyToPay: return 'Paid';
       default: return status;
     }
   }

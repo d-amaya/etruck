@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TripService } from '../../../core/services/trip.service';
-import { DispatcherPaymentReport } from '@haulhub/shared';
+type DispatcherPaymentReport = any;
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
 import jsPDF from 'jspdf';
@@ -93,7 +93,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     if (!this.report) return;
     
     if (this.report.groupedByDriver) {
-      this.enrichedDriverData = Object.entries(this.report.groupedByDriver).map(([driverId, data]) => {
+      this.enrichedDriverData = Object.entries((this.report as any).driverId || {}).map(([driverId, data]: [string, any]) => {
         const driver = this.driverMap.get(driverId);
         return {
           driverName: driver?.name || driverId.substring(0, 8),
@@ -104,7 +104,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     }
     
     if (this.report.groupedByTruck) {
-      this.enrichedTruckData = Object.entries(this.report.groupedByTruck).map(([truckId, data]) => {
+      this.enrichedTruckData = Object.entries((this.report as any).truckId || {}).map(([truckId, data]: [string, any]) => {
         const truck = this.truckMap.get(truckId);
         const truckName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : truckId.substring(0, 8);
         return {
@@ -116,7 +116,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     }
     
     if (this.report.groupedByTruckOwner) {
-      this.enrichedTruckOwnerData = Object.entries(this.report.groupedByTruckOwner).map(([ownerId, data]) => {
+      this.enrichedTruckOwnerData = Object.entries((this.report as any).ownerId || {}).map(([ownerId, data]: any) => {
         const owner = this.truckOwnerMap.get(ownerId);
         return {
           ownerName: owner?.name || ownerId.substring(0, 8),
@@ -171,7 +171,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   getEnrichedBrokerData(): any[] {
     if (!this.report?.groupedByBroker) return [];
     
-    return Object.entries(this.report.groupedByBroker).map(([brokerId, data]) => ({
+    return Object.entries((this.report as any).brokerId || {}).map(([brokerId, data]: [string, any]) => ({
       brokerName: this.getBrokerName(brokerId),
       totalPayment: data.totalPayment,
       tripCount: data.tripCount
@@ -309,7 +309,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       sheets.push({
         name: 'By Broker',
         headers: ['Broker Name', 'Total Payment', 'Order Count'],
-        rows: Object.entries(this.report.groupedByBroker).map(([brokerId, data]: [string, any]) => [
+        rows: Object.entries((this.report as any).groupedByBroker).map(([brokerId, data]: [string, any]) => [
           this.getBrokerName(brokerId), data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
         ])
       });

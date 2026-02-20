@@ -23,7 +23,8 @@ import { CarrierService, User } from '../../../../core/services/carrier.service'
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { CarrierDashboardStateService } from '../../shared/carrier-dashboard-state.service';
-import { Trip, TripStatus, Broker, calculateTripProfit } from '@haulhub/shared';
+import { Trip, TripStatus, calculateTripProfit } from '../../../../core/services/trip.service';
+import { Broker } from '@haulhub/shared';
 import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-charts-widget.component';
 
 @Component({

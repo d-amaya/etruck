@@ -17,8 +17,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { TripService } from '../../../core/services/trip.service';
-import { DispatcherPaymentReport, PaymentReportFilters } from '@haulhub/shared';
+import { OrderService } from '../../../core/services/order.service';
+import { OrderFilters } from '@haulhub/shared';
+type PaymentReportFilters = Partial<OrderFilters>;
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SharedFilterService } from '../dashboard/shared-filter.service';
@@ -53,14 +54,14 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   
   private destroy$ = new Subject<void>();
   filterForm: FormGroup;
-  report: DispatcherPaymentReport | null = null;
+  report: any | null = null;
   loading = false;
   activeTabIndex = 0; // Initialize to 0 for "By Broker" tab (first tab)
 
   // Table columns
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
-  truckOwnerColumns: string[] = ['ownerName', 'totalPayment', 'tripCount'];
+  carrierColumns: string[] = ['ownerName', 'totalPayment', 'tripCount'];
   
   // Enriched data for display
   enrichedDriverData: any[] = [];
@@ -74,7 +75,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private tripService: TripService,
+    private orderService: OrderService,
     private snackBar: MatSnackBar,
     private excelExportService: ExcelExportService,
     private router: Router,
@@ -109,7 +110,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       cache.trucks.forEach((t, id) => this.truckMap.set(id, t));
       cache.drivers.forEach((d, id) => this.driverMap.set(id, d));
       cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
-      cache.truckOwners.forEach((o, id) => this.truckOwnerMap.set(id, o));
+      cache.carriers.forEach((o, id) => this.truckOwnerMap.set(id, o));
     });
   }
 
@@ -126,7 +127,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     
     // Enrich driver data
     if (this.report.groupedByDriver) {
-      this.enrichedDriverData = Object.entries(this.report.groupedByDriver).map(([driverId, data]) => {
+      this.enrichedDriverData = Object.entries((this.report as any).groupedByDriver).map(([driverId, data]: any) => {
         const driver = this.driverMap.get(driverId);
         return {
           driverName: driver?.name || driverId.substring(0, 8),
@@ -138,7 +139,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     
     // Enrich truck owner data
     if (this.report.groupedByTruckOwner) {
-      this.enrichedTruckOwnerData = Object.entries(this.report.groupedByTruckOwner).map(([ownerId, data]) => {
+      this.enrichedTruckOwnerData = Object.entries((this.report as any).groupedByTruckOwner).map(([ownerId, data]: any) => {
         const owner = this.truckOwnerMap.get(ownerId);
         return {
           ownerName: owner?.name || ownerId.substring(0, 8),
@@ -184,7 +185,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate
     );
     if (cached) {
-      this.report = cached as DispatcherPaymentReport;
+      this.report = cached as any;
       this.enrichGroupedData();
       this.loading = false;
       this.dashboardStateService.setLoadingState(false);
@@ -192,9 +193,9 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.tripService.getPaymentReport(filters).subscribe({
-      next: (report) => {
-        this.report = report as DispatcherPaymentReport;
+    this.orderService.getPaymentReport(filters).subscribe({
+      next: (report: any) => {
+        this.report = report as any;
         this.dashboardStateService.setCachedPaymentReport(
           sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate, report
         );
@@ -204,7 +205,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
         this.dashboardStateService.setLoadingState(false);
         this.dashboardStateService.clearError();
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading payment report:', error);
         this.snackBar.open('Failed to load payment report', 'Close', {
           duration: 3000
@@ -271,7 +272,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return [];
     }
     
-    return Object.entries(this.report.groupedByBroker).map(([brokerId, data]) => {
+    return Object.entries((this.report as any).groupedByBroker).map(([brokerId, data]: any) => {
       const broker = this.brokerMap.get(brokerId);
       return {
         brokerId,
@@ -400,7 +401,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       sheets.push({
         name: 'By Broker',
         headers: ['Broker Name', 'Total Payment', 'Order Count'],
-        rows: Object.entries(this.report.groupedByBroker).map(([brokerId, data]: [string, any]) => [
+        rows: Object.entries((this.report as any).groupedByBroker).map(([brokerId, data]: [string, any]) => [
           this.brokerMap.get(brokerId)?.brokerName || brokerId, data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
         ])
       });
@@ -419,7 +420,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
         name: 'By Truck Owner',
         headers: ['Truck Owner', 'Total Payment', 'Order Count'],
         rows: this.enrichedTruckOwnerData.map((o: any) => [
-          o.ownerName || o.truckOwnerId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
+          o.ownerName || o.carrierId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
         ])
       });
     }

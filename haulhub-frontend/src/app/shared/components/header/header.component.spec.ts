@@ -72,7 +72,7 @@ describe('HeaderComponent', () => {
 
   it('should format role names correctly', () => {
     expect(component['formatRole'](UserRole.Dispatcher)).toBe('Dispatcher');
-    expect(component['formatRole'](UserRole.LorryOwner)).toBe('Lorry Owner');
+    expect(component['formatRole'](UserRole.Carrier)).toBe('Carrier');
     expect(component['formatRole'](UserRole.Driver)).toBe('Driver');
     expect(component['formatRole'](UserRole.Admin)).toBe('Admin');
   });

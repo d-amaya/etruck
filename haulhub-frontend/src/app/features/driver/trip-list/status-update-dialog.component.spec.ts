@@ -3,7 +3,7 @@ import { StatusUpdateDialogComponent } from './status-update-dialog.component';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { FormBuilder } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Trip, TripStatus } from '../../../core/services/trip.service';
 import { createMockTrip } from '../../../testing/mock-trip.helper';
 
 describe('StatusUpdateDialogComponent', () => {
@@ -44,28 +44,28 @@ describe('StatusUpdateDialogComponent', () => {
 
   it('should have only allowed statuses', () => {
     expect(component.allowedStatuses).toEqual([
-      TripStatus.PickedUp,
-      TripStatus.InTransit,
+      TripStatus.PickingUp,
+      TripStatus.Transit,
       TripStatus.Delivered
     ]);
   });
 
   it('should set default status to PickedUp when current status is Scheduled', () => {
-    expect(component.statusForm.value.status).toBe(TripStatus.PickedUp);
+    expect(component.statusForm.value.status).toBe(TripStatus.PickingUp);
   });
 
   it('should set default status to InTransit when current status is PickedUp', () => {
-    const pickedUpTrip = createMockTrip({ orderStatus: TripStatus.PickedUp });
+    const pickedUpTrip = createMockTrip({ orderStatus: TripStatus.PickingUp });
     const newComponent = new StatusUpdateDialogComponent(
       new FormBuilder(),
       mockDialogRef,
       { trip: pickedUpTrip }
     );
-    expect(newComponent.statusForm.value.status).toBe(TripStatus.InTransit);
+    expect(newComponent.statusForm.value.status).toBe(TripStatus.Transit);
   });
 
   it('should set default status to Delivered when current status is InTransit', () => {
-    const inTransitTrip = createMockTrip({ orderStatus: TripStatus.InTransit });
+    const inTransitTrip = createMockTrip({ orderStatus: TripStatus.Transit });
     const newComponent = new StatusUpdateDialogComponent(
       new FormBuilder(),
       mockDialogRef,
@@ -75,11 +75,11 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should close dialog with result when form is valid and submitted', () => {
-    component.statusForm.patchValue({ status: TripStatus.PickedUp });
+    component.statusForm.patchValue({ status: TripStatus.PickingUp });
     component.onSubmit();
 
     expect(mockDialogRef.close).toHaveBeenCalledWith({
-      status: TripStatus.PickedUp
+      status: TripStatus.PickingUp
     });
   });
 
@@ -100,11 +100,11 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should return correct status label for PickedUp', () => {
-    expect(component.getStatusLabel(TripStatus.PickedUp)).toBe('Picked Up');
+    expect(component.getStatusLabel(TripStatus.PickingUp)).toBe('Picked Up');
   });
 
   it('should return correct status label for InTransit', () => {
-    expect(component.getStatusLabel(TripStatus.InTransit)).toBe('In Transit');
+    expect(component.getStatusLabel(TripStatus.Transit)).toBe('In Transit');
   });
 
   it('should return correct status label for Delivered', () => {
@@ -112,7 +112,7 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should return correct status label for Paid', () => {
-    expect(component.getStatusLabel(TripStatus.Paid)).toBe('Paid');
+    expect(component.getStatusLabel(TripStatus.ReadyToPay)).toBe('Paid');
   });
 
   it('should have required validator on status field', () => {
@@ -122,7 +122,7 @@ describe('StatusUpdateDialogComponent', () => {
   });
 
   it('should be valid when status is selected', () => {
-    component.statusForm.patchValue({ status: TripStatus.PickedUp });
+    component.statusForm.patchValue({ status: TripStatus.PickingUp });
     expect(component.statusForm.valid).toBe(true);
   });
 });

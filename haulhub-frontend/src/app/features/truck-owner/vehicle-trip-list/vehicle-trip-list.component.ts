@@ -94,10 +94,10 @@ export class VehicleTripListComponent implements OnInit {
       this.trucks = [];
       this.trailers = [];
       this.approvedTrucks = this.trucks.filter(
-        t => t.verificationStatus === VehicleVerificationStatus.Approved
+        t => t.accountStatus === VehicleVerificationStatus.Approved
       );
       this.approvedTrailers = this.trailers.filter(
-        t => t.verificationStatus === VehicleVerificationStatus.Approved
+        t => t.accountStatus === VehicleVerificationStatus.Approved
       );
       
       if (this.approvedTrucks.length > 0 || this.approvedTrailers.length > 0) {
@@ -275,7 +275,7 @@ export class VehicleTripListComponent implements OnInit {
     const trailer = this.trailers.find(t => t.trailerId === trip.trailerId);
     
     const truckInfo = truck ? `Truck: ${truck.plate}` : '';
-    const trailerInfo = trailer ? `Trailer: ${trailer.licensePlate}` : '';
+    const trailerInfo = trailer ? `Trailer: ${trailer.plate}` : '';
     
     return [truckInfo, trailerInfo].filter(Boolean).join(' | ');
   }

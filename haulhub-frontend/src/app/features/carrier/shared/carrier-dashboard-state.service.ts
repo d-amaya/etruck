@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
-import { TripStatus } from '@haulhub/shared';
+import { TripStatus } from '../../../core/services/trip.service';
 
 export interface CarrierDashboardFilters {
   dateRange: {

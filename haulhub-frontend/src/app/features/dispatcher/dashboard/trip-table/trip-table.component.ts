@@ -17,9 +17,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { TripService } from '../../../../core/services';
+import { OrderService } from '../../../../core/services';
 import { AuthService } from '../../../../core/services';
-import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit, calculateFuelCost, hasFuelData, calculateTripExpenses } from '@haulhub/shared';
+import { Order, OrderStatus, OrderFilters, Broker, calcDispatcherProfit, calculateFuelCost, hasFuelData } from '@haulhub/shared';
 import { DashboardStateService, DashboardFilters, PaginationState } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
 import { AssetCacheService } from '../asset-cache.service';
@@ -63,7 +63,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'dropoffLocation',
     'brokerName',
     'truckId',
-    'truckOwnerId',
+    'carrierId',
     'driverName',
     'revenue',
     'expenses',
@@ -71,7 +71,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'actions'
   ];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   totalTrips = 0;
   pageSize = 25;
   pageIndex = 0;
@@ -80,11 +80,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   // Filter form
   filterForm: FormGroup;
-  statusOptions = Object.values(TripStatus);
+  statusOptions = Object.values(OrderStatus);
   brokers: Broker[] = [];
   trucks: any[] = [];
   drivers: any[] = [];
-  truckOwners: any[] = [];
+  carriers: any[] = [];
   
   // Filtered observables for autocomplete
   filteredTrucks!: Observable<any[]>;
@@ -99,7 +99,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private trailerMap = new Map<string, any>(); // trailerId -> trailer (for display)
   private driverMap = new Map<string, any>(); // driverId -> driver (for display)
   private brokerMap = new Map<string, any>(); // brokerId -> broker (for display)
-  private truckOwnerMap = new Map<string, any>(); // truckOwnerId -> truckOwner (for display)
+  private truckOwnerMap = new Map<string, any>(); // carrierId -> truckOwner (for display)
   
   // Autocomplete suggestions
   truckPlates: string[] = [];
@@ -116,7 +116,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private tripService: TripService,
+    private orderService: OrderService,
     private authService: AuthService,
     private dashboardState: DashboardStateService,
     private sharedFilterService: SharedFilterService,
@@ -133,7 +133,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       brokerId: [null],
       truckId: [null],
       driverId: [null],
-      truckOwnerId: [null]
+      carrierId: [null]
     });
   }
 
@@ -162,8 +162,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
         a.name.localeCompare(b.name)
       );
       
-      this.truckOwnerMap = cache.truckOwners;
-      this.truckOwners = Array.from(cache.truckOwners.values()).sort((a, b) =>
+      this.truckOwnerMap = cache.carriers;
+      this.carriers = Array.from(cache.carriers.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
       
@@ -184,7 +184,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       );
 
       // Setup autocomplete filtering for truck owners
-      this.filteredTruckOwners = this.filterForm.get('truckOwnerId')!.valueChanges.pipe(
+      this.filteredTruckOwners = this.filterForm.get('carrierId')!.valueChanges.pipe(
         startWith(''),
         map(value => this._filterTruckOwners(value || ''))
       );
@@ -196,7 +196,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
         brokerId: currentFilters.brokerId,
         truckId: currentFilters.truckId || '',
         driverId: currentFilters.driverId || '',
-        truckOwnerId: currentFilters.truckOwnerId || ''
+        carrierId: currentFilters.carrierId || ''
       }, { emitEvent: false });
     });
     
@@ -223,7 +223,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       }),
       takeUntil(this.destroy$)
     ).subscribe(result => {
-      this.trips = result.trips;
+      this.trips = ((result as any).orders || (result as any).trips);
       this.totalTrips = result.total;
       
       // Share dashboard data (including chartAggregates) with other components
@@ -232,7 +232,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       }
       
       // Update the dashboard state with the filtered trips for payment summary calculation
-      this.dashboardState.updateFilteredTrips(this.trips);
+      this.dashboardState.updateFilteredOrders(this.trips);
     });
   }
 
@@ -258,14 +258,14 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Get truck owner name from ID
    */
-  getTruckOwnerName(truckOwnerId: string): string {
-    return this.truckOwnerMap.get(truckOwnerId)?.name || truckOwnerId.substring(0, 8);
+  getCarrierName(carrierId: string): string {
+    return this.truckOwnerMap.get(carrierId)?.name || carrierId.substring(0, 8);
   }
 
   /**
    * Get pickup location string
    */
-  getPickupLocation(trip: Trip): string {
+  getPickupLocation(trip: Order): string {
     return trip.pickupCity && trip.pickupState 
       ? `${trip.pickupCity}, ${trip.pickupState}` 
       : '';
@@ -274,7 +274,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Get delivery location string
    */
-  getDeliveryLocation(trip: Trip): string {
+  getDeliveryLocation(trip: Order): string {
     return trip.deliveryCity && trip.deliveryState 
       ? `${trip.deliveryCity}, ${trip.deliveryState}` 
       : '';
@@ -358,11 +358,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
    */
   private _filterTruckOwners(value: string | any): any[] {
     if (typeof value === 'object') {
-      return this.truckOwners;
+      return this.carriers;
     }
     
     const filterValue = (value || '').toString().toLowerCase();
-    return this.truckOwners.filter(owner =>
+    return this.carriers.filter(owner =>
       owner.name.toLowerCase().includes(filterValue)
     );
   }
@@ -386,8 +386,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Clear truck owner filter
    */
-  clearTruckOwnerFilter(): void {
-    this.filterForm.patchValue({ truckOwnerId: null }, { emitEvent: false });
+  clearCarrierFilter(): void {
+    this.filterForm.patchValue({ carrierId: null }, { emitEvent: false });
     this.applyFilters();
   }
 
@@ -412,9 +412,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Display function for truck owner autocomplete - shows name instead of UUID
    */
-  displayTruckOwner = (truckOwnerId: string | null): string => {
-    if (!truckOwnerId) return '';
-    const owner = this.truckOwnerMap.get(truckOwnerId);
+  displayCarrier = (carrierId: string | null): string => {
+    if (!carrierId) return '';
+    const owner = this.truckOwnerMap.get(carrierId);
     return owner ? owner.name : '';
   };
 
@@ -454,7 +454,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
   }
 
-  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Trip[], total: number, assets?: any, chartAggregates?: any }> {
+  private loadTrips(filters: DashboardFilters, pagination: PaginationState): Observable<{ trips: Order[], total: number, assets?: any, chartAggregates?: any }> {
     // Check cache first — avoid redundant API calls when switching views
     const cached = this.dashboardState.getCachedTrips(filters, pagination);
     if (cached) {
@@ -471,13 +471,13 @@ export class TripTableComponent implements OnInit, OnDestroy {
     const needsAggregates = !isPaginating;
 
     const apiCall$: Observable<any> = needsAggregates 
-      ? this.tripService.getDashboard(apiFilters)
-      : this.tripService.getTrips(apiFilters);
+      ? this.orderService.getOrders(apiFilters)
+      : this.orderService.getOrders(apiFilters);
 
     return apiCall$.pipe(
       map((response: any) => {
         this.loading = false;
-        const trips = response.trips;
+        const trips = response.orders;
         
         // Backend handles all filtering - just sort the results
         const sortedTrips = trips.sort((a: any, b: any) => {
@@ -538,8 +538,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     );
   }
 
-  private buildApiFilters(filters: DashboardFilters, pagination: PaginationState): TripFilters {
-    const apiFilters: TripFilters = {
+  private buildApiFilters(filters: DashboardFilters, pagination: PaginationState): OrderFilters {
+    const apiFilters: OrderFilters = {
       limit: pagination.pageSize
     };
 
@@ -568,8 +568,8 @@ export class TripTableComponent implements OnInit, OnDestroy {
     if (filters.driverId) {
       apiFilters.driverId = filters.driverId;
     }
-    if (filters.truckOwnerId) {
-      apiFilters.truckOwnerId = filters.truckOwnerId;
+    if (filters.carrierId) {
+      apiFilters.carrierId = filters.carrierId;
     }
 
     return apiFilters;
@@ -582,31 +582,31 @@ export class TripTableComponent implements OnInit, OnDestroy {
     });
   }
 
-  viewTrip(trip: Trip): void {
+  viewTrip(trip: Order): void {
     try {
-      this.router.navigate(['/dispatcher/trips', trip.tripId]).catch(err => {
+      this.router.navigate(['/dispatcher/trips', trip.orderId]).catch(err => {
         console.error('Navigation error:', err);
         this.snackBar.open('Error navigating to order details', 'Close', { duration: 3000 });
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in viewTrip:', error);
       this.snackBar.open('Error viewing order', 'Close', { duration: 3000 });
     }
   }
 
-  editTrip(trip: Trip): void {
+  editTrip(trip: Order): void {
     try {
-      this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']).catch(err => {
+      this.router.navigate(['/dispatcher/trips', trip.orderId, 'edit']).catch(err => {
         console.error('Navigation error:', err);
         this.snackBar.open('Error navigating to edit order', 'Close', { duration: 3000 });
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in editTrip:', error);
       this.snackBar.open('Error editing order', 'Close', { duration: 3000 });
     }
   }
 
-  deleteTrip(trip: Trip): void {
+  deleteTrip(trip: Order): void {
     try {
       const pickupLoc = this.getPickupLocation(trip);
       const deliveryLoc = this.getDeliveryLocation(trip);
@@ -625,16 +625,16 @@ export class TripTableComponent implements OnInit, OnDestroy {
           this.performDelete(trip);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in deleteTrip:', error);
       this.snackBar.open('Error opening delete dialog', 'Close', { duration: 3000 });
     }
   }
 
-  private performDelete(trip: Trip): void {
-    this.tripService.deleteTrip(trip.tripId).subscribe({
+  private performDelete(trip: Order): void {
+    this.orderService.deleteOrder(trip.orderId).subscribe({
       next: () => {
-        this.trips = this.trips.filter(t => t.tripId !== trip.tripId);
+        this.trips = this.trips.filter(t => t.orderId !== trip.orderId);
         this.totalTrips--;
 
         // Trigger payment summary refresh after deletion
@@ -646,7 +646,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
           { duration: 3000 }
         );
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error deleting trip:', error);
         this.snackBar.open('Error deleting trip. Please try again.', 'Close', {
           duration: 5000
@@ -711,37 +711,37 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }).format(amount);
   }
 
-  calculateProfit(trip: Trip): number {
-    return calculateTripProfit(trip);
+  calculateProfit(trip: Order): number {
+    return calcDispatcherProfit(trip);
   }
 
-  calculateExpenses(trip: Trip): number {
-    return calculateTripExpenses(trip);
+  calculateExpenses(trip: Order): number {
+    return calcDispatcherProfit(trip);
   }
 
-  calculateFuelCost(trip: Trip): number {
+  calculateFuelCost(trip: Order): number {
     return calculateFuelCost(trip);
   }
 
-  getStatusClass(status: TripStatus | string): string {
+  getStatusClass(status: OrderStatus | string): string {
     if (!status) return '';
-    // Handle both TripStatus enum and string literals
+    // Handle both OrderStatus enum and string literals
     const statusStr = typeof status === 'string' ? status : status;
     
     switch (statusStr) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
       case 'Scheduled':
         return 'status-scheduled';
-      case TripStatus.PickedUp:
+      case OrderStatus.PickingUp:
       case 'Picked Up':
         return 'status-picked-up';
-      case TripStatus.InTransit:
+      case OrderStatus.Transit:
       case 'In Transit':
         return 'status-in-transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
       case 'Delivered':
         return 'status-delivered';
-      case TripStatus.Paid:
+      case OrderStatus.ReadyToPay:
       case 'Paid':
         return 'status-paid';
       default:
@@ -749,25 +749,25 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
   }
 
-  getStatusLabel(status: TripStatus | string): string {
+  getStatusLabel(status: OrderStatus | string): string {
     if (!status) return '';
-    // Handle both TripStatus enum and string literals
+    // Handle both OrderStatus enum and string literals
     const statusStr = typeof status === 'string' ? status : status;
     
     switch (statusStr) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
       case 'Scheduled':
         return 'Scheduled';
-      case TripStatus.PickedUp:
+      case OrderStatus.PickingUp:
       case 'Picked Up':
         return 'Picked Up';
-      case TripStatus.InTransit:
+      case OrderStatus.Transit:
       case 'In Transit':
         return 'In Transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
       case 'Delivered':
         return 'Delivered';
-      case TripStatus.Paid:
+      case OrderStatus.ReadyToPay:
       case 'Paid':
         return 'Paid';
       default:
@@ -796,7 +796,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       brokerId: null,
       truckId: null,
       driverId: null,
-      truckOwnerId: null
+      carrierId: null
     });
     
     // Also clear the form fields visually
@@ -805,7 +805,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       brokerId: null,
       truckId: null,
       driverId: null,
-      truckOwnerId: null
+      carrierId: null
     });
     
     // Manually reset the paginator UI to page 0
@@ -828,19 +828,19 @@ export class TripTableComponent implements OnInit, OnDestroy {
     if (filters.brokerId) apiFilters.brokerId = filters.brokerId;
     if (filters.truckId) apiFilters.truckId = filters.truckId;
     if (filters.driverId) apiFilters.driverId = filters.driverId;
-    if (filters.truckOwnerId) apiFilters.truckOwnerId = filters.truckOwnerId;
+    if (filters.carrierId) apiFilters.carrierId = filters.carrierId;
 
-    this.tripService.getDashboardExport(apiFilters).subscribe({
-      next: (data) => {
-        const allTrips = data.trips || [];
+    this.orderService.getOrders(apiFilters).subscribe({
+      next: (data: any) => {
+        const allTrips = data.orders || [];
         const brokerMap = new Map((data.assets?.brokers || []).map((b: any) => [b.brokerId, b.brokerName]));
         const driverMap = new Map((data.assets?.drivers || []).map((d: any) => [d.userId, d.name]));
         const truckMap = new Map((data.assets?.trucks || []).map((t: any) => [t.truckId, t.plate]));
         const headers = ['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Truck Owner', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss'];
         const rows = allTrips.map((t: any) => {
-          const expenses = (t.driverPayment || 0) + (t.dispatcherPayment || 0) + (t.truckOwnerPayment || 0) + (t.fuelCost || 0) + (t.lumperValue || 0) + (t.detentionValue || 0);
-          const profit = (t.brokerPayment || 0) - expenses;
-          const ownerName = this.getTruckOwnerName(t.truckOwnerId);
+          const expenses = (t.driverPayment || 0) + (t.dispatcherPayment || 0) + (t.carrierPayment || 0) + (t.fuelCost || 0) + (t.lumperValue || 0) + (t.detentionValue || 0);
+          const profit = (t.orderRate || 0) - expenses;
+          const ownerName = this.getCarrierName(t.carrierId);
           return [
             t.orderStatus || '',
             t.scheduledTimestamp?.split('T')[0] || '',
@@ -850,7 +850,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
             truckMap.get(t.truckId) || t.truckId,
             ownerName,
             driverMap.get(t.driverId) || t.driverId,
-            t.brokerPayment || 0,
+            t.orderRate || 0,
             expenses,
             profit
           ];
@@ -885,10 +885,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
     }
     
     // Validate truck owner selection - only apply if it's a valid UUID or null
-    let truckOwnerId = formValue.truckOwnerId;
-    if (truckOwnerId && typeof truckOwnerId === 'string' && !this.isValidUUID(truckOwnerId)) {
-      console.log('Invalid truck owner selection, ignoring:', truckOwnerId);
-      truckOwnerId = null;
+    let carrierId = formValue.carrierId;
+    if (carrierId && typeof carrierId === 'string' && !this.isValidUUID(carrierId)) {
+      console.log('Invalid truck owner selection, ignoring:', carrierId);
+      carrierId = null;
     }
     
     const filtersToApply = {
@@ -896,7 +896,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
       brokerId: formValue.brokerId,
       truckId: truckId,
       driverId: driverId,
-      truckOwnerId: truckOwnerId
+      carrierId: carrierId
     };
     
     this.sharedFilterService.updateFilters(filtersToApply);
@@ -945,7 +945,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Get ARIA label for trip status
    */
-  getStatusAriaLabel(status: TripStatus): string {
+  getStatusAriaLabel(status: OrderStatus): string {
     return this.accessibilityService.getStatusAriaLabel(status);
   }
 
@@ -959,7 +959,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Get ARIA label for profit column
    */
-  getProfitAriaLabel(trip: Trip): string {
+  getProfitAriaLabel(trip: Order): string {
     const profit = this.calculateProfit(trip);
     const profitText = this.formatCurrency(profit);
     const profitType = profit >= 0 ? 'profit' : 'loss';

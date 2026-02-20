@@ -245,13 +245,13 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
     this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (data) => {
+        next: (data: any) => {
           this.dashboardStateService.setCachedAnalytics(this.startDate, this.endDate, data);
           this.processUnifiedAnalyticsData(data);
           this.isLoading = false;
           this.dashboardStateService.completeLoad();
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('[Analytics] Error loading unified analytics:', error);
           this.error = 'Failed to load analytics data. Please try again.';
           this.isLoading = false;

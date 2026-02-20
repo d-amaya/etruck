@@ -54,13 +54,13 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck Owner</mat-label>
-        <input type="text" matInput formControlName="truckOwnerId" [matAutocomplete]="truckOwnerAuto" placeholder="Type to search...">
-        <button *ngIf="filterForm.get('truckOwnerId')?.value" matSuffix mat-icon-button (click)="clearTruckOwnerFilter(); $event.stopPropagation()">
+        <mat-label>Carrier</mat-label>
+        <input type="text" matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('carrierId')?.value" matSuffix mat-icon-button (click)="clearCarrierFilter(); $event.stopPropagation()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-autocomplete #truckOwnerAuto="matAutocomplete" [displayWith]="displayTruckOwner" (optionSelected)="onDropdownChange()">
-          <mat-option [value]="null">All Truck Owners</mat-option>
+        <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier" (optionSelected)="onDropdownChange()">
+          <mat-option [value]="null">All Carriers</mat-option>
           <mat-option *ngFor="let owner of filteredTruckOwners | async" [value]="owner.userId">
             {{ owner.name }}
           </mat-option>
@@ -162,12 +162,12 @@
         </td>
       </ng-container>
 
-      <!-- Truck Owner Column -->
-      <ng-container matColumnDef="truckOwnerId">
-        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Truck Owner</th>
+      <!-- Carrier Column -->
+      <ng-container matColumnDef="carrierId">
+        <th mat-header-cell *matHeaderCellDef role="columnheader" scope="col">Carrier</th>
         <td mat-cell *matCellDef="let trip" role="gridcell"
-            [attr.aria-label]="'Truck Owner: ' + getTruckOwnerName(trip.truckOwnerId)">
-          {{ getTruckOwnerName(trip.truckOwnerId) }}
+            [attr.aria-label]="'Carrier: ' + getCarrierName(trip.carrierId)">
+          {{ getCarrierName(trip.carrierId) }}
         </td>
       </ng-container>
 
@@ -196,8 +196,8 @@
       <ng-container matColumnDef="revenue">
         <th mat-header-cell *matHeaderCellDef class="numeric" role="columnheader" scope="col">Revenue</th>
         <td mat-cell *matCellDef="let trip" class="numeric" role="gridcell"
-            [attr.aria-label]="'Revenue: ' + formatCurrency(trip.brokerPayment)">
-          {{ formatCurrency(trip.brokerPayment) }}
+            [attr.aria-label]="'Revenue: ' + formatCurrency(trip.orderRate)">
+          {{ formatCurrency(trip.orderRate) }}
         </td>
       </ng-container>
 

@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DriverDashboardStateService } from './driver-dashboard-state.service';
 import { DriverAssetCacheService } from './driver-asset-cache.service';
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Trip, TripStatus } from '../../../core/services/trip.service';
 
 @Injectable({
   providedIn: 'root'
@@ -353,7 +353,8 @@ export class DriverPdfExportService {
       [TripStatus.InTransit]: 'In Transit',
       [TripStatus.Delivered]: 'Delivered',
       [TripStatus.Paid]: 'Paid',
-      [TripStatus.Canceled]: 'Canceled'
+      [TripStatus.Canceled]: 'Canceled',
+      WaitingRC: 'Waiting RC'
     };
     return labels[status] || status;
   }

@@ -15,8 +15,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatMenuModule } from '@angular/material/menu';
-import { TripService } from '../../../core/services';
-import { Trip, TripStatus, TripFilters, Broker, calculateTripProfit } from '@haulhub/shared';
+import { OrderService } from '../../../core/services';
+import { Order, OrderStatus, OrderFilters, Broker, calcDispatcherProfit } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-list',
@@ -50,13 +50,13 @@ export class TripListComponent implements OnInit {
     'truckId',
     'driverName',
     'status',
-    'brokerPayment',
-    'truckOwnerPayment',
+    'orderRate',
+    'carrierPayment',
     'driverPayment',
     'actions'
   ];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   brokers: Broker[] = [];
   loading = false;
   filterForm: FormGroup;
@@ -69,11 +69,11 @@ export class TripListComponent implements OnInit {
   paginationKeys: Map<number, string> = new Map(); // Track keys for each page
 
   // Status options
-  statusOptions = Object.values(TripStatus);
-  TripStatus = TripStatus;
+  statusOptions = Object.values(OrderStatus);
+  OrderStatus = OrderStatus;
 
   constructor(
-    private tripService: TripService,
+    private orderService: OrderService,
     private router: Router,
     private fb: FormBuilder
   ) {
@@ -98,11 +98,11 @@ export class TripListComponent implements OnInit {
   }
 
   private loadBrokers(): void {
-    this.tripService.getBrokers().subscribe({
+    this.orderService.getBrokers().subscribe({
       next: (brokers) => {
         this.brokers = brokers.filter(b => b.isActive);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading brokers:', error);
       }
     });
@@ -112,8 +112,8 @@ export class TripListComponent implements OnInit {
     this.loading = true;
     const filters = this.buildFilters();
     
-    this.tripService.getTrips(filters).subscribe({
-      next: (response) => {
+    this.orderService.getOrders(filters).subscribe({
+      next: (response: any) => {
         console.log('Received response:', {
           tripCount: response.trips.length,
           hasMorePages: !!response.lastEvaluatedKey,
@@ -149,16 +149,16 @@ export class TripListComponent implements OnInit {
         
         this.loading = false;
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading orders:', error);
         this.loading = false;
       }
     });
   }
 
-  private buildFilters(): TripFilters {
+  private buildFilters(): OrderFilters {
     const formValue = this.filterForm.value;
-    const filters: TripFilters = {
+    const filters: OrderFilters = {
       limit: this.pageSize
     };
 
@@ -182,8 +182,8 @@ export class TripListComponent implements OnInit {
       filters.driverId = formValue.driverId.trim();
     }
 
-    if (formValue.driverName) {
-      filters.driverName = formValue.driverName.trim();
+    if (formValue.driverId) {
+      filters.driverId = formValue.driverId.trim();
     }
 
     if (formValue.orderStatus) {
@@ -244,12 +244,12 @@ export class TripListComponent implements OnInit {
     this.loadTrips();
   }
 
-  onViewDetails(trip: Trip): void {
-    this.router.navigate(['/dispatcher/trips', trip.tripId]);
+  onViewDetails(trip: Order): void {
+    this.router.navigate(['/dispatcher/trips', trip.orderId]);
   }
 
-  onEditTrip(trip: Trip): void {
-    this.router.navigate(['/dispatcher/trips', trip.tripId, 'edit']);
+  onEditTrip(trip: Order): void {
+    this.router.navigate(['/dispatcher/trips', trip.orderId, 'edit']);
   }
 
   onCreateTrip(): void {
@@ -260,34 +260,34 @@ export class TripListComponent implements OnInit {
     this.router.navigate(['/dispatcher/dashboard']);
   }
 
-  getStatusClass(status: TripStatus): string {
+  getStatusClass(status: OrderStatus): string {
     switch (status) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
         return 'status-scheduled';
-      case TripStatus.PickedUp:
+      case OrderStatus.PickingUp:
         return 'status-picked-up';
-      case TripStatus.InTransit:
+      case OrderStatus.Transit:
         return 'status-in-transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
         return 'status-delivered';
-      case TripStatus.Paid:
+      case OrderStatus.ReadyToPay:
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
+  getStatusLabel(status: OrderStatus): string {
     switch (status) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
         return 'Scheduled';
-      case TripStatus.PickedUp:
+      case OrderStatus.PickingUp:
         return 'Picked Up';
-      case TripStatus.InTransit:
+      case OrderStatus.Transit:
         return 'In Transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
         return 'Delivered';
-      case TripStatus.Paid:
+      case OrderStatus.ReadyToPay:
         return 'Paid';
       default:
         return status;
@@ -312,8 +312,8 @@ export class TripListComponent implements OnInit {
     }).format(amount);
   }
 
-  calculateProfit(trip: Trip): number {
-    return calculateTripProfit(trip);
+  calculateProfit(trip: Order): number {
+    return calcDispatcherProfit(trip);
   }
 
   hasActiveFilters(): boolean {
@@ -324,7 +324,7 @@ export class TripListComponent implements OnInit {
       formValue.brokerId ||
       formValue.lorryId ||
       formValue.driverId ||
-      formValue.driverName ||
+      formValue.driverId ||
       formValue.status
     );
   }

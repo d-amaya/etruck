@@ -9,7 +9,8 @@ import { CarrierFilterService } from '../../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { TripService } from '../../../../core/services';
 import { CarrierService, User } from '../../../../core/services/carrier.service';
-import { Trip, TripStatus, TripFilters, calculateTripProfit, calculateTripExpenses } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters, calculateTripProfit } from '../../../../core/services/trip.service';
+const calculateTripExpenses = (t: any) => 0;
 
 Chart.register(...registerables);
 

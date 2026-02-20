@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { TripStatus } from '@haulhub/shared';
+import { OrderStatus } from '@haulhub/shared';
 import { DashboardStateService } from './dashboard-state.service';
 
 export interface DashboardFilters {
@@ -8,11 +8,11 @@ export interface DashboardFilters {
     startDate: Date | null;
     endDate: Date | null;
   };
-  status: TripStatus | null;
+  status: OrderStatus | null;
   brokerId: string | null;
   truckId: string | null;
   driverId: string | null;
-  truckOwnerId: string | null;
+  carrierId: string | null;
 }
 
 export type ViewMode = 'table' | 'analytics' | 'payments';
@@ -34,7 +34,7 @@ export class SharedFilterService {
     brokerId: null,
     truckId: null,
     driverId: null,
-    truckOwnerId: null
+    carrierId: null
   };
 
   private filtersSubject = new BehaviorSubject<DashboardFilters>(this.defaultFilters);
@@ -104,7 +104,7 @@ export class SharedFilterService {
         brokerId: filters.brokerId !== undefined ? filters.brokerId : currentFilters.brokerId,
         truckId: filters.truckId !== undefined ? filters.truckId : currentFilters.truckId,
         driverId: filters.driverId !== undefined ? filters.driverId : currentFilters.driverId,
-        truckOwnerId: filters.truckOwnerId !== undefined ? filters.truckOwnerId : currentFilters.truckOwnerId
+        carrierId: filters.carrierId !== undefined ? filters.carrierId : currentFilters.carrierId
       });
       
       // Update local subject to keep it in sync (but this won't trigger dashboard updates)
@@ -131,7 +131,7 @@ export class SharedFilterService {
            filters1.brokerId === filters2.brokerId &&
            filters1.truckId === filters2.truckId &&
            filters1.driverId === filters2.driverId &&
-           filters1.truckOwnerId === filters2.truckOwnerId;
+           filters1.carrierId === filters2.carrierId;
   }
 
   /**
@@ -164,7 +164,7 @@ export class SharedFilterService {
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
     if (filters.driverId) count++;
-    if (filters.truckOwnerId) count++;
+    if (filters.carrierId) count++;
 
     return count;
   }

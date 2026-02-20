@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Trip, TripStatus } from '../../../core/services/trip.service';
 
 export interface StatusUpdateDialogData {
   trip: Trip;

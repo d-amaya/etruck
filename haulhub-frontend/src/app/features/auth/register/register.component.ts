@@ -41,7 +41,7 @@ export class RegisterComponent implements OnInit {
   // Available roles for registration (excluding Admin)
   roles = [
     { value: UserRole.Dispatcher, label: 'Dispatcher' },
-    { value: UserRole.LorryOwner, label: 'Lorry Owner' },
+    { value: UserRole.Carrier, label: 'Carrier' },
     { value: UserRole.Driver, label: 'Driver' }
   ];
 

@@ -10,7 +10,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { Truck, VehicleVerificationStatus } from '@haulhub/shared';
+import { Truck } from '@haulhub/shared';
+const VehicleVerificationStatus = { Approved: 'Approved', Pending: 'Pending', Rejected: 'Rejected', NeedsMoreEvidence: 'NeedsMoreEvidence' } as const;
+type VehicleVerificationStatus = typeof VehicleVerificationStatus[keyof typeof VehicleVerificationStatus];
 
 @Component({
   selector: 'app-truck-list',

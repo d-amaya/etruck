@@ -6,7 +6,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { Lorry, LorryDocumentMetadata } from '@haulhub/shared';
+type Lorry = any;
+type LorryDocumentMetadata = any;
 import { AdminService } from '../../../../core/services/admin.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 

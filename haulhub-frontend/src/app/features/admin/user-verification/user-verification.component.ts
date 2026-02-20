@@ -8,7 +8,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AdminService } from '../../../core/services/admin.service';
-import { User, VerificationStatus, UserRole } from '@haulhub/shared';
+import { UserRole } from '@haulhub/shared';
+const VerificationStatus = { Verified: 'Verified', Pending: 'Pending', Rejected: 'Rejected' } as const;
+type VerificationStatus = typeof VerificationStatus[keyof typeof VerificationStatus];
+type User = any;
 import { UserVerificationDialogComponent } from './user-verification-dialog/user-verification-dialog.component';
 
 @Component({
@@ -78,7 +81,7 @@ export class UserVerificationComponent implements OnInit {
     switch (role) {
       case UserRole.Dispatcher:
         return 'Dispatcher';
-      case UserRole.LorryOwner:
+      case UserRole.Carrier:
         return 'Lorry Owner';
       case UserRole.Driver:
         return 'Driver';

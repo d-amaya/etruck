@@ -278,7 +278,7 @@ describe('AuthService', () => {
     it('should navigate to lorry owner dashboard for lorry owner role', () => {
       const lorryOwnerResponse: AuthResponse = {
         ...mockAuthResponse,
-        role: UserRole.LorryOwner
+        role: UserRole.Carrier
       };
 
       const loginDto: LoginDto = {

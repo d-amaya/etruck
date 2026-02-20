@@ -19,7 +19,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripService } from '../../../core/services';
-import { Trip, TripStatus, TripFilters, UpdateTripStatusDto } from '@haulhub/shared';
+import { Trip, TripStatus, TripFilters } from '../../../core/services/trip.service';
+import { UpdateOrderStatusDto as UpdateTripStatusDto } from '@haulhub/shared';
 import { StatusUpdateDialogComponent, StatusUpdateDialogResult } from './status-update-dialog.component';
 
 @Component({
@@ -215,7 +216,7 @@ export class TripListComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: StatusUpdateDialogResult | undefined) => {
       if (result) {
-        this.updateTripStatus(trip.tripId, result.status, result.deliveryTimestamp);
+        this.updateTripStatus(trip.tripId || trip.orderId || "", result.status, result.deliveryTimestamp);
       }
     });
   }

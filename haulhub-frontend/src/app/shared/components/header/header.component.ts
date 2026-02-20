@@ -69,16 +69,12 @@ export class HeaderComponent implements OnInit {
     switch (role) {
       case UserRole.Dispatcher:
         return 'Dispatcher';
-      case UserRole.LorryOwner:
-        return 'Lorry Owner';
-      case UserRole.TruckOwner:
-        return 'Truck Owner';
+      case UserRole.Carrier:
+        return 'Carrier';
       case UserRole.Driver:
         return 'Driver';
       case UserRole.Admin:
         return 'Admin';
-      case UserRole.Carrier:
-        return 'Carrier';
       default:
         return '';
     }

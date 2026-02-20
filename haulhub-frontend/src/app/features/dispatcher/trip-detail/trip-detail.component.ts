@@ -7,12 +7,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
-import { TripService } from '../../../core/services';
+import { OrderService } from '../../../core/services';
 import { AuthService } from '../../../core/services/auth.service';
 import { AssetCacheService } from '../dashboard/asset-cache.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { CarrierAssetCacheService } from '../../carrier/shared/carrier-asset-cache.service';
-import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
+import { Order, OrderStatus, calcDispatcherProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-detail',
@@ -30,10 +30,10 @@ import { Trip, TripStatus, calculateTripProfit, calculateFuelCost, hasFuelData, 
   styleUrls: ['./trip-detail.component.scss']
 })
 export class TripDetailComponent implements OnInit {
-  trip?: Trip;
+  trip?: Order;
   loading = true;
   error?: string;
-  TripStatus = TripStatus;
+  OrderStatus = OrderStatus;
   
   // Asset lookup maps from localStorage
   private truckMap = new Map<string, any>();
@@ -44,7 +44,7 @@ export class TripDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private tripService: TripService,
+    private orderService: OrderService,
     private authService: AuthService,
     private assetCache: AssetCacheService,
     private carrierAssetCache: CarrierAssetCacheService,
@@ -94,12 +94,12 @@ export class TripDetailComponent implements OnInit {
 
   private loadTrip(tripId: string): void {
     this.loading = true;
-    this.tripService.getTripById(tripId).subscribe({
-      next: (trip) => {
+    this.orderService.getOrderById(tripId).subscribe({
+      next: (trip: any) => {
         this.trip = trip;
         this.loading = false;
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading trip:', error);
         this.error = error.error?.message || 'Failed to load order details';
         this.loading = false;
@@ -119,7 +119,7 @@ export class TripDetailComponent implements OnInit {
 
   onEditTrip(): void {
     if (this.trip) {
-      this.router.navigate(['/dispatcher/trips', this.trip.tripId, 'edit']);
+      this.router.navigate(['/dispatcher/trips', this.trip.orderId, 'edit']);
     }
   }
 
@@ -128,50 +128,50 @@ export class TripDetailComponent implements OnInit {
     return this.authService.userRole === UserRole.Dispatcher;
   }
 
-  getStatusClass(status: TripStatus | string): string {
-    // Handle both TripStatus enum and string literals from new schema
+  getStatusClass(status: OrderStatus | string): string {
+    // Handle both OrderStatus enum and string literals from new schema
     const statusStr = typeof status === 'string' ? status : status;
     
     switch (statusStr) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
       case 'Scheduled':
         return 'status-scheduled';
-      case TripStatus.PickedUp:
-      case 'Picked Up':
+      case OrderStatus.PickingUp:
+      case 'PickingUp':
         return 'status-picked-up';
-      case TripStatus.InTransit:
-      case 'In Transit':
+      case OrderStatus.Transit:
+      case 'Transit':
         return 'status-in-transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
       case 'Delivered':
         return 'status-delivered';
-      case TripStatus.Paid:
-      case 'Paid':
+      case OrderStatus.ReadyToPay:
+      case 'ReadyToPay':
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus | string): string {
-    // Handle both TripStatus enum and string literals from new schema
+  getStatusLabel(status: OrderStatus | string): string {
+    // Handle both OrderStatus enum and string literals from new schema
     const statusStr = typeof status === 'string' ? status : status;
     
     switch (statusStr) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
       case 'Scheduled':
         return 'Scheduled';
-      case TripStatus.PickedUp:
-      case 'Picked Up':
+      case OrderStatus.PickingUp:
+      case 'PickingUp':
         return 'Picked Up';
-      case TripStatus.InTransit:
-      case 'In Transit':
+      case OrderStatus.Transit:
+      case 'Transit':
         return 'In Transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
       case 'Delivered':
         return 'Delivered';
-      case TripStatus.Paid:
-      case 'Paid':
+      case OrderStatus.ReadyToPay:
+      case 'ReadyToPay':
         return 'Paid';
       default:
         return String(status);
@@ -199,10 +199,10 @@ export class TripDetailComponent implements OnInit {
     // Return the most recent timestamp based on status
     switch (this.trip.orderStatus) {
       case 'Delivered':
-      case 'Paid':
+      case 'ReadyToPay':
         return this.trip.deliveryTimestamp || this.trip.pickupTimestamp || this.trip.scheduledTimestamp;
-      case 'Picked Up':
-      case 'In Transit':
+      case 'PickingUp':
+      case 'Transit':
         return this.trip.pickupTimestamp || this.trip.scheduledTimestamp;
       case 'Scheduled':
       default:
@@ -294,7 +294,7 @@ export class TripDetailComponent implements OnInit {
 
   calculateProfit(): number {
     if (!this.trip) return 0;
-    return calculateTripProfit(this.trip);
+    return calcDispatcherProfit(this.trip);
   }
 
   /**
@@ -304,7 +304,7 @@ export class TripDetailComponent implements OnInit {
     if (!this.trip) return 0;
     
     let expenses = 0;
-    expenses += this.trip.truckOwnerPayment || 0;
+    expenses += this.trip.carrierPayment || 0;
     expenses += this.trip.driverPayment || 0;
     expenses += this.calculateFuelCost();
     expenses += this.trip.lumperValue || 0;

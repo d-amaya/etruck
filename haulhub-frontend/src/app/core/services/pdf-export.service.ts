@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TripService } from './trip.service';
+import { OrderService } from './order.service';
 import { AssetCacheService } from '../../features/dispatcher/dashboard/asset-cache.service';
 import { DashboardStateService, DashboardFilters } from '../../features/dispatcher/dashboard/dashboard-state.service';
-import { Trip, TripStatus, TripFilters, calculateTripProfit } from '@haulhub/shared';
+import { Order, OrderStatus, OrderFilters, calcDispatcherProfit } from '@haulhub/shared';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -12,7 +12,7 @@ import { Observable } from 'rxjs';
 })
 export class PdfExportService {
   constructor(
-    private tripService: TripService,
+    private orderService: OrderService,
     private dashboardState: DashboardStateService,
     private assetCache: AssetCacheService
   ) {}
@@ -21,11 +21,11 @@ export class PdfExportService {
     const filters = this.dashboardState['filtersSubject'].value;
 
     // Load all data in a single API call
-    this.tripService.getDashboardExport(this.buildApiFilters(filters)).subscribe({
-      next: (data) => {
-        this.generatePdf(data.trips, data.summaryByStatus, data.paymentSummary, data.assets, filters);
+    this.orderService.getOrders(this.buildApiFilters(filters)).subscribe({
+      next: (data: any) => {
+        this.generatePdf(data.orders || [], data.summaryByStatus || {}, data.paymentSummary || {}, data.assets || {}, filters);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading dashboard data for PDF export:', error);
         alert('Failed to export PDF. Please try again.');
       }
@@ -33,8 +33,8 @@ export class PdfExportService {
   }
 
   private generatePdf(
-    trips: Trip[],
-    summaryByStatus: Record<TripStatus, number>,
+    orders: Order[],
+    summaryByStatus: Record<OrderStatus, number>,
     paymentSummary: any,
     assets: {
       brokers: Array<{ brokerId: string; brokerName: string }>;
@@ -49,10 +49,10 @@ export class PdfExportService {
     const truckMap = new Map(assets.trucks.map(t => [t.truckId, t.plate]));
     const driverMap = new Map(assets.drivers.map(d => [d.userId, d.name]));
     const trailerMap = new Map(assets.trailers.map(t => [t.trailerId, t.plate]));
-    const truckOwnerMap = new Map<string, string>();
+    const carrierMap = new Map<string, string>();
     const cache = this.assetCache.currentCache;
-    if (cache?.truckOwners) {
-      cache.truckOwners.forEach((o: any, id: string) => truckOwnerMap.set(id, o.name || o.corpName || id));
+    if (cache?.carriers) {
+      cache.carriers.forEach((o: any, id: string) => carrierMap.set(id, o.name || o.corpName || id));
     }
 
     const doc = new jsPDF('landscape');
@@ -113,7 +113,7 @@ export class PdfExportService {
 
     // Card 1: Total Trips
     this.drawSummaryCard(doc, 14, cardY, cardWidth, cardHeight, 
-      'Total Orders', trips.length.toString(), primaryBlue);
+      'Total Orders', orders.length.toString(), primaryBlue);
 
     // Card 2: Total Revenue
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
@@ -145,11 +145,11 @@ export class PdfExportService {
     yPosition += 6;
 
     const summaryData = [
-      ['Scheduled', summaryByStatus[TripStatus.Scheduled] || 0],
-      ['Picked Up', summaryByStatus[TripStatus.PickedUp] || 0],
-      ['In Transit', summaryByStatus[TripStatus.InTransit] || 0],
-      ['Delivered', summaryByStatus[TripStatus.Delivered] || 0],
-      ['Paid', summaryByStatus[TripStatus.Paid] || 0]
+      ['Scheduled', summaryByStatus[OrderStatus.Scheduled] || 0],
+      ['Picking Up', summaryByStatus[OrderStatus.PickingUp] || 0],
+      ['In Transit', summaryByStatus[OrderStatus.Transit] || 0],
+      ['Delivered', summaryByStatus[OrderStatus.Delivered] || 0],
+      ['Ready To Pay', summaryByStatus[OrderStatus.ReadyToPay] || 0]
     ];
 
     autoTable(doc, {
@@ -175,7 +175,7 @@ export class PdfExportService {
     yPosition = (doc as any).lastAutoTable.finalY + 15;
 
     // ========== TRIPS TABLE SECTION ==========
-    if (trips.length > 0) {
+    if (orders.length > 0) {
       // Check if we need a new page
       if (yPosition > 150) {
         doc.addPage();
@@ -185,29 +185,29 @@ export class PdfExportService {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text(`Order Details (${trips.length} orders)`, 14, yPosition);
+      doc.text(`Order Details (${orders.length} orders)`, 14, yPosition);
       yPosition += 6;
 
-      const tripTableData = trips.map(trip => {
-        const expenses = (trip.driverPayment || 0) + (trip.dispatcherPayment || 0) + (trip.truckOwnerPayment || 0) + (trip.fuelCost || 0) + (trip.lumperValue || 0) + (trip.detentionValue || 0);
-        const profit = (trip.brokerPayment || 0) - expenses;
-        const pickupLocation = trip.pickupCity && trip.pickupState ? `${trip.pickupCity}, ${trip.pickupState}` : '';
-        const dropoffLocation = trip.deliveryCity && trip.deliveryState ? `${trip.deliveryCity}, ${trip.deliveryState}` : '';
-        const brokerName = brokerMap.get(trip.brokerId) || trip.brokerId.substring(0, 8);
-        const truckPlate = truckMap.get(trip.truckId) || trip.truckId.substring(0, 8);
-        const ownerName = truckOwnerMap.get(trip.truckOwnerId) || trip.truckOwnerId?.substring(0, 8) || '';
-        const driverName = driverMap.get(trip.driverId) || trip.driverId.substring(0, 8);
+      const tripTableData = orders.map(order => {
+        const expenses = (order.driverPayment || 0) + (order.dispatcherPayment || 0) + (0 || 0) + (order.fuelCost || 0) + (order.lumperValue || 0) + (order.detentionValue || 0);
+        const profit = (order.orderRate || 0) - expenses;
+        const pickupLocation = order.pickupCity && order.pickupState ? `${order.pickupCity}, ${order.pickupState}` : '';
+        const dropoffLocation = order.deliveryCity && order.deliveryState ? `${order.deliveryCity}, ${order.deliveryState}` : '';
+        const brokerName = brokerMap.get(order.brokerId) || order.brokerId.substring(0, 8);
+        const truckPlate = truckMap.get(order.truckId) || order.truckId.substring(0, 8);
+        const carrierName = carrierMap.get(order.carrierId) || order.carrierId?.substring(0, 8) || '';
+        const driverName = driverMap.get(order.driverId) || order.driverId.substring(0, 8);
         
         return [
-          this.getStatusLabel(trip.orderStatus as any),
-          this.formatDate(trip.scheduledTimestamp),
+          this.getStatusLabel(order.orderStatus as any),
+          this.formatDate(order.scheduledTimestamp),
           this.truncateText(pickupLocation, 20),
           this.truncateText(dropoffLocation, 20),
           this.truncateText(brokerName, 18),
           this.truncateText(truckPlate, 14),
-          this.truncateText(ownerName, 16),
+          this.truncateText(carrierName, 16),
           this.truncateText(driverName, 18),
-          this.formatCurrency(trip.brokerPayment),
+          this.formatCurrency(order.orderRate),
           this.formatCurrency(expenses),
           this.formatCurrency(profit)
         ];
@@ -215,7 +215,7 @@ export class PdfExportService {
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Truck Owner', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss']],
+        head: [['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Carrier', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss']],
         body: tripTableData,
         theme: 'striped',
         headStyles: { 
@@ -268,7 +268,7 @@ export class PdfExportService {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(100, 100, 100);
-      doc.text('No trips found matching the selected filters.', 14, yPosition);
+      doc.text('No orders found matching the selected filters.', 14, yPosition);
     }
 
     // ========== FOOTER ON EACH PAGE ==========
@@ -385,8 +385,8 @@ export class PdfExportService {
     return `${filename}.pdf`;
   }
 
-  private buildApiFilters(filters: DashboardFilters): TripFilters {
-    const apiFilters: TripFilters = {};
+  private buildApiFilters(filters: DashboardFilters): OrderFilters {
+    const apiFilters: OrderFilters = {};
 
     if (filters.dateRange.startDate) {
       apiFilters.startDate = filters.dateRange.startDate.toISOString();
@@ -406,8 +406,8 @@ export class PdfExportService {
     if (filters.driverId) {
       apiFilters.driverId = filters.driverId;
     }
-    if (filters.truckOwnerId) {
-      apiFilters.truckOwnerId = filters.truckOwnerId;
+    if (filters.carrierId) {
+      apiFilters.carrierId = filters.carrierId;
     }
 
     return apiFilters;
@@ -430,20 +430,21 @@ export class PdfExportService {
     }).format(amount);
   }
 
-  private getStatusLabel(status: TripStatus): string {
-    const labels: Record<TripStatus, string> = {
-      [TripStatus.Scheduled]: 'Scheduled',
-      [TripStatus.PickedUp]: 'Picked Up',
-      [TripStatus.InTransit]: 'In Transit',
-      [TripStatus.Delivered]: 'Delivered',
-      [TripStatus.Paid]: 'Paid',
-      [TripStatus.Canceled]: 'Canceled'
+  private getStatusLabel(status: OrderStatus): string {
+    const labels: Record<string, string> = {
+      [OrderStatus.Scheduled]: 'Scheduled',
+      [OrderStatus.PickingUp]: 'Picking Up',
+      [OrderStatus.Transit]: 'In Transit',
+      [OrderStatus.Delivered]: 'Delivered',
+      [OrderStatus.WaitingRC]: 'Waiting RC',
+      [OrderStatus.ReadyToPay]: 'Ready To Pay',
+      [OrderStatus.Canceled]: 'Canceled'
     };
     return labels[status] || status;
   }
 
-  private calculateProfit(trip: Trip): number {
-    return calculateTripProfit(trip);
+  private calculateProfit(order: Partial<Order>): number {
+    return calcDispatcherProfit(order);
   }
 
   /**

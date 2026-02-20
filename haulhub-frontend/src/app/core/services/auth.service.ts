@@ -363,7 +363,7 @@ export class AuthService {
     switch (role) {
       case UserRole.Dispatcher:
         return '/dispatcher/dashboard';
-      case UserRole.LorryOwner:
+      case UserRole.Carrier:
         return '/truck-owner/dashboard';
       case UserRole.Driver:
         return '/driver/dashboard';

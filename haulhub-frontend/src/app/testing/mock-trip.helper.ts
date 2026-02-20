@@ -1,10 +1,10 @@
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Trip, TripStatus } from '../core/services/trip.service';
 
 /**
  * Helper function to create complete mock Trip objects for testing
  * Provides all required fields with sensible defaults
  */
-export function createMockTrip(overrides: Partial<Trip> = {}): Trip {
+export function createMockTrip(overrides: any = {}): any {
   return {
     tripId: 'trip-1',
     dispatcherId: 'dispatcher-1',
@@ -13,7 +13,7 @@ export function createMockTrip(overrides: Partial<Trip> = {}): Trip {
     truckId: 'truck-1',
     truckOwnerId: 'owner-1',
     trailerId: 'trailer-1',
-    orderConfirmation: 'ORDER-123',
+    invoiceNumber: 'ORDER-123',
     scheduledTimestamp: '2024-01-15T10:00:00Z',
     pickupTimestamp: null,
     deliveryTimestamp: null,
@@ -32,32 +32,20 @@ export function createMockTrip(overrides: Partial<Trip> = {}): Trip {
     deliveryPhone: '555-0200',
     deliveryNotes: '',
     brokerId: 'broker-1',
-    brokerPayment: 1500,
-    truckOwnerPayment: 500,
+    orderRate: 1500,
+    carrierPayment: 500,
     driverPayment: 800,
     mileageOrder: 200,
     mileageEmpty: 20,
     mileageTotal: 220,
-    brokerRate: 7.5,
     driverRate: 4.0,
-    truckOwnerRate: 2.5,
     dispatcherRate: 1.0,
-    factoryRate: 0,
-    orderRate: 7.5,
-    orderAverage: 7.5,
     dispatcherPayment: 200,
-    brokerAdvance: 0,
-    driverAdvance: 0,
-    factoryAdvance: 0,
     fuelCost: 100,
     fuelGasAvgCost: 3.5,
     fuelGasAvgGallxMil: 0.15,
-    brokerCost: 0,
-    factoryCost: 0,
     lumperValue: 0,
     detentionValue: 0,
-    orderExpenses: 1600,
-    orderRevenue: 1500,
     notes: '',
     orderStatus: TripStatus.Scheduled,
     createdAt: '2024-01-10T08:00:00Z',

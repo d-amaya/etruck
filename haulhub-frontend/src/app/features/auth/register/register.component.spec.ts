@@ -189,7 +189,7 @@ describe('RegisterComponent', () => {
   it('should have three role options', () => {
     expect(component.roles.length).toBe(3);
     expect(component.roles.map(r => r.value)).toContain(UserRole.Dispatcher);
-    expect(component.roles.map(r => r.value)).toContain(UserRole.LorryOwner);
+    expect(component.roles.map(r => r.value)).toContain(UserRole.Carrier);
     expect(component.roles.map(r => r.value)).toContain(UserRole.Driver);
     expect(component.roles.map(r => r.value)).not.toContain(UserRole.Admin);
   });

@@ -183,19 +183,19 @@
             </td>
           </ng-container>
 
-          <!-- Broker Payment Column -->
-          <ng-container matColumnDef="brokerPayment">
+          <!-- Order Rate Column -->
+          <ng-container matColumnDef="orderRate">
             <th mat-header-cell *matHeaderCellDef>Order Rate</th>
             <td mat-cell *matCellDef="let trip" class="payment-cell">
-              {{ formatCurrency(trip.brokerPayment) }}
+              {{ formatCurrency(trip.orderRate) }}
             </td>
           </ng-container>
 
-          <!-- Truck Owner Payment Column -->
-          <ng-container matColumnDef="truckOwnerPayment">
+          <!-- Carrier Payment Column -->
+          <ng-container matColumnDef="carrierPayment">
             <th mat-header-cell *matHeaderCellDef>Truck Payment</th>
             <td mat-cell *matCellDef="let trip" class="payment-cell">
-              {{ formatCurrency(trip.truckOwnerPayment) }}
+              {{ formatCurrency(trip.carrierPayment) }}
             </td>
           </ng-container>
 

@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest, Subject, of } from 'rxjs';
 import { distinctUntilChanged, debounceTime, tap, map, catchError } from 'rxjs/operators';
-import { TripStatus, Broker, Trip } from '@haulhub/shared';
-import { TripService } from '../../../core/services/trip.service';
+import { OrderStatus, Broker, Order } from '@haulhub/shared';
+import { OrderService } from '../../../core/services/order.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SharedFilterService } from './shared-filter.service';
 
@@ -11,11 +11,11 @@ export interface DashboardFilters {
     startDate: Date | null;
     endDate: Date | null;
   };
-  status: TripStatus | null;
+  status: OrderStatus | null;
   brokerId: string | null;
   truckId: string | null;
   driverId: string | null;
-  truckOwnerId: string | null;
+  carrierId: string | null;
 }
 
 export interface PaymentSummary {
@@ -105,8 +105,8 @@ export class DashboardStateService {
   public dashboardData$: Observable<any> = this.dashboardDataSubject.asObservable();
   
   // Filtered trips for payment summary calculation
-  private filteredTripsSubject = new BehaviorSubject<Trip[]>([]);
-  public filteredTrips$: Observable<Trip[]> = this.filteredTripsSubject.asObservable();
+  private filteredOrdersSubject = new BehaviorSubject<Order[]>([]);
+  public filteredOrders$: Observable<Order[]> = this.filteredOrdersSubject.asObservable();
 
   // Trigger for refreshing payment summary after data mutations (delete, create, update)
   private refreshPaymentSummarySubject = new Subject<void>();
@@ -115,10 +115,10 @@ export class DashboardStateService {
   // Response caches for Analytics and Payments views (avoid redundant API calls on view switch)
   private analyticsCache: { data: any; startTime: number | null; endTime: number | null } | null = null;
   private paymentCache: { data: any; startTime: number | null; endTime: number | null } | null = null;
-  private tripsCache: { data: any; key: string } | null = null;
+  private ordersCache: { data: any; key: string } | null = null;
 
   constructor(
-    private tripService: TripService,
+    private orderService: OrderService,
     private authService: AuthService,
     private sharedFilterService: SharedFilterService
   ) {
@@ -183,7 +183,7 @@ export class DashboardStateService {
     if (filters.brokerId) count++;
     if (filters.truckId) count++;
     if (filters.driverId) count++;
-    if (filters.truckOwnerId) count++;
+    if (filters.carrierId) count++;
     return count;
   }
 
@@ -195,8 +195,8 @@ export class DashboardStateService {
     return this.filtersSubject.value;
   }
 
-  updateFilteredTrips(trips: Trip[]): void {
-    this.filteredTripsSubject.next(trips);
+  updateFilteredOrders(orders: Order[]): void {
+    this.filteredOrdersSubject.next(orders);
   }
 
   updateDashboardData(data: any): void {
@@ -249,25 +249,25 @@ export class DashboardStateService {
       b: filters.brokerId,
       t: filters.truckId,
       d: filters.driverId,
-      o: filters.truckOwnerId,
+      o: filters.carrierId,
       p: pagination.page,
       ps: pagination.pageSize
     });
   }
 
   getCachedTrips(filters: DashboardFilters, pagination: PaginationState): any | null {
-    if (!this.tripsCache) return null;
-    return this.tripsCache.key === this.tripsKey(filters, pagination) ? this.tripsCache.data : null;
+    if (!this.ordersCache) return null;
+    return this.ordersCache.key === this.tripsKey(filters, pagination) ? this.ordersCache.data : null;
   }
 
   setCachedTrips(filters: DashboardFilters, pagination: PaginationState, data: any): void {
-    this.tripsCache = { data, key: this.tripsKey(filters, pagination) };
+    this.ordersCache = { data, key: this.tripsKey(filters, pagination) };
   }
 
   invalidateViewCaches(): void {
     this.analyticsCache = null;
     this.paymentCache = null;
-    this.tripsCache = null;
+    this.ordersCache = null;
   }
 
   /**
@@ -327,7 +327,7 @@ export class DashboardStateService {
     this.lastBrokerRefreshAttempt = now;
     this.brokersRefreshing = true;
     
-    return this.tripService.getBrokers().pipe(
+    return this.orderService.getBrokers().pipe(
       tap(brokers => {
         this.brokersCache = brokers;
         this.brokersSubject.next(brokers);
@@ -359,7 +359,7 @@ export class DashboardStateService {
       brokerId: null,
       truckId: null,
       driverId: null,
-      truckOwnerId: null
+      carrierId: null
     };
   }
 
@@ -420,12 +420,12 @@ export class DashboardStateService {
   }
 
   private loadBrokers(): void {
-    this.tripService.getBrokers().subscribe({
+    this.orderService.getBrokers().subscribe({
       next: (brokers) => {
         this.brokersCache = brokers.filter(b => b.isActive);
         this.brokersSubject.next(this.brokersCache);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Failed to load brokers:', error);
         // Emit empty array on error so subscribers still get notified
         this.brokersSubject.next([]);
