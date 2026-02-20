@@ -72,6 +72,17 @@ const apiStack = new ApiStack(app, `HaulHub-Api-${environment}`, {
   eTruckyTrailersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Trailers`,
   eTruckyTripsTableName: 'eTrucky-Trips',
   eTruckyTripsTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Trips`,
+  // v2 tables (admin-centric hierarchy)
+  v2OrdersTableName: 'eTruckyOrders',
+  v2OrdersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyOrders`,
+  v2UsersTableName: 'eTruckyUsers',
+  v2UsersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyUsers`,
+  v2TrucksTableName: 'eTruckyTrucks',
+  v2TrucksTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyTrucks`,
+  v2TrailersTableName: 'eTruckyTrailers',
+  v2TrailersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyTrailers`,
+  v2BrokersTableName: 'eTruckyBrokers',
+  v2BrokersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyBrokers`,
   // Storage
   documentsBucketName: storageStack.documentsBucket.bucketName,
   documentsBucketArn: storageStack.documentsBucket.bucketArn,

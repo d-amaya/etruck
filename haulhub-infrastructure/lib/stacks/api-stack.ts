@@ -24,7 +24,7 @@ export interface ApiStackProps extends HaulHubStackProps {
   userPoolId: string;
   userPoolArn: string;
   userPoolClientId: string;
-  // eTrucky tables (new architecture)
+  // eTrucky tables (old architecture)
   eTruckyBrokersTableName: string;
   eTruckyBrokersTableArn: string;
   eTruckyUsersTableName: string;
@@ -35,6 +35,17 @@ export interface ApiStackProps extends HaulHubStackProps {
   eTruckyTrailersTableArn: string;
   eTruckyTripsTableName: string;
   eTruckyTripsTableArn: string;
+  // v2 tables (admin-centric hierarchy)
+  v2OrdersTableName: string;
+  v2OrdersTableArn: string;
+  v2UsersTableName: string;
+  v2UsersTableArn: string;
+  v2TrucksTableName: string;
+  v2TrucksTableArn: string;
+  v2TrailersTableName: string;
+  v2TrailersTableArn: string;
+  v2BrokersTableName: string;
+  v2BrokersTableArn: string;
   documentsBucketName: string;
   documentsBucketArn: string;
   allowedOrigins?: string;
@@ -80,6 +91,16 @@ export class ApiStack extends cdk.Stack {
         `${props.eTruckyTrailersTableArn}/index/*`,
         props.eTruckyTripsTableArn,
         `${props.eTruckyTripsTableArn}/index/*`,
+        // v2 tables
+        props.v2OrdersTableArn,
+        `${props.v2OrdersTableArn}/index/*`,
+        props.v2UsersTableArn,
+        `${props.v2UsersTableArn}/index/*`,
+        props.v2TrucksTableArn,
+        `${props.v2TrucksTableArn}/index/*`,
+        props.v2TrailersTableArn,
+        `${props.v2TrailersTableArn}/index/*`,
+        props.v2BrokersTableArn,
       ],
     }));
 
@@ -142,6 +163,12 @@ export class ApiStack extends cdk.Stack {
         LORRIES_TABLE_NAME: props.eTruckyTrucksTableName,
         TRAILERS_TABLE_NAME: props.eTruckyTrailersTableName,
         USERS_TABLE_NAME: props.eTruckyUsersTableName,
+        // v2 table names (admin-centric hierarchy)
+        ETRUCKY_ORDERS_TABLE: props.v2OrdersTableName,
+        ETRUCKY_V2_USERS_TABLE: props.v2UsersTableName,
+        ETRUCKY_V2_TRUCKS_TABLE: props.v2TrucksTableName,
+        ETRUCKY_V2_TRAILERS_TABLE: props.v2TrailersTableName,
+        ETRUCKY_V2_BROKERS_TABLE: props.v2BrokersTableName,
         // AWS Services
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
