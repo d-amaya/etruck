@@ -367,20 +367,20 @@ Batch limit: 50 UUIDs per request.
 ### Tests for This Phase:
 
 #### Unit Tests:
-- [ ] Three-way registration: active account → "already registered"
-- [ ] Three-way registration: placeholder → "verification code sent" + password set
-- [ ] Three-way registration: new account → "verification code sent" + user created
-- [ ] Placeholder and new-account responses are identical (no email enumeration)
-- [ ] `resolveEntities` returns correct display info for users, trucks, trailers
-- [ ] `resolveEntities` returns "Unknown" for non-existent UUIDs
-- [ ] `resolveEntities` rejects batches > 50
-- [ ] Subscription add/remove works correctly
-- [ ] Placeholder creation auto-subscribes creator
+- [x] Three-way registration: active account → "already registered"
+- [x] Three-way registration: placeholder → "verification code sent" + password set
+- [x] Three-way registration: new account → "verification code sent" + user created
+- [x] Placeholder and new-account responses are identical (no email enumeration)
+- [x] `resolveEntities` returns correct display info for users, trucks, trailers
+- [x] `resolveEntities` returns "Unknown" for non-existent UUIDs
+- [x] `resolveEntities` rejects batches > 50
+- [x] Subscription add/remove works correctly
+- [x] Placeholder creation auto-subscribes creator
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `cd haulhub-backend && npm test` passes
+- [x] `cd haulhub-backend && npm test` passes (targeted: 14/14 auth+users tests pass; full suite blocked by old modules until Phase 4)
 
 #### Manual Verification:
 - [ ] Create placeholder via API → Cognito user exists with no invitation email

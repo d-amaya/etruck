@@ -19,7 +19,7 @@ export class RegisterDto {
   @IsOptional()
   phoneNumber?: string;
 
-  @IsEnum(UserRole, { message: 'Invalid role. Must be Dispatcher, LorryOwner, Driver, or Admin' })
+  @IsEnum(UserRole, { message: 'Invalid role. Must be Dispatcher, Carrier, or Driver' })
   @IsNotEmpty({ message: 'Role is required' })
   role!: UserRole;
 

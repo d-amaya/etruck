@@ -11,20 +11,12 @@ import {
   AdminAddUserToGroupCommand,
   AdminGetUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
+import { AuthService } from '../auth/auth.service';
+import { UserRole } from '@haulhub/shared';
 import { v4 as uuidv4 } from 'uuid';
-
-/**
- * User roles supported by the system
- */
-export enum UserRole {
-  CARRIER = 'Carrier',
-  DISPATCHER = 'Dispatcher',
-  DRIVER = 'Driver',
-  TRUCK_OWNER = 'TruckOwner',
-}
 
 /**
  * DTO for creating a new user
@@ -137,6 +129,7 @@ export class UsersService {
   constructor(
     private readonly awsService: AwsService,
     private readonly configService: ConfigService,
+    private readonly authService: AuthService,
   ) {}
 
   /**
@@ -637,5 +630,161 @@ export class UsersService {
       .split('')
       .sort(() => Math.random() - 0.5)
       .join('');
+  }
+
+  // ── v2 Methods ──────────────────────────────────────────────────
+
+  /**
+   * Batch resolve UUIDs to display info across Users, Trucks, Trailers tables.
+   */
+  async resolveEntities(ids: string[]): Promise<Record<string, { name: string; type: string }>> {
+    if (ids.length === 0) return {};
+
+    const ddb = this.awsService.getDynamoDBClient();
+    const tables = [
+      { table: this.configService.v2UsersTableName, prefix: 'USER#', type: 'user' },
+      { table: this.configService.v2TrucksTableName, prefix: 'TRUCK#', type: 'truck' },
+      { table: this.configService.v2TrailersTableName, prefix: 'TRAILER#', type: 'trailer' },
+    ];
+
+    const result: Record<string, { name: string; type: string }> = {};
+
+    // Try each table — BatchGetItem per table
+    for (const { table, prefix, type } of tables) {
+      const unresolvedIds = ids.filter(id => !result[id]);
+      if (unresolvedIds.length === 0) break;
+
+      const keys = unresolvedIds.map(id => ({ PK: `${prefix}${id}`, SK: 'METADATA' }));
+
+      try {
+        const resp = await ddb.send(new BatchGetCommand({
+          RequestItems: { [table]: { Keys: keys, ProjectionExpression: 'PK, #n, #r, plate, brand',
+            ExpressionAttributeNames: { '#n': 'name', '#r': 'role' } } },
+        }));
+
+        for (const item of resp.Responses?.[table] || []) {
+          const id = (item.PK as string).split('#')[1];
+          if (type === 'user') {
+            result[id] = { name: item.name || 'Unknown', type: (item.role || 'user').toLowerCase() };
+          } else {
+            result[id] = { name: item.plate || item.brand || 'Unknown', type };
+          }
+        }
+      } catch {
+        // Table miss — continue to next
+      }
+    }
+
+    // Fill unknowns
+    for (const id of ids) {
+      if (!result[id]) result[id] = { name: 'Unknown', type: 'unknown' };
+    }
+
+    return result;
+  }
+
+  /**
+   * Get subscription lists for a user.
+   */
+  async getSubscriptions(userId: string): Promise<{
+    subscribedAdminIds: string[];
+    subscribedCarrierIds: string[];
+  }> {
+    const resp = await this.awsService.getDynamoDBClient().send(new GetCommand({
+      TableName: this.configService.v2UsersTableName,
+      Key: { PK: `USER#${userId}`, SK: 'METADATA' },
+      ProjectionExpression: 'subscribedAdminIds, subscribedCarrierIds',
+    }));
+
+    return {
+      subscribedAdminIds: resp.Item?.subscribedAdminIds || [],
+      subscribedCarrierIds: resp.Item?.subscribedCarrierIds || [],
+    };
+  }
+
+  /**
+   * Add/remove subscription IDs on a user record.
+   */
+  async updateSubscriptions(
+    userId: string,
+    updates: {
+      addAdminIds?: string[];
+      removeAdminIds?: string[];
+      addCarrierIds?: string[];
+      removeCarrierIds?: string[];
+    },
+  ): Promise<{ subscribedAdminIds: string[]; subscribedCarrierIds: string[] }> {
+    const setParts: string[] = [];
+    const addParts: string[] = [];
+    const deleteParts: string[] = [];
+    const exprNames: Record<string, string> = {};
+    const exprValues: Record<string, any> = {};
+
+    if (updates.addAdminIds?.length) {
+      addParts.push('#sai :addAdmin');
+      exprNames['#sai'] = 'subscribedAdminIds';
+      exprValues[':addAdmin'] = new Set(updates.addAdminIds);
+    }
+    if (updates.removeAdminIds?.length) {
+      deleteParts.push('#sai :rmAdmin');
+      exprNames['#sai'] = 'subscribedAdminIds';
+      exprValues[':rmAdmin'] = new Set(updates.removeAdminIds);
+    }
+    if (updates.addCarrierIds?.length) {
+      addParts.push('#sci :addCarrier');
+      exprNames['#sci'] = 'subscribedCarrierIds';
+      exprValues[':addCarrier'] = new Set(updates.addCarrierIds);
+    }
+    if (updates.removeCarrierIds?.length) {
+      deleteParts.push('#sci :rmCarrier');
+      exprNames['#sci'] = 'subscribedCarrierIds';
+      exprValues[':rmCarrier'] = new Set(updates.removeCarrierIds);
+    }
+
+    const parts: string[] = [];
+    if (setParts.length) parts.push(`SET ${setParts.join(', ')}`);
+    if (addParts.length) parts.push(`ADD ${addParts.join(', ')}`);
+    if (deleteParts.length) parts.push(`DELETE ${deleteParts.join(', ')}`);
+
+    if (parts.length === 0) {
+      return this.getSubscriptions(userId);
+    }
+
+    const resp = await this.awsService.getDynamoDBClient().send(new UpdateCommand({
+      TableName: this.configService.v2UsersTableName,
+      Key: { PK: `USER#${userId}`, SK: 'METADATA' },
+      UpdateExpression: parts.join(' '),
+      ExpressionAttributeNames: exprNames,
+      ExpressionAttributeValues: exprValues,
+      ReturnValues: 'ALL_NEW',
+    }));
+
+    return {
+      subscribedAdminIds: resp.Attributes?.subscribedAdminIds
+        ? Array.from(resp.Attributes.subscribedAdminIds) : [],
+      subscribedCarrierIds: resp.Attributes?.subscribedCarrierIds
+        ? Array.from(resp.Attributes.subscribedCarrierIds) : [],
+    };
+  }
+
+  /**
+   * Create a placeholder user and auto-subscribe the creator.
+   */
+  async createPlaceholderUser(
+    creatorId: string,
+    email: string,
+    name: string,
+    role: UserRole,
+  ): Promise<{ userId: string; message: string }> {
+    const userId = await this.authService.createPlaceholder(creatorId, email, name, role);
+
+    // Auto-subscribe creator
+    if (role === UserRole.Carrier) {
+      await this.updateSubscriptions(creatorId, { addCarrierIds: [userId] });
+    } else if (role === UserRole.Admin) {
+      await this.updateSubscriptions(creatorId, { addAdminIds: [userId] });
+    }
+
+    return { userId, message: `Placeholder ${role} created. They can claim via registration.` };
   }
 }

@@ -15,7 +15,7 @@ import {
   GlobalSignOutCommand,
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { AwsService } from '../config/aws.service';
 import { ConfigService } from '../config/config.service';
 import { JwtValidatorService } from './jwt-validator.service';
@@ -32,69 +32,181 @@ export class AuthService {
   ) {}
 
   /**
-   * Register a new user in Cognito and create user profile in DynamoDB
+   * Register a new user — three-way check:
+   * 1. Active Cognito user → "already registered"
+   * 2. Placeholder (unclaimed) → claim it (set password, activate)
+   * 3. New → create from scratch
+   * Cases 2 and 3 return identical responses to prevent email enumeration.
    */
   async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
     const { email, password, fullName, phoneNumber, role, driverLicenseNumber } = registerDto;
 
-    // Validate driver license number for Driver role
     if (role === UserRole.Driver && !driverLicenseNumber) {
       throw new BadRequestException('Driver license number is required for Driver role');
     }
 
-    // Prevent Admin role registration via public API
-    if (role === UserRole.Admin) {
-      throw new BadRequestException('Admin users cannot be created through registration. Contact system administrator.');
+    // Three-way check
+    try {
+      const existingUser = await this.awsService.getCognitoClient().send(
+        new AdminGetUserCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+        }),
+      );
+
+      // User exists in Cognito — check status
+      if (existingUser.UserStatus === 'CONFIRMED') {
+        throw new ConflictException('An account with this email already exists');
+      }
+
+      // Placeholder (FORCE_CHANGE_PASSWORD) — claim it
+      const userId = existingUser.UserAttributes?.find(a => a.Name === 'sub')?.Value!;
+
+      await this.awsService.getCognitoClient().send(
+        new AdminSetUserPasswordCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+          Password: password,
+          Permanent: true,
+        }),
+      );
+
+      // Update DDB: accountStatus → active, set claimedAt
+      await this.awsService.getDynamoDBClient().send(new UpdateCommand({
+        TableName: this.configService.v2UsersTableName,
+        Key: { PK: `USER#${userId}`, SK: 'METADATA' },
+        UpdateExpression: 'SET #status = :active, #claimed = :now, #name = :name, #phone = :phone, #updated = :now',
+        ExpressionAttributeNames: {
+          '#status': 'accountStatus', '#claimed': 'claimedAt',
+          '#name': 'name', '#phone': 'phone', '#updated': 'updatedAt',
+        },
+        ExpressionAttributeValues: {
+          ':active': 'active', ':now': new Date().toISOString(),
+          ':name': fullName, ':phone': phoneNumber || '',
+        },
+      }));
+
+      return { message: 'User registered successfully. You can now log in.', userId };
+    } catch (error: any) {
+      if (error instanceof ConflictException) throw error;
+
+      if (error.name !== 'UserNotFoundException') {
+        this.handleCognitoError(error, 'registration');
+      }
     }
 
+    // Case 3: New user — create from scratch
     try {
-      // Create user in Cognito using AdminCreateUser for immediate group assignment
-      const createUserCommand = new AdminCreateUserCommand({
+      const createUserResponse = await this.awsService.getCognitoClient().send(
+        new AdminCreateUserCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+          UserAttributes: [
+            { Name: 'email', Value: email },
+            { Name: 'email_verified', Value: 'true' },
+            { Name: 'name', Value: fullName },
+            ...(phoneNumber ? [{ Name: 'phone_number', Value: phoneNumber }] : []),
+          ],
+          TemporaryPassword: password,
+          MessageAction: 'SUPPRESS',
+        }),
+      );
+
+      await this.awsService.getCognitoClient().send(
+        new AdminSetUserPasswordCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+          Password: password,
+          Permanent: true,
+        }),
+      );
+
+      await this.addUserToGroup(email, role);
+
+      const userDetails = await this.awsService.getCognitoClient().send(
+        new AdminGetUserCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+        }),
+      );
+      const userId = userDetails.UserAttributes?.find(a => a.Name === 'sub')?.Value!;
+
+      await this.createUserProfileV2(userId, email, fullName, phoneNumber || '', role, driverLicenseNumber);
+
+      return { message: 'User registered successfully. You can now log in.', userId };
+    } catch (error: any) {
+      this.handleCognitoError(error, 'registration');
+    }
+  }
+
+  /**
+   * Create a placeholder user in Cognito + DynamoDB (no invitation email).
+   * Returns the userId (Cognito sub).
+   */
+  async createPlaceholder(
+    creatorId: string,
+    email: string,
+    name: string,
+    role: UserRole,
+  ): Promise<string> {
+    // Check if email already exists
+    try {
+      await this.awsService.getCognitoClient().send(
+        new AdminGetUserCommand({
+          UserPoolId: this.configService.cognitoUserPoolId,
+          Username: email,
+        }),
+      );
+      throw new ConflictException('An account with this email already exists');
+    } catch (error: any) {
+      if (error instanceof ConflictException) throw error;
+      if (error.name !== 'UserNotFoundException') throw error;
+    }
+
+    const tempPassword = 'Placeholder1!'; // Never sent — user sets own on claim
+    const createResp = await this.awsService.getCognitoClient().send(
+      new AdminCreateUserCommand({
         UserPoolId: this.configService.cognitoUserPoolId,
         Username: email,
         UserAttributes: [
           { Name: 'email', Value: email },
-          { Name: 'email_verified', Value: 'true' }, // Auto-verify email
-          { Name: 'name', Value: fullName },
-          { Name: 'phone_number', Value: phoneNumber },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'name', Value: name },
         ],
-        TemporaryPassword: password,
-        MessageAction: 'SUPPRESS', // Don't send welcome email, we'll handle password setting
-      });
+        TemporaryPassword: tempPassword,
+        MessageAction: 'SUPPRESS',
+      }),
+    );
 
-      const createUserResponse = await this.awsService.getCognitoClient().send(createUserCommand);
-      const userId = createUserResponse.User?.Username!;
+    await this.addUserToGroup(email, role);
 
-      // Set permanent password
-      const setPasswordCommand = new AdminSetUserPasswordCommand({
+    const userDetails = await this.awsService.getCognitoClient().send(
+      new AdminGetUserCommand({
         UserPoolId: this.configService.cognitoUserPoolId,
         Username: email,
-        Password: password,
-        Permanent: true,
-      });
-      await this.awsService.getCognitoClient().send(setPasswordCommand);
+      }),
+    );
+    const userId = userDetails.UserAttributes?.find(a => a.Name === 'sub')?.Value!;
 
-      // Add user to role group
-      await this.addUserToGroup(email, role);
+    const now = new Date().toISOString();
+    const gsi1pk = role === UserRole.Carrier ? `CARRIER#${userId}` : 'NONE';
+    const item: Record<string, any> = {
+      PK: `USER#${userId}`, SK: 'METADATA',
+      GSI1PK: gsi1pk, GSI1SK: `ROLE#${role.toUpperCase()}#USER#${userId}`,
+      GSI2PK: `EMAIL#${email}`, GSI2SK: `USER#${userId}`,
+      userId, email, name, role: role.toUpperCase(),
+      accountStatus: 'unclaimed', isActive: true,
+      createdAt: now, updatedAt: now,
+      createdBy: creatorId, lastModifiedBy: creatorId,
+    };
+    if (role === UserRole.Carrier) item.carrierId = userId;
 
-      // Get the actual user sub (UUID)
-      const getUserCommand = new AdminGetUserCommand({
-        UserPoolId: this.configService.cognitoUserPoolId,
-        Username: email,
-      });
-      const userDetails = await this.awsService.getCognitoClient().send(getUserCommand);
-      const actualUserId = userDetails.UserAttributes?.find(attr => attr.Name === 'sub')?.Value!;
+    await this.awsService.getDynamoDBClient().send(new PutCommand({
+      TableName: this.configService.v2UsersTableName,
+      Item: item,
+    }));
 
-      // Create user profile in DynamoDB
-      await this.createUserProfile(actualUserId, email, fullName, phoneNumber, role, driverLicenseNumber);
-
-      return {
-        message: 'User registered successfully. You can now log in.',
-        userId: actualUserId,
-      };
-    } catch (error: any) {
-      this.handleCognitoError(error, 'registration');
-    }
+    return userId;
   }
 
   /**
@@ -299,9 +411,9 @@ export class AuthService {
   }
 
   /**
-   * Create user profile in DynamoDB
+   * Create user profile in v2 DynamoDB table
    */
-  private async createUserProfile(
+  private async createUserProfileV2(
     userId: string,
     email: string,
     fullName: string,
@@ -310,36 +422,28 @@ export class AuthService {
     driverLicenseNumber?: string,
   ): Promise<void> {
     const now = new Date().toISOString();
+    const gsi1pk = role === UserRole.Carrier ? `CARRIER#${userId}` : 'NONE';
 
-    const item: any = {
-      PK: `USER#${userId}`,
-      SK: 'PROFILE',
-      userId,
-      email,
-      fullName,
-      phoneNumber,
-      role,
-      verificationStatus: 'Pending',
-      createdAt: now,
-      updatedAt: now,
+    const item: Record<string, any> = {
+      PK: `USER#${userId}`, SK: 'METADATA',
+      GSI1PK: gsi1pk, GSI1SK: `ROLE#${role.toUpperCase()}#USER#${userId}`,
+      GSI2PK: `EMAIL#${email}`, GSI2SK: `USER#${userId}`,
+      userId, email, name: fullName, phone: phoneNumber, role: role.toUpperCase(),
+      accountStatus: 'active', isActive: true,
+      createdAt: now, updatedAt: now,
+      createdBy: userId, lastModifiedBy: userId,
     };
-
-    // Add driver license number if provided (for Driver role)
-    if (driverLicenseNumber) {
-      item.driverLicenseNumber = driverLicenseNumber;
+    if (role === UserRole.Carrier) item.carrierId = userId;
+    if (role === UserRole.Dispatcher) {
+      item.subscribedCarrierIds = new Set<string>();
+      item.subscribedAdminIds = new Set<string>();
     }
+    if (driverLicenseNumber) item.driverLicenseNumber = driverLicenseNumber;
 
-    const putCommand = new PutCommand({
-      TableName: this.configService.usersTableName,
+    await this.awsService.getDynamoDBClient().send(new PutCommand({
+      TableName: this.configService.v2UsersTableName,
       Item: item,
-    });
-
-    try {
-      await this.awsService.getDynamoDBClient().send(putCommand);
-    } catch (error: any) {
-      console.error('Error creating user profile in DynamoDB:', error);
-      throw new InternalServerErrorException('Failed to create user profile');
-    }
+    }));
   }
 
   /**
