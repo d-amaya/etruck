@@ -9,20 +9,33 @@ export const DISPATCHER_ROUTES: Routes = [
     path: 'analytics',
     loadComponent: () => import('./analytics-dashboard/analytics-dashboard.component').then(m => m.AnalyticsDashboardComponent)
   },
-  // Trip management routes
+  // Order management routes (v2)
   {
-    path: 'trips/create',
+    path: 'orders/create',
     loadComponent: () => import('./trip-create/trip-create.component').then(m => m.TripCreateComponent)
   },
   {
-    path: 'trips/:tripId/edit',
+    path: 'orders/:orderId/edit',
     loadComponent: () => import('./trip-edit/trip-edit.component').then(m => m.TripEditComponent)
   },
   {
-    path: 'trips/:tripId',
+    path: 'orders/:orderId',
     loadComponent: () => import('./trip-detail/trip-detail.component').then(m => m.TripDetailComponent)
   },
-  // Redirects
+  // Legacy redirects
+  {
+    path: 'trips/create',
+    redirectTo: 'orders/create',
+    pathMatch: 'full'
+  },
+  {
+    path: 'trips/:tripId/edit',
+    redirectTo: 'orders/:tripId/edit'
+  },
+  {
+    path: 'trips/:tripId',
+    redirectTo: 'orders/:tripId'
+  },
   {
     path: 'trips',
     redirectTo: 'dashboard',

@@ -15,27 +15,62 @@
     <mat-card-content>
       <form [formGroup]="tripForm" (ngSubmit)="onSubmit()">
 
-        <!-- 1. Order & Broker -->
+        <!-- 1. Admin & Carrier -->
+        <div class="form-section">
+          <h3>Organization</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Admin</mat-label>
+              <input matInput formControlName="adminId" [matAutocomplete]="adminAuto" placeholder="Type to search...">
+              <mat-autocomplete #adminAuto="matAutocomplete" [displayWith]="displayAdmin">
+                <mat-option *ngFor="let admin of filteredAdmins$ | async" [value]="admin.userId">
+                  {{ admin.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('adminId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Carrier</mat-label>
+              <input matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
+              <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier"
+                                (optionSelected)="onCarrierSelected()">
+                <mat-option *ngFor="let carrier of filteredCarriers$ | async" [value]="carrier.userId">
+                  {{ carrier.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('carrierId') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- 2. Order & Broker -->
         <div class="form-section">
           <h3>Order Information</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Order Confirmation #</mat-label>
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Invoice #</mat-label>
               <input matInput formControlName="invoiceNumber" placeholder="e.g. ORD-001">
               <mat-error>{{ getErrorMessage('invoiceNumber') }}</mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Broker Load #</mat-label>
+              <input matInput formControlName="brokerLoad">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Broker</mat-label>
-              <mat-select formControlName="brokerId" [disabled]="loadingBrokers">
-                <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+              <input matInput formControlName="brokerId" [matAutocomplete]="brokerAuto" placeholder="Type to search...">
+              <mat-autocomplete #brokerAuto="matAutocomplete" [displayWith]="displayBroker">
+                <mat-option *ngFor="let broker of filteredBrokers$ | async" [value]="broker.brokerId">
                   {{ broker.brokerName }}
                 </mat-option>
-              </mat-select>
+              </mat-autocomplete>
               <mat-error>{{ getErrorMessage('brokerId') }}</mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Scheduled Date</mat-label>
               <input matInput [matDatepicker]="scheduledPicker" formControlName="scheduledTimestamp">
               <mat-datepicker-toggle matSuffix [for]="scheduledPicker"></mat-datepicker-toggle>
@@ -45,7 +80,48 @@
           </div>
         </div>
 
-        <!-- 2. Pickup -->
+        <!-- 3. Assignment (cascading from Carrier) -->
+        <div class="form-section">
+          <h3>Assignment</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Truck</mat-label>
+              <input matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Select carrier first...">
+              <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck"
+                                (optionSelected)="onTruckSelected()">
+                <mat-option *ngFor="let truck of filteredTrucks$ | async" [value]="truck.truckId">
+                  {{ truck.brand }} {{ truck.year }} — {{ truck.plate }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('truckId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Trailer</mat-label>
+              <input matInput formControlName="trailerId" [matAutocomplete]="trailerAuto" placeholder="Select carrier first...">
+              <mat-autocomplete #trailerAuto="matAutocomplete" [displayWith]="displayTrailer">
+                <mat-option *ngFor="let trailer of filteredTrailers$ | async" [value]="trailer.trailerId">
+                  {{ trailer.brand }} {{ trailer.year }} — {{ trailer.plate }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('trailerId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Driver</mat-label>
+              <input matInput formControlName="driverId" [matAutocomplete]="driverAuto" placeholder="Select carrier first...">
+              <mat-autocomplete #driverAuto="matAutocomplete" [displayWith]="displayDriver"
+                                (optionSelected)="onDriverSelected()">
+                <mat-option *ngFor="let driver of filteredDrivers$ | async" [value]="driver.userId">
+                  {{ driver.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- 4. Pickup -->
         <div class="form-section">
           <h3>Pickup</h3>
           <div class="form-row">
@@ -107,7 +183,7 @@
           </mat-form-field>
         </div>
 
-        <!-- 3. Delivery -->
+        <!-- 5. Delivery -->
         <div class="form-section">
           <h3>Delivery</h3>
           <div class="form-row">
@@ -169,66 +245,25 @@
           </mat-form-field>
         </div>
 
-        <!-- 4. Assignment -->
-        <div class="form-section">
-          <h3>Assignment</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Truck</mat-label>
-              <mat-select formControlName="truckId" [disabled]="loadingAssets">
-                <mat-option *ngFor="let truck of trucks" [value]="truck.truckId">
-                  {{ truck.brand }} {{ truck.year }} — {{ truck.plate }}
-                </mat-option>
-              </mat-select>
-              <mat-error>{{ getErrorMessage('truckId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Trailer</mat-label>
-              <mat-select formControlName="trailerId" [disabled]="loadingAssets">
-                <mat-option *ngFor="let trailer of trailers" [value]="trailer.trailerId">
-                  {{ trailer.brand }} {{ trailer.year }} — {{ trailer.plate }}
-                </mat-option>
-              </mat-select>
-              <mat-error>{{ getErrorMessage('trailerId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Driver</mat-label>
-              <mat-select formControlName="driverId" [disabled]="loadingAssets">
-                <mat-option *ngFor="let driver of drivers" [value]="driver.userId">
-                  {{ driver.name }}
-                </mat-option>
-              </mat-select>
-              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- 5. Mileage & Fuel -->
+        <!-- 6. Mileage -->
         <div class="form-section">
           <h3>Mileage</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Loaded Miles</mat-label>
               <input matInput type="number" step="0.1" formControlName="mileageOrder">
               <mat-error>{{ getErrorMessage('mileageOrder') }}</mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Empty Miles</mat-label>
               <input matInput type="number" step="0.1" formControlName="mileageEmpty">
               <mat-error>{{ getErrorMessage('mileageEmpty') }}</mat-error>
             </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Total Miles</mat-label>
-              <input matInput formControlName="mileageTotal" readonly>
-            </mat-form-field>
           </div>
         </div>
 
-        <!-- 6. Rates & Payments -->
+        <!-- 7. Finances -->
         <div class="form-section">
           <h3>Finances</h3>
 
@@ -252,87 +287,41 @@
 
           <div class="form-row">
             <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Avg Fuel Cost ($/gal)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="fuelGasAvgCost">
-              <mat-error>{{ getErrorMessage('fuelGasAvgCost') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Avg Gallons/Mile</mat-label>
-              <input matInput type="number" step="0.001" formControlName="fuelGasAvgGallxMil">
-              <mat-error>{{ getErrorMessage('fuelGasAvgGallxMil') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width cost-field">
-              <mat-label>Est. Fuel Cost ($)</mat-label>
-              <input matInput formControlName="estimatedFuelCost" readonly>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Dispatcher</mat-label>
-              <input matInput [value]="currentDispatcherName" disabled>
+              <mat-label>Admin Rate (%)</mat-label>
+              <input matInput formControlName="adminRate" readonly>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width">
               <mat-label>Dispatcher Rate (%)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="dispatcherRate">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width cost-field">
-              <mat-label>Dispatcher Payment ($)</mat-label>
-              <input matInput formControlName="dispatcherPayment" readonly>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Driver</mat-label>
-              <input matInput [value]="selectedDriverName" disabled>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Driver Rate ($/mile)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="driverRate">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width cost-field">
-              <mat-label>Driver Payment ($)</mat-label>
-              <input matInput formControlName="driverPayment" readonly>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Carrier</mat-label>
-              <input matInput [value]="selectedTruckOwnerName" disabled>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Carrier Rate (%)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="carrierRate">
+              <input matInput formControlName="dispatcherRate" readonly>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="third-width cost-field">
               <mat-label>Carrier Payment ($)</mat-label>
-              <input matInput formControlName="carrierPayment" readonly>
+              <input matInput [value]="carrierPayment.toFixed(2)" readonly>
             </mat-form-field>
           </div>
 
-          <div class="profit-display" [ngClass]="calculateProfit() >= 0 ? 'profit-positive' : 'profit-negative'">
-            <span class="profit-label">{{ getProfitLabel() }}</span>
-            <span class="profit-amount">{{ formatProfitAmount() }}</span>
-          </div>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width cost-field">
+              <mat-label>Admin Payment ($)</mat-label>
+              <input matInput [value]="adminPayment.toFixed(2)" readonly>
+            </mat-form-field>
 
-          
+            <mat-form-field appearance="outline" class="third-width cost-field">
+              <mat-label>Dispatcher Payment ($)</mat-label>
+              <input matInput [value]="dispatcherPayment.toFixed(2)" readonly>
+            </mat-form-field>
+
+            <div class="third-width"></div>
+          </div>
         </div>
 
         <!-- Actions -->
         <div class="form-actions">
           <button mat-raised-button type="button" (click)="onCancel()" [disabled]="loading">Cancel</button>
           <button mat-raised-button color="primary" type="submit"
-                  [disabled]="loading || loadingBrokers || loadingAssets">
+                  [disabled]="loading || loadingAssets">
             <mat-spinner *ngIf="loading" diameter="20" class="button-spinner"></mat-spinner>
             <span *ngIf="!loading">Create Order</span>
           </button>

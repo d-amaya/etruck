@@ -177,8 +177,8 @@
         </mat-card-content>
       </mat-card>
 
-      <!-- Fuel Cost Information Card -->
-      <mat-card class="detail-card">
+      <!-- Fuel Cost Information Card (hidden for Dispatchers) -->
+      <mat-card class="detail-card" *ngIf="!isDispatcher">
         <mat-card-header>
           <mat-card-title>Fuel Cost Information</mat-card-title>
         </mat-card-header>
@@ -216,38 +216,22 @@
               <span class="detail-label">Order Rate:</span>
               <span class="detail-value payment-positive">{{ formatCurrency(trip.orderRate) }}</span>
             </div>
-            <div class="detail-row indent" *ngIf="trip.orderRate && trip.orderRate > 0">
-              <span class="detail-label">Advance Received:</span>
-              <span class="detail-value payment-info">{{ formatCurrency(trip.orderRate) }}</span>
-            </div>
-            <div class="detail-row indent" *ngIf="trip.orderRate && trip.orderRate > 0">
-              <span class="detail-label">Balance Due:</span>
-              <span class="detail-value payment-info">{{ formatCurrency(trip.orderRate - trip.orderRate) }}</span>
-            </div>
           </div>
           
-          <!-- Column 2: Expenses -->
+          <!-- Column 2: Expenses (Dispatcher view) -->
           <div class="payment-column">
             <h4 class="section-title">Expenses</h4>
             <div class="detail-row">
-              <span class="detail-label">Truck Owner:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.carrierPayment) }}</span>
+              <span class="detail-label">Dispatcher Rate:</span>
+              <span class="detail-value">{{ trip.dispatcherRate || 0 }}%</span>
             </div>
             <div class="detail-row">
-              <span class="detail-label">Driver Payment:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.driverPayment) }}</span>
+              <span class="detail-label">Dispatcher Payment:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.dispatcherPayment || 0) }}</span>
             </div>
-            <div class="detail-row indent" *ngIf="trip.driverPayment && trip.driverPayment > 0">
-              <span class="detail-label">Advance Paid:</span>
-              <span class="detail-value payment-info">{{ formatCurrency(trip.driverPayment) }}</span>
-            </div>
-            <div class="detail-row indent" *ngIf="trip.driverPayment && trip.driverPayment > 0">
-              <span class="detail-label">Balance Due:</span>
-              <span class="detail-value payment-info">{{ formatCurrency(trip.driverPayment - trip.driverPayment) }}</span>
-            </div>
-            <div class="detail-row" *ngIf="calculateFuelCost() > 0">
-              <span class="detail-label">Fuel Cost:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(calculateFuelCost()) }}</span>
+            <div class="detail-row">
+              <span class="detail-label">Carrier Payment:</span>
+              <span class="detail-value payment-negative">{{ formatCurrency(trip.carrierPayment || 0) }}</span>
             </div>
             <div class="detail-row" *ngIf="trip.lumperValue && trip.lumperValue > 0">
               <span class="detail-label">Lumper Fees:</span>
@@ -262,11 +246,6 @@
           <!-- Column 3: Summary -->
           <div class="payment-column">
             <h4 class="section-title">Summary</h4>
-            
-            <div class="detail-row total-row">
-              <span class="detail-label"><strong>Total Expenses:</strong></span>
-              <span class="detail-value payment-negative"><strong>{{ formatCurrency(calculateTotalExpenses()) }}</strong></span>
-            </div>
             
             <div class="detail-row profit-row" style="margin-top: 12px;">
               <span class="detail-label"><strong>{{ calculateProfit() >= 0 ? 'Net Profit:' : 'Net Loss:' }}</strong></span>

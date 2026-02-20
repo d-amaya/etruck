@@ -584,7 +584,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   viewTrip(trip: Order): void {
     try {
-      this.router.navigate(['/dispatcher/trips', trip.orderId]).catch(err => {
+      this.router.navigate(['/dispatcher/orders', trip.orderId]).catch(err => {
         console.error('Navigation error:', err);
         this.snackBar.open('Error navigating to order details', 'Close', { duration: 3000 });
       });
@@ -596,7 +596,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   editTrip(trip: Order): void {
     try {
-      this.router.navigate(['/dispatcher/trips', trip.orderId, 'edit']).catch(err => {
+      this.router.navigate(['/dispatcher/orders', trip.orderId, 'edit']).catch(err => {
         console.error('Navigation error:', err);
         this.snackBar.open('Error navigating to edit order', 'Close', { duration: 3000 });
       });
@@ -656,7 +656,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   }
 
   createTrip(): void {
-    this.router.navigate(['/dispatcher/trips/create']);
+    this.router.navigate(['/dispatcher/orders/create']);
   }
 
   getEmptyStateMessage(): string {

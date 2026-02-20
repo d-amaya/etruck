@@ -62,7 +62,7 @@ describe('TripListComponent', () => {
 
   it('should navigate to create trip when onCreateTrip is called', () => {
     component.onCreateTrip();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/dispatcher/trips/create']);
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/dispatcher/orders/create']);
   });
 
   it('should navigate to dashboard when onBackToDashboard is called', () => {

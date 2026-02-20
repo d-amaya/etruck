@@ -58,9 +58,9 @@ export class TripDetailComponent implements OnInit {
     // Load asset maps from localStorage
     this.loadAssetMapsFromStorage();
     
-    const tripId = this.route.snapshot.paramMap.get('tripId');
-    if (tripId) {
-      this.loadTrip(tripId);
+    const orderId = this.route.snapshot.paramMap.get('orderId') || this.route.snapshot.paramMap.get('tripId');
+    if (orderId) {
+      this.loadTrip(orderId);
     } else {
       this.error = 'No order ID provided';
       this.loading = false;
@@ -119,7 +119,7 @@ export class TripDetailComponent implements OnInit {
 
   onEditTrip(): void {
     if (this.trip) {
-      this.router.navigate(['/dispatcher/trips', this.trip.orderId, 'edit']);
+      this.router.navigate(['/dispatcher/orders', this.trip.orderId, 'edit']);
     }
   }
 
@@ -365,4 +365,8 @@ export class TripDetailComponent implements OnInit {
 
   // Expose Math to template
   Math = Math;
+
+  get isDispatcher(): boolean {
+    return this.authService.userRole === UserRole.Dispatcher;
+  }
 }

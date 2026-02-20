@@ -96,6 +96,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onCreateTrip(): void {
-    this.router.navigate(['/dispatcher/trips/create']);
+    this.router.navigate(['/dispatcher/orders/create']);
   }
 }

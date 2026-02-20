@@ -245,15 +245,15 @@ export class TripListComponent implements OnInit {
   }
 
   onViewDetails(trip: Order): void {
-    this.router.navigate(['/dispatcher/trips', trip.orderId]);
+    this.router.navigate(['/dispatcher/orders', trip.orderId]);
   }
 
   onEditTrip(trip: Order): void {
-    this.router.navigate(['/dispatcher/trips', trip.orderId, 'edit']);
+    this.router.navigate(['/dispatcher/orders', trip.orderId, 'edit']);
   }
 
   onCreateTrip(): void {
-    this.router.navigate(['/dispatcher/trips/create']);
+    this.router.navigate(['/dispatcher/orders/create']);
   }
 
   onBackToDashboard(): void {
