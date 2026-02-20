@@ -1,13 +1,13 @@
-import { Trip, TripStatus } from '@haulhub/shared';
+import { Order, OrderStatus } from '@haulhub/shared';
 
 export class DashboardExportResponseDto {
-  trips: Trip[];
-  summaryByStatus: Record<TripStatus, number>;
+  orders: Order[];
+  summaryByStatus: Record<OrderStatus, number>;
   paymentSummary: {
-    totalBrokerPayments: number;
-    totalDriverPayments: number;
-    totalTruckOwnerPayments: number;
-    totalProfit: number;
+    totalOrderRate: number;
+    totalCarrierPayment: number;
+    totalDriverPayment: number;
+    totalFuelCost: number;
   };
   assets: {
     brokers: Array<{ brokerId: string; brokerName: string }>;

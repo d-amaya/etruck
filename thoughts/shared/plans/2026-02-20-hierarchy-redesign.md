@@ -447,19 +447,19 @@ Remove TruckOwner analytics. Point to v2 tables.
 ### Tests for This Phase:
 
 #### Unit Tests:
-- [ ] Broker endpoint returns list on GET, rejects POST/PATCH/DELETE
-- [ ] Asset creation includes audit fields
+- [x] Broker endpoint returns list on GET, rejects POST/PATCH/DELETE
+- [x] Asset creation includes audit fields
 - [ ] Dispatcher can create assets for subscribed Carriers
 - [ ] Dispatcher cannot create assets for unsubscribed Carriers → 403
 - [ ] Analytics returns correct profit per role
-- [ ] No references to TruckOwner/LorryOwner in any backend file
+- [x] No references to TruckOwner/LorryOwner in any backend file
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `cd haulhub-backend && npm run build` compiles with zero errors
-- [ ] `cd haulhub-backend && npm test` passes
-- [ ] `grep -r "TruckOwner\|LorryOwner\|truckOwnerId" haulhub-backend/src/` returns zero matches
+- [x] `cd haulhub-backend && npm run build` compiles with zero errors
+- [x] `cd haulhub-backend && npm test` passes
+- [x] `grep -r "TruckOwner\|LorryOwner\|truckOwnerId" haulhub-backend/src/` returns zero matches
 
 #### Manual Verification:
 - [ ] Full API smoke test with seeded data — all endpoints respond correctly
