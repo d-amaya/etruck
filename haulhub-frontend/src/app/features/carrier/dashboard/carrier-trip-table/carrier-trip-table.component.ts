@@ -19,12 +19,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { CarrierService, User } from '../../../../core/services/carrier.service';
+import { CarrierService } from '../../../../core/services/carrier.service';
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { CarrierDashboardStateService } from '../../shared/carrier-dashboard-state.service';
-import { Trip, TripStatus, calculateTripProfit } from '../../../../core/services/trip.service';
-import { Broker } from '@haulhub/shared';
+import { Order, OrderStatus, Broker, calcCarrierProfit } from '@haulhub/shared';
 import { CarrierChartsWidgetComponent } from '../carrier-charts-widget/carrier-charts-widget.component';
 
 @Component({
@@ -59,17 +58,16 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     'pickupLocation',
     'dropoffLocation',
     'dispatcherName',
-    'brokerName',
     'truckId',
     'driverName',
-    'truckOwnerName',
-    'revenue',
+    'trailerId',
+    'carrierPayment',
     'expenses',
     'profitLoss',
     'actions'
   ];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   totalTrips = 0;
   pageSize = 10;
   pageIndex = 0;
@@ -77,27 +75,22 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   lastDashboardResponse: any = null;
 
   filterForm: FormGroup;
-  statusOptions = Object.values(TripStatus).sort();
-  brokers: Broker[] = [];
-  dispatchers: User[] = [];
-  drivers: User[] = [];
+  statusOptions = Object.values(OrderStatus).sort();
+  dispatchers: any[] = [];
+  drivers: any[] = [];
   trucks: any[] = [];
   trailers: any[] = [];
-  truckOwners: User[] = [];
 
   // Filtered observables for autocomplete
   filteredTrucks: Observable<any[]> = new Observable();
   filteredDrivers: Observable<any[]> = new Observable();
   filteredDispatchers: Observable<any[]> = new Observable();
-  filteredTruckOwners: Observable<any[]> = new Observable();
 
   // Lookup maps for display
-  private brokerMap = new Map<string, Broker>();
-  private dispatcherMap = new Map<string, User>();
-  private driverMap = new Map<string, User>();
+  private dispatcherMap = new Map<string, any>();
+  private driverMap = new Map<string, any>();
   private truckMap = new Map<string, any>();
   private trailerMap = new Map<string, any>();
-  private truckOwnerMap = new Map<string, User>();
 
   private destroy$ = new Subject<void>();
 
@@ -112,11 +105,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   ) {
     this.filterForm = this.fb.group({
       status: [null],
-      brokerId: [null],
       dispatcherId: [null],
       driverId: [null],
-      truckId: [null],
-      truckOwnerId: [null]
+      truckId: [null]
     });
   }
 
@@ -129,15 +120,11 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       this.trailers = Array.from(cache.trailers.values()).sort((a, b) => a.plate.localeCompare(b.plate));
       this.drivers = Array.from(cache.drivers.values()).sort((a, b) => a.name.localeCompare(b.name));
       this.dispatchers = Array.from(cache.dispatchers.values()).sort((a, b) => a.name.localeCompare(b.name));
-      this.brokers = Array.from(cache.brokers.values()).sort((a, b) => a.brokerName.localeCompare(b.brokerName));
-      this.truckOwners = Array.from(cache.truckOwners.values()).sort((a, b) => a.name.localeCompare(b.name));
       
       this.truckMap = cache.trucks;
       this.trailerMap = cache.trailers;
       this.driverMap = cache.drivers;
       this.dispatcherMap = cache.dispatchers;
-      this.brokerMap = cache.brokers;
-      this.truckOwnerMap = cache.truckOwners;
       
       // Setup autocomplete filters
       this.filteredTrucks = this.filterForm.get('truckId')!.valueChanges.pipe(
@@ -155,20 +142,13 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
         map(value => this._filterDispatchers(value || ''))
       );
 
-      this.filteredTruckOwners = this.filterForm.get('truckOwnerId')!.valueChanges.pipe(
-        startWith(''),
-        map(value => this._filterTruckOwners(value || ''))
-      );
-
       // Restore filter form from dashboard state
       const currentFilters = this.dashboardState.getCurrentFilters();
       this.filterForm.patchValue({
         status: currentFilters.status,
-        brokerId: currentFilters.brokerId,
         dispatcherId: currentFilters.dispatcherId,
         driverId: currentFilters.driverId,
         truckId: currentFilters.truckId,
-        truckOwnerId: currentFilters.truckOwnerId,
       }, { emitEvent: false });
     });
     
@@ -240,9 +220,6 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     if (filters.status) {
       apiFilters.orderStatus = filters.status;
     }
-    if (filters.brokerId) {
-      apiFilters.brokerId = filters.brokerId;
-    }
     if (filters.dispatcherId) {
       apiFilters.dispatcherId = filters.dispatcherId;
     }
@@ -251,9 +228,6 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     }
     if (filters.truckId) {
       apiFilters.truckId = filters.truckId;
-    }
-    if (filters.truckOwnerId) {
-      apiFilters.truckOwnerId = filters.truckOwnerId;
     }
     
     if (pagination.page > 0 && pagination.pageTokens[pagination.page - 1]) {
@@ -278,22 +252,18 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.dashboardState.updateFilters({
       ...currentFilters,
       status: formValue.status,
-      brokerId: formValue.brokerId,
       dispatcherId: formValue.dispatcherId,
       driverId: formValue.driverId,
       truckId: formValue.truckId,
-      truckOwnerId: formValue.truckOwnerId,
     });
   }
 
   clearAllFilters(): void {
     this.filterForm.reset({
       status: null,
-      brokerId: null,
       dispatcherId: null,
       driverId: null,
-      truckId: null,
-      truckOwnerId: null
+      truckId: null
     });
     this.dashboardState.resetFilters();
   }
@@ -305,8 +275,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     });
   }
 
-  viewTrip(trip: Trip): void {
-    this.router.navigate(['/carrier/trips', trip.tripId]);
+  viewTrip(trip: Order): void {
+    this.router.navigate(['/carrier/orders', trip.orderId]);
   }
 
   createTrip(): void {
@@ -340,12 +310,12 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     }).format(amount);
   }
 
-  calculateProfit(trip: Trip): number {
-    return calculateTripProfit(trip);
+  calculateProfit(order: Order): number {
+    return calcCarrierProfit(order);
   }
 
-  calculateExpenses(trip: Trip): number {
-    return (trip.driverPayment || 0) + (trip.truckOwnerPayment || 0) + (trip.fuelCost || 0);
+  calculateExpenses(order: Order): number {
+    return (order.driverPayment || 0) + (order.fuelCost || 0);
   }
 
   getTruckDisplay(truckId: string): string {
@@ -366,83 +336,40 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     return driver ? driver.name : driverId.substring(0, 8);
   }
 
-  getTruckOwnerDisplay(ownerId: string): string {
-    if (!ownerId) return 'N/A';
-    const owner = this.truckOwnerMap.get(ownerId);
-    return owner ? owner.name : ownerId.substring(0, 8);
-  }
-
-  getBrokerDisplay(brokerId: string): string {
-    if (!brokerId) return 'N/A';
-    const broker = this.brokerMap.get(brokerId);
-    return broker ? broker.brokerName : brokerId;
-  }
-
   getDispatcherDisplay(dispatcherId: string): string {
     if (!dispatcherId) return 'N/A';
     const dispatcher = this.dispatcherMap.get(dispatcherId);
     return dispatcher ? dispatcher.name : dispatcherId.substring(0, 8);
   }
 
-  getStatusClass(status: TripStatus | string): string {
-    const statusStr = typeof status === 'string' ? status : status;
-    
-    switch (statusStr) {
-      case TripStatus.Scheduled:
-      case 'Scheduled':
-        return 'status-scheduled';
-      case TripStatus.PickedUp:
-      case 'Picked Up':
-        return 'status-picked-up';
-      case TripStatus.InTransit:
-      case 'In Transit':
-        return 'status-in-transit';
-      case TripStatus.Delivered:
-      case 'Delivered':
-        return 'status-delivered';
-      case TripStatus.Paid:
-      case 'Paid':
-        return 'status-paid';
-      default:
-        return '';
+  getStatusClass(status: OrderStatus | string): string {
+    switch (status) {
+      case OrderStatus.Scheduled: return 'status-scheduled';
+      case OrderStatus.PickingUp: return 'status-picking-up';
+      case OrderStatus.Transit: return 'status-in-transit';
+      case OrderStatus.Delivered: return 'status-delivered';
+      case OrderStatus.WaitingRC: return 'status-waiting-rc';
+      case OrderStatus.ReadyToPay: return 'status-ready-to-pay';
+      case OrderStatus.Canceled: return 'status-canceled';
+      default: return '';
     }
   }
 
-  getStatusLabel(status: TripStatus | string): string {
-    const statusStr = typeof status === 'string' ? status : status;
-    
-    switch (statusStr) {
-      case TripStatus.Scheduled:
-      case 'Scheduled':
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-      case 'Picked Up':
-        return 'Picked Up';
-      case TripStatus.InTransit:
-      case 'In Transit':
-        return 'In Transit';
-      case TripStatus.Delivered:
-      case 'Delivered':
-        return 'Delivered';
-      case TripStatus.Paid:
-      case 'Paid':
-        return 'Paid';
-      default:
-        return String(status);
-    }
+  getStatusLabel(status: OrderStatus | string): string {
+    return String(status);
   }
 
-  getStatusAriaLabel(status: TripStatus): string {
+  getStatusAriaLabel(status: OrderStatus): string {
     return `Trip status: ${this.getStatusLabel(status)}`;
   }
 
-  getActionAriaLabel(action: string, tripId: string, destination?: string): string {
+  getActionAriaLabel(action: string, orderId: string, destination?: string): string {
     const dest = destination ? ` to ${destination}` : '';
     return `${action} trip${dest}`;
   }
 
-  getProfitAriaLabel(trip: Trip): string {
-    const profit = this.calculateProfit(trip);
+  getProfitAriaLabel(order: Order): string {
+    const profit = this.calculateProfit(order);
     const profitText = this.formatCurrency(profit);
     const profitType = profit >= 0 ? 'profit' : 'loss';
     return `${profitType}: ${profitText}`;
@@ -454,7 +381,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   get hasActiveFilters(): boolean {
     const formValue = this.filterForm.value;
-    return !!(formValue.status || formValue.brokerId || formValue.dispatcherId || formValue.driverId || formValue.truckId);
+    return !!(formValue.status || formValue.dispatcherId || formValue.driverId || formValue.truckId);
   }
 
   private _filterTrucks(value: string | any): any[] {
@@ -475,7 +402,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     return this.drivers.filter(driver => {
       const name = driver.name.toLowerCase();
       const words = name.split(' ');
-      return words.some(word => word.startsWith(filterValue)) || name.includes(filterValue);
+      return words.some((word: string) => word.startsWith(filterValue)) || name.includes(filterValue);
     });
   }
 
@@ -488,7 +415,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       const name = dispatcher.name.toLowerCase();
       const words = name.split(' ');
       // Match if any word starts with the filter value OR full name contains it
-      return words.some(word => word.startsWith(filterValue)) || name.includes(filterValue);
+      return words.some((word: string) => word.startsWith(filterValue)) || name.includes(filterValue);
     });
     return filtered;
   }
@@ -526,38 +453,15 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.onFilterChange();
   }
 
-  private _filterTruckOwners(value: string | any): any[] {
-    if (typeof value === 'object') return this.truckOwners;
-    const filterValue = (value || '').toString().toLowerCase();
-    return this.truckOwners.filter(owner => {
-      const name = owner.name.toLowerCase();
-      const words = name.split(' ');
-      return words.some(word => word.startsWith(filterValue)) || name.includes(filterValue);
-    });
-  }
-
-  displayTruckOwner = (ownerId: string | null): string => {
-    if (!ownerId) return '';
-    const owner = this.truckOwnerMap.get(ownerId);
-    return owner ? owner.name : '';
-  };
-
-  clearTruckOwnerFilter(): void {
-    this.filterForm.patchValue({ truckOwnerId: null });
-    this.onFilterChange();
-  }
-
   private buildExportFilters(): any {
     const filters = this.dashboardState.getCurrentFilters();
     const apiFilters: any = {};
     if (filters.dateRange?.startDate) apiFilters.startDate = filters.dateRange.startDate.toISOString();
     if (filters.dateRange?.endDate) apiFilters.endDate = filters.dateRange.endDate.toISOString();
     if (filters.status) apiFilters.orderStatus = filters.status;
-    if (filters.brokerId) apiFilters.brokerId = filters.brokerId;
     if (filters.dispatcherId) apiFilters.dispatcherId = filters.dispatcherId;
     if (filters.driverId) apiFilters.driverId = filters.driverId;
     if (filters.truckId) apiFilters.truckId = filters.truckId;
-    if (filters.truckOwnerId) apiFilters.truckOwnerId = filters.truckOwnerId;
     return apiFilters;
   }
 
@@ -568,10 +472,10 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       `${trip.pickupCity || ''}, ${trip.pickupState || ''}`,
       `${trip.deliveryCity || ''}, ${trip.deliveryState || ''}`,
       this.getDispatcherDisplay(trip.dispatcherId),
-      this.getBrokerDisplay(trip.brokerId),
       this.getTruckDisplay(trip.truckId),
       this.getDriverDisplay(trip.driverId),
-      trip.brokerPayment || 0,
+      this.getTrailerDisplay(trip.trailerId),
+      trip.carrierPayment || 0,
       this.calculateExpenses(trip),
       this.calculateProfit(trip)
     ];
@@ -619,7 +523,6 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       filterParts.push(`Date: ${this.formatDate(filters.dateRange.startDate.toISOString())} - ${this.formatDate(filters.dateRange.endDate.toISOString())}`);
     }
     if (filters.status) filterParts.push(`Status: ${filters.status}`);
-    if (filters.brokerId) filterParts.push(`Broker: ${this.getBrokerDisplay(filters.brokerId)}`);
     if (filters.dispatcherId) filterParts.push(`Dispatcher: ${this.getDispatcherDisplay(filters.dispatcherId)}`);
     if (filters.driverId) filterParts.push(`Driver: ${this.getDriverDisplay(filters.driverId)}`);
     if (filters.truckId) filterParts.push(`Truck: ${this.getTruckDisplay(filters.truckId)}`);
@@ -657,7 +560,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     }
     
     // Table
-    const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit'];
+    const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Driver', 'Trailer', 'Carrier Payment', 'Expenses', 'Profit'];
     const tableData = allTrips.map(trip => this.buildExportRow(trip).map((v, i) => i >= 8 ? this.formatCurrency(v) : v));
     
     autoTable(doc, {
@@ -682,7 +585,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.carrierService.getTrips(apiFilters).subscribe({
       next: (res: any) => {
         const allTrips = res.trips || res || [];
-        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Broker', 'Truck', 'Driver', 'Revenue', 'Expenses', 'Profit'];
+        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Driver', 'Trailer', 'Carrier Payment', 'Expenses', 'Profit'];
         const rows = allTrips.map((t: any) => this.buildExportRow(t));
         const df = this.filterService.getCurrentFilter();
         this.excelExportService.exportToExcel('carrier-orders-export', [{ name: 'Orders', headers, rows }], df.startDate, df.endDate);

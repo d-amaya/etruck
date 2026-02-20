@@ -9,9 +9,8 @@ export interface CarrierAssetCache {
   drivers: Map<string, any>;
   dispatchers: Map<string, any>;
   brokers: Map<string, any>;
-  truckOwners: Map<string, any>;
-  truckPlates: Map<string, string>; // plate -> truckId
-  trailerPlates: Map<string, string>; // plate -> trailerId
+  truckPlates: Map<string, string>;
+  trailerPlates: Map<string, string>;
   timestamp: number;
 }
 
@@ -56,14 +55,13 @@ export class CarrierAssetCacheService {
     this.loading = true;
 
     return this.carrierService.getAllAssets().pipe(
-      tap(({ trucks, trailers, drivers, dispatchers, brokers, truckOwners }) => {
+      tap(({ trucks, trailers, drivers, dispatchers, brokers }) => {
         const cache: CarrierAssetCache = {
           trucks: new Map(trucks.map(t => [t.truckId, t])),
           trailers: new Map(trailers.map(t => [t.trailerId, t])),
           drivers: new Map(drivers.map(d => [d.userId, d])),
           dispatchers: new Map(dispatchers.map(d => [d.userId, d])),
           brokers: new Map(brokers.map(b => [b.brokerId, b])),
-          truckOwners: new Map(truckOwners.map(o => [o.userId, o])),
           truckPlates: new Map(trucks.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.truckId])),
           trailerPlates: new Map(trailers.filter(t => t.isActive).map(t => [t.plate.toUpperCase(), t.trailerId])),
           timestamp: Date.now()
@@ -157,7 +155,6 @@ export class CarrierAssetCacheService {
       drivers: new Map(),
       dispatchers: new Map(),
       brokers: new Map(),
-      truckOwners: new Map(),
       truckPlates: new Map(),
       trailerPlates: new Map(),
       timestamp: Date.now()
@@ -172,7 +169,6 @@ export class CarrierAssetCacheService {
         drivers: Array.from(cache.drivers.entries()),
         dispatchers: Array.from(cache.dispatchers.entries()),
         brokers: Array.from(cache.brokers.entries()),
-        truckOwners: Array.from(cache.truckOwners.entries()),
         truckPlates: Array.from(cache.truckPlates.entries()),
         trailerPlates: Array.from(cache.trailerPlates.entries()),
         timestamp: cache.timestamp
@@ -194,7 +190,6 @@ export class CarrierAssetCacheService {
           drivers: new Map(serialized.drivers),
           dispatchers: new Map(serialized.dispatchers),
           brokers: new Map(serialized.brokers),
-          truckOwners: new Map(serialized.truckOwners || []),
           truckPlates: new Map(serialized.truckPlates || []),
           trailerPlates: new Map(serialized.trailerPlates || []),
           timestamp: serialized.timestamp || 0

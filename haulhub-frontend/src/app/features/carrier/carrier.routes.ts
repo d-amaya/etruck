@@ -14,13 +14,16 @@ export const CARRIER_ROUTES: Routes = [
     loadComponent: () => import('./asset-management/asset-management.component').then(m => m.AssetManagementComponent)
   },
   {
-    path: 'trips',
+    path: 'orders',
     loadComponent: () => import('./trip-list/trip-list.component').then(m => m.CarrierTripListComponent)
   },
   {
-    path: 'trips/:tripId',
+    path: 'orders/:orderId',
     loadComponent: () => import('../dispatcher/trip-detail/trip-detail.component').then(m => m.TripDetailComponent)
   },
+  // Legacy redirects
+  { path: 'trips', redirectTo: 'orders', pathMatch: 'full' },
+  { path: 'trips/:tripId', redirectTo: 'orders/:tripId', pathMatch: 'full' },
   {
     path: 'analytics',
     loadComponent: () => import('./analytics/analytics.component').then(m => m.CarrierAnalyticsComponent)

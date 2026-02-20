@@ -46,16 +46,13 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
   truckColumns: string[] = ['truckName', 'totalPayment', 'tripCount'];
-  truckOwnerColumns: string[] = ['ownerName', 'totalPayment', 'tripCount'];
   
   enrichedDriverData: any[] = [];
   enrichedTruckData: any[] = [];
-  enrichedTruckOwnerData: any[] = [];
   
   private truckMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
   private brokerMap = new Map<string, any>();
-  private truckOwnerMap = new Map<string, any>();
 
   constructor(
     private tripService: TripService,
@@ -80,7 +77,6 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       this.truckMap = cache.trucks;
       this.driverMap = cache.drivers;
       cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
-      cache.truckOwners.forEach((o, id) => this.truckOwnerMap.set(id, o));
     });
   }
 
@@ -109,17 +105,6 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
         const truckName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : truckId.substring(0, 8);
         return {
           truckName,
-          totalPayment: data.totalPayment,
-          tripCount: data.tripCount
-        };
-      });
-    }
-    
-    if (this.report.groupedByTruckOwner) {
-      this.enrichedTruckOwnerData = Object.entries((this.report as any).ownerId || {}).map(([ownerId, data]: any) => {
-        const owner = this.truckOwnerMap.get(ownerId);
-        return {
-          ownerName: owner?.name || ownerId.substring(0, 8),
           totalPayment: data.totalPayment,
           tripCount: data.tripCount
         };
@@ -218,8 +203,8 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPos, cardWidth, cardHeight, 'Driver Payments',
       this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
-    this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPos, cardWidth, cardHeight, 'Truck Owner Payments',
-      this.formatCurrency(this.report?.totalTruckOwnerPayments || 0), lossRed);
+    this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPos, cardWidth, cardHeight, 'Fuel Cost',
+      this.formatCurrency(this.report?.totalFuelCost || 0), lossRed);
     
     yPos += cardHeight + 15;
     
@@ -271,30 +256,6 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
     
-    // By Truck Owner
-    if (this.enrichedTruckOwnerData.length > 0) {
-      if (yPos > 240) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Payments by Truck Owner', 14, yPos);
-      yPos += 5;
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Truck Owner', 'Total Payment', 'Orders']],
-        body: this.enrichedTruckOwnerData.map(o => [o.ownerName, this.formatCurrency(o.totalPayment), o.tripCount.toString()]),
-        theme: 'grid',
-        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
-      });
-    }
-    
     doc.save(`carrier-payments-${new Date().toISOString().split('T')[0]}.pdf`);
     
     this.snackBar.open('Payment report exported to PDF successfully', 'Close', {
@@ -320,15 +281,6 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
         headers: ['Driver Name', 'Total Payment', 'Order Count'],
         rows: this.enrichedDriverData.map((d: any) => [
           d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
-        ])
-      });
-    }
-    if (this.enrichedTruckOwnerData?.length > 0) {
-      sheets.push({
-        name: 'By Truck Owner',
-        headers: ['Truck Owner', 'Total Payment', 'Order Count'],
-        rows: this.enrichedTruckOwnerData.map((o: any) => [
-          o.ownerName || o.truckOwnerId, o.totalPayment?.toFixed(2) || 0, o.tripCount || 0
         ])
       });
     }

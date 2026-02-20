@@ -132,8 +132,8 @@ export class CarrierFilterService {
     if (!this.tripsCache) return null;
     const key = JSON.stringify({
       s: filters.dateRange.startDate?.getTime(), e: filters.dateRange.endDate?.getTime(),
-      st: filters.status, b: filters.brokerId, t: filters.truckId,
-      d: filters.driverId, di: filters.dispatcherId, o: filters.truckOwnerId,
+      st: filters.status, t: filters.truckId,
+      d: filters.driverId, di: filters.dispatcherId,
       p: pagination.page, ps: pagination.pageSize
     });
     return this.tripsCache.key === key && (Date.now() - this.tripsCache.fetchedAt) < this.CACHE_TTL_MS
@@ -143,8 +143,8 @@ export class CarrierFilterService {
   setCachedTrips(filters: CarrierDashboardFilters, pagination: PaginationState, data: any): void {
     const key = JSON.stringify({
       s: filters.dateRange.startDate?.getTime(), e: filters.dateRange.endDate?.getTime(),
-      st: filters.status, b: filters.brokerId, t: filters.truckId,
-      d: filters.driverId, di: filters.dispatcherId, o: filters.truckOwnerId,
+      st: filters.status, t: filters.truckId,
+      d: filters.driverId, di: filters.dispatcherId,
       p: pagination.page, ps: pagination.pageSize
     });
     this.tripsCache = { data, key, fetchedAt: Date.now() };

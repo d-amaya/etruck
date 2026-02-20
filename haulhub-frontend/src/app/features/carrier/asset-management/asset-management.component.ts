@@ -26,8 +26,6 @@ interface Truck {
   year: number;
   vin: string;
   color: string;
-  truckOwnerId: string;
-  truckOwnerName?: string;
   isActive: boolean;
 }
 
@@ -40,12 +38,6 @@ interface Trailer {
   color: string;
   reefer: string | null;
   isActive: boolean;
-}
-
-interface TruckOwner {
-  userId: string;
-  name: string;
-  company: string;
 }
 
 @Component({
@@ -72,12 +64,11 @@ interface TruckOwner {
 })
 export class AssetManagementComponent implements OnInit {
   // Tab state
-  activeTab: 'dispatchers' | 'drivers' | 'truckOwners' | 'trucks' | 'trailers' = 'dispatchers';
+  activeTab: 'dispatchers' | 'drivers' | 'trucks' | 'trailers' = 'dispatchers';
 
   // Users
   dispatchers: any[] = [];
   drivers: any[] = [];
-  truckOwners: any[] = [];
 
   // Trucks
   trucks: any[] = [];
@@ -133,10 +124,8 @@ export class AssetManagementComponent implements OnInit {
       
       this.dispatchers = assets.dispatchers;
       this.drivers = assets.drivers;
-      this.truckOwners = assets.truckOwners;
       this.trucks = assets.trucks.map(truck => ({
-        ...truck,
-        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId || "")
+        ...truck
       }));
       this.trailers = assets.trailers;
       
@@ -164,11 +153,6 @@ export class AssetManagementComponent implements OnInit {
       );
       this.drivers = driversResponse.users;
 
-      // Load truck owners
-      const ownersResponse = await firstValueFrom(
-        this.carrierService.getUsers('TRUCK_OWNER')
-      );
-      this.truckOwners = ownersResponse.users;
     } catch (err: any) {
       console.error('Error loading users:', err);
     }
@@ -177,7 +161,6 @@ export class AssetManagementComponent implements OnInit {
   private initializeForms(): void {
     // Truck form
     this.truckForm = this.fb.group({
-      truckOwnerId: ['', Validators.required],
       plate: ['', [Validators.required, Validators.minLength(2)]],
       brand: ['', [Validators.required, Validators.minLength(2)]],
       year: ['', [Validators.required, Validators.min(1900), Validators.max(this.currentYear + 1)]],
@@ -196,21 +179,6 @@ export class AssetManagementComponent implements OnInit {
     });
   }
 
-  async loadTruckOwners(): Promise<void> {
-    try {
-      const response = await firstValueFrom(
-        this.carrierService.getUsers('TRUCK_OWNER')
-      );
-      this.truckOwners = response.users.map(user => ({
-        userId: user.userId,
-        name: user.name,
-        company: user.company || ''
-      }));
-    } catch (err: any) {
-      console.error('Error loading truck owners:', err);
-    }
-  }
-
   async loadTrucks(): Promise<void> {
     this.loading = true;
     this.error = null;
@@ -225,7 +193,6 @@ export class AssetManagementComponent implements OnInit {
       
       this.trucks = response.trucks.map(truck => ({
         ...truck,
-        truckOwnerName: this.getTruckOwnerName(truck.truckOwnerId || "")
       }));
       this.applyTruckFilters();
     } catch (err: any) {
@@ -257,11 +224,6 @@ export class AssetManagementComponent implements OnInit {
 
   applyTruckFilters(): void {
     let filtered = [...this.trucks];
-
-    // Owner filter
-    if (this.selectedOwnerId) {
-      filtered = filtered.filter(truck => truck.truckOwnerId === this.selectedOwnerId);
-    }
 
     // Search filter (plate)
     if (this.truckSearchTerm) {
@@ -300,11 +262,6 @@ export class AssetManagementComponent implements OnInit {
     this.applyTrailerFilters();
   }
 
-  getTruckOwnerName(ownerId: string): string {
-    const owner = this.truckOwners.find(o => o.userId === ownerId);
-    return owner ? `${owner.name} (${owner.company})` : 'Unknown';
-  }
-
   // Truck Dialog Methods
   openCreateTruckDialog(): void {
     this.editMode = false;
@@ -319,7 +276,6 @@ export class AssetManagementComponent implements OnInit {
     this.currentTruckId = truck.truckId;
     
     this.truckForm.patchValue({
-      truckOwnerId: truck.truckOwnerId,
       plate: truck.plate,
       brand: truck.brand,
       year: truck.year,
@@ -357,7 +313,6 @@ export class AssetManagementComponent implements OnInit {
     try {
       const formValue = this.truckForm.getRawValue();
       const truckData = {
-        truckOwnerId: formValue.truckOwnerId,
         plate: formValue.plate,
         brand: formValue.brand,
         year: parseInt(formValue.year, 10),
@@ -375,7 +330,7 @@ export class AssetManagementComponent implements OnInit {
         });
       } else {
         await firstValueFrom(
-          this.carrierService.createTruck(truckData)
+          this.carrierService.createTruck(truckData as any)
         );
         this.snackBar.open('Truck created successfully!', 'Close', {
           duration: 3000,
@@ -636,7 +591,7 @@ export class AssetManagementComponent implements OnInit {
   }
 
   onTabChange(index: number): void {
-    const tabs = ['dispatchers', 'drivers', 'truckOwners', 'trucks', 'trailers'];
+    const tabs = ['dispatchers', 'drivers', 'trucks', 'trailers'];
     this.activeTab = tabs[index] as any;
   }
 
@@ -676,9 +631,6 @@ export class AssetManagementComponent implements OnInit {
         } else if (result.role === 'DRIVER') {
           const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
           this.drivers = response.users;
-        } else if (result.role === 'TRUCK_OWNER') {
-          const response = await firstValueFrom(this.carrierService.getUsers('TRUCK_OWNER'));
-          this.truckOwners = response.users;
         }
       }
     });
@@ -686,19 +638,19 @@ export class AssetManagementComponent implements OnInit {
 
   editUser(user: any): void {
     // Map role from user object to dialog role type
-    let role: 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER';
+    let role: 'DISPATCHER' | 'DRIVER';
     
     if (user.role === 'Dispatcher' || user.role === 'DISPATCHER') {
       role = 'DISPATCHER';
     } else if (user.role === 'Driver' || user.role === 'DRIVER') {
       role = 'DRIVER';
     } else {
-      role = 'TRUCK_OWNER';
+      role = 'DRIVER'; // fallback
     }
     
     const dialogData: UserDialogData = {
       user,
-      role,
+      role: role as 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER',
       mode: 'edit'
     };
 
@@ -716,9 +668,6 @@ export class AssetManagementComponent implements OnInit {
         } else if (result.role === 'DRIVER') {
           const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
           this.drivers = response.users;
-        } else if (result.role === 'TRUCK_OWNER') {
-          const response = await firstValueFrom(this.carrierService.getUsers('TRUCK_OWNER'));
-          this.truckOwners = response.users;
         }
       }
     });

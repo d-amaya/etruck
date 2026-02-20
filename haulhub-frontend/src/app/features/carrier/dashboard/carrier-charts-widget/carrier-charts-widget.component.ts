@@ -5,12 +5,11 @@ import { takeUntil, switchMap, debounceTime, distinctUntilChanged } from 'rxjs/o
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import { Order, OrderStatus } from '@haulhub/shared';
 import { CarrierFilterService } from '../../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../../shared/carrier-asset-cache.service';
 import { TripService } from '../../../../core/services';
-import { CarrierService, User } from '../../../../core/services/carrier.service';
-import { Trip, TripStatus, TripFilters, calculateTripProfit } from '../../../../core/services/trip.service';
-const calculateTripExpenses = (t: any) => 0;
+import { CarrierService } from '../../../../core/services/carrier.service';
 
 Chart.register(...registerables);
 
@@ -39,9 +38,9 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     
     const payment = agg.paymentSummary || {};
     this.revenueData = {
-      revenue: payment.totalBrokerPayments || 0,
-      expenses: (payment.totalDriverPayments || 0) + (payment.totalTruckOwnerPayments || 0) + (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0) + (payment.totalFuelCost || 0),
-      profit: payment.totalProfit || 0
+      revenue: payment.totalCarrierPayments || payment.totalBrokerPayments || 0,
+      expenses: (payment.totalDriverPayments || 0) + (payment.totalFuelCost || 0),
+      profit: (payment.totalCarrierPayments || payment.totalBrokerPayments || 0) - (payment.totalDriverPayments || 0) - (payment.totalFuelCost || 0)
     };
     
     const topPerformers = agg.topPerformers || {};
@@ -347,45 +346,20 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   }
 
   private getStatusColor(status: string): string {
-    // Handle both camelCase keys from backend and display strings
     switch (status) {
-      case 'scheduled':
-      case 'Scheduled':
-      case TripStatus.Scheduled:
-        return '#2196f3';
-      case 'pickedUp':
-      case 'PickedUp':
-      case 'Picked Up':
-      case TripStatus.PickedUp:
-        return '#ff9800';
-      case 'inTransit':
-      case 'InTransit':
-      case 'In Transit':
-      case TripStatus.InTransit:
-        return '#9c27b0';
-      case 'delivered':
-      case 'Delivered':
-      case TripStatus.Delivered:
-        return '#4caf50';
-      case 'paid':
-      case 'Paid':
-      case TripStatus.Paid:
-        return '#009688';
-      default:
-        // Removed debug warning
-        return '#757575';
+      case OrderStatus.Scheduled: return '#2196f3';
+      case OrderStatus.PickingUp: return '#ff9800';
+      case OrderStatus.Transit: return '#9c27b0';
+      case OrderStatus.Delivered: return '#4caf50';
+      case OrderStatus.WaitingRC: return '#009688';
+      case OrderStatus.ReadyToPay: return '#00bcd4';
+      case OrderStatus.Canceled: return '#757575';
+      default: return '#757575';
     }
   }
 
   private getStatusLabel(status: string): string {
-    switch (status) {
-      case TripStatus.Scheduled: return 'Scheduled';
-      case TripStatus.PickedUp: return 'Picked Up';
-      case TripStatus.InTransit: return 'In Transit';
-      case TripStatus.Delivered: return 'Delivered';
-      case TripStatus.Paid: return 'Paid';
-      default: return status;
-    }
+    return status;
   }
 
   formatCurrency(amount: number): string {

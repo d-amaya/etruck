@@ -1,19 +1,17 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
-import { TripStatus } from '../../../core/services/trip.service';
+import { OrderStatus } from '@haulhub/shared';
 
 export interface CarrierDashboardFilters {
   dateRange: {
     startDate: Date | null;
     endDate: Date | null;
   };
-  status: TripStatus | null;
-  brokerId: string | null;
+  status: OrderStatus | null;
   truckId: string | null;
   driverId: string | null;
   dispatcherId: string | null;
-  truckOwnerId: string | null;
 }
 
 export interface PaginationState {
@@ -28,11 +26,9 @@ const defaultFilters: CarrierDashboardFilters = {
     endDate: (() => { const today = new Date(); const day = today.getDay(); const diff = day === 0 ? 6 : day - 1; const d = new Date(today); d.setDate(d.getDate() - diff + 6); d.setHours(23, 59, 59, 999); return d; })(),
   },
   status: null,
-  brokerId: null,
   truckId: null,
   driverId: null,
   dispatcherId: null,
-  truckOwnerId: null,
 };
 
 const defaultPagination: PaginationState = {
@@ -41,9 +37,7 @@ const defaultPagination: PaginationState = {
   pageTokens: [],
 };
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class CarrierDashboardStateService {
   private filtersSubject = new BehaviorSubject<CarrierDashboardFilters>(defaultFilters);
   private paginationSubject = new BehaviorSubject<PaginationState>(defaultPagination);
@@ -54,23 +48,16 @@ export class CarrierDashboardStateService {
   public filtersAndPagination$: Observable<[CarrierDashboardFilters, PaginationState]> = 
     combineLatest([this.filters$, this.pagination$]).pipe(
       debounceTime(200),
-      distinctUntilChanged((prev, curr) => 
-        JSON.stringify(prev) === JSON.stringify(curr)
-      )
+      distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
     );
 
   updateFilters(filters: Partial<CarrierDashboardFilters>): void {
-    const current = this.filtersSubject.value;
-    const newFilters = { ...current, ...filters };
-    
-    // Reset pagination when filters change
-    this.filtersSubject.next(newFilters);
+    this.filtersSubject.next({ ...this.filtersSubject.value, ...filters });
     this.paginationSubject.next({ ...defaultPagination });
   }
 
   updatePagination(pagination: Partial<PaginationState>): void {
     const current = this.paginationSubject.value;
-    
     if (pagination.pageSize !== undefined && pagination.pageSize !== current.pageSize) {
       this.paginationSubject.next({ ...current, ...pagination, page: 0, pageTokens: [] });
     } else {
@@ -83,13 +70,8 @@ export class CarrierDashboardStateService {
     (this.paginationSubject as any)._value = { ...current, ...pagination };
   }
 
-  getCurrentFilters(): CarrierDashboardFilters {
-    return this.filtersSubject.value;
-  }
-
-  getCurrentPagination(): PaginationState {
-    return this.paginationSubject.value;
-  }
+  getCurrentFilters(): CarrierDashboardFilters { return this.filtersSubject.value; }
+  getCurrentPagination(): PaginationState { return this.paginationSubject.value; }
 
   resetFilters(): void {
     this.filtersSubject.next(defaultFilters);

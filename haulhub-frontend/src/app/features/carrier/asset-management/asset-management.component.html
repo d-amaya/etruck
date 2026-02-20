@@ -118,62 +118,6 @@
         </div>
       </mat-tab>
 
-      <!-- Truck Owners Tab -->
-      <mat-tab label="Truck Owners ({{ truckOwners.length }})">
-        <div class="tab-content">
-          <div class="tab-toolbar">
-            <button mat-raised-button color="primary" (click)="openCreateUserDialog('TRUCK_OWNER')">
-              <mat-icon>add</mat-icon>
-              Add Truck Owner
-            </button>
-          </div>
-          
-          <div class="table-container" *ngIf="truckOwners.length > 0">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Company</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let user of truckOwners">
-                  <td><strong>{{ user.name }}</strong></td>
-                  <td>{{ user.email }}</td>
-                  <td>{{ user.phone }}</td>
-                  <td>{{ user.company }}</td>
-                  <td>
-                    <span class="status-badge" [class.active]="user.isActive">
-                      {{ user.isActive ? 'Active' : 'Inactive' }}
-                    </span>
-                  </td>
-                  <td class="actions-cell">
-                    <button mat-icon-button color="primary" (click)="editUser(user)" matTooltip="Edit">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button 
-                            color="primary"
-                            (click)="toggleUserStatus(user)" 
-                            [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
-                      <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="empty-state" *ngIf="truckOwners.length === 0">
-            <mat-icon>business</mat-icon>
-            <p>No truck owners found</p>
-          </div>
-        </div>
-      </mat-tab>
-
       <!-- Trucks Tab -->
       <mat-tab label="Trucks ({{ trucks.length }})">
         <div class="tab-content">
@@ -196,16 +140,6 @@
 
           <!-- Filters -->
           <div class="filters" *ngIf="!loading && !error">
-            <mat-form-field appearance="outline" class="filter-field">
-              <mat-label>Filter by Owner</mat-label>
-              <mat-select [(ngModel)]="selectedOwnerId" (selectionChange)="onOwnerFilterChange()">
-                <mat-option value="">All Owners</mat-option>
-                <mat-option *ngFor="let owner of truckOwners" [value]="owner.userId">
-                  {{ owner.name }} ({{ owner.company }})
-                </mat-option>
-              </mat-select>
-            </mat-form-field>
-
             <mat-form-field appearance="outline" class="search-field">
               <mat-label>Search by Plate</mat-label>
               <input 
@@ -228,7 +162,6 @@
                   <th>Year</th>
                   <th>VIN</th>
                   <th>Color</th>
-                  <th>Owner</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -240,7 +173,6 @@
                   <td>{{ truck.year }}</td>
                   <td>{{ truck.vin }}</td>
                   <td>{{ truck.color }}</td>
-                  <td>{{ truck.truckOwnerName }}</td>
                   <td>
                     <span class="status-badge" [class.active]="truck.isActive">
                       {{ truck.isActive ? 'Active' : 'Inactive' }}
@@ -271,7 +203,7 @@
               <mat-icon>local_shipping</mat-icon>
               <p>No trucks found</p>
               <p class="empty-state-hint">
-                {{ truckSearchTerm || selectedOwnerId ? 'Try adjusting your filters' : 'Add your first truck to get started' }}
+                {{ truckSearchTerm ? 'Try adjusting your filters' : 'Add your first truck to get started' }}
               </p>
             </div>
           </div>
@@ -380,19 +312,6 @@
     <h3>{{ editMode ? 'Edit Truck' : 'Create Truck' }}</h3>
     
     <form [formGroup]="truckForm" (ngSubmit)="saveTruck()">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Truck Owner *</mat-label>
-        <mat-select formControlName="truckOwnerId">
-          <mat-option value="">Select Owner</mat-option>
-          <mat-option *ngFor="let owner of truckOwners" [value]="owner.userId">
-            {{ owner.name }} ({{ owner.company }})
-          </mat-option>
-        </mat-select>
-        <mat-error *ngIf="truckForm.get('truckOwnerId')?.hasError('required')">
-          Truck owner is required
-        </mat-error>
-      </mat-form-field>
-
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>License Plate *</mat-label>

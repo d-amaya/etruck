@@ -48,11 +48,11 @@
 
       <div class="summary-card expense">
         <div class="card-icon">
-          <mat-icon>local_shipping</mat-icon>
+          <mat-icon>local_gas_station</mat-icon>
         </div>
         <div class="card-content">
-          <span class="card-label">Truck Owner Payments</span>
-          <span class="card-value">{{ formatCurrency(report.totalTruckOwnerPayments) }}</span>
+          <span class="card-label">Fuel Cost</span>
+          <span class="card-value">{{ formatCurrency(report.totalFuelCost || 0) }}</span>
         </div>
       </div>
     </div>
@@ -117,37 +117,6 @@
 
           <div *ngIf="enrichedDriverData.length === 0" class="no-data">
             No driver data available for the selected period
-          </div>
-        </div>
-      </mat-tab>
-
-      <!-- By Truck Owner Tab -->
-      <mat-tab label="By Truck Owner">
-        <div class="tab-content">
-          <div class="data-table">
-            <table mat-table [dataSource]="enrichedTruckOwnerData" class="analytics-table">
-              <ng-container matColumnDef="ownerName">
-                <th mat-header-cell *matHeaderCellDef>Truck Owner</th>
-                <td mat-cell *matCellDef="let element">{{ element.ownerName }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="totalPayment">
-                <th mat-header-cell *matHeaderCellDef>Total Payment</th>
-                <td mat-cell *matCellDef="let element">{{ formatCurrency(element.totalPayment) }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="tripCount">
-                <th mat-header-cell *matHeaderCellDef>Order Count</th>
-                <td mat-cell *matCellDef="let element">{{ element.tripCount }}</td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="truckOwnerColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: truckOwnerColumns;"></tr>
-            </table>
-          </div>
-
-          <div *ngIf="enrichedTruckOwnerData.length === 0" class="no-data">
-            No truck owner data available for the selected period
           </div>
         </div>
       </mat-tab>
