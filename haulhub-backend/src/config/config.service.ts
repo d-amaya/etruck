@@ -57,4 +57,21 @@ export class ConfigService {
   get kmsKeyId(): string {
     return process.env.KMS_KEY_ID || '';
   }
+
+  // v2 tables (admin-centric hierarchy)
+  get ordersTableName(): string {
+    return process.env.ETRUCKY_ORDERS_TABLE || 'eTruckyOrders';
+  }
+  get v2UsersTableName(): string {
+    return process.env.ETRUCKY_V2_USERS_TABLE || 'eTruckyUsers';
+  }
+  get v2TrucksTableName(): string {
+    return process.env.ETRUCKY_V2_TRUCKS_TABLE || 'eTruckyTrucks';
+  }
+  get v2TrailersTableName(): string {
+    return process.env.ETRUCKY_V2_TRAILERS_TABLE || 'eTruckyTrailers';
+  }
+  get v2BrokersTableName(): string {
+    return process.env.ETRUCKY_V2_BROKERS_TABLE || 'eTruckyBrokers';
+  }
 }

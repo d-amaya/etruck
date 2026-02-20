@@ -3,6 +3,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import { ConfigModule } from './config/config.module';
 import { AuthModule } from './auth/auth.module';
 import { TripsModule } from './trips/trips.module';
+import { OrdersModule } from './orders/orders.module';
 import { LorriesModule } from './lorries/lorries.module';
 import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -20,6 +21,7 @@ import { CarrierModule } from './carrier/carrier.module';
     ConfigModule,
     AuthModule,
     TripsModule,
+    OrdersModule,
     LorriesModule,
     AdminModule,
     AnalyticsModule,

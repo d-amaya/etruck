@@ -281,25 +281,26 @@ ETRUCKY_BROKERS_TABLE=eTruckyBrokers
 ### Tests for This Phase:
 
 #### Unit Tests:
-- [ ] Index selector returns correct GSI for each role
-- [ ] Field-level allowlist rejects disallowed fields with 400
-- [ ] Field-level allowlist accepts allowed fields
-- [ ] Ownership ConditionExpression built correctly per role
-- [ ] ConditionalCheckFailedException with Item → 403
-- [ ] ConditionalCheckFailedException without Item → 404
-- [ ] Auto-recalc: changing dispatcherRate recalculates adminRate, adminPayment, dispatcherPayment
-- [ ] Auto-recalc: changing driverRate recalculates driverPayment
-- [ ] Auto-recalc: changing fuel inputs recalculates fuelCost
-- [ ] carrierPayment = orderRate × 90% always
-- [ ] Status transitions: valid transitions succeed, invalid transitions → 400
-- [ ] Role-based field filtering strips correct fields per role
-- [ ] Create order calculates all payment fields from entity defaults
+- [x] Index selector returns correct GSI for each role
+- [x] Field-level allowlist rejects disallowed fields with 400
+- [x] Field-level allowlist accepts allowed fields
+- [x] Ownership ConditionExpression built correctly per role
+- [x] ConditionalCheckFailedException with Item → 403
+- [x] ConditionalCheckFailedException without Item → 404
+- [x] Auto-recalc: changing dispatcherRate recalculates adminRate, adminPayment, dispatcherPayment
+- [x] Auto-recalc: changing driverRate recalculates driverPayment
+- [x] Auto-recalc: changing fuel inputs recalculates fuelCost
+- [x] carrierPayment = orderRate × 90% always
+- [x] Status transitions: valid transitions succeed, invalid transitions → 400
+- [x] Role-based field filtering strips correct fields per role
+- [x] Create order calculates all payment fields from entity defaults
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `cd haulhub-backend && npm run build` compiles
-- [ ] `cd haulhub-backend && npm test` passes
+- [x] `cd haulhub-backend && npx jest --testPathPattern=src/orders` passes (22/22)
+- [ ] `cd haulhub-backend && npm run build` compiles (blocked by old modules — requires Phase 4)
+- [ ] `cd haulhub-backend && npm test` passes (blocked by old modules — requires Phase 4)
 
 #### Manual Verification:
 - [ ] Create order via curl as Dispatcher → order appears in DynamoDB with all fields
