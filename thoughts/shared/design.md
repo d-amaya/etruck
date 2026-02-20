@@ -21,10 +21,14 @@
 10. [Client-Side Asset Caching Strategy](#10-client-side-asset-caching-strategy)
 11. [Dashboard & Table Design Per Role](#11-dashboard--table-design-per-role)
 12. [Broker Management](#12-broker-management)
+    - 12.1 [Dispatcher Order Form — Cascading Dropdown](#121-dispatcher-order-form--cascading-carrierasset-dropdown)
 13. [Infrastructure & Migration Strategy](#13-infrastructure--migration-strategy)
 14. [Current DynamoDB State — Gap & Waste Analysis](#14-current-dynamodb-state--gap--waste-analysis)
 15. [What Gets Removed](#15-what-gets-removed)
-16. [Open Questions](#16-open-questions)
+16. [Resolved Questions](#16-resolved-questions)
+    - 16.1 [DynamoDB Pagination — Hard Requirement](#161-dynamodb-pagination--hard-requirement)
+17. [Revised Financial Model (Final)](#17-revised-financial-model-final)
+18. [Concrete Codebase Change Map](#18-concrete-codebase-change-map)
 
 ---
 
@@ -109,7 +113,17 @@ Driver (Carrier's Employee)
 └── profit = their payment (always positive)
 ```
 
-### 1.5 Key Decisions Made During Design
+### 1.5 Hard Constraints
+
+These constraints are non-negotiable and apply to ALL implementation work.
+
+**UX/UI Constraint:** The current look and feel, styling, and customer experience of eTrucky MUST NOT change. The existing dashboard structure, components, Angular Material theming, and layout patterns MUST remain intact. Any new component (e.g., Admin business-owner dashboard) MUST adopt the same visual style, component structure, and interaction patterns as the existing dashboards. No new CSS frameworks, no redesigned layouts, no altered color schemes or typography.
+
+**Efficiency Constraint:** The existing state management and caching strategies MUST be retained. Every dashboard uses the same architecture: `*-state.service.ts` (BehaviorSubjects for filters, pagination, loading, error, view caches), `*-asset-cache.service.ts` (entity resolution with localStorage, TTL, cache-on-miss), `*-filter.service.ts` (shared filter state). Any new dashboard or component MUST adopt these same patterns. No alternative state management libraries, no different caching approaches.
+
+**Pagination Constraint:** The existing DynamoDB pagination logic (`lastEvaluatedKey` via `x-pagination-token` header, `pageTokens[]` for back-navigation, filter-reset-to-page-0) is a hard requirement. Any new dashboard MUST implement the same pagination strategy. See Section 16.1 for details.
+
+### 1.6 Key Decisions Made During Design
 
 The following decisions were reached through discussion between Daniel (product owner) and Kiro (AI assistant) on 2026-02-20. Each decision is documented here so that future sessions can understand the reasoning without access to the original conversation.
 
@@ -117,11 +131,13 @@ The following decisions were reached through discussion between Daniel (product 
 Admin↔Dispatcher and Dispatcher↔Carrier are both many-to-many. A Dispatcher can work for multiple Admins simultaneously and with multiple Carriers. This means there is no `adminId` or `carrierId` on the Dispatcher's user record — these relationships are expressed at the Order level (each order specifies which Admin and which Carrier it belongs to) and via subscription lists.
 
 #### Decision 2: Subscription Model for Permissions
-Rather than a Carrier maintaining a "trusted Dispatchers" list, the permission model works via subscription lists on the user who needs to select from a dropdown:
-- **Admin's record** has `subscribedDispatcherIds: string[]` — controls which Dispatchers appear in the Admin's views.
+The permission model works via subscription lists on the user who needs to select from a dropdown:
+- **Dispatcher's record** has `subscribedAdminIds: string[]` — controls which Admins appear in the Dispatcher's Create Order dropdown.
 - **Dispatcher's record** has `subscribedCarrierIds: string[]` — controls which Carriers appear in the Dispatcher's dropdowns and which Carriers' assets the Dispatcher can create/modify.
 
-Subscription is initiated by the entity being subscribed (a Carrier subscribes to a Dispatcher, a Dispatcher subscribes to an Admin). When a Dispatcher creates a new Carrier placeholder, that Carrier is auto-subscribed to the Dispatcher. Unsubscribing removes the ID from the list but does not affect existing orders.
+The Admin does NOT need a reciprocal `subscribedDispatcherIds` list — their Dispatcher filter is derived from order data (unique `dispatcherId` values from their GSI4 query results).
+
+Subscription is initiated by the entity being subscribed (an Admin subscribes to a Dispatcher's list, a Carrier subscribes to a Dispatcher's list). When a Dispatcher creates a new Carrier placeholder, that Carrier is auto-subscribed. Unsubscribing removes the ID from the list but does not affect existing orders.
 
 #### Decision 3: No Denormalized Names on Order Records
 Instead of storing snapshot names (carrierName, driverName, etc.) on each order record, the system uses a client-side caching strategy (detailed in Section 10). This was chosen because:
@@ -131,6 +147,23 @@ Instead of storing snapshot names (carrierName, driverName, etc.) on each order 
 - Order records stay lean (no duplicate name fields).
 
 The tradeoff is that a backend endpoint must exist to resolve any UUID to display info regardless of subscription status, and entities must be soft-deleted (never hard-deleted) so resolution always works.
+
+**Order immutability rule:** Orders are snapshots of the assignment at creation time. If an asset (Truck, Trailer) or a Driver is later transferred to a different Carrier, existing orders are NOT modified — they retain the original `carrierId`, `truckId`, `trailerId`, `driverId`. The transfer only affects which Carrier's asset pool the entity appears in for future order creation. Historical orders remain queryable by the original Carrier via their GSI, and the asset's display info (plate, name) resolves via entity cache regardless of current ownership.
+
+**Asset transfer flow (Truck/Trailer):** Ownership transfer uses an invite/accept pattern (same as Driver mobility in Q10):
+1. Carrier-2 requests ownership transfer → `pendingCarrierId` is set on the asset record
+2. Carrier-1 sees a transfer request indicator next to the asset → accepts or rejects
+3. Accept → `carrierId` updates to Carrier-2, `pendingCarrierId` clears, GSI1PK re-indexes automatically
+4. Reject → `pendingCarrierId` clears
+
+This preserves the asset's UUID across the transfer — no duplicate records, no plate uniqueness issues, and historical orders are unaffected (same `truckId`/`trailerId`, order immutability rule holds).
+
+New optional fields on Truck and Trailer interfaces:
+```typescript
+pendingCarrierId?: string;  // Set when another Carrier requests ownership transfer
+```
+
+**Deferred to post-launch**: Transfer UI. For initial build, the manual workaround is: Carrier-1 deactivates the asset, Carrier-2 registers it fresh (same plate, new UUID). This requires plate/VIN uniqueness checks to only match active records (`isActive = true`). The current `getTruckByPlate` scan in `lorries.service.ts` does not filter by `isActive` — this must be fixed in v2.
 
 #### Decision 4: Order Statuses
 The old statuses (Scheduled, Picked Up, In Transit, Delivered, Paid, Canceled) are replaced with new statuses reflecting the actual business workflow. "Picking Up" is an in-progress state (driver en route), different from the old "Picked Up" (completed action). "Waiting RC" means awaiting documentation/rate confirmation. "Ready To Pay" means all docs are in order. See Section 5 for full details.
@@ -161,6 +194,29 @@ To avoid breaking the deployed application while developing the new model, entir
 
 #### Decision 12: Audit Fields on Assets
 All assets (Trucks, Trailers) get `createdAt`, `createdBy`, `updatedAt`, and `lastModifiedBy` fields, since assets can be created by either a Dispatcher or a Carrier.
+
+#### Decision 13: Backend Order Ownership Guard Rails
+Every order mutation (update, status change, delete) must enforce two layers of authorization beyond the existing role gate:
+
+1. **Ownership verification via DynamoDB `ConditionExpression`** (atomic, no read-then-check race condition). The update/delete command includes a condition that verifies the caller's relationship to the order based on their role:
+   - Admin: `adminId = :callerId`
+   - Dispatcher: `dispatcherId = :callerId`
+   - Carrier: `carrierId = :callerId`
+   - Driver: `driverId = :callerId`
+   Uses `ReturnValuesOnConditionCheckFailure: 'ALL_OLD'` to distinguish 404 from 403:
+   - `ConditionalCheckFailedException` with `error.Item` → 403 "You do not have permission to update this order"
+   - `ConditionalCheckFailedException` without `error.Item` → 404 "Order not found"
+
+2. **Field-level allowlist enforcement** (per-role). The backend validates the incoming DTO against a per-role allowlist of modifiable fields. If the DTO contains fields the role is not permitted to modify → 400 Bad Request (not silent strip).
+
+   | Role | Allowed Fields on Order Update |
+   |------|-------------------------------|
+   | Admin | `dispatcherRate` (triggers adminRate + payment recalc), `notes` |
+   | Dispatcher | All fields EXCEPT `dispatcherRate`, `adminRate`, `driverRate`, `fuelGasAvgCost`, `fuelGasAvgGallxMil` |
+   | Carrier | `driverId`, `truckId`, `trailerId`, `driverRate`, `fuelGasAvgCost`, `fuelGasAvgGallxMil`, `notes` |
+   | Driver | `notes` only (status updates via separate endpoint) |
+
+   See `thoughts/shared/research/2026-02-20-order-ownership-authorization.md` for full analysis.
 
 ---
 
@@ -205,11 +261,12 @@ All assets (Trucks, Trailers) get `createdAt`, `createdBy`, `updatedAt`, and `la
 ### Admin ↔ Dispatcher (Many-to-Many)
 - A Dispatcher can work for multiple Admins simultaneously
 - An Admin can have multiple Dispatchers
-- Modeled via `subscribedDispatcherIds: string[]` on the Admin's user record
+- Modeled via `subscribedAdminIds: string[]` on the Dispatcher's user record
 - When creating an order, the Dispatcher selects which Admin it belongs to
 - The `adminId` lives on the Order record, not on the Dispatcher's user record
-- A Dispatcher subscribes to an Admin → their dispatcherId is added to the Admin's list
-- When an Admin creates a Dispatcher placeholder → auto-subscribed
+- An Admin subscribes to a Dispatcher → their adminId is added to the Dispatcher's `subscribedAdminIds`
+- When a Dispatcher creates an Admin placeholder → auto-subscribed
+- The Admin does NOT need a `subscribedDispatcherIds` list — their Dispatcher filter dropdown is derived from the orders themselves (unique `dispatcherId` values from GSI4 query results, resolved to names via entity cache)
 
 ### Dispatcher ↔ Carrier (Many-to-Many)
 - A Dispatcher can work with multiple Carriers
@@ -222,7 +279,7 @@ All assets (Trucks, Trailers) get `createdAt`, `createdBy`, `updatedAt`, and `la
   2. Which Carriers' assets (trucks, trailers, drivers) the Dispatcher can create/modify
 
 ### Bidirectional Subscription Discovery
-During implementation planning, we identified that the Dispatcher needs to know which Admins they work for (to populate the "Select Admin" dropdown on the Create Order form). Since `subscribedDispatcherIds` lives on the Admin's record, querying "which Admins contain my ID" would require a table scan. Solution: add `subscribedAdminIds: string[]` to the Dispatcher's record, maintained in sync. When an Admin subscribes a Dispatcher, both records are updated.
+During implementation planning, we identified that the Dispatcher needs to know which Admins they work for (to populate the "Select Admin" dropdown on the Create Order form). This is handled by `subscribedAdminIds: string[]` on the Dispatcher's record. The Admin does NOT need a reciprocal list — their Dispatcher filter is derived from order data (unique `dispatcherId` values from GSI4 results). No bidirectional sync is needed for the Admin↔Dispatcher relationship.
 
 ### Carrier → Driver (One-to-Many)
 - Drivers belong to exactly one Carrier
@@ -493,9 +550,8 @@ interface User {
   cdlExpires?: string;
 
   // Subscription lists
-  subscribedDispatcherIds?: string[];  // On Admin records only
   subscribedCarrierIds?: string[];     // On Dispatcher records only
-  subscribedAdminIds?: string[];       // On Dispatcher records only (bidirectional sync)
+  subscribedAdminIds?: string[];       // On Dispatcher records only
 
   // Audit
   createdAt: string;
@@ -653,10 +709,11 @@ No GSIs. No changes from old model.
 ### Self-Registration / Claim Flow
 
 1. User goes to the eTrucky registration page, enters email + name + password + role.
-2. Backend checks if a Cognito user exists with that email:
-   - **Exists (placeholder)**: sends a verification code to that email address.
-   - **Doesn't exist**: creates a new Cognito user, sends a verification code.
-3. The HTTP response is identical in both cases: "Verification code sent to your email." This prevents email enumeration attacks — an attacker cannot determine whether a placeholder exists by observing the response.
+2. Backend checks Cognito for that email — three possible states:
+   - **Already active (confirmed account)**: returns "This email is already registered." Frontend shows a "Go to Sign In" link. No verification code sent.
+   - **Exists as placeholder (unclaimed)**: sends a verification code to that email address. Response: "Verification code sent to your email."
+   - **Doesn't exist**: creates a new Cognito user, sends a verification code. Response: "Verification code sent to your email."
+3. The response for placeholder and new-account cases is **identical** — this prevents email enumeration of placeholders. The already-active case is safe to distinguish (standard UX, not a security leak — every major service does this).
 4. User receives the verification code in their inbox and enters it.
 5. Account becomes `active`; password is set.
 6. All existing order references (using the placeholder's userId) are already correct — no data migration needed.
@@ -694,48 +751,74 @@ type AccountStatus = 'unclaimed' | 'pending_verification' | 'active' | 'suspende
 ### Problem
 Order tables display human-readable names (e.g., "Swift Logistics" instead of a UUID). If a Carrier unsubscribes from a Dispatcher, the Dispatcher loses access to that Carrier's asset list, and the table would show raw UUIDs. Additionally, if a Carrier renames their company, we need consistent display across all orders.
 
-### Solution: Two-Tier Cache with Forced Refresh
+### UX/UI Constraint: Preserve Existing Patterns
 
-#### Cache Structure (localStorage)
+The current codebase implements a per-dashboard caching architecture that must be preserved:
+
+```
+features/<role>/dashboard/
+├── *-state.service.ts        ← BehaviorSubjects for filters, pagination, loading, error, view caches
+├── *-asset-cache.service.ts  ← Entity resolution with localStorage, TTL, cache-on-miss
+├── *-filter.service.ts       ← Shared filter state across sub-components
+```
+
+Each dashboard (Dispatcher, Carrier, Driver) has its own `AssetCacheService` that:
+- Uses `forkJoin` to load all subscribed entities on dashboard load
+- Persists to `localStorage` with a 4-hour TTL
+- Implements cache-on-miss with a 15-minute failed-lookup TTL
+- Tracks failed lookups to avoid hammering the backend
+
+**This pattern must be retained.** The solution below evolves it rather than replacing it.
+
+### Solution: Evolved Two-Tier Cache (extends existing AssetCacheService)
+
+Each role's `AssetCacheService` is extended with a second bucket for resolved (unsubscribed/historical) entities.
+
+#### Cache Structure (localStorage) — Evolution of Current Pattern
 
 ```json
 {
-  "ttl": "<ISO timestamp>",
+  "timestamp": 1708444800000,
   "subscribed": {
-    "<uuid>": { "name": "Swift Transport", "type": "carrier" },
-    "<uuid>": { "name": "James Garcia", "type": "driver" },
-    "<uuid>": { "plate": "ABC1234", "brand": "Peterbilt", "type": "truck" }
+    "trucks": { "<truckId>": { "plate": "ABC1234", "brand": "Peterbilt" } },
+    "trailers": { "<trailerId>": { "plate": "XYZ5678", "brand": "Wabash" } },
+    "drivers": { "<userId>": { "name": "James Garcia" } },
+    "brokers": { "<brokerId>": { "brokerName": "C.H. Robinson" } },
+    "carriers": { "<carrierId>": { "name": "Swift Transport", "company": "Swift LLC" } }
   },
   "resolved": {
-    "<uuid>": { "name": "Old Carrier LLC", "type": "carrier", "fetchedAt": "..." }
+    "<uuid>": { "name": "Old Carrier LLC", "type": "carrier", "fetchedAt": 1708444800000 }
   }
 }
 ```
 
-- **`subscribed` bucket**: Populated from full refresh of subscribed entities. Refreshed every 5 minutes.
-- **`resolved` bucket**: Populated from cache-miss fetches. Longer TTL (30-60 minutes) since these are for historical/unsubscribed entities.
+- **`subscribed` bucket**: Populated from the existing `forkJoin` load pattern. Refreshed on dashboard load (existing behavior) and on Create Order page navigation (new: forced refresh).
+- **`resolved` bucket**: NEW. Populated from cache-miss fetches via `POST /entities/resolve`. Uses 30-minute TTL. Handles historical/unsubscribed entities.
 
-#### Refresh Strategy
+#### Refresh Strategy (preserves existing triggers, adds new ones)
 
-| Trigger | Action |
-|---------|--------|
-| Dashboard load | Fetch all subscribed assets → populate `subscribed` bucket |
-| Every 5 minutes | Background refresh of `subscribed` bucket (picks up new subscriptions, name changes) |
-| Navigate to Create Order page | **Forced full refresh** (always fresh Carrier/asset list when it matters most) |
-| Cache miss during table render | Batch-fetch unknown UUIDs via `POST /entities/resolve` → populate `resolved` bucket |
+| Trigger | Action | Existing? |
+|---------|--------|-----------|
+| Dashboard load | `forkJoin` load all subscribed assets → populate `subscribed` bucket | ✅ Existing |
+| Cache TTL expired (4 hours) | Clear and reload on next dashboard load | ✅ Existing |
+| Navigate to Create Order page | **Forced full refresh** — bypass TTL, fetch fresh from backend. Carrier assets fetched live on every Carrier selection (never cached). | 🆕 New |
+| Cache miss during table render | Batch-fetch unknown UUIDs via `POST /entities/resolve` → populate `resolved` bucket | 🆕 New |
+| Failed lookup retry (15-min TTL) | Skip re-fetch for recently failed UUIDs | ✅ Existing pattern (extend to resolved bucket) |
 
 #### Table Rendering Logic
 
 When rendering an order table cell that needs a name:
 1. Check `subscribed` cache for the UUID → if found, display current name.
-2. Check `resolved` cache for the UUID → if found, display resolved name.
+2. Check `resolved` cache for the UUID → if found and not expired, display resolved name.
 3. If neither → add UUID to a batch list. After processing all rows, call `POST /entities/resolve` with the batch. Populate `resolved` cache. Re-render.
+
+This is the same cache-on-miss pattern already used by `DashboardStateService.getBrokerName()` — extended to all entity types.
 
 #### Filters
 
 Filters always operate on UUIDs, not names. The filter dropdown is populated from the `subscribed` cache (current names), but the filter value sent to the backend is the UUID. This means name changes never break filtering.
 
-#### Backend Endpoint
+#### Backend Endpoint (NEW)
 
 ```
 POST /entities/resolve
@@ -749,8 +832,21 @@ Response: {
 
 - Returns minimal public display info for any entity by UUID.
 - Works regardless of subscription status.
+- Requires authentication (JWT) but no role restriction.
 - Entities are soft-deleted (never hard-deleted), so resolution always works.
 - If an entity is truly gone, returns `{ "name": "Unknown", "type": "unknown" }`.
+- Batch limit: 50 UUIDs per request.
+
+#### Codebase Impact
+
+| Current File | Change |
+|-------------|--------|
+| `features/dispatcher/dashboard/asset-cache.service.ts` | Add `resolved` bucket, `POST /entities/resolve` integration, forced refresh on Create Order |
+| `features/carrier/shared/carrier-asset-cache.service.ts` | Same evolution |
+| `features/driver/dashboard/driver-asset-cache.service.ts` | Same evolution |
+| `features/admin/dashboard/` (NEW) | Create `admin-asset-cache.service.ts` following same pattern |
+| `haulhub-backend/src/users/users.controller.ts` | Add `POST /entities/resolve` endpoint |
+| `haulhub-backend/src/users/users.service.ts` | Add `resolveEntities()` method |
 
 ---
 
@@ -806,6 +902,113 @@ Brokers remain a global read-only list. The backend exposes `GET /brokers` for D
 
 ---
 
+## 12.1. Dispatcher Order Form — Cascading Carrier→Asset Dropdown
+
+### UX Flow
+
+When a Dispatcher creates or edits an order, the Assignment section works as follows:
+
+1. **Admin autocomplete** — `mat-autocomplete` populated from the Dispatcher's `subscribedAdminIds` (resolved via asset cache). Dispatcher types to filter by name. Required field.
+2. **Carrier autocomplete** — `mat-autocomplete` populated from the Dispatcher's `subscribedCarrierIds` (resolved via asset cache). Dispatcher types to filter by company name. Required field.
+3. **On Carrier selection** — the form fetches the selected Carrier's assets **fresh from the backend** (never from cache):
+   - Trucks belonging to that Carrier (`GET /trucks?carrierId=<id>`)
+   - Trailers belonging to that Carrier (`GET /trailers?carrierId=<id>`)
+   - Drivers belonging to that Carrier (`GET /users?carrierId=<id>&role=DRIVER`)
+4. **Truck, Trailer, Driver autocompletes** — `mat-autocomplete` populated with the selected Carrier's assets. Truck filters by plate, Trailer filters by plate, Driver filters by name. All required.
+5. **"Add New" button** next to each asset autocomplete — opens a dialog to create a new asset for the selected Carrier on the fly. After creation, the Carrier's assets are re-fetched from the backend and the autocomplete auto-selects the new asset.
+
+All autocomplete dropdowns follow the existing pattern used in the dashboard filter bars (`trip-table.component.html`): `<input matInput [matAutocomplete]>` with `valueChanges.pipe(startWith(''), map(value => _filter(value)))` for type-to-filter, `[displayWith]` for showing the human-readable name when a UUID is selected, and a clear button (`mat-icon-button` with `close` icon) to reset the field.
+
+### Forced Cache Refresh on Create Order Navigation
+
+This is a **hard requirement**. When the Dispatcher navigates to the Create Order page, the `AssetCacheService` must perform a full refresh of the `subscribed` bucket — bypassing localStorage TTL and fetching fresh data from the backend. This guarantees:
+
+- Any Carriers recently subscribed to the Dispatcher appear immediately in the Carrier dropdown.
+- Any Admins recently subscribed appear immediately in the Admin dropdown.
+- The Dispatcher always works with the latest subscription state.
+
+Additionally, when the Dispatcher selects a Carrier from the dropdown, the Carrier's assets (trucks, trailers, drivers) are **always fetched live from the backend** — never served from cache. This guarantees:
+
+- If the Carrier (or another Dispatcher) just registered a new truck, it appears immediately.
+- If an asset was deactivated, it no longer appears.
+- The Dispatcher always assigns from the Carrier's current asset pool.
+
+The only data that may come from cache during order creation is the Broker list (brokers change infrequently and are managed outside the app).
+
+### Implementation Detail
+
+```typescript
+// In the Create Order component's ngOnInit:
+this.assetCacheService.forceRefresh().subscribe(() => {
+  // Subscribed bucket is now fresh — populate Admin and Carrier dropdowns
+  this.admins = this.assetCacheService.getSubscribedAdmins();
+  this.carriers = this.assetCacheService.getSubscribedCarriers();
+});
+
+// On Carrier dropdown selection change — always live fetch, no cache:
+onCarrierSelected(carrierId: string): void {
+  forkJoin({
+    trucks: this.assetService.getTrucksByCarrier(carrierId),
+    trailers: this.assetService.getTrailersByCarrier(carrierId),
+    drivers: this.assetService.getDriversByCarrier(carrierId),
+  }).subscribe(({ trucks, trailers, drivers }) => {
+    this.trucks = trucks.filter(t => t.isActive).sort((a, b) => a.plate.localeCompare(b.plate));
+    this.trailers = trailers.filter(t => t.isActive).sort((a, b) => a.plate.localeCompare(b.plate));
+    this.drivers = drivers.filter(d => d.isActive).sort((a, b) => a.name.localeCompare(b.name));
+    // Reset dependent dropdowns — previous Carrier's assets are no longer valid
+    this.form.patchValue({ truckId: null, trailerId: null, driverId: null });
+  });
+}
+```
+
+### Sorting Rule
+
+All autocomplete dropdown lists are sorted ascending by their display field:
+
+| Dropdown | Sort Field | Order |
+|----------|-----------|-------|
+| Admin | `name` | A → Z |
+| Carrier | `company` (or `name`) | A → Z |
+| Broker | `brokerName` | A → Z |
+| Truck | `plate` | A → Z |
+| Trailer | `plate` | A → Z |
+| Driver | `name` | A → Z |
+
+This applies everywhere autocomplete lists appear — Create Order, Edit Order, and dashboard filter bars.
+
+### Codebase Impact
+
+| Current File | Change |
+|-------------|--------|
+| `features/dispatcher/trip-create/trip-create.component.ts` | Add Admin dropdown; change Carrier selection to trigger asset reload; add "Add New" dialogs |
+| `features/dispatcher/trip-create/trip-create.component.html` | Add Admin field; restructure Assignment section with cascading dropdowns |
+| `features/dispatcher/trip-edit/trip-edit.component.ts` | Same cascading logic for edit form |
+| `features/dispatcher/dashboard/asset-cache.service.ts` | Add method to load assets for a specific Carrier (not just the user's own Carrier) |
+
+### Auto-Calculated Fields on Order Creation
+
+When the Dispatcher submits the Create Order form, the backend ALWAYS calculates and stores:
+
+```typescript
+// From the form
+const { orderRate, adminRate, dispatcherRate, lumperValue, detentionValue, driverId, truckId, mileageOrder, mileageTotal } = dto;
+
+// Looked up from entity records
+const driver = await getUser(driverId);  // driver.rate = $/mile
+const truck = await getTruck(truckId);   // truck.fuelGasAvgGallxMil, truck.fuelGasAvgCost
+
+// Calculated
+const adminPayment = round2(orderRate * adminRate / 100);
+const dispatcherPayment = round2(orderRate * dispatcherRate / 100);
+const carrierPayment = round2(orderRate * 0.9);
+const driverPayment = round2(driver.rate * mileageOrder);
+const fuelCost = round2(mileageTotal * truck.fuelGasAvgGallxMil * truck.fuelGasAvgCost);
+```
+
+These values are stored on the order so the Carrier sees them immediately. The Dispatcher and Admin never see `driverPayment` or `fuelCost` in their views.
+
+---
+
 ## 13. Infrastructure & Migration Strategy
 
 ### Migration Approach: Parallel Tables
@@ -857,17 +1060,74 @@ ETRUCKY_BROKERS_TABLE=eTruckyBrokers
 - Ensure placeholder creation uses `MessageAction: 'SUPPRESS'`.
 - Cognito user pool itself doesn't change — same pool, same groups. Just attribute usage changes.
 
-### New Seed Data
+### v2 Tables — Deployed and Seeded
 
-Wipe v2 tables and seed with:
-- 2 Admins (business owners)
-- 3 Dispatchers (subscribed across both Admins)
-- 3 Carriers (subscribed across Dispatchers, each with trucks/trailers/drivers)
-- 6-8 Drivers (distributed across Carriers)
-- 10-15 Trucks (distributed across Carriers)
-- 10-15 Trailers (distributed across Carriers)
-- 20 Brokers (same list as current)
-- 200+ Orders with new statuses, new financial model, proper adminId/carrierId references
+The v2 DynamoDB tables and Cognito users are **already deployed and populated** in the AWS account. The CDK definitions are in `haulhub-infrastructure/lib/stacks/database-stack.ts` (the `v2*` table properties). The seed script is `scripts/seed-v2.ts` + `scripts/seed-v2-helpers.ts`.
+
+**Tables and GSIs (live in AWS):**
+
+| Table | PK | SK | GSIs |
+|-------|----|----|------|
+| `eTruckyOrders` | `ORDER#<orderId>` | `METADATA` | GSI1: `CARRIER#<carrierId>` / `<timestamp>#<orderId>`, GSI2: `DISPATCHER#<dispatcherId>` / `<timestamp>#<orderId>`, GSI3: `DRIVER#<driverId>` / `<timestamp>#<orderId>`, GSI4: `ADMIN#<adminId>` / `<timestamp>#<orderId>`, GSI5: `BROKER#<brokerId>` / `<timestamp>#<orderId>` |
+| `eTruckyUsers` | `USER#<userId>` | `METADATA` | GSI1: `CARRIER#<carrierId>` / `ROLE#<role>#USER#<userId>`, GSI2: `EMAIL#<email>` / `USER#<userId>` |
+| `eTruckyTrucks` | `TRUCK#<truckId>` | `METADATA` | GSI1: `CARRIER#<carrierId>` / `TRUCK#<truckId>` |
+| `eTruckyTrailers` | `TRAILER#<trailerId>` | `METADATA` | GSI1: `CARRIER#<carrierId>` / `TRAILER#<trailerId>` |
+| `eTruckyBrokers` | `BROKER#<brokerId>` | `METADATA` | None |
+
+**Seeded data (live in AWS, seeded 2026-02-20):**
+
+| Entity | Count | Details |
+|--------|-------|---------|
+| Admins | 2 | Maria Rodriguez (`admin1@etrucky.com`), James Chen (`admin2@etrucky.com`) |
+| Dispatchers | 3 | Carlos Mendez (`dispatcher1@etrucky.com`), Sarah Johnson (`dispatcher2@etrucky.com`), Mike Williams (`dispatcher3@etrucky.com`) |
+| Carriers | 3 | Swift Transport LLC (`carrier1@etrucky.com`), Eagle Freight Inc (`carrier2@etrucky.com`), Pacific Haulers (`carrier3@etrucky.com`) |
+| Drivers | 8 | 3 per Swift, 3 per Eagle, 2 per Pacific (`driver1@etrucky.com` ... `driver8@etrucky.com`) |
+| Trucks | 12 | 4 per Carrier, each with `fuelGasAvgGallxMil` and `fuelGasAvgCost` defaults |
+| Trailers | 12 | 4 per Carrier |
+| Brokers | 20 | C.H. Robinson, XPO Logistics, TQL, etc. |
+| Orders | 1,400 | 700 per Admin, Jan 2025 → Apr 2026 |
+
+**Password for all test users:** `TempPass123!`
+
+**Subscription wiring (one-directional, on Dispatcher records only):**
+
+| Dispatcher | `subscribedAdminIds` | `subscribedCarrierIds` |
+|------------|---------------------|----------------------|
+| Carlos Mendez | [Maria] | [Swift, Eagle] |
+| Sarah Johnson | [Maria, James] | [Eagle, Pacific] |
+| Mike Williams | [James] | [Pacific] |
+
+Admins have **no** subscription lists. Their Dispatcher filter is derived from order data.
+
+**Many-to-many relationships demonstrated:**
+- Sarah works for both Admins (Maria and James) — her orders are split across both
+- Carlos and Sarah share Eagle Freight as a Carrier
+- Sarah and Mike share Pacific Haulers as a Carrier
+
+**Order status distribution (time-based):**
+
+| Order age | Primary statuses |
+|-----------|-----------------|
+| Future (Mar–Apr 2026) | 100% Scheduled |
+| 0–7 days old | Scheduled 40%, Picking Up 30%, Transit 20%, Delivered 10% |
+| 8–30 days old | Mix of Delivered, Waiting RC, Transit, Picking Up, Scheduled, Canceled |
+| 31–90 days old | Ready To Pay 35%, Waiting RC 25%, Delivered 25%, Canceled 15% |
+| 90+ days old | Ready To Pay 80%, Canceled 10%, Delivered 10% |
+
+**Order record fields (every order has all of these):**
+```
+orderId, adminId, dispatcherId, carrierId, driverId, truckId, trailerId, brokerId,
+invoiceNumber, brokerLoad, orderStatus, scheduledTimestamp, pickupTimestamp, deliveryTimestamp,
+pickupCompany, pickupAddress, pickupCity, pickupState, pickupZip, pickupPhone, pickupNotes,
+deliveryCompany, deliveryAddress, deliveryCity, deliveryState, deliveryZip, deliveryPhone, deliveryNotes,
+mileageEmpty, mileageOrder, mileageTotal,
+orderRate, adminRate, adminPayment, dispatcherRate, dispatcherPayment,
+carrierRate (90), carrierPayment, lumperValue, detentionValue,
+driverRate, driverPayment, fuelGasAvgCost, fuelGasAvgGallxMil, fuelCost,
+notes, createdAt, updatedAt, lastModifiedBy
+```
+
+**To re-seed:** `USER_POOL_ID=us-east-1_yoiMUn0Q8 AWS_PROFILE=haul-hub npx ts-node scripts/seed-v2.ts`
 
 ---
 
@@ -1059,6 +1319,61 @@ All open questions were resolved on 2026-02-20. Answers documented here for futu
 
 ---
 
+## 16.1. DynamoDB Pagination — Hard Requirement
+
+### Current Pattern (MUST preserve)
+
+The existing pagination implementation is a hard requirement. All new dashboards must adopt the same strategy.
+
+**Frontend (`DashboardStateService`):**
+```typescript
+interface PaginationState {
+  page: number;
+  pageSize: number;
+  lastEvaluatedKey?: string;
+  pageTokens?: string[];  // Stores tokens for each page to enable back-navigation
+}
+```
+
+- `lastEvaluatedKey` sent as `x-pagination-token` HTTP header (not query param)
+- `pageTokens[]` array stores the `lastEvaluatedKey` for each page index
+- Forward navigation: use `lastEvaluatedKey` from previous response
+- Back navigation: look up `pageTokens[targetPage]`
+- Filter changes: reset to page 0, clear `pageTokens[]`
+- Page size changes: reset to page 0, clear `pageTokens[]`
+
+**Backend (`TripsService`):**
+- Receives `lastEvaluatedKey` from `x-pagination-token` header
+- Passes it as `ExclusiveStartKey` to DynamoDB Query
+- Returns `lastEvaluatedKey` from DynamoDB response in the response body
+- Uses `Limit` parameter to control page size
+- Applies `FilterExpression` for status/secondary filters AFTER the Query (DynamoDB evaluates filters after reading `Limit` items, so the returned count may be less than `Limit`)
+
+**Critical behavior:** When filters are applied, the number of returned records may be less than `pageSize` because DynamoDB applies `FilterExpression` after reading `Limit` items. The frontend handles this gracefully — it shows whatever records are returned and enables "Next" if `lastEvaluatedKey` is present.
+
+### v2 Changes (minimal)
+
+The pagination logic itself does not change. Only the GSI selection changes:
+
+| Role | Primary GSI | Partition Key | Sort Key |
+|------|------------|---------------|----------|
+| Admin | GSI4 | `ADMIN#<adminId>` | `<timestamp>#<orderId>` |
+| Dispatcher | GSI2 | `DISPATCHER#<dispatcherId>` | `<timestamp>#<orderId>` |
+| Carrier | GSI1 | `CARRIER#<carrierId>` | `<timestamp>#<orderId>` |
+| Driver | GSI3 | `DRIVER#<driverId>` | `<timestamp>#<orderId>` |
+
+The `IndexSelectorService` simplifies: the user's role determines the GSI. Secondary filters (broker, truck, driver, status) are applied as `FilterExpression` on the role's primary GSI.
+
+### Codebase Impact
+
+| Current File | Change |
+|-------------|--------|
+| `haulhub-backend/src/trips/index-selector.service.ts` | Simplify: role → GSI mapping instead of filter-based selection |
+| `haulhub-frontend/src/app/features/dispatcher/dashboard/dashboard-state.service.ts` | Update filter interface (remove truckOwnerId, add carrierId) |
+| `haulhub-frontend/src/app/features/admin/dashboard/` (NEW) | Create `admin-state.service.ts` following same pattern |
+
+---
+
 ## 17. Revised Financial Model (Final)
 
 The financial model was revised during Q&A. This section supersedes Section 4 where there are conflicts.
@@ -1138,3 +1453,109 @@ carrierProfit      = $4,500 - driverPayment - fuelCost  (unchanged)
 | Waiting RC → Ready To Pay | ✅ | ❌ | ❌ |
 | Ready To Pay → Waiting RC | ✅ | ❌ | ❌ |
 | ANY → Canceled | ✅ | ❌ | ❌ |
+
+---
+
+## 18. Concrete Codebase Change Map
+
+This section maps every design decision to the specific files that need to change. It serves as the implementation roadmap.
+
+### 18.1. Shared Package (`haulhub-shared/src/`)
+
+| Action | File | Details |
+|--------|------|---------|
+| UPDATE | `enums/user-role.enum.ts` | Remove `TruckOwner`, `LorryOwner` |
+| REPLACE | `enums/trip-status.enum.ts` | New `OrderStatus` enum: Scheduled, PickingUp, Transit, Delivered, WaitingRC, ReadyToPay, Canceled |
+| DELETE | `enums/verification-status.enum.ts` | No longer needed |
+| DELETE | `enums/lorry-verification-status.enum.ts` | No longer needed |
+| DELETE | `enums/vehicle-verification-status.enum.ts` | No longer needed |
+| CREATE | `enums/account-status.enum.ts` | `unclaimed`, `pending_verification`, `active`, `suspended` |
+| UPDATE | `enums/index.ts` | Update exports |
+| REPLACE | `interfaces/trip.interface.ts` → `interfaces/order.interface.ts` | New Order interface per Section 6 |
+| UPDATE | `interfaces/user.interface.ts` | Add `accountStatus`, `carrierId`, `subscribedDispatcherIds`, `subscribedCarrierIds`, `subscribedAdminIds`, `createdBy`, `lastModifiedBy`, `claimedAt`; remove `verificationStatus` |
+| UPDATE | `interfaces/truck.interface.ts` | Remove `truckOwnerId`, `verificationStatus`, `LegacyTruck`; add `rate`, `fuelGasAvgGallxMil`, `fuelGasAvgCost`, `createdBy`, `lastModifiedBy` |
+| UPDATE | `interfaces/trailer.interface.ts` | Change `ownerId`→`carrierId`; remove `verificationStatus`; add `createdBy`, `lastModifiedBy` |
+| KEEP | `interfaces/broker.interface.ts` | No changes |
+| UPDATE | `interfaces/workflow-rules.interface.ts` | New statuses, new role-based permissions per Section 5 |
+| UPDATE | `interfaces/payment-report.interface.ts` | Replace `TruckOwnerPaymentReport` with per-role reports |
+| UPDATE | `interfaces/index.ts` | Update exports |
+| REPLACE | `dtos/trip.dto.ts` → `dtos/order.dto.ts` | `CreateOrderDto`, `UpdateOrderDto`, `UpdateOrderStatusDto`, `OrderFilters` per Section 6 |
+| UPDATE | `dtos/truck.dto.ts` | Remove `truckOwnerId`; add audit fields |
+| UPDATE | `dtos/trailer.dto.ts` | Change `ownerId`→`carrierId`; add audit fields |
+| KEEP | `dtos/broker.dto.ts` | No changes |
+| UPDATE | `dtos/index.ts` | Update exports |
+| UPDATE | `utils/trip-calculations.util.ts` | Per-role profit calculations per Section 17 |
+
+### 18.2. Backend (`haulhub-backend/src/`)
+
+| Action | File/Module | Details |
+|--------|-------------|---------|
+| RENAME+REWRITE | `trips/` → `orders/` | New controller, service, module for Order CRUD with v2 data model |
+| SIMPLIFY | `trips/index-selector.service.ts` → `orders/index-selector.service.ts` | Role→GSI mapping per Section 16.1 |
+| UPDATE | `auth/auth.service.ts` | Create-then-claim flow; placeholder Cognito creation with `MessageAction: 'SUPPRESS'` |
+| UPDATE | `auth/dto/register.dto.ts` | Remove TruckOwner role option |
+| UPDATE | `auth/guards/roles.guard.ts` | Remove TruckOwner role |
+| ADD ENDPOINT | `users/users.controller.ts` | `POST /entities/resolve`, `GET /users/subscriptions`, `PATCH /users/subscriptions`, `POST /users/placeholder` |
+| UPDATE | `users/users.service.ts` | Add `resolveEntities()`, subscription management, placeholder creation |
+| GUT | `admin/admin.controller.ts` | Remove verification endpoints; add Admin business-owner query endpoints |
+| GUT | `admin/admin.service.ts` | Remove verification logic; add org-wide order queries via GSI4 |
+| UPDATE | `admin/brokers.controller.ts` | Keep only `GET /brokers`; remove POST, PATCH, DELETE |
+| UPDATE | `admin/brokers.service.ts` | Keep only `findAll()`; remove create, update, delete |
+| UPDATE | `carrier/carrier.controller.ts` | Update for new model (Carrier = asset owner); update edit permissions per Section 17 |
+| UPDATE | `carrier/carrier.service.ts` | Update for new financial model |
+| RENAME | `lorries/` → `assets/` | Remove truckOwnerId logic; add audit fields; support Dispatcher creating assets for subscribed Carriers |
+| UPDATE | `analytics/analytics.service.ts` | Per-role profit calculations per Section 17 |
+| UPDATE | `config/config.service.ts` | Add v2 table name env vars |
+| UPDATE | `app.module.ts` | Update module imports (orders replaces trips, assets replaces lorries) |
+
+### 18.3. Frontend (`haulhub-frontend/src/app/`)
+
+| Action | File/Module | Details |
+|--------|-------------|---------|
+| UPDATE | `features/dispatcher/trip-create/` | Rename to order-create; add Admin dropdown; cascading Carrier→Asset dropdowns; auto-calc fields |
+| UPDATE | `features/dispatcher/trip-edit/` | Rename to order-edit; same cascading logic |
+| UPDATE | `features/dispatcher/trip-detail/` | Rename to order-detail; update financial visibility per Section 4 |
+| UPDATE | `features/dispatcher/trip-list/` | Rename to order-list; update columns per Section 11 |
+| UPDATE | `features/dispatcher/dashboard/dashboard-state.service.ts` | Update filter interface (remove truckOwnerId, add carrierId); update view caching keys |
+| UPDATE | `features/dispatcher/dashboard/asset-cache.service.ts` | Add resolved bucket, `/entities/resolve` integration, forced refresh |
+| UPDATE | `features/dispatcher/dashboard/trip-table/` | Update displayedColumns per Section 11; update profit calculation |
+| UPDATE | `features/dispatcher/dashboard/dashboard-charts-widget/` | Use dispatcherPayment as profit metric |
+| UPDATE | `features/dispatcher/analytics-dashboard/` | Use dispatcherPayment as profit metric |
+| UPDATE | `features/dispatcher/payment-report/` | Use dispatcherPayment as profit metric |
+| REBUILD | `features/admin/dashboard/` | New business-owner dashboard following Dispatcher pattern (state service, asset cache, filter card, order table, charts, analytics, payments) |
+| DELETE | `features/admin/user-verification/` | Entire component + dialogs |
+| DELETE | `features/admin/lorry-verification/` | Entire component + dialogs |
+| DELETE | `features/admin/broker-management/` | Entire component + dialogs |
+| UPDATE | `features/admin/admin.routes.ts` | Remove verification/broker routes; add dashboard sub-routes |
+| UPDATE | `features/carrier/shared/carrier-asset-cache.service.ts` | Add resolved bucket |
+| UPDATE | `features/carrier/shared/carrier-dashboard-state.service.ts` | Update filter interface |
+| UPDATE | `features/carrier/dashboard/carrier-trip-table/` | Update columns per Section 11; update profit = carrierPayment - driverPayment - fuelCost |
+| UPDATE | `features/carrier/analytics/` | Use carrier profit as metric |
+| UPDATE | `features/carrier/payment-report/` | Use carrier profit as metric |
+| DELETE | `features/truck-owner/` | **Entire module** (dashboard, truck-list, truck-registration, trailer-list, trailer-registration, vehicle-trip-list) |
+| UPDATE | `features/driver/dashboard/driver-asset-cache.service.ts` | Add resolved bucket |
+| UPDATE | `features/driver/dashboard/driver-trip-table/` | Update columns per Section 11 |
+| UPDATE | `features/auth/register/register.component.ts` | Remove TruckOwner role option; update for claim flow |
+| UPDATE | `shared/components/header/header.component.ts` | Remove TruckOwner navigation; update dashboard titles per Q9 |
+| UPDATE | `core/services/trip.service.ts` | Rename to order.service.ts; update API paths |
+| UPDATE | `core/services/admin.service.ts` | Remove verification methods; add Admin order query methods |
+| UPDATE | `core/services/carrier.service.ts` | Update for new model |
+| UPDATE | `core/services/auth.service.ts` | Update role references |
+| UPDATE | `app.routes.ts` | Remove truck-owner routes; update admin routes |
+
+### 18.4. Infrastructure (`haulhub-infrastructure/`)
+
+| Action | File | Details |
+|--------|------|---------|
+| KEEP | `lib/stacks/database-stack.ts` | v2 tables already defined — no changes needed |
+| UPDATE | `lib/stacks/api-stack.ts` | Update Lambda env vars to point to v2 tables for deployment |
+| KEEP | `lib/stacks/auth-stack.ts` | Cognito pool unchanged |
+| KEEP | `lib/stacks/frontend-stack.ts` | No changes |
+| KEEP | `lib/stacks/storage-stack.ts` | No changes |
+
+### 18.5. Scripts
+
+| Action | File | Details |
+|--------|------|---------|
+| KEEP | `scripts/seed-v2.ts` | Already seeds v2 data — no changes needed |
+| KEEP | `scripts/seed-v2-helpers.ts` | Already implements v2 model — no changes needed |

@@ -42,7 +42,7 @@ const T = {
 };
 
 const PASSWORD = 'TempPass123!';
-const EMAIL_DOMAIN = 'etrucky-v2.test';
+const EMAIL_DOMAIN = 'etrucky.com';
 
 // ── Helpers ─────────────────────────────────────────────────────────
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -70,10 +70,11 @@ async function clearTable(table: string): Promise<number> {
 
 async function clearCognitoV2Users(): Promise<number> {
   let count = 0;
+  const domainsToDelete = [`@${EMAIL_DOMAIN}`, '@etrucky-v2.test'];
   const res = await cognito.send(new ListUsersCommand({ UserPoolId: USER_POOL_ID, Limit: 60 }));
   for (const u of res.Users || []) {
     const email = u.Attributes?.find(a => a.Name === 'email')?.Value;
-    if (email?.endsWith(`@${EMAIL_DOMAIN}`)) {
+    if (email && domainsToDelete.some(d => email.endsWith(d))) {
       try {
         await cognito.send(new AdminDeleteUserCommand({ UserPoolId: USER_POOL_ID, Username: u.Username! }));
         count++;
@@ -157,7 +158,6 @@ async function seedAdmins(): Promise<UserRecord[]> {
       accountStatus: 'active', company: d.company,
       rate: 5, ein: genEIN(), ss: genSSN(),
       city: d.city, state: d.state, phone: `(555) 100-000${i + 1}`,
-      subscribedDispatcherIds: [], // filled after dispatchers created
       isActive: true,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       createdBy: 'seed', lastModifiedBy: 'seed',
@@ -273,6 +273,8 @@ async function seedTrucks(carriers: UserRecord[]): Promise<{ truckId: string; ca
   for (const carrier of carriers) {
     for (let i = 0; i < 4; i++) {
       const truckId = uuidv4();
+      const fuelGasAvgGallxMil = +(0.12 + i * 0.02).toFixed(2);
+      const fuelGasAvgCost = +(3.2 + i * 0.3).toFixed(2);
       await ddb.send(new PutCommand({
         TableName: T.trucks,
         Item: {
@@ -281,6 +283,7 @@ async function seedTrucks(carriers: UserRecord[]): Promise<{ truckId: string; ca
           truckId, carrierId: carrier.userId,
           plate: genPlate(), brand: brands[i], year: 2019 + i,
           vin: genVIN(), color: colors[i], isActive: true,
+          fuelGasAvgGallxMil, fuelGasAvgCost,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
           createdBy: carrier.userId, lastModifiedBy: 'seed',
         },

@@ -23,22 +23,16 @@ async function wireSubscriptions(
 ) {
   console.log('\n🔗 Wiring subscriptions...');
 
-  // Admin "Maria" (0) subscribes Dispatchers "Carlos" (0) and "Sarah" (1)
-  // Admin "James" (1) subscribes Dispatchers "Sarah" (1) and "Mike" (2)
+  // Admin→Dispatcher: Admin's ID is added to Dispatcher's subscribedAdminIds
+  // (Admins do NOT have subscribedDispatcherIds — their Dispatcher filter is derived from order data)
+  // Maria(0) works with Carlos(0) and Sarah(1)
+  // James(1) works with Sarah(1) and Mike(2)
   const adminToDispatchers: [number, number[]][] = [
     [0, [0, 1]],
     [1, [1, 2]],
   ];
 
   for (const [ai, dis] of adminToDispatchers) {
-    const dispIds = dis.map(di => dispatchers[di].userId);
-    await ddb.send(new UpdateCommand({
-      TableName: T.users,
-      Key: { PK: `USER#${admins[ai].userId}`, SK: 'METADATA' },
-      UpdateExpression: 'SET subscribedDispatcherIds = :ids',
-      ExpressionAttributeValues: { ':ids': dispIds },
-    }));
-    // Bidirectional: update each Dispatcher's subscribedAdminIds
     for (const di of dis) {
       await ddb.send(new UpdateCommand({
         TableName: T.users,
@@ -72,6 +66,39 @@ async function wireSubscriptions(
 }
 
 // ── Order Seeding ───────────────────────────────────────────────────
+
+/**
+ * Pick a realistic order status based on how old the order is.
+ * Older orders → terminal states; newer orders → active states.
+ */
+function pickStatusByAge(daysAgo: number): string {
+  const r = Math.random();
+  if (daysAgo < 0) {
+    return 'Scheduled';
+  } else if (daysAgo <= 7) {
+    if (r < 0.40) return 'Scheduled';
+    if (r < 0.70) return 'Picking Up';
+    if (r < 0.90) return 'Transit';
+    return 'Delivered';
+  } else if (daysAgo <= 30) {
+    if (r < 0.25) return 'Delivered';
+    if (r < 0.45) return 'Waiting RC';
+    if (r < 0.65) return 'Transit';
+    if (r < 0.80) return 'Picking Up';
+    if (r < 0.95) return 'Scheduled';
+    return 'Canceled';
+  } else if (daysAgo <= 90) {
+    if (r < 0.35) return 'Ready To Pay';
+    if (r < 0.60) return 'Waiting RC';
+    if (r < 0.85) return 'Delivered';
+    return 'Canceled';
+  } else {
+    if (r < 0.80) return 'Ready To Pay';
+    if (r < 0.90) return 'Canceled';
+    return 'Delivered';
+  }
+}
+
 async function seedOrders(
   admins: UserRecord[],
   dispatchers: UserRecord[],
@@ -81,9 +108,8 @@ async function seedOrders(
   trailers: { trailerId: string; carrierId: string }[],
   brokers: { id: string; name: string }[],
 ): Promise<number> {
-  console.log('\n📋 Seeding Orders...');
+  console.log('\n📋 Seeding Orders (target: 700 per Admin)...');
 
-  const statuses = ['Scheduled', 'Picking Up', 'Transit', 'Delivered', 'Waiting RC', 'Ready To Pay', 'Canceled'];
   const cities = [
     { city: 'Los Angeles', state: 'CA', zip: '90001' },
     { city: 'Phoenix', state: 'AZ', zip: '85001' },
@@ -95,59 +121,72 @@ async function seedOrders(
     { city: 'Denver', state: 'CO', zip: '80201' },
   ];
 
-  // Map dispatcher→admin and dispatcher→carrier assignments
-  // Carlos(0) works for Maria(0), uses Swift(0)/Eagle(1)
-  // Sarah(1) works for Maria(0)/James(1), uses Eagle(1)/Pacific(2)
-  // Mike(2) works for James(1), uses Pacific(2)
-  const dispatcherConfig: { adminIdx: number; carrierIdxs: number[] }[] = [
-    { adminIdx: 0, carrierIdxs: [0, 1] },
-    { adminIdx: 0, carrierIdxs: [1, 2] }, // Sarah alternates admins
-    { adminIdx: 1, carrierIdxs: [2] },
+  const now = new Date();
+
+  // Dispatcher→Admin and Dispatcher→Carrier mappings (many-to-many)
+  // Carlos(0): works for Maria(0), uses Swift(0)/Eagle(1)
+  // Sarah(1): works for Maria(0) AND James(1), uses Eagle(1)/Pacific(2)
+  // Mike(2): works for James(1), uses Pacific(2)
+  const dispatcherConfig: { adminIdxs: number[]; carrierIdxs: number[] }[] = [
+    { adminIdxs: [0],    carrierIdxs: [0, 1] },
+    { adminIdxs: [0, 1], carrierIdxs: [1, 2] },
+    { adminIdxs: [1],    carrierIdxs: [2] },
   ];
 
-  let orderCount = 0;
+  // Target 700 orders per admin. Generate order slots per admin.
+  const ORDERS_PER_ADMIN = 700;
   const startDate = new Date('2025-01-01');
-  const endDate = new Date('2026-02-15');
+  const endDate = new Date('2026-04-30');
+  const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    // ~1-2 orders per day
-    const ordersToday = rand(0, 2);
-    for (let o = 0; o < ordersToday; o++) {
-      const dispIdx = orderCount % dispatchers.length;
-      const cfg = dispatcherConfig[dispIdx];
-      // Sarah alternates admins every other order
-      const adminIdx = dispIdx === 1 && orderCount % 4 >= 2 ? 1 : cfg.adminIdx;
-      const carrierIdx = cfg.carrierIdxs[orderCount % cfg.carrierIdxs.length];
+  let orderCount = 0;
 
-      const admin = admins[adminIdx];
+  for (let ai = 0; ai < admins.length; ai++) {
+    const admin = admins[ai];
+    // Find dispatchers that work for this admin
+    const adminDispatchers = dispatcherConfig
+      .map((cfg, di) => ({ di, cfg }))
+      .filter(({ cfg }) => cfg.adminIdxs.includes(ai));
+
+    let adminOrderCount = 0;
+    // Spread orders evenly across the date range
+    for (let oi = 0; oi < ORDERS_PER_ADMIN; oi++) {
+      // Distribute orders across the date range with some randomness
+      const dayOffset = Math.floor((oi / ORDERS_PER_ADMIN) * totalDays) + rand(0, 1);
+      const scheduledDate = new Date(startDate);
+      scheduledDate.setDate(scheduledDate.getDate() + Math.min(dayOffset, totalDays - 1));
+      scheduledDate.setHours(6 + rand(0, 10), rand(0, 59));
+
+      const daysAgo = Math.floor((now.getTime() - scheduledDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Pick dispatcher (round-robin across this admin's dispatchers)
+      const { di: dispIdx, cfg } = adminDispatchers[oi % adminDispatchers.length];
       const dispatcher = dispatchers[dispIdx];
+
+      // Pick carrier from this dispatcher's subscribed carriers
+      const carrierIdx = cfg.carrierIdxs[oi % cfg.carrierIdxs.length];
       const carrier = carriers[carrierIdx];
 
-      // Pick driver/truck/trailer belonging to this carrier
+      // Pick assets belonging to this carrier
       const carrierDrivers = drivers.filter(d => d.carrierId === carrier.userId);
       const carrierTrucks = trucks.filter(t => t.carrierId === carrier.userId);
       const carrierTrailers = trailers.filter(t => t.carrierId === carrier.userId);
-
       if (!carrierDrivers.length || !carrierTrucks.length || !carrierTrailers.length) continue;
 
-      const driver = carrierDrivers[orderCount % carrierDrivers.length];
-      const truck = carrierTrucks[orderCount % carrierTrucks.length];
-      const trailer = carrierTrailers[orderCount % carrierTrailers.length];
-      const broker = brokers[orderCount % brokers.length];
+      const driver = carrierDrivers[oi % carrierDrivers.length];
+      const truck = carrierTrucks[oi % carrierTrucks.length];
+      const trailer = carrierTrailers[oi % carrierTrailers.length];
+      const broker = brokers[oi % brokers.length];
 
-      const status = statuses[orderCount % statuses.length];
-      const pickupCity = cities[orderCount % cities.length];
-      const deliveryCity = cities[(orderCount + 3) % cities.length];
-
-      const scheduledDate = new Date(d);
-      scheduledDate.setHours(6 + rand(0, 8), rand(0, 59));
+      const status = pickStatusByAge(daysAgo);
+      const pickupCity = cities[oi % cities.length];
+      const deliveryCity = cities[(oi + 3) % cities.length];
       const scheduledTimestamp = iso(scheduledDate);
 
       const mileageOrder = rand(200, 1200);
       const mileageEmpty = rand(10, 120);
       const mileageTotal = mileageOrder + mileageEmpty;
 
-      // Financial model: admin+dispatcher = 10%, carrier = 90%
       const orderRate = rand(2000, 8000);
       const adminRate = 5;
       const dispatcherRate = 5;
@@ -161,7 +200,6 @@ async function seedOrders(
       const fuelGasAvgGallxMil = randFloat(0.12, 0.18);
       const fuelCost = +(mileageTotal * fuelGasAvgGallxMil * fuelGasAvgCost).toFixed(2);
 
-      // Timestamps based on status
       let pickupTimestamp: string | null = null;
       let deliveryTimestamp: string | null = null;
       if (['Picking Up', 'Transit', 'Delivered', 'Waiting RC', 'Ready To Pay'].includes(status)) {
@@ -205,10 +243,12 @@ async function seedOrders(
         },
       }));
       orderCount++;
+      adminOrderCount++;
     }
+    console.log(`  ✅ Admin ${admin.name}: ${adminOrderCount} orders`);
   }
 
-  console.log(`  ✅ ${orderCount} orders`);
+  console.log(`  ✅ Total: ${orderCount} orders`);
   return orderCount;
 }
 
@@ -251,18 +291,19 @@ async function main() {
   console.log(`  Trailers:     ${trailers.length}`);
   console.log(`  Brokers:      ${brokers.length}`);
   console.log(`  Orders:       ${orderCount}`);
-  console.log('\n🔗 Subscriptions:');
-  console.log('  Admin Maria → Dispatchers: Carlos, Sarah');
-  console.log('  Admin James → Dispatchers: Sarah, Mike');
-  console.log('  Dispatcher Carlos → Carriers: Swift, Eagle');
-  console.log('  Dispatcher Sarah → Carriers: Eagle, Pacific');
-  console.log('  Dispatcher Mike → Carriers: Pacific');
+  console.log('\n🔗 Subscriptions (one-directional — Admin ID on Dispatcher record):');
+  console.log('  Dispatcher Carlos subscribedAdminIds: [Maria]');
+  console.log('  Dispatcher Sarah  subscribedAdminIds: [Maria, James]');
+  console.log('  Dispatcher Mike   subscribedAdminIds: [James]');
+  console.log('  Dispatcher Carlos subscribedCarrierIds: [Swift, Eagle]');
+  console.log('  Dispatcher Sarah  subscribedCarrierIds: [Eagle, Pacific]');
+  console.log('  Dispatcher Mike   subscribedCarrierIds: [Pacific]');
   console.log('\n🔑 Test Credentials:');
   console.log(`  Password: TempPass123!`);
-  console.log('  Admins:      admin1@etrucky-v2.test, admin2@etrucky-v2.test');
-  console.log('  Dispatchers: dispatcher1@etrucky-v2.test, dispatcher2@etrucky-v2.test, dispatcher3@etrucky-v2.test');
-  console.log('  Carriers:    carrier1@etrucky-v2.test, carrier2@etrucky-v2.test, carrier3@etrucky-v2.test');
-  console.log('  Drivers:     driver1@etrucky-v2.test ... driver8@etrucky-v2.test');
+  console.log('  Admins:      admin1@etrucky.com, admin2@etrucky.com');
+  console.log('  Dispatchers: dispatcher1@etrucky.com, dispatcher2@etrucky.com, dispatcher3@etrucky.com');
+  console.log('  Carriers:    carrier1@etrucky.com, carrier2@etrucky.com, carrier3@etrucky.com');
+  console.log('  Drivers:     driver1@etrucky.com ... driver8@etrucky.com');
 }
 
 main().catch(err => { console.error('❌ Error:', err.message); process.exit(1); });
