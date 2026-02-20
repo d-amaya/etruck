@@ -6,16 +6,19 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
+    path: 'brokers',
+    loadComponent: () => import('./broker-management/broker-management.component').then(m => m.BrokerManagementComponent)
+  },
+  // Legacy redirects
+  {
     path: 'lorries/verification',
-    loadComponent: () => import('./lorry-verification/lorry-verification.component').then(m => m.LorryVerificationComponent)
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
   },
   {
     path: 'users/verification',
-    loadComponent: () => import('./user-verification/user-verification.component').then(m => m.UserVerificationComponent)
-  },
-  {
-    path: 'brokers',
-    loadComponent: () => import('./broker-management/broker-management.component').then(m => m.BrokerManagementComponent)
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
   },
   {
     path: '',

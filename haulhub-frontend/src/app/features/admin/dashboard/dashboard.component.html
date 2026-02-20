@@ -1,140 +1,113 @@
 <div class="dashboard-container">
-  <h1>Admin Dashboard</h1>
-
-  <!-- Loading State -->
-  <div *ngIf="loading" class="loading-container">
-    <mat-spinner></mat-spinner>
-    <p>Loading dashboard data...</p>
-  </div>
-
   <!-- Error State -->
-  <div *ngIf="error && !loading" class="error-container">
-    <mat-icon color="warn">error</mat-icon>
-    <p>{{ error }}</p>
-    <button mat-raised-button color="primary" (click)="loadDashboardData()">
-      Retry
-    </button>
-  </div>
+  <app-error-state
+    *ngIf="errorState.hasError && !loadingState.isLoading"
+    [title]="'Dashboard Error'"
+    [message]="errorState.errorMessage"
+    [isRetrying]="loadingState.isLoading"
+    (retry)="onRetry()">
+  </app-error-state>
 
   <!-- Dashboard Content -->
-  <div *ngIf="!loading && !error && summary" class="dashboard-content">
-    <!-- Pending Verifications Section -->
-    <section class="verification-section">
-      <h2>Pending Verifications</h2>
-      <div class="cards-grid">
-        <!-- Pending User Verifications Card -->
-        <mat-card class="stat-card clickable" (click)="navigateToUserVerification()">
-          <mat-card-header>
-            <mat-icon mat-card-avatar color="primary">person</mat-icon>
-            <mat-card-title>User Verifications</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="stat-value">{{ summary.pendingUserCount }}</div>
-            <div class="stat-label">Pending</div>
-          </mat-card-content>
-          <mat-card-actions>
-            <button mat-button color="primary">
-              View All
-              <mat-icon>arrow_forward</mat-icon>
-            </button>
-          </mat-card-actions>
-        </mat-card>
-
-        <!-- Pending Lorry Verifications Card -->
-        <mat-card class="stat-card clickable" (click)="navigateToLorryVerification()">
-          <mat-card-header>
-            <mat-icon mat-card-avatar color="primary">local_shipping</mat-icon>
-            <mat-card-title>Lorry Verifications</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="stat-value">{{ summary.pendingLorryCount }}</div>
-            <div class="stat-label">Pending</div>
-          </mat-card-content>
-          <mat-card-actions>
-            <button mat-button color="primary">
-              View All
-              <mat-icon>arrow_forward</mat-icon>
-            </button>
-          </mat-card-actions>
-        </mat-card>
-      </div>
-    </section>
-
-    <!-- System Overview Section -->
-    <section class="overview-section">
-      <h2>System Overview</h2>
-      <div class="cards-grid">
-        <!-- Total Users Card -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <mat-icon mat-card-avatar color="accent">people</mat-icon>
-            <mat-card-title>Total Users</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="stat-value">{{ getTotalUsers() }}</div>
-            <div class="stat-label">Registered</div>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Users by Role Card -->
-        <mat-card class="stat-card users-by-role">
-          <mat-card-header>
-            <mat-icon mat-card-avatar color="accent">group</mat-icon>
-            <mat-card-title>Users by Role</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="role-breakdown">
-              <div class="role-item">
-                <span class="role-name">Dispatchers:</span>
-                <span class="role-count">{{ summary.usersByRole.Dispatcher }}</span>
-              </div>
-              <div class="role-item">
-                <span class="role-name">Lorry Owners:</span>
-                <span class="role-count">{{ summary.usersByRole.LorryOwner }}</span>
-              </div>
-              <div class="role-item">
-                <span class="role-name">Drivers:</span>
-                <span class="role-count">{{ summary.usersByRole.Driver }}</span>
-              </div>
-              <div class="role-item">
-                <span class="role-name">Admins:</span>
-                <span class="role-count">{{ summary.usersByRole.Admin }}</span>
+  <div *ngIf="!errorState.hasError" class="dashboard-content">
+    <!-- Filter Card -->
+    <mat-card class="unified-filter-card">
+      <mat-card-content>
+        <div class="card-header">
+          <div class="title-row">
+            <h1 class="page-title">
+              <mat-icon>dashboard</mat-icon>
+              Admin Dashboard
+            </h1>
+            <div class="view-section-header">
+              <span class="view-label">View:</span>
+              <div class="view-mode-selector">
+                <div class="view-links">
+                  <a class="view-link" [class.active]="currentViewMode === 'table'" (click)="setViewMode('table')">
+                    <mat-icon>table_chart</mat-icon><span>Table</span>
+                  </a>
+                  <a class="view-link" [class.active]="currentViewMode === 'analytics'" (click)="setViewMode('analytics')">
+                    <mat-icon>analytics</mat-icon><span>Analytics</span>
+                  </a>
+                  <a class="view-link" [class.active]="currentViewMode === 'payments'" (click)="setViewMode('payments')">
+                    <mat-icon>payments</mat-icon><span>Payments</span>
+                  </a>
+                </div>
               </div>
             </div>
-          </mat-card-content>
-        </mat-card>
-      </div>
-    </section>
+          </div>
+          <h2 class="filter-title">
+            <mat-icon>date_range</mat-icon>
+            Date Range
+          </h2>
+        </div>
 
-    <!-- Quick Actions Section -->
-    <section class="actions-section">
-      <h2>Quick Actions</h2>
-      <div class="actions-grid">
-        <button 
-          mat-raised-button 
-          color="primary" 
-          class="action-button"
-          (click)="navigateToUserVerification()">
-          <mat-icon>person_add</mat-icon>
-          Verify Users
-        </button>
-        <button 
-          mat-raised-button 
-          color="primary" 
-          class="action-button"
-          (click)="navigateToLorryVerification()">
-          <mat-icon>verified</mat-icon>
-          Verify Lorries
-        </button>
-        <button 
-          mat-raised-button 
-          color="primary" 
-          class="action-button"
-          (click)="navigateToBrokerManagement()">
-          <mat-icon>business</mat-icon>
-          Manage Brokers
-        </button>
+        <form [formGroup]="filterForm" class="filter-form">
+          <div class="filter-section date-section">
+            <div class="date-row">
+              <div class="date-inputs">
+                <mat-form-field appearance="outline" class="date-field">
+                  <mat-label>From</mat-label>
+                  <input matInput [matDatepicker]="startPicker" formControlName="startDate" (dateChange)="activePreset = null">
+                  <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #startPicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="date-field">
+                  <mat-label>To</mat-label>
+                  <input matInput [matDatepicker]="endPicker" formControlName="endDate" (dateChange)="activePreset = null">
+                  <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #endPicker></mat-datepicker>
+                </mat-form-field>
+
+                <div class="date-presets">
+                  <button mat-button type="button" (click)="setDatePreset('lastMonth')" [class.active]="activePreset === 'lastMonth'">Last 30 Days</button>
+                  <button mat-button type="button" (click)="setDatePreset('currentWeek')" [class.active]="activePreset === 'currentWeek'">Current Week</button>
+                  <button mat-button type="button" (click)="setDatePreset('currentMonth')" [class.active]="activePreset === 'currentMonth'">Current Month</button>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="dateRangeError" class="date-range-error">
+              <mat-icon>error</mat-icon>
+              <span>{{ dateRangeError }}</span>
+            </div>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Loading Overlay for Filter Updates -->
+    <div class="content-wrapper" [style.position]="loadingState.isFilterUpdate ? 'relative' : 'static'">
+      <app-loading-overlay
+        [isVisible]="loadingState.isFilterUpdate"
+        [message]="loadingState.loadingMessage">
+      </app-loading-overlay>
+
+      <!-- Initial Load: Skeleton -->
+      <div *ngIf="loadingState.isInitialLoad" class="skeleton-content">
+        <app-trip-table-skeleton></app-trip-table-skeleton>
       </div>
-    </section>
+
+      <!-- Loaded Content -->
+      <div *ngIf="!loadingState.isInitialLoad" class="loaded-content">
+        <!-- Table View -->
+        <div *ngIf="currentViewMode === 'table'" class="table-view">
+          <div class="table-section">
+            <app-admin-order-table></app-admin-order-table>
+          </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div *ngIf="currentViewMode === 'analytics'" class="analytics-view">
+          <app-admin-analytics-wrapper></app-admin-analytics-wrapper>
+        </div>
+
+        <!-- Payments View -->
+        <div *ngIf="currentViewMode === 'payments'" class="payments-view">
+          <app-admin-payments-wrapper></app-admin-payments-wrapper>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

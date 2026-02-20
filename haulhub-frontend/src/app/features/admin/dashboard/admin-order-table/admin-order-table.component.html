@@ -1,0 +1,185 @@
+<div class="trip-table-container" role="region" aria-label="Admin order list">
+  <!-- Charts Widget -->
+  <app-admin-charts-widget></app-admin-charts-widget>
+
+  <!-- Table Filters -->
+  <div class="table-filters" *ngIf="!loading">
+    <form [formGroup]="filterForm" class="filter-row">
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Statuses</mat-option>
+          <mat-option *ngFor="let status of statusOptions" [value]="status">
+            {{ getStatusLabel(status) }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Broker</mat-label>
+        <mat-select formControlName="brokerId" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Brokers</mat-option>
+          <mat-option *ngFor="let broker of brokers" [value]="broker.brokerId">
+            {{ broker.brokerName }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Dispatcher</mat-label>
+        <mat-select formControlName="dispatcherId" (selectionChange)="onDropdownChange()">
+          <mat-option [value]="null">All Dispatchers</mat-option>
+          <mat-option *ngFor="let d of dispatchers" [value]="d.id">
+            {{ d.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="spacer"></div>
+
+      <div class="action-buttons-group">
+        <button mat-icon-button (click)="clearAllFilters()" type="button" matTooltip="Clear all filters" class="action-btn clear-btn">
+          <mat-icon>filter_alt_off</mat-icon>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="table-wrapper" *ngIf="!loading && orders.length > 0">
+    <table mat-table [dataSource]="orders" class="trip-table" role="table">
+      <!-- Status -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let order">
+          <mat-chip [class]="getStatusClass(order.orderStatus)">{{ getStatusLabel(order.orderStatus) }}</mat-chip>
+        </td>
+      </ng-container>
+
+      <!-- Invoice Number -->
+      <ng-container matColumnDef="invoiceNumber">
+        <th mat-header-cell *matHeaderCellDef>Invoice #</th>
+        <td mat-cell *matCellDef="let order">{{ order.invoiceNumber || 'N/A' }}</td>
+      </ng-container>
+
+      <!-- Broker Load -->
+      <ng-container matColumnDef="brokerLoad">
+        <th mat-header-cell *matHeaderCellDef>Broker Load</th>
+        <td mat-cell *matCellDef="let order">{{ order.brokerLoad || 'N/A' }}</td>
+      </ng-container>
+
+      <!-- Date -->
+      <ng-container matColumnDef="scheduledTimestamp">
+        <th mat-header-cell *matHeaderCellDef>Date</th>
+        <td mat-cell *matCellDef="let order">{{ formatDate(order.scheduledTimestamp) }}</td>
+      </ng-container>
+
+      <!-- Pickup -->
+      <ng-container matColumnDef="pickupCity">
+        <th mat-header-cell *matHeaderCellDef>Pickup</th>
+        <td mat-cell *matCellDef="let order" class="location-cell">
+          <span [matTooltip]="(order.pickupCity || '') + ', ' + (order.pickupState || '')">
+            {{ order.pickupCity }}, {{ order.pickupState }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Delivery -->
+      <ng-container matColumnDef="deliveryCity">
+        <th mat-header-cell *matHeaderCellDef>Delivery</th>
+        <td mat-cell *matCellDef="let order" class="location-cell">
+          <span [matTooltip]="(order.deliveryCity || '') + ', ' + (order.deliveryState || '')">
+            {{ order.deliveryCity }}, {{ order.deliveryState }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Broker -->
+      <ng-container matColumnDef="broker">
+        <th mat-header-cell *matHeaderCellDef>Broker</th>
+        <td mat-cell *matCellDef="let order">{{ getBrokerName(order.brokerId) }}</td>
+      </ng-container>
+
+      <!-- Dispatcher -->
+      <ng-container matColumnDef="dispatcher">
+        <th mat-header-cell *matHeaderCellDef>Dispatcher</th>
+        <td mat-cell *matCellDef="let order">{{ getDispatcherName(order.dispatcherId) }}</td>
+      </ng-container>
+
+      <!-- Order Rate -->
+      <ng-container matColumnDef="orderRate">
+        <th mat-header-cell *matHeaderCellDef class="numeric">Order Rate</th>
+        <td mat-cell *matCellDef="let order" class="numeric">{{ formatCurrency(order.orderRate || 0) }}</td>
+      </ng-container>
+
+      <!-- Admin Profit -->
+      <ng-container matColumnDef="adminProfit">
+        <th mat-header-cell *matHeaderCellDef class="numeric">Admin Profit</th>
+        <td mat-cell *matCellDef="let order" class="numeric">
+          <span [class.positive-profit]="calculateAdminProfit(order) >= 0"
+                [class.negative-profit]="calculateAdminProfit(order) < 0">
+            {{ formatCurrency(calculateAdminProfit(order)) }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Actions -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let order">
+          <div class="action-buttons">
+            <button mat-icon-button class="action-btn view-btn" (click)="viewOrder(order)" matTooltip="View order">
+              <mat-icon>visibility</mat-icon>
+            </button>
+
+            <!-- Inline dispatcher rate edit -->
+            <ng-container *ngIf="editingOrderId !== order.orderId">
+              <button mat-icon-button class="action-btn edit-btn" (click)="startEdit(order)" matTooltip="Edit dispatcher rate">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </ng-container>
+            <ng-container *ngIf="editingOrderId === order.orderId">
+              <mat-form-field appearance="outline" class="inline-edit-field">
+                <input matInput type="number" [(ngModel)]="editDispatcherRate" min="0" max="10" step="0.5"
+                       [ngModelOptions]="{standalone: true}">
+                <span matSuffix>%</span>
+              </mat-form-field>
+              <button mat-icon-button class="action-btn" (click)="saveDispatcherRate(order)" matTooltip="Save">
+                <mat-icon>check</mat-icon>
+              </button>
+              <button mat-icon-button class="action-btn" (click)="cancelEdit()" matTooltip="Cancel">
+                <mat-icon>close</mat-icon>
+              </button>
+            </ng-container>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="trip-row"></tr>
+    </table>
+
+    <mat-paginator
+      [length]="totalOrders"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      (page)="onPageChange($event)"
+      showFirstLastButtons>
+    </mat-paginator>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!loading && orders.length === 0" role="status">
+    <mat-icon>inbox</mat-icon>
+    <h3>No orders found</h3>
+    <p *ngIf="hasActiveFilters">No orders match your filters. Try adjusting your filters.</p>
+    <p *ngIf="!hasActiveFilters">No orders have been created by your dispatchers yet.</p>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="skeleton-row" *ngFor="let i of [1,2,3,4,5]">
+      <div class="skeleton-cell" *ngFor="let j of [1,2,3,4,5,6,7,8,9,10]"></div>
+    </div>
+  </div>
+</div>
