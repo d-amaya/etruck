@@ -122,7 +122,6 @@ export class PdfExportService {
     // Card 3: Total Expenses (driver + owner + fuel + fees)
     const totalExpenses = 
       (paymentSummary.totalDriverPayments || 0) + 
-      (paymentSummary.totalTruckOwnerPayments || 0) + 
       (paymentSummary.totalFuelCost || 0) + 
       (paymentSummary.totalAdditionalFees || 0);
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,

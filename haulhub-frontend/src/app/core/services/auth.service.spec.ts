@@ -275,8 +275,8 @@ describe('AuthService', () => {
       req.flush(mockAuthResponse);
     });
 
-    it('should navigate to lorry owner dashboard for lorry owner role', () => {
-      const lorryOwnerResponse: AuthResponse = {
+    it('should navigate to carrier dashboard for carrier role', () => {
+      const carrierResponse: AuthResponse = {
         ...mockAuthResponse,
         role: UserRole.Carrier
       };
@@ -288,11 +288,11 @@ describe('AuthService', () => {
 
       service.login(loginDto).subscribe(() => {
         service.navigateToDashboard();
-        expect(router.navigate).toHaveBeenCalledWith(['/truck-owner/dashboard']);
+        expect(router.navigate).toHaveBeenCalledWith(['/carrier/dashboard']);
       });
 
       const req = httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`);
-      req.flush(lorryOwnerResponse);
+      req.flush(carrierResponse);
     });
 
     it('should navigate to driver dashboard for driver role', () => {

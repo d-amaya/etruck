@@ -613,7 +613,7 @@ export class AssetManagementComponent implements OnInit {
 
   openCreateUserDialog(role: string): void {
     const dialogData: UserDialogData = {
-      role: role as 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER',
+      role: role as 'DISPATCHER' | 'DRIVER',
       mode: 'create'
     };
 
@@ -650,7 +650,7 @@ export class AssetManagementComponent implements OnInit {
     
     const dialogData: UserDialogData = {
       user,
-      role: role as 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER',
+      role: role as 'DISPATCHER' | 'DRIVER',
       mode: 'edit'
     };
 

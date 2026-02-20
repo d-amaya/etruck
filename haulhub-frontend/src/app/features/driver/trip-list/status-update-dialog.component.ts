@@ -7,14 +7,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
-import { Trip, TripStatus } from '../../../core/services/trip.service';
+import { Order, OrderStatus } from '@haulhub/shared';
 
 export interface StatusUpdateDialogData {
-  trip: Trip;
+  trip: Order;
 }
 
 export interface StatusUpdateDialogResult {
-  status: TripStatus;
+  status: OrderStatus;
   deliveryTimestamp?: string;
 }
 
@@ -137,12 +137,12 @@ export interface StatusUpdateDialogResult {
 })
 export class StatusUpdateDialogComponent {
   statusForm: FormGroup;
-  allowedStatuses: TripStatus[] = [
-    TripStatus.PickedUp,
-    TripStatus.InTransit,
-    TripStatus.Delivered
+  allowedStatuses: OrderStatus[] = [
+    OrderStatus.PickingUp,
+    OrderStatus.Transit,
+    OrderStatus.Delivered
   ];
-  deliveredStatus = TripStatus.Delivered;
+  deliveredStatus = OrderStatus.Delivered;
 
   constructor(
     private fb: FormBuilder,
@@ -160,7 +160,7 @@ export class StatusUpdateDialogComponent {
     // Add/remove deliveryTimestamp validation when status changes
     this.statusForm.get('status')?.valueChanges.subscribe(status => {
       const ctrl = this.statusForm.get('deliveryTimestamp')!;
-      if (status === TripStatus.Delivered) {
+      if (status === OrderStatus.Delivered) {
         ctrl.setValidators(Validators.required);
       } else {
         ctrl.clearValidators();
@@ -174,38 +174,17 @@ export class StatusUpdateDialogComponent {
     const currentStatus = this.data.trip.orderStatus;
     
     // Suggest next logical status
-    if (currentStatus === TripStatus.Scheduled) {
-      this.statusForm.patchValue({ status: TripStatus.PickedUp });
-    } else if (currentStatus === TripStatus.PickedUp) {
-      this.statusForm.patchValue({ status: TripStatus.InTransit });
-    } else if (currentStatus === TripStatus.InTransit) {
-      this.statusForm.patchValue({ status: TripStatus.Delivered });
+    if (currentStatus === OrderStatus.Scheduled) {
+      this.statusForm.patchValue({ status: OrderStatus.PickingUp });
+    } else if (currentStatus === OrderStatus.PickingUp) {
+      this.statusForm.patchValue({ status: OrderStatus.Transit });
+    } else if (currentStatus === OrderStatus.Transit) {
+      this.statusForm.patchValue({ status: OrderStatus.Delivered });
     }
   }
 
-  getStatusLabel(status: TripStatus | string): string {
-    // Handle both TripStatus enum and string literals from new schema
-    const statusStr = typeof status === 'string' ? status : status;
-    
-    switch (statusStr) {
-      case TripStatus.Scheduled:
-      case 'Scheduled':
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-      case 'Picked Up':
-        return 'Picked Up';
-      case TripStatus.InTransit:
-      case 'In Transit':
-        return 'In Transit';
-      case TripStatus.Delivered:
-      case 'Delivered':
-        return 'Delivered';
-      case TripStatus.Paid:
-      case 'Paid':
-        return 'Paid';
-      default:
-        return String(status);
-    }
+  getStatusLabel(status: string): string {
+    return status;
   }
 
   onSubmit(): void {

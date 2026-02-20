@@ -364,13 +364,11 @@ export class AuthService {
       case UserRole.Dispatcher:
         return '/dispatcher/dashboard';
       case UserRole.Carrier:
-        return '/truck-owner/dashboard';
+        return '/carrier/dashboard';
       case UserRole.Driver:
         return '/driver/dashboard';
       case UserRole.Admin:
         return '/admin/dashboard';
-      case UserRole.Carrier:
-        return '/carrier/dashboard';
       default:
         return '/auth/login';
     }

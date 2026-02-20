@@ -46,7 +46,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   topBrokers: TopPerformer[] = [];
   topDrivers: TopPerformer[] = [];
   topTrucks: TopPerformer[] = [];
-  expenseData = { driver: 0, owner: 0, fuel: 0, fees: 0 };
+  expenseData = { driver: 0, fuel: 0, fees: 0 };
 
   constructor(
     private dashboardState: DashboardStateService,
@@ -220,7 +220,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
 
     this.expenseData = {
       driver: driverPay,
-      owner: ownerPay,
       fuel: fuelCost,
       fees: fees
     };
@@ -393,7 +392,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     // Sort expenses by value (highest to lowest)
     const expenses = [
       { label: 'Driver Pay', value: this.expenseData.driver },
-      { label: 'Owner Pay', value: this.expenseData.owner },
       { label: 'Fuel Cost', value: this.expenseData.fuel },
       { label: 'Fees', value: this.expenseData.fees }
     ].sort((a, b) => b.value - a.value);
@@ -485,7 +483,6 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     // Total expenses = driver + owner + fuel + fees
     const totalExpenses = 
       (payment.totalDriverPayments || 0) + 
-      (payment.totalTruckOwnerPayments || 0) + 
       (payment.totalFuelCost || 0) + 
       (payment.totalAdditionalFees || 0);
     
@@ -495,10 +492,8 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       profit: payment.totalProfit || 0
     };
     
-    // Set expense breakdown
     this.expenseData = {
       driver: payment.totalDriverPayments || 0,
-      owner: payment.totalTruckOwnerPayments || 0,
       fuel: payment.totalFuelCost || 0,
       fees: payment.totalAdditionalFees || 0
     };

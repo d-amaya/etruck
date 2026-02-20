@@ -13,7 +13,7 @@ import { firstValueFrom } from 'rxjs';
 
 export interface UserDialogData {
   user?: any;
-  role: 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER';
+  role: 'DISPATCHER' | 'DRIVER';
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -49,10 +49,6 @@ export class UserDialogComponent {
     
     if (data.user && (data.mode === 'edit' || data.mode === 'view')) {
       const userData = { ...data.user };
-      // Remove company field for non-truck-owners
-      if (data.role !== 'TRUCK_OWNER') {
-        delete userData.company;
-      }
       this.userForm.patchValue(userData);
       
       // Disable email in edit mode (can't change username)
@@ -91,12 +87,6 @@ export class UserDialogComponent {
         cdlExpires: ['', Validators.required],
         fax: ['']
       });
-    } else if (this.data.role === 'TRUCK_OWNER') {
-      return this.fb.group({
-        ...baseFields,
-        rate: ['', [Validators.required, Validators.min(0.01)]],
-        company: ['', Validators.required]
-      });
     } else {
       return this.fb.group({
         ...baseFields,
@@ -116,7 +106,6 @@ export class UserDialogComponent {
     switch (this.data.role) {
       case 'DISPATCHER': return 'Dispatcher';
       case 'DRIVER': return 'Driver';
-      case 'TRUCK_OWNER': return 'Truck Owner';
       default: return 'User';
     }
   }

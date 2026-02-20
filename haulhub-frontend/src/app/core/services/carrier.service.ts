@@ -17,7 +17,6 @@ export interface DashboardMetrics {
   activeUsers: {
     dispatchers: number;
     drivers: number;
-    truckOwners: number;
   };
   tripStatusBreakdown: {
     scheduled: number;
@@ -160,7 +159,6 @@ export interface UsersResponse {
 }
 
 export interface CreateTruckDto {
-  truckOwnerId: string;
   plate: string;
   brand: string;
   year: number;
@@ -169,7 +167,6 @@ export interface CreateTruckDto {
 }
 
 export interface UpdateTruckDto {
-  truckOwnerId?: string;
   plate?: string;
   brand?: string;
   year?: number;
@@ -309,7 +306,6 @@ export class CarrierService {
     trailers: any[];
     drivers: any[];
     dispatchers: any[];
-    truckOwners: any[];
     brokers: any[];
   }> {
     return this.apiService.get('/carrier/assets');

@@ -89,7 +89,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   // Filtered observables for autocomplete
   filteredTrucks!: Observable<any[]>;
   filteredDrivers!: Observable<any[]>;
-  filteredTruckOwners!: Observable<any[]>;
+  filteredCarriers!: Observable<any[]>;
   
   // Asset lookup maps for filter validation and conversion
   private truckPlateToIdMap = new Map<string, string>(); // plate -> truckId
@@ -99,7 +99,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   private trailerMap = new Map<string, any>(); // trailerId -> trailer (for display)
   private driverMap = new Map<string, any>(); // driverId -> driver (for display)
   private brokerMap = new Map<string, any>(); // brokerId -> broker (for display)
-  private truckOwnerMap = new Map<string, any>(); // carrierId -> truckOwner (for display)
+  private carrierMap = new Map<string, any>(); // carrierId -> truckOwner (for display)
   
   // Autocomplete suggestions
   truckPlates: string[] = [];
@@ -162,7 +162,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
         a.name.localeCompare(b.name)
       );
       
-      this.truckOwnerMap = cache.carriers;
+      this.carrierMap = cache.carriers;
       this.carriers = Array.from(cache.carriers.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
@@ -184,9 +184,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
       );
 
       // Setup autocomplete filtering for truck owners
-      this.filteredTruckOwners = this.filterForm.get('carrierId')!.valueChanges.pipe(
+      this.filteredCarriers = this.filterForm.get('carrierId')!.valueChanges.pipe(
         startWith(''),
-        map(value => this._filterTruckOwners(value || ''))
+        map(value => this._filterCarriers(value || ''))
       );
 
       // Restore filter form from state after assets load
@@ -259,7 +259,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
    * Get truck owner name from ID
    */
   getCarrierName(carrierId: string): string {
-    return this.truckOwnerMap.get(carrierId)?.name || carrierId.substring(0, 8);
+    return this.carrierMap.get(carrierId)?.name || carrierId.substring(0, 8);
   }
 
   /**
@@ -356,7 +356,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Filter truck owners for autocomplete (by name)
    */
-  private _filterTruckOwners(value: string | any): any[] {
+  private _filterCarriers(value: string | any): any[] {
     if (typeof value === 'object') {
       return this.carriers;
     }
@@ -414,7 +414,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
    */
   displayCarrier = (carrierId: string | null): string => {
     if (!carrierId) return '';
-    const owner = this.truckOwnerMap.get(carrierId);
+    const owner = this.carrierMap.get(carrierId);
     return owner ? owner.name : '';
   };
 

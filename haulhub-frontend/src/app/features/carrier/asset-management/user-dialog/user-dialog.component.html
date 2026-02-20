@@ -112,14 +112,6 @@
       </mat-form-field>
     </ng-container>
 
-    <!-- Truck Owner-specific Fields -->
-    <ng-container *ngIf="data.role === 'TRUCK_OWNER'">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Company</mat-label>
-        <input matInput formControlName="company">
-        <mat-error>{{ getErrorMessage('company') }}</mat-error>
-      </mat-form-field>
-    </ng-container>
   </form>
 </div>
 

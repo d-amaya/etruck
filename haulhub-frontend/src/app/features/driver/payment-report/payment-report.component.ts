@@ -13,7 +13,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
 import { TripService } from '../../../core/services';
-import { DriverPaymentReport, PaymentReportFilters, TripPaymentDetail } from '../../../core/services/trip.service';
+import { OrderFilters } from '@haulhub/shared';
 
 @Component({
   selector: 'app-driver-payment-report',
@@ -39,7 +39,7 @@ import { DriverPaymentReport, PaymentReportFilters, TripPaymentDetail } from '..
 export class PaymentReportComponent implements OnInit {
   filterForm: FormGroup;
   loading = false;
-  report: DriverPaymentReport | null = null;
+  report: any = null;
   
   displayedColumns: string[] = [
     'scheduledTimestamp',
@@ -81,7 +81,7 @@ export class PaymentReportComponent implements OnInit {
     
     this.tripService.getPaymentReport(filters).subscribe({
       next: (report) => {
-        this.report = report as DriverPaymentReport;
+        this.report = report;
         this.loading = false;
       },
       error: (error) => {
@@ -91,9 +91,9 @@ export class PaymentReportComponent implements OnInit {
     });
   }
 
-  private buildFilters(): PaymentReportFilters {
+  private buildFilters(): Partial<OrderFilters> {
     const formValue = this.filterForm.value;
-    const filters: PaymentReportFilters = {
+    const filters: Partial<OrderFilters> = {
       // groupBy: 'dispatcher'
     };
 

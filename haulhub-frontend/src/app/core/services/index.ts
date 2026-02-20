@@ -1,7 +1,7 @@
 export * from './api.service';
 export * from './auth.service';
 export * from './order.service';
-export { TripService, TripStatus, TripFilters, Trip, CreateTripDto, calculateTripProfit, PaymentReportFilters, DriverPaymentReport, TripPaymentDetail, CarrierPaymentReport, TripsResponse, PaymentSummary, PaymentsTimeline } from './trip.service';
+export { TripService, TripsResponse, PaymentSummary, PaymentsTimeline, Truck, Trailer, Driver } from './trip.service';
 export * from './admin.service';
 export * from './carrier.service';
 export * from './error.service';

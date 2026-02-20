@@ -20,8 +20,7 @@ import { TripService } from '../../../core/services';
 import { CarrierService, User } from '../../../core/services/carrier.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierUnifiedFilterCardComponent } from '../shared/unified-filter-card/unified-filter-card.component';
-import { Trip, TripStatus, TripFilters, calculateTripProfit } from '../../../core/services/trip.service';
-import { Broker } from '@haulhub/shared';
+import { Order, OrderStatus, OrderFilters, Broker, calcCarrierProfit } from '@haulhub/shared';
 
 @Component({
   selector: 'app-carrier-trip-list',
@@ -64,7 +63,7 @@ export class CarrierTripListComponent implements OnInit {
     'actions'
   ];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   brokers: Broker[] = [];
   dispatchers: User[] = [];
   drivers: User[] = [];
@@ -76,11 +75,11 @@ export class CarrierTripListComponent implements OnInit {
   pageIndex = 0;
   totalTrips = 0;
   lastEvaluatedKey?: string;
-  paginationKeys: Map<number, string> = new Map(); // Track keys for each page
+  paginationKeys: Map<number, string> = new Map();
 
   // Status options
-  statusOptions = Object.values(TripStatus);
-  TripStatus = TripStatus;
+  statusOptions = Object.values(OrderStatus);
+  OrderStatus = OrderStatus;
 
   constructor(
     private tripService: TripService,
@@ -190,10 +189,10 @@ export class CarrierTripListComponent implements OnInit {
     });
   }
 
-  private buildFilters(): TripFilters {
+  private buildFilters(): Partial<OrderFilters> {
     const formValue = this.filterForm.value;
-    const filters: TripFilters = {
-      limit: 1000 // Increase limit to ensure all matching trips are fetched
+    const filters: Partial<OrderFilters> = {
+      limit: 1000
     };
 
     if (formValue.startDate) {
@@ -282,46 +281,29 @@ export class CarrierTripListComponent implements OnInit {
     this.loadTrips();
   }
 
-  onViewDetails(trip: Trip): void {
-    this.router.navigate(['/carrier/trips', trip.tripId]);
+  onViewDetails(trip: Order): void {
+    this.router.navigate(['/carrier/orders', trip.orderId]);
   }
 
   onBackToDashboard(): void {
     this.router.navigate(['/carrier/dashboard']);
   }
 
-  getStatusClass(status: TripStatus): string {
+  getStatusClass(status: string): string {
     switch (status) {
-      case TripStatus.Scheduled:
-        return 'status-scheduled';
-      case TripStatus.PickedUp:
-        return 'status-picked-up';
-      case TripStatus.InTransit:
-        return 'status-in-transit';
-      case TripStatus.Delivered:
-        return 'status-delivered';
-      case TripStatus.Paid:
-        return 'status-paid';
-      default:
-        return '';
+      case OrderStatus.Scheduled: return 'status-scheduled';
+      case OrderStatus.PickingUp: return 'status-picking-up';
+      case OrderStatus.Transit: return 'status-in-transit';
+      case OrderStatus.Delivered: return 'status-delivered';
+      case OrderStatus.ReadyToPay: return 'status-ready-to-pay';
+      case OrderStatus.WaitingRC: return 'status-waiting-rc';
+      case OrderStatus.Canceled: return 'status-canceled';
+      default: return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
-    switch (status) {
-      case TripStatus.Scheduled:
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-        return 'Picked Up';
-      case TripStatus.InTransit:
-        return 'In Transit';
-      case TripStatus.Delivered:
-        return 'Delivered';
-      case TripStatus.Paid:
-        return 'Paid';
-      default:
-        return status;
-    }
+  getStatusLabel(status: string): string {
+    return status;
   }
 
   formatDate(dateString: string): string {
@@ -342,8 +324,8 @@ export class CarrierTripListComponent implements OnInit {
     }).format(amount);
   }
 
-  calculateProfit(trip: Trip): number {
-    return calculateTripProfit(trip);
+  calculateProfit(trip: Order): number {
+    return calcCarrierProfit(trip);
   }
 
   hasActiveFilters(): boolean {
@@ -379,7 +361,7 @@ export class CarrierTripListComponent implements OnInit {
     this.onApplyFilters();
   }
 
-  calculateExpenses(trip: Trip): number {
-    return (trip.driverPayment || 0) + (trip.truckOwnerPayment || 0) + (trip.fuelCost || 0);
+  calculateExpenses(trip: Order): number {
+    return (trip.driverPayment || 0) + (trip.fuelCost || 0);
   }
 }

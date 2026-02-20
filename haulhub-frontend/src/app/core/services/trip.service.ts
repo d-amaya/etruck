@@ -1,7 +1,3 @@
-/**
- * COMPATIBILITY LAYER — will be removed in Phases 7-9
- * Re-exports v2 types under old names so driver/carrier/admin features compile.
- */
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { ApiService } from './api.service';
@@ -11,63 +7,9 @@ import {
   OrderFilters, OrderStatus, PaymentReport,
 } from '@haulhub/shared';
 
-// Type aliases for backward compatibility
-export type Trip = Order & {
-  // Old field names that may still be referenced in carrier/driver/admin code
-  brokerPayment?: number;
-  truckOwnerPayment?: number;
-  truckOwnerId?: string;
-  dispatcherPayment?: number;
-  driverPayment?: number;
-  fuelCost?: number;
-  tripId?: string;
-};
-export const TripStatus = {
-  ...OrderStatus,
-  // Old enum value aliases
-  PickedUp: OrderStatus.PickingUp,
-  InTransit: OrderStatus.Transit,
-  Paid: OrderStatus.ReadyToPay,
-} as const;
-export type TripStatus = OrderStatus;
-export type TripFilters = OrderFilters & { truckOwnerId?: string };
-export type CreateTripDto = CreateOrderDto;
-export type UpdateTripStatusDto = UpdateOrderStatusDto;
-export type PaymentReportFilters = Partial<OrderFilters>;
-
-export type DriverPaymentReport = any;
-export type TripPaymentDetail = any;
-export type CarrierPaymentReport = any;
-
-/** @deprecated Use calcDispatcherProfit from @haulhub/shared */
-export function calculateTripProfit(order: Partial<Order>): number {
-  return order.dispatcherPayment || 0;
-}
-
-export interface TripsResponse {
-  trips: Order[];
-  lastEvaluatedKey?: string;
-}
-
-export interface PaymentSummary {
-  totalBrokerPayments: number;
-  totalDriverPayments: number;
-  totalTruckOwnerPayments: number;
-  totalProfit: number;
-}
-
-export interface PaymentsTimeline {
-  labels: string[];
-  brokerPayments: number[];
-  driverPayments: number[];
-  truckOwnerPayments: number[];
-  profit: number[];
-}
-
 export interface Truck {
   truckId: string;
   carrierId: string;
-  truckOwnerId?: string;
   plate: string;
   brand: string;
   year: number;
@@ -100,6 +42,26 @@ export interface Driver {
   cdlState?: string;
   nationalId?: string;
   isActive: boolean;
+}
+
+export interface TripsResponse {
+  trips: Order[];
+  lastEvaluatedKey?: string;
+}
+
+export interface PaymentSummary {
+  totalBrokerPayments: number;
+  totalDriverPayments: number;
+  totalFuelCost: number;
+  totalProfit: number;
+}
+
+export interface PaymentsTimeline {
+  labels: string[];
+  brokerPayments: number[];
+  driverPayments: number[];
+  fuelCosts: number[];
+  profit: number[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -137,24 +99,20 @@ export class TripService {
     return this.apiService.delete<{ message: string }>(`/orders/${tripId}`);
   }
 
-  getTrucksByCarrier(carrierId?: string): Observable<Truck[]> {
+  getTrucksByCarrier(): Observable<Truck[]> {
     return this.apiService.get<Truck[]>('/carrier/trucks');
   }
 
-  getTrailersByCarrier(carrierId?: string): Observable<Trailer[]> {
+  getTrailersByCarrier(): Observable<Trailer[]> {
     return this.apiService.get<Trailer[]>('/carrier/trailers');
   }
 
-  getDriversByCarrier(carrierId?: string): Observable<Driver[]> {
+  getDriversByCarrier(): Observable<Driver[]> {
     return this.apiService.get<Driver[]>('/carrier/users', { role: 'DRIVER' });
   }
 
-  getDispatchersByCarrier(carrierId?: string): Observable<any[]> {
+  getDispatchersByCarrier(): Observable<any[]> {
     return this.apiService.get<any[]>('/carrier/users', { role: 'DISPATCHER' });
-  }
-
-  getTruckOwnersByCarrier(carrierId?: string): Observable<any[]> {
-    return of([]);
   }
 
   getBrokers(): Observable<Broker[]> {

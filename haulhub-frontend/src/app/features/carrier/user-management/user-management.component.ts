@@ -22,7 +22,7 @@ interface User {
   userId: string;
   name: string;
   email: string;
-  role: 'DISPATCHER' | 'DRIVER' | 'TRUCK_OWNER';
+  role: 'DISPATCHER' | 'DRIVER';
   phone: string;
   isActive: boolean;
   // Role-specific fields
@@ -137,8 +137,8 @@ export class UserManagementComponent implements OnInit {
       this.userForm.get('cdlState')?.setValidators([Validators.required, Validators.pattern(/^[A-Z]{2}$/)]);
       this.userForm.get('cdlIssued')?.setValidators(Validators.required);
       this.userForm.get('cdlExpires')?.setValidators(Validators.required);
-    } else if (role === 'TRUCK_OWNER') {
-      this.userForm.get('company')?.setValidators([Validators.required, Validators.minLength(2)]);
+    } else {
+      // No extra validators for other roles
     }
 
     // Update validity
@@ -159,7 +159,7 @@ export class UserManagementComponent implements OnInit {
         )
       );
       
-      this.users = response.users;
+      this.users = response.users as any[];
       this.applyFilters();
     } catch (err: any) {
       console.error('Error loading users:', err);
@@ -283,9 +283,6 @@ export class UserManagementComponent implements OnInit {
           updateData.cdlExpires = formValue.cdlExpires;
           if (formValue.fax) updateData.fax = formValue.fax;
         }
-        if (formValue.role === 'TRUCK_OWNER') {
-          updateData.company = formValue.company;
-        }
 
         await firstValueFrom(
           this.carrierService.updateUser(this.currentUserId, updateData)
@@ -322,8 +319,6 @@ export class UserManagementComponent implements OnInit {
           createData.cdlIssued = formValue.cdlIssued;
           createData.cdlExpires = formValue.cdlExpires;
           if (formValue.fax) createData.fax = formValue.fax;
-        } else if (formValue.role === 'TRUCK_OWNER') {
-          createData.company = formValue.company;
         }
 
         const response = await firstValueFrom(
@@ -466,27 +461,17 @@ export class UserManagementComponent implements OnInit {
 
   getRoleBadgeClass(role: string): string {
     switch (role) {
-      case 'DISPATCHER':
-        return 'badge-dispatcher';
-      case 'DRIVER':
-        return 'badge-driver';
-      case 'TRUCK_OWNER':
-        return 'badge-truck-owner';
-      default:
-        return '';
+      case 'DISPATCHER': return 'badge-dispatcher';
+      case 'DRIVER': return 'badge-driver';
+      default: return '';
     }
   }
 
   getRoleDisplayName(role: string): string {
     switch (role) {
-      case 'DISPATCHER':
-        return 'Dispatcher';
-      case 'DRIVER':
-        return 'Driver';
-      case 'TRUCK_OWNER':
-        return 'Truck Owner';
-      default:
-        return role;
+      case 'DISPATCHER': return 'Dispatcher';
+      case 'DRIVER': return 'Driver';
+      default: return role;
     }
   }
 }

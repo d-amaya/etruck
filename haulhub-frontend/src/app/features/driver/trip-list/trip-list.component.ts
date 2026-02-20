@@ -19,8 +19,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripService } from '../../../core/services';
-import { Trip, TripStatus, TripFilters } from '../../../core/services/trip.service';
-import { UpdateOrderStatusDto as UpdateTripStatusDto } from '@haulhub/shared';
+import { Order, OrderStatus, OrderFilters, UpdateOrderStatusDto } from '@haulhub/shared';
 import { StatusUpdateDialogComponent, StatusUpdateDialogResult } from './status-update-dialog.component';
 
 @Component({
@@ -63,7 +62,7 @@ export class TripListComponent implements OnInit {
     'actions'
   ];
 
-  trips: Trip[] = [];
+  trips: Order[] = [];
   loading = false;
   filterForm: FormGroup;
   
@@ -75,8 +74,8 @@ export class TripListComponent implements OnInit {
   paginationKeys: Map<number, string> = new Map();
 
   // Status options
-  statusOptions = Object.values(TripStatus);
-  TripStatus = TripStatus;
+  statusOptions = Object.values(OrderStatus);
+  OrderStatus = OrderStatus;
 
   constructor(
     private tripService: TripService,
@@ -128,9 +127,9 @@ export class TripListComponent implements OnInit {
     });
   }
 
-  private buildFilters(): TripFilters {
+  private buildFilters(): Partial<OrderFilters> {
     const formValue = this.filterForm.value;
-    const filters: TripFilters = {
+    const filters: Partial<OrderFilters> = {
       limit: this.pageSize
     };
 
@@ -204,11 +203,11 @@ export class TripListComponent implements OnInit {
     this.loadTrips();
   }
 
-  onViewDetails(trip: Trip): void {
-    this.router.navigate(['/driver/trips', trip.tripId]);
+  onViewDetails(trip: Order): void {
+    this.router.navigate(['/driver/trips', trip.orderId]);
   }
 
-  onUpdateStatus(trip: Trip): void {
+  onUpdateStatus(trip: Order): void {
     const dialogRef = this.dialog.open(StatusUpdateDialogComponent, {
       width: '500px',
       data: { trip }
@@ -216,13 +215,13 @@ export class TripListComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: StatusUpdateDialogResult | undefined) => {
       if (result) {
-        this.updateTripStatus(trip.tripId || trip.orderId || "", result.status, result.deliveryTimestamp);
+        this.updateTripStatus(trip.orderId || "", result.status, result.deliveryTimestamp);
       }
     });
   }
 
-  private updateTripStatus(tripId: string, status: TripStatus, deliveryTimestamp?: string): void {
-    const statusDto: UpdateTripStatusDto = { orderStatus: status };
+  private updateTripStatus(tripId: string, status: OrderStatus, deliveryTimestamp?: string): void {
+    const statusDto: UpdateOrderStatusDto = { orderStatus: status };
     if (deliveryTimestamp) {
       statusDto.deliveryTimestamp = deliveryTimestamp;
     }
@@ -230,7 +229,7 @@ export class TripListComponent implements OnInit {
     this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: (updatedTrip) => {
         // Update the trip in the local array
-        const index = this.trips.findIndex(t => t.tripId === tripId);
+        const index = this.trips.findIndex(t => t.orderId === tripId);
         if (index !== -1) {
           this.trips[index] = updatedTrip;
         }
@@ -254,44 +253,31 @@ export class TripListComponent implements OnInit {
     });
   }
 
-  canUpdateStatus(trip: Trip): boolean {
+  canUpdateStatus(trip: Order): boolean {
     // Driver can only update status for trips that are not yet delivered or paid
-    return trip.orderStatus !== TripStatus.Delivered && 
-           trip.orderStatus !== TripStatus.Paid;
+    return trip.orderStatus !== OrderStatus.Delivered && 
+           trip.orderStatus !== OrderStatus.ReadyToPay;
   }
 
-  getStatusClass(status: TripStatus): string {
+  getStatusClass(status: OrderStatus): string {
     switch (status) {
-      case TripStatus.Scheduled:
+      case OrderStatus.Scheduled:
         return 'status-scheduled';
-      case TripStatus.PickedUp:
+      case OrderStatus.PickingUp:
         return 'status-picked-up';
-      case TripStatus.InTransit:
+      case OrderStatus.Transit:
         return 'status-in-transit';
-      case TripStatus.Delivered:
+      case OrderStatus.Delivered:
         return 'status-delivered';
-      case TripStatus.Paid:
+      case OrderStatus.ReadyToPay:
         return 'status-paid';
       default:
         return '';
     }
   }
 
-  getStatusLabel(status: TripStatus): string {
-    switch (status) {
-      case TripStatus.Scheduled:
-        return 'Scheduled';
-      case TripStatus.PickedUp:
-        return 'Picked Up';
-      case TripStatus.InTransit:
-        return 'In Transit';
-      case TripStatus.Delivered:
-        return 'Delivered';
-      case TripStatus.Paid:
-        return 'Paid';
-      default:
-        return status;
-    }
+  getStatusLabel(status: string): string {
+    return status;
   }
 
   formatDate(dateString: string): string {

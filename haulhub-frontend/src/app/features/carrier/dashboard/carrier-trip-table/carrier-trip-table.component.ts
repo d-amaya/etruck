@@ -550,7 +550,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPosition, cardWidth, cardHeight,
         'Total Revenue', this.formatCurrency(payment.totalBrokerPayments), profitGreen);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPosition, cardWidth, cardHeight,
-        'Total Expenses', this.formatCurrency(payment.totalDriverPayments + payment.totalTruckOwnerPayments + (payment.totalFuelCost || 0) + (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0)), lossRed);
+        'Total Expenses', this.formatCurrency(payment.totalDriverPayments + (payment.totalFuelCost || 0) + (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0)), lossRed);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 3, yPosition, cardWidth, cardHeight,
         payment.totalProfit >= 0 ? 'Net Profit' : 'Net Loss', 
         this.formatCurrency(Math.abs(payment.totalProfit)), 

@@ -215,7 +215,7 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
 
       dialogRef.afterClosed().subscribe(result => {
         if (result) {
-          this.updateTripStatus(trip.tripId, result.status, result.notes, result.deliveryTimestamp);
+          this.updateTripStatus(trip.orderId, result.status, result.notes, result.deliveryTimestamp);
         }
       });
     });

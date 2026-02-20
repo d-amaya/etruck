@@ -1,17 +1,15 @@
-import { Trip, TripStatus } from '../core/services/trip.service';
+import { OrderStatus } from '@haulhub/shared';
 
 /**
- * Helper function to create complete mock Trip objects for testing
- * Provides all required fields with sensible defaults
+ * Helper function to create complete mock Order objects for testing
  */
 export function createMockTrip(overrides: any = {}): any {
   return {
-    tripId: 'trip-1',
+    orderId: 'order-1',
     dispatcherId: 'dispatcher-1',
     carrierId: 'carrier-1',
     driverId: 'driver-1',
     truckId: 'truck-1',
-    truckOwnerId: 'owner-1',
     trailerId: 'trailer-1',
     invoiceNumber: 'ORDER-123',
     scheduledTimestamp: '2024-01-15T10:00:00Z',
@@ -47,7 +45,7 @@ export function createMockTrip(overrides: any = {}): any {
     lumperValue: 0,
     detentionValue: 0,
     notes: '',
-    orderStatus: TripStatus.Scheduled,
+    orderStatus: OrderStatus.Scheduled,
     createdAt: '2024-01-10T08:00:00Z',
     updatedAt: '2024-01-10T08:00:00Z',
     ...overrides

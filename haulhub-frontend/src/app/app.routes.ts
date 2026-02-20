@@ -21,9 +21,8 @@ export const routes: Routes = [
   },
   {
     path: 'truck-owner',
-    canActivate: [authGuard],
-    data: { roles: [UserRole.Carrier] },
-    loadChildren: () => import('./features/truck-owner/truck-owner.routes').then(m => m.TRUCK_OWNER_ROUTES)
+    redirectTo: '/carrier/dashboard',
+    pathMatch: 'prefix'
   },
   {
     path: 'driver',

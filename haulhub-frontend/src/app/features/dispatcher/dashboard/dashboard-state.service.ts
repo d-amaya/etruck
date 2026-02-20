@@ -21,7 +21,7 @@ export interface DashboardFilters {
 export interface PaymentSummary {
   totalBrokerPayments: number;
   totalDriverPayments: number;
-  totalTruckOwnerPayments: number;
+  totalFuelCost: number;
   totalProfit: number;
 }
 

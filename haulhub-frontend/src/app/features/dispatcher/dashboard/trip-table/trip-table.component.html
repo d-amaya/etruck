@@ -61,7 +61,7 @@
         </button>
         <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier" (optionSelected)="onDropdownChange()">
           <mat-option [value]="null">All Carriers</mat-option>
-          <mat-option *ngFor="let owner of filteredTruckOwners | async" [value]="owner.userId">
+          <mat-option *ngFor="let owner of filteredCarriers | async" [value]="owner.userId">
             {{ owner.name }}
           </mat-option>
         </mat-autocomplete>

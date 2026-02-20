@@ -7,7 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { Trip, TripStatus } from '../../../core/services/trip.service';
+import { Order, OrderStatus } from '@haulhub/shared';
 import { StatusUpdateDialogComponent } from './status-update-dialog.component';
 import { createMockTrip } from '../../../testing/mock-trip.helper';
 
@@ -19,10 +19,10 @@ describe('TripListComponent', () => {
   let mockDialog: jasmine.SpyObj<MatDialog>;
   let mockSnackBar: jasmine.SpyObj<MatSnackBar>;
 
-  const mockTrip: Trip = createMockTrip({
-    tripId: 'trip-1',
+  const mockTrip: Order = createMockTrip({
+    orderId: 'order-1',
     truckId: 'ABC123',
-    orderStatus: TripStatus.Scheduled,
+    orderStatus: OrderStatus.Scheduled,
     mileageOrder: 215,
     mileageTotal: 235
   });
@@ -83,22 +83,22 @@ describe('TripListComponent', () => {
   });
 
   it('should update trip status when dialog returns result', () => {
-    const updatedTrip = createMockTrip({ orderStatus: TripStatus.PickingUp, pickupTimestamp: '2024-01-15T10:30:00Z' });
+    const updatedTrip = createMockTrip({ orderStatus: OrderStatus.PickingUp, pickupTimestamp: '2024-01-15T10:30:00Z' });
     const dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRefSpy.afterClosed.and.returnValue(of({ status: TripStatus.PickingUp }));
+    dialogRefSpy.afterClosed.and.returnValue(of({ status: OrderStatus.PickingUp }));
     mockDialog.open.and.returnValue(dialogRefSpy);
     mockTripService.updateTripStatus.and.returnValue(of(updatedTrip));
 
     component.trips = [mockTrip];
     component.onUpdateStatus(mockTrip);
 
-    expect(mockTripService.updateTripStatus).toHaveBeenCalledWith('trip-1', { orderStatus: TripStatus.PickingUp });
+    expect(mockTripService.updateTripStatus).toHaveBeenCalledWith('order-1', { orderStatus: OrderStatus.PickingUp });
   });
 
   it('should show success message after successful status update', () => {
-    const updatedTrip = createMockTrip({ orderStatus: TripStatus.PickingUp });
+    const updatedTrip = createMockTrip({ orderStatus: OrderStatus.PickingUp });
     const dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRefSpy.afterClosed.and.returnValue(of({ status: TripStatus.PickingUp }));
+    dialogRefSpy.afterClosed.and.returnValue(of({ status: OrderStatus.PickingUp }));
     mockDialog.open.and.returnValue(dialogRefSpy);
     mockTripService.updateTripStatus.and.returnValue(of(updatedTrip));
 
@@ -113,21 +113,21 @@ describe('TripListComponent', () => {
   });
 
   it('should update trip in local array after successful status update', () => {
-    const updatedTrip = createMockTrip({ orderStatus: TripStatus.PickingUp, pickupTimestamp: '2024-01-15T10:30:00Z' });
+    const updatedTrip = createMockTrip({ orderStatus: OrderStatus.PickingUp, pickupTimestamp: '2024-01-15T10:30:00Z' });
     const dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRefSpy.afterClosed.and.returnValue(of({ status: TripStatus.PickingUp }));
+    dialogRefSpy.afterClosed.and.returnValue(of({ status: OrderStatus.PickingUp }));
     mockDialog.open.and.returnValue(dialogRefSpy);
     mockTripService.updateTripStatus.and.returnValue(of(updatedTrip));
 
     component.trips = [mockTrip];
     component.onUpdateStatus(mockTrip);
 
-    expect(component.trips[0].orderStatus).toBe(TripStatus.PickingUp);
+    expect(component.trips[0].orderStatus).toBe(OrderStatus.PickingUp);
   });
 
   it('should show error message when status update fails', () => {
     const dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRefSpy.afterClosed.and.returnValue(of({ status: TripStatus.PickingUp }));
+    dialogRefSpy.afterClosed.and.returnValue(of({ status: OrderStatus.PickingUp }));
     mockDialog.open.and.returnValue(dialogRefSpy);
     mockTripService.updateTripStatus.and.returnValue(
       throwError(() => ({ error: { message: 'Update failed' } }))
@@ -154,12 +154,12 @@ describe('TripListComponent', () => {
   });
 
   it('should return false for canUpdateStatus when trip is Delivered', () => {
-    const deliveredTrip = createMockTrip({ orderStatus: TripStatus.Delivered });
+    const deliveredTrip = createMockTrip({ orderStatus: OrderStatus.Delivered });
     expect(component.canUpdateStatus(deliveredTrip)).toBe(false);
   });
 
   it('should return false for canUpdateStatus when trip is Paid', () => {
-    const paidTrip = createMockTrip({ orderStatus: TripStatus.ReadyToPay });
+    const paidTrip = createMockTrip({ orderStatus: OrderStatus.ReadyToPay });
     expect(component.canUpdateStatus(paidTrip)).toBe(false);
   });
 
@@ -168,7 +168,7 @@ describe('TripListComponent', () => {
   });
 
   it('should return true for canUpdateStatus when trip is PickedUp', () => {
-    const pickedUpTrip = createMockTrip({ orderStatus: TripStatus.PickingUp });
+    const pickedUpTrip = createMockTrip({ orderStatus: OrderStatus.PickingUp });
     expect(component.canUpdateStatus(pickedUpTrip)).toBe(true);
   });
 
@@ -213,11 +213,11 @@ describe('TripListComponent', () => {
 
   it('should handle status update with timestamp setting', () => {
     const updatedTrip = createMockTrip({ 
-      orderStatus: TripStatus.PickingUp,
+      orderStatus: OrderStatus.PickingUp,
       pickupTimestamp: '2024-01-15T10:30:00Z'
     });
     const dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRefSpy.afterClosed.and.returnValue(of({ status: TripStatus.PickingUp }));
+    dialogRefSpy.afterClosed.and.returnValue(of({ status: OrderStatus.PickingUp }));
     mockDialog.open.and.returnValue(dialogRefSpy);
     mockTripService.updateTripStatus.and.returnValue(of(updatedTrip));
 

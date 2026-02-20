@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DriverDashboardStateService } from './driver-dashboard-state.service';
 import { DriverAssetCacheService } from './driver-asset-cache.service';
-import { Trip, TripStatus } from '../../../core/services/trip.service';
+import { Order, OrderStatus } from '@haulhub/shared';
 
 @Injectable({
   providedIn: 'root'
@@ -41,8 +41,8 @@ export class DriverPdfExportService {
   }
 
   private generatePdf(
-    trips: Trip[],
-    summaryByStatus: Record<TripStatus, number>,
+    trips: Order[],
+    summaryByStatus: Record<OrderStatus, number>,
     paymentSummary: any,
     cache: any,
     filters: any
@@ -137,10 +137,10 @@ export class DriverPdfExportService {
 
     const summaryData = [
       ['Scheduled', visibleStatusSummary['Scheduled'] || 0],
-      ['Picked Up', visibleStatusSummary['Picked Up'] || 0],
-      ['In Transit', visibleStatusSummary['In Transit'] || 0],
+      ['PickingUp', visibleStatusSummary['PickingUp'] || 0],
+      ['Transit', visibleStatusSummary['Transit'] || 0],
       ['Delivered', visibleStatusSummary['Delivered'] || 0],
-      ['Paid', visibleStatusSummary['Paid'] || 0]
+      ['ReadyToPay', visibleStatusSummary['ReadyToPay'] || 0]
     ];
 
     autoTable(doc, {
@@ -346,16 +346,7 @@ export class DriverPdfExportService {
     }).format(amount);
   }
 
-  private getStatusLabel(status: TripStatus): string {
-    const labels: Record<TripStatus, string> = {
-      [TripStatus.Scheduled]: 'Scheduled',
-      [TripStatus.PickedUp]: 'Picked Up',
-      [TripStatus.InTransit]: 'In Transit',
-      [TripStatus.Delivered]: 'Delivered',
-      [TripStatus.Paid]: 'Paid',
-      [TripStatus.Canceled]: 'Canceled',
-      WaitingRC: 'Waiting RC'
-    };
-    return labels[status] || status;
+  private getStatusLabel(status: string): string {
+    return status;
   }
 }

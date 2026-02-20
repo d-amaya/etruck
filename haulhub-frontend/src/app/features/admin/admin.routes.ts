@@ -5,11 +5,12 @@ export const ADMIN_ROUTES: Routes = [
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
+  // Legacy redirects
   {
     path: 'brokers',
-    loadComponent: () => import('./broker-management/broker-management.component').then(m => m.BrokerManagementComponent)
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
   },
-  // Legacy redirects
   {
     path: 'lorries/verification',
     redirectTo: 'dashboard',
