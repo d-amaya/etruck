@@ -119,8 +119,9 @@
                       <th>Driver Name</th>
                       <th>Total Orders</th>
                       <th>Completed</th>
+                      <th>Total Revenue</th>
+                      <th>Total Profit</th>
                       <th>Total Distance</th>
-                      <th>Total Earnings</th>
                       <th>Avg Earnings/Order</th>
                       <th>Completion Rate</th>
                     </tr>
@@ -130,8 +131,11 @@
                       <td>{{ driver.driverName }}</td>
                       <td>{{ driver.totalTrips }}</td>
                       <td>{{ driver.completedTrips }}</td>
+                      <td>{{ formatCurrency(driver.totalRevenue) }}</td>
+                      <td [class.profit-positive]="driver.totalProfit >= 0" [class.profit-negative]="driver.totalProfit < 0">
+                        {{ formatCurrency(driver.totalProfit) }}
+                      </td>
                       <td>{{ driver.totalDistance | number:'1.0-0' }} mi</td>
-                      <td>{{ formatCurrency(driver.totalEarnings) }}</td>
                       <td>{{ formatCurrency(driver.averageEarningsPerTrip) }}</td>
                       <td>
                         <span class="completion-badge" [class.high]="driver.completionRate >= 90"
@@ -154,56 +158,6 @@
         </div>
       </mat-tab>
 
-      <!-- Broker Performance Tab -->
-      <mat-tab label="Broker Performance">
-        <div class="tab-content">
-          <mat-card class="chart-card">
-            <mat-card-content>
-              <div *ngIf="brokerAnalyticsData && brokerAnalyticsData.brokers && brokerAnalyticsData.brokers.length > 0" class="data-table">
-                <div class="column-descriptions">
-                  <p><strong>Completion Rate:</strong> Percentage of orders from this broker that were successfully completed. <strong>Avg Revenue/Order:</strong> Average payment received per order from this broker.</p>
-                </div>
-                <table class="analytics-table">
-                  <thead>
-                    <tr>
-                      <th>Broker Name</th>
-                      <th>Total Orders</th>
-                      <th>Completed</th>
-                      <th>Total Revenue</th>
-                      <th>Avg Revenue/Order</th>
-                      <th>Total Distance</th>
-                      <th>Completion Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let broker of brokerAnalyticsData.brokers">
-                      <td>{{ broker.brokerName }}</td>
-                      <td>{{ broker.tripCount }}</td>
-                      <td>{{ broker.completedTrips }}</td>
-                      <td>{{ formatCurrency(broker.totalRevenue) }}</td>
-                      <td>{{ formatCurrency(broker.averageRevenue) }}</td>
-                      <td>{{ broker.totalDistance | number:'1.0-0' }} mi</td>
-                      <td>
-                        <span class="completion-badge" [class.high]="broker.completionRate >= 90"
-                              [class.medium]="broker.completionRate >= 70 && broker.completionRate < 90"
-                              [class.low]="broker.completionRate < 70">
-                          {{ broker.completionRate | number:'1.0-0' }}%
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="no-data" *ngIf="!brokerAnalyticsData || !brokerAnalyticsData.brokers || brokerAnalyticsData.brokers.length === 0">
-                <mat-icon>business</mat-icon>
-                <p>No broker performance data available</p>
-                <p class="hint">Create trips with broker information to see analytics</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-      </mat-tab>
-
       <!-- Vehicle Performance Tab -->
       <mat-tab label="Vehicle Performance">
         <div class="tab-content">
@@ -220,7 +174,7 @@
                       <th>Total Orders</th>
                       <th>Total Distance</th>
                       <th>Total Revenue</th>
-                      <th>Utilization Rate</th>
+                      <th>Total Profit</th>
                       <th>Avg Revenue/Order</th>
                     </tr>
                   </thead>
@@ -230,14 +184,10 @@
                       <td>{{ vehicle.totalTrips }}</td>
                       <td>{{ vehicle.totalDistance | number:'1.0-0' }} mi</td>
                       <td>{{ formatCurrency(vehicle.totalRevenue) }}</td>
-                      <td>
-                        <span class="utilization-badge" [class.high]="vehicle.utilizationRate >= 70" 
-                              [class.medium]="vehicle.utilizationRate >= 40 && vehicle.utilizationRate < 70"
-                              [class.low]="vehicle.utilizationRate < 40">
-                          {{ vehicle.utilizationRate | number:'1.1-1' }}%
-                        </span>
+                      <td [class.profit-positive]="vehicle.totalProfit >= 0" [class.profit-negative]="vehicle.totalProfit < 0">
+                        {{ formatCurrency(vehicle.totalProfit) }}
                       </td>
-                      <td>{{ formatCurrency(vehicle.averageRevenuePerTrip) }}</td>
+                      <td>{{ formatCurrency(vehicle.averageRevenue) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -252,55 +202,5 @@
         </div>
       </mat-tab>
 
-      <!-- Fuel Efficiency Tab -->
-      <mat-tab label="Fuel Efficiency">
-        <div class="tab-content">
-          <mat-card class="chart-card">
-            <mat-card-content>
-              <div *ngIf="fuelEfficiencyChartData">
-                
-                <div class="data-table" *ngIf="fuelEfficiencyChartData.vehicles && fuelEfficiencyChartData.vehicles.length > 0">
-                  <div class="column-descriptions">
-                    <p><strong>Avg MPG:</strong> Average miles per gallon fuel efficiency for this vehicle. <strong>Total Gallons:</strong> Total fuel consumed across all orders.</p>
-                  </div>
-                  <table class="analytics-table">
-                    <thead>
-                      <tr>
-                        <th>Truck</th>
-                        <th>Trips</th>
-                        <th>Total Miles</th>
-                        <th>Total Gallons</th>
-                        <th>Avg MPG</th>
-                        <th>Total Fuel Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let vehicle of fuelEfficiencyChartData.vehicles">
-                        <td>{{ vehicle.vehicleId }}</td>
-                        <td>{{ vehicle.tripCount }}</td>
-                        <td>{{ vehicle.totalMiles | number:'1.0-0' }} mi</td>
-                        <td>{{ vehicle.totalGallons | number:'1.1-1' }} gal</td>
-                        <td>
-                          <span class="utilization-badge" [class.high]="vehicle.averageMPG >= 6.5"
-                                [class.medium]="vehicle.averageMPG >= 5.5 && vehicle.averageMPG < 6.5"
-                                [class.low]="vehicle.averageMPG < 5.5">
-                            {{ vehicle.averageMPG | number:'1.2-2' }} mpg
-                          </span>
-                        </td>
-                        <td>{{ formatCurrency(vehicle.totalCost) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="no-data" *ngIf="!fuelEfficiencyChartData">
-                <mat-icon>speed</mat-icon>
-                <p>No fuel efficiency data available</p>
-                <p class="hint">Add fuel efficiency information to trips to see analytics</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </div>
-      </mat-tab>
     </mat-tab-group>
 </div>

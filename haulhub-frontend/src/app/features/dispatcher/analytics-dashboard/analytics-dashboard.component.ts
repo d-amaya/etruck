@@ -96,16 +96,10 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   outstandingPayments = 0;
   averageRates = 0;
   
-  // Fleet Utilization Data
-  driverPerformanceData: any[] = [];
-  vehicleUtilizationData: any[] = [];
-  
-  // Broker Performance Data
+  // Performance Data
+  adminPerformanceData: any[] = [];
   brokerAnalyticsData: any = null;
-  
-  // Fuel Efficiency Data
-  fuelCostChartData: any = null;
-  fuelEfficiencyChartData: any = null;
+  carrierPerformanceData: any[] = [];
   
 
   
@@ -264,41 +258,63 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
   private processUnifiedAnalyticsData(data: any): void {
     this.processTripAnalytics(data.tripAnalytics);
-    this.driverPerformanceData = (data.driverPerformance || []).map((d: any) => ({
-      ...d, driverName: this.driverMap.get(d.driverId)?.name || d.driverId?.substring(0, 8)
-    }));
-    this.vehicleUtilizationData = (data.vehicleUtilization || []).map((v: any) => ({
-      ...v, vehicleName: this.truckMap.get(v.vehicleId)?.plate || v.vehicleId?.substring(0, 8)
-    }));
+
+    // Group by admin
+    const orders = data._rawOrders || [];
+    const adminMap = new Map<string, any[]>();
+    const carrierMap = new Map<string, any[]>();
+    for (const o of orders) {
+      if (o.adminId) { if (!adminMap.has(o.adminId)) adminMap.set(o.adminId, []); adminMap.get(o.adminId)!.push(o); }
+      if (o.carrierId) { if (!carrierMap.has(o.carrierId)) carrierMap.set(o.carrierId, []); carrierMap.get(o.carrierId)!.push(o); }
+    }
+
+    const sum = (arr: any[], f: string) => arr.reduce((s: number, o: any) => s + (o[f] || 0), 0);
+    const completed = (arr: any[]) => arr.filter((o: any) => o.orderStatus === 'Delivered' || o.orderStatus === 'ReadyToPay').length;
+    const revenue = (arr: any[]) => sum(arr, 'dispatcherPayment');
+    const profit = (arr: any[]) => sum(arr, 'dispatcherPayment');
+
+    this.adminPerformanceData = [...adminMap.entries()].map(([adminId, trips]) => {
+      const rev = revenue(trips);
+      return {
+        name: adminId.substring(0, 8), totalTrips: trips.length, completedTrips: completed(trips),
+        totalRevenue: rev, totalProfit: profit(trips),
+        averageProfit: trips.length ? profit(trips) / trips.length : 0,
+        completionRate: trips.length ? (completed(trips) / trips.length) * 100 : 0,
+      };
+    });
+
     this.brokerAnalyticsData = {
       brokers: (data.brokerAnalytics || []).map((b: any) => ({
-        ...b, brokerName: this.brokerMap.get(b.brokerId)?.brokerName || b.brokerId?.substring(0, 8)
+        ...b,
+        brokerName: this.brokerMap.get(b.brokerId)?.brokerName || b.brokerId?.substring(0, 8),
+        totalProfit: b.totalRevenue, // For dispatcher, revenue = profit
       }))
     };
-    if (data.fuelAnalytics && data.fuelAnalytics.tripsWithFuelData > 0) {
-      this.fuelCostChartData = {
-        avgCost: data.fuelAnalytics.averageFuelCost,
-        totalCost: data.fuelAnalytics.totalFuelCost,
-        tripCount: data.fuelAnalytics.totalTripsWithFuelData,
-        totalGallons: data.fuelAnalytics.totalGallonsUsed,
-        avgFuelPrice: data.fuelAnalytics.averageFuelPrice
+
+    this.carrierPerformanceData = [...carrierMap.entries()].map(([carrierId, trips]) => {
+      const rev = revenue(trips);
+      return {
+        name: carrierId.substring(0, 8), totalTrips: trips.length, completedTrips: completed(trips),
+        totalRevenue: rev, totalProfit: profit(trips),
+        averageProfit: trips.length ? profit(trips) / trips.length : 0,
+        completionRate: trips.length ? (completed(trips) / trips.length) * 100 : 0,
       };
-      const bestVehicle = data.fuelAnalytics.vehicleFuelEfficiency?.length > 0 ? data.fuelAnalytics.vehicleFuelEfficiency[0] : null;
-      this.fuelEfficiencyChartData = {
-        fleetAvg: data.fuelAnalytics.averageGallonsPerMile,
-        fleetAvgMPG: data.fuelAnalytics.averageGallonsPerMile > 0 ? 1 / data.fuelAnalytics.averageGallonsPerMile : 0,
-        bestVehicle: bestVehicle ? (this.truckMap.get(bestVehicle.vehicleId)?.plate || bestVehicle.vehicleId?.substring(0, 8)) : 'N/A',
-        bestEfficiency: bestVehicle ? bestVehicle.averageGallonsPerMile : 0,
-        bestMPG: bestVehicle ? bestVehicle.averageMPG : 0,
-        vehicleCount: data.fuelAnalytics.vehicleFuelEfficiency?.length || 0,
-        vehicles: (data.fuelAnalytics.vehicleFuelEfficiency || []).map((v: any) => ({
-          ...v,
-          vehicleId: this.truckMap.get(v.vehicleId)?.plate || v.vehicleId?.substring(0, 8),
-          tripCount: v.totalTrips,
-          totalMiles: v.totalDistance,
-          totalCost: v.totalFuelCost,
-        }))
-      };
+    });
+
+    // Resolve admin and carrier names
+    const unknownIds = [
+      ...this.adminPerformanceData.filter(a => a.name.length === 8).map((a: any, i: number) => ({ id: [...adminMap.keys()][i], arr: this.adminPerformanceData, index: i })),
+      ...this.carrierPerformanceData.filter(c => c.name.length === 8).map((c: any, i: number) => ({ id: [...carrierMap.keys()][i], arr: this.carrierPerformanceData, index: i })),
+    ];
+    if (unknownIds.length > 0) {
+      const ids = unknownIds.map(u => u.id);
+      this.analyticsService.resolveEntitiesForAnalytics(ids).subscribe((resolved: any) => {
+        const entries: Record<string, any> = Array.isArray(resolved) ? {} : resolved;
+        for (const u of unknownIds) {
+          const entity = entries[u.id];
+          if (entity?.name) u.arr[u.index].name = entity.name;
+        }
+      });
     }
   }
 
@@ -471,49 +487,24 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
     yPos += cardHeight + 15;
 
-    // Vehicle Performance
-    if (this.vehicleUtilizationData?.length > 0) {
+    // Admin Performance
+    if (this.adminPerformanceData?.length > 0) {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Vehicle Performance', 14, yPos);
+      doc.text('Admin Performance', 14, yPos);
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Truck', 'Orders', 'Distance', 'Revenue', 'Utilization', 'Avg/Order']],
-        body: this.vehicleUtilizationData.map(v => [
-          v.vehicleName, v.totalTrips.toString(), `${v.totalDistance.toFixed(0)} mi`,
-          this.formatCurrency(v.totalRevenue), `${v.utilizationRate.toFixed(1)}%`,
-          this.formatCurrency(v.averageRevenuePerTrip)
+        head: [['Admin', 'Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate']],
+        body: this.adminPerformanceData.map((a: any) => [
+          a.name, a.totalTrips.toString(), a.completedTrips.toString(),
+          this.formatCurrency(a.totalRevenue), this.formatCurrency(a.totalProfit),
+          `${a.completionRate.toFixed(0)}%`
         ]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
         bodyStyles: { fontSize: 8 },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'center' }, 5: { halign: 'right' } }
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // Driver Performance
-    if (this.driverPerformanceData?.length > 0) {
-      if (yPos > 240) { doc.addPage(); yPos = 20; }
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Driver Performance', 14, yPos);
-      yPos += 5;
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Driver', 'Orders', 'Completed', 'Distance', 'Earnings', 'Completion Rate']],
-        body: this.driverPerformanceData.map(d => [
-          d.driverName, d.totalTrips.toString(), d.completedTrips.toString(),
-          `${d.totalDistance.toFixed(0)} mi`, this.formatCurrency(d.totalEarnings),
-          `${d.completionRate.toFixed(0)}%`
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: { 4: { halign: 'right' }, 5: { halign: 'center' } }
       });
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
@@ -528,15 +519,38 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Broker', 'Orders', 'Completed', 'Revenue', 'Avg/Order']],
+        head: [['Broker', 'Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate']],
         body: this.brokerAnalyticsData.brokers.map((b: any) => [
           b.brokerName, (b.tripCount || 0).toString(), (b.completedTrips || 0).toString(),
-          this.formatCurrency(b.totalRevenue || 0), this.formatCurrency(b.averageRevenue || 0)
+          this.formatCurrency(b.totalRevenue || 0), this.formatCurrency(b.totalProfit || 0),
+          `${(b.completionRate || 0).toFixed(0)}%`
         ]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
         bodyStyles: { fontSize: 8 },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Carrier Performance
+    if (this.carrierPerformanceData?.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Carrier Performance', 14, yPos);
+      yPos += 5;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Carrier', 'Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate']],
+        body: this.carrierPerformanceData.map((c: any) => [
+          c.name, c.totalTrips.toString(), c.completedTrips.toString(),
+          this.formatCurrency(c.totalRevenue), this.formatCurrency(c.totalProfit),
+          `${c.completionRate.toFixed(0)}%`
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
       });
     }
 
@@ -546,35 +560,30 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
 
   onExportCSV(): void {
     const sheets: any[] = [];
+    if (this.adminPerformanceData?.length > 0) {
+      sheets.push({
+        name: 'Admin Performance',
+        headers: ['Admin', 'Total Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate'],
+        rows: this.adminPerformanceData.map((a: any) => [
+          a.name, a.totalTrips, a.completedTrips, a.totalRevenue?.toFixed(2), a.totalProfit?.toFixed(2), `${a.completionRate?.toFixed(0)}%`
+        ])
+      });
+    }
     if (this.brokerAnalyticsData?.brokers?.length > 0) {
       sheets.push({
         name: 'Broker Performance',
-        headers: ['Broker Name', 'Total Orders', 'Completed', 'Total Revenue', 'Avg Revenue/Order', 'Total Distance', 'Completion Rate'],
+        headers: ['Broker', 'Total Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate'],
         rows: this.brokerAnalyticsData.brokers.map((b: any) => [
-          b.brokerName, b.tripCount || 0, b.completedTrips || 0,
-          b.totalRevenue?.toFixed(2) || 0, b.averageRevenue?.toFixed(2) || 0,
-          b.totalDistance || 0, `${(b.completionRate || 0).toFixed(0)}%`
+          b.brokerName, b.tripCount || 0, b.completedTrips || 0, b.totalRevenue?.toFixed(2), b.totalProfit?.toFixed(2), `${(b.completionRate || 0).toFixed(0)}%`
         ])
       });
     }
-    if (this.driverPerformanceData?.length > 0) {
+    if (this.carrierPerformanceData?.length > 0) {
       sheets.push({
-        name: 'Driver Performance',
-        headers: ['Driver Name', 'Total Orders', 'Completed', 'Total Distance', 'Total Earnings', 'Avg Earnings/Order', 'Completion Rate'],
-        rows: this.driverPerformanceData.map((d: any) => [
-          d.driverName, d.totalTrips || 0, d.completedTrips || 0,
-          d.totalDistance || 0, d.totalEarnings?.toFixed(2) || 0, d.averageEarningsPerTrip?.toFixed(2) || 0,
-          `${(d.completionRate || 0).toFixed(0)}%`
-        ])
-      });
-    }
-    if (this.vehicleUtilizationData?.length > 0) {
-      sheets.push({
-        name: 'Vehicle Utilization',
-        headers: ['Truck', 'Total Orders', 'Total Distance', 'Total Revenue', 'Utilization Rate', 'Avg Revenue/Order'],
-        rows: this.vehicleUtilizationData.map((v: any) => [
-          v.vehicleName, v.totalTrips || 0, v.totalDistance || 0,
-          v.totalRevenue?.toFixed(2) || 0, `${(v.utilizationRate || 0).toFixed(1)}%`, v.averageRevenuePerTrip?.toFixed(2) || 0
+        name: 'Carrier Performance',
+        headers: ['Carrier', 'Total Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate'],
+        rows: this.carrierPerformanceData.map((c: any) => [
+          c.name, c.totalTrips, c.completedTrips, c.totalRevenue?.toFixed(2), c.totalProfit?.toFixed(2), `${c.completionRate?.toFixed(0)}%`
         ])
       });
     }

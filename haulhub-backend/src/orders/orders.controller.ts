@@ -57,13 +57,17 @@ export class OrdersController {
   @Roles(UserRole.Admin, UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver)
   async getOrders(
     @CurrentUser() user: CurrentUserData,
-    @Query() filters: OrderFilters,
+    @Query() filters: any,
     @Headers('x-pagination-token') paginationToken?: string,
   ) {
     return this.ordersService.getOrders(
       user.userId,
       user.role as UserRole,
-      { ...filters, lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey },
+      {
+        ...filters,
+        lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey,
+        includeAggregates: filters.includeAggregates === 'true',
+      },
     );
   }
 

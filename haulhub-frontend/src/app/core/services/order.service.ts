@@ -69,12 +69,12 @@ export class OrderService {
     return this.apiService.post<Order>('/orders', dto);
   }
 
-  getOrders(filters?: Partial<OrderFilters>): Observable<OrdersResponse> {
+  getOrders(filters?: Partial<OrderFilters> & { includeAggregates?: boolean }): Observable<any> {
     const { lastEvaluatedKey, ...query } = filters || {} as any;
     const options = lastEvaluatedKey
       ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
       : undefined;
-    return this.apiService.get<OrdersResponse>('/orders', query, options);
+    return this.apiService.get<any>('/orders', query, options);
   }
 
   getOrderById(orderId: string): Observable<Order> {

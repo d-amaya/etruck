@@ -23,15 +23,15 @@ export class ConfigService {
   }
 
   get lorriesTableName(): string {
-    return process.env.LORRIES_TABLE_NAME || 'eTrucky-Trucks';
+    return process.env.ETRUCKY_V2_TRUCKS_TABLE || process.env.LORRIES_TABLE_NAME || 'eTruckyTrucks';
   }
 
   get usersTableName(): string {
-    return process.env.USERS_TABLE_NAME || 'eTrucky-Users';
+    return process.env.ETRUCKY_V2_USERS_TABLE || process.env.USERS_TABLE_NAME || 'eTruckyUsers';
   }
 
   get trailersTableName(): string {
-    return process.env.TRAILERS_TABLE_NAME || 'eTrucky-Trailers';
+    return process.env.ETRUCKY_V2_TRAILERS_TABLE || process.env.TRAILERS_TABLE_NAME || 'eTruckyTrailers';
   }
 
   get s3DocumentsBucketName(): string {

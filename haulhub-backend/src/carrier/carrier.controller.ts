@@ -33,13 +33,14 @@ export class CarrierController {
   @Get('assets')
   async getAllAssets(@CurrentUser() user: CurrentUserData) {
     const carrierId = this.getCarrierId(user);
-    const [trucks, trailers, drivers, brokers] = await Promise.all([
+    const [trucks, trailers, drivers, dispatchers, brokers] = await Promise.all([
       this.assetsService.getTrucksByCarrier(carrierId),
       this.assetsService.getTrailersByCarrier(carrierId),
       this.usersService.getUsersByCarrier(carrierId, 'DRIVER'),
+      this.usersService.getUsersByCarrier(carrierId, 'DISPATCHER'),
       this.brokersService.getAllBrokers(true),
     ]);
-    return { trucks, trailers, drivers, brokers };
+    return { trucks, trailers, drivers, dispatchers, brokers };
   }
 
   // ── Orders ────────────────────────────────────────────────
@@ -53,7 +54,11 @@ export class CarrierController {
     const carrierId = this.getCarrierId(user);
     return this.ordersService.getOrders(
       carrierId, UserRole.Carrier,
-      { ...filters, lastEvaluatedKey: paginationToken },
+      {
+        ...filters,
+        lastEvaluatedKey: paginationToken,
+        includeAggregates: !paginationToken && filters.includeAggregates !== 'false',
+      },
     );
   }
 

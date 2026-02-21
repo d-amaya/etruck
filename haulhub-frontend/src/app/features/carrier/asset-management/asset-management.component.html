@@ -6,60 +6,6 @@
 
     <!-- Tabs -->
     <mat-tab-group (selectedIndexChange)="onTabChange($event)" class="asset-tabs">
-      <!-- Dispatchers Tab -->
-      <mat-tab label="Dispatchers ({{ dispatchers.length }})">
-        <div class="tab-content">
-          <div class="tab-toolbar">
-            <button mat-raised-button color="primary" (click)="openCreateUserDialog('DISPATCHER')">
-              <mat-icon>add</mat-icon>
-              Add Dispatcher
-            </button>
-          </div>
-          
-          <div class="table-container" *ngIf="dispatchers.length > 0">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let user of dispatchers">
-                  <td><strong>{{ user.name }}</strong></td>
-                  <td>{{ user.email }}</td>
-                  <td>{{ user.phone }}</td>
-                  <td>
-                    <span class="status-badge" [class.active]="user.isActive">
-                      {{ user.isActive ? 'Active' : 'Inactive' }}
-                    </span>
-                  </td>
-                  <td class="actions-cell">
-                    <button mat-icon-button color="primary" (click)="editUser(user)" matTooltip="Edit">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button 
-                            color="primary"
-                            (click)="toggleUserStatus(user)" 
-                            [matTooltip]="user.isActive ? 'Deactivate' : 'Activate'">
-                      <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="empty-state" *ngIf="dispatchers.length === 0">
-            <mat-icon>people</mat-icon>
-            <p>No dispatchers found</p>
-          </div>
-        </div>
-      </mat-tab>
-
       <!-- Drivers Tab -->
       <mat-tab label="Drivers ({{ drivers.length }})">
         <div class="tab-content">

@@ -58,8 +58,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     'pickupLocation',
     'dropoffLocation',
     'dispatcherName',
-    'truckId',
     'driverName',
+    'truckId',
     'trailerId',
     'carrierPayment',
     'expenses',
@@ -164,23 +164,34 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       this.trips = result.trips;
       this.lastDashboardResponse = result;
       this.loading = false;
+
+      // Resolve cache misses from orders (e.g. dispatchers not in carrier's asset cache)
+      if (result.trips?.length) {
+        this.assetCache.resolveFromOrders(result.trips).pipe(takeUntil(this.destroy$)).subscribe(() => {
+          const cache = this.assetCache.getCurrentCache();
+          if (cache) {
+            this.dispatcherMap = cache.dispatchers;
+            this.driverMap = cache.drivers;
+            this.truckMap = cache.trucks;
+            this.trailerMap = cache.trailers;
+          }
+          this.trips = [...this.trips]; // trigger re-render
+        });
+      }
       
       const pagination = this.dashboardState.getCurrentPagination();
       
       // Store pagination token
-      if (result.lastEvaluatedKey) {
+      const itemsBeforeCurrentPage = pagination.page * pagination.pageSize;
+      const currentPageItems = result.trips.length;
+
+      // If fewer items than pageSize, this is the last page regardless of lastEvaluatedKey
+      if (result.lastEvaluatedKey && currentPageItems >= pagination.pageSize) {
         const pageTokens = [...pagination.pageTokens];
         pageTokens[pagination.page] = result.lastEvaluatedKey;
         this.dashboardState.updatePaginationSilent({ pageTokens });
-        
-        // Estimate total to enable next button
-        const itemsBeforeCurrentPage = pagination.page * pagination.pageSize;
-        const currentPageItems = result.trips.length;
         this.totalTrips = itemsBeforeCurrentPage + currentPageItems + 1;
       } else {
-        // Last page - exact total
-        const itemsBeforeCurrentPage = pagination.page * pagination.pageSize;
-        const currentPageItems = result.trips.length;
         this.totalTrips = itemsBeforeCurrentPage + currentPageItems;
       }
     });
@@ -356,7 +367,12 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   }
 
   getStatusLabel(status: OrderStatus | string): string {
-    return String(status);
+    switch (status) {
+      case 'PickingUp': return 'Picking Up';
+      case 'WaitingRC': return 'Waiting RC';
+      case 'ReadyToPay': return 'Ready to Pay';
+      default: return String(status);
+    }
   }
 
   getStatusAriaLabel(status: OrderStatus): string {
@@ -472,8 +488,8 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       `${trip.pickupCity || ''}, ${trip.pickupState || ''}`,
       `${trip.deliveryCity || ''}, ${trip.deliveryState || ''}`,
       this.getDispatcherDisplay(trip.dispatcherId),
-      this.getTruckDisplay(trip.truckId),
       this.getDriverDisplay(trip.driverId),
+      this.getTruckDisplay(trip.truckId),
       this.getTrailerDisplay(trip.trailerId),
       trip.carrierPayment || 0,
       this.calculateExpenses(trip),
@@ -545,22 +561,26 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
       const cardHeight = 25;
       const cardGap = 10;
       
+      const revenue = payment.carrierPayment || 0;
+      const expenses = (payment.driverPayment || 0) + (payment.fuelCost || 0);
+      const profit = revenue - expenses;
+      
       this.drawSummaryCard(doc, 14, yPosition, cardWidth, cardHeight, 
         'Total Orders', allTrips.length.toString(), primaryBlue);
       this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPosition, cardWidth, cardHeight,
-        'Total Revenue', this.formatCurrency(payment.totalBrokerPayments), profitGreen);
+        'Revenue', this.formatCurrency(revenue), profitGreen);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPosition, cardWidth, cardHeight,
-        'Total Expenses', this.formatCurrency(payment.totalDriverPayments + (payment.totalFuelCost || 0) + (payment.totalLumperFees || 0) + (payment.totalDetentionFees || 0)), lossRed);
+        'Expenses', this.formatCurrency(expenses), lossRed);
       this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 3, yPosition, cardWidth, cardHeight,
-        payment.totalProfit >= 0 ? 'Net Profit' : 'Net Loss', 
-        this.formatCurrency(Math.abs(payment.totalProfit)), 
-        payment.totalProfit >= 0 ? profitGreen : lossRed);
+        profit >= 0 ? 'Net Profit' : 'Net Loss', 
+        this.formatCurrency(Math.abs(profit)), 
+        profit >= 0 ? profitGreen : lossRed);
       
       yPosition += cardHeight + 15;
     }
     
     // Table
-    const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Driver', 'Trailer', 'Carrier Payment', 'Expenses', 'Profit'];
+    const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Driver', 'Truck', 'Trailer', 'Revenue', 'Expenses', 'Profit'];
     const tableData = allTrips.map(trip => this.buildExportRow(trip).map((v, i) => i >= 8 ? this.formatCurrency(v) : v));
     
     autoTable(doc, {
@@ -585,7 +605,7 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.carrierService.getTrips(apiFilters).subscribe({
       next: (res: any) => {
         const allTrips = res.trips || res || [];
-        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Driver', 'Trailer', 'Carrier Payment', 'Expenses', 'Profit'];
+        const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Driver', 'Truck', 'Trailer', 'Revenue', 'Expenses', 'Profit'];
         const rows = allTrips.map((t: any) => this.buildExportRow(t));
         const df = this.filterService.getCurrentFilter();
         this.excelExportService.exportToExcel('carrier-orders-export', [{ name: 'Orders', headers, rows }], df.startDate, df.endDate);

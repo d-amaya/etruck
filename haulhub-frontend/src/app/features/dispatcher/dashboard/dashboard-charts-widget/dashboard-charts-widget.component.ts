@@ -449,7 +449,9 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       case OrderStatus.PickingUp: return '#ff9800';
       case OrderStatus.Transit: return '#9c27b0';
       case OrderStatus.Delivered: return '#4caf50';
-      case OrderStatus.ReadyToPay: return '#009688';
+      case OrderStatus.WaitingRC: return '#009688';
+      case OrderStatus.ReadyToPay: return '#00bcd4';
+      case OrderStatus.Canceled: return '#757575';
       default: return '#757575';
     }
   }

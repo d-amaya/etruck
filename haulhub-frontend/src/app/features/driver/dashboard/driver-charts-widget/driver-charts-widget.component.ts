@@ -133,11 +133,13 @@ export class DriverChartsWidgetComponent implements OnInit, OnDestroy {
     if (!this.dispatcherChartRef) return;
 
     const statusColors: Record<string, string> = {
-      'Scheduled': '#1976d2',
-      'Picked Up': '#ff9800',
-      'In Transit': '#9c27b0',
+      'Scheduled': '#2196f3',
+      'PickingUp': '#ff9800',
+      'Transit': '#9c27b0',
       'Delivered': '#4caf50',
-      'Paid': '#00acc1'
+      'WaitingRC': '#009688',
+      'ReadyToPay': '#00bcd4',
+      'Canceled': '#757575'
     };
 
     const config: ChartConfiguration = {

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, forkJoin, of } from 'rxjs';
 import { tap, catchError, map } from 'rxjs/operators';
 import { CarrierService } from '../../../core/services/carrier.service';
+import { OrderService } from '../../../core/services/order.service';
 
 export interface CarrierAssetCache {
   trucks: Map<string, any>;
@@ -30,7 +31,10 @@ export class CarrierAssetCacheService {
   private failedDriverLookups = new Map<string, number>();
   private failedTrailerLookups = new Map<string, number>();
 
-  constructor(private carrierService: CarrierService) {
+  constructor(
+    private carrierService: CarrierService,
+    private orderService: OrderService,
+  ) {
     this.loadFromLocalStorage();
   }
 
@@ -141,6 +145,78 @@ export class CarrierAssetCacheService {
   clearCache(): void {
     this.cacheSubject.next(null);
     localStorage.removeItem('etrucky_carrier_asset_cache');
+  }
+
+  getCurrentCache(): CarrierAssetCache | null {
+    return this.cacheSubject.value;
+  }
+
+  /**
+   * Resolve cache misses from a set of orders.
+   * Checks each entity ID field against its Map, batches all misses
+   * into one POST /entities/resolve call, routes results to the
+   * correct Map, and persists only the affected Maps to localStorage.
+   */
+  resolveFromOrders(orders: any[]): Observable<void> {
+    const cache = this.cacheSubject.value;
+    if (!cache) return of(undefined);
+
+    // Collect misses grouped by which field they came from
+    const fieldToMap: Record<string, Map<string, any>> = {
+      dispatcherId: cache.dispatchers,
+      driverId: cache.drivers,
+      truckId: cache.trucks,
+      trailerId: cache.trailers,
+      brokerId: cache.brokers,
+    };
+
+    // missOrigin: id → set of field names that reference it
+    const missOrigin = new Map<string, Set<string>>();
+
+    for (const order of orders) {
+      for (const [field, assetMap] of Object.entries(fieldToMap)) {
+        const id = order[field];
+        if (id && !assetMap.has(id) && !missOrigin.has(id)) {
+          missOrigin.set(id, new Set());
+        }
+        if (id && missOrigin.has(id)) {
+          missOrigin.get(id)!.add(field);
+        }
+      }
+    }
+
+    if (missOrigin.size === 0) return of(undefined);
+
+    const missIds = [...missOrigin.keys()];
+
+    return this.orderService.resolveEntities(missIds).pipe(
+      tap((resolved: any) => {
+        const entries: [string, any][] = Array.isArray(resolved)
+          ? resolved.map((e: any) => [e.id, e])
+          : Object.entries(resolved);
+
+        const dirtyMaps = new Set<string>();
+
+        for (const [id, entity] of entries) {
+          if (!entity || !entity.name || entity.name === 'Unknown') continue;
+          const fields = missOrigin.get(id);
+          if (!fields) continue;
+
+          for (const field of fields) {
+            const assetMap = fieldToMap[field];
+            assetMap.set(id, { name: entity.name, userId: id, ...entity });
+            dirtyMaps.add(field);
+          }
+        }
+
+        if (dirtyMaps.size > 0) {
+          this.cacheSubject.next({ ...cache });
+          this.saveToLocalStorage(cache);
+        }
+      }),
+      map(() => undefined),
+      catchError(() => of(undefined))
+    );
   }
 
   private isCacheValid(cache: CarrierAssetCache): boolean {

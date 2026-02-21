@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { AdminService } from './admin.service';
 import {
@@ -172,9 +173,13 @@ export class TripService {
 
   getDashboard(filters?: Partial<OrderFilters>): Observable<any> {
     const { lastEvaluatedKey, ...query } = filters || {} as any;
-    const options = lastEvaluatedKey
-      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
-      : undefined;
-    return this.apiService.get('/orders/dashboard', query, options);
+    return this.apiService.get('/orders', { ...query, includeAggregates: true }).pipe(
+      map((res: any) => ({
+        trips: res.orders || [],
+        chartAggregates: res.aggregates,
+        entityIds: res.entityIds,
+        lastEvaluatedKey: res.lastEvaluatedKey,
+      }))
+    );
   }
 }

@@ -124,7 +124,7 @@ export class AdminDashboardStateService {
 
   triggerRefresh(): void {
     this.invalidateViewCaches();
-    this.refreshSubject.next();
+    this.paginationSubject.next({ ...this.paginationSubject.value, page: 0, pageTokens: [] });
   }
 
   // View caching

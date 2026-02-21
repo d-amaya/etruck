@@ -37,10 +37,12 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     this.totalTripsInRange = Object.values(this.statusData).reduce((sum: number, count) => sum + (count as number), 0);
     
     const payment = agg.paymentSummary || {};
+    const revenue = payment.carrierPayment || 0;
+    const expenses = (payment.driverPayment || 0) + (payment.fuelCost || 0);
     this.revenueData = {
-      revenue: payment.totalCarrierPayments || payment.totalBrokerPayments || 0,
-      expenses: (payment.totalDriverPayments || 0) + (payment.totalFuelCost || 0),
-      profit: (payment.totalCarrierPayments || payment.totalBrokerPayments || 0) - (payment.totalDriverPayments || 0) - (payment.totalFuelCost || 0)
+      revenue,
+      expenses,
+      profit: revenue - expenses
     };
     
     const topPerformers = agg.topPerformers || {};
@@ -65,13 +67,13 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
       };
     });
     
-    // Resolve dispatcher IDs to names
-    this.topDispatchers = (topPerformers.topDispatchers || []).map((d: any) => {
-      const dispatcher = this.dispatcherMap.get(d.id);
+    // Resolve truck IDs to plates
+    this.topTrucks = (topPerformers.topTrucks || []).map((t: any) => {
+      const truck = this.truckMap.get(t.id);
       return {
-        name: dispatcher?.name || d.id.substring(0, 8),
-        value: d.profit,
-        count: d.count
+        name: truck?.plate || t.id.substring(0, 8),
+        value: t.trips,
+        count: t.trips
       };
     });
     
@@ -98,12 +100,13 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
   topBrokers: TopPerformer[] = [];
   topDispatchers: TopPerformer[] = [];
   topDrivers: TopPerformer[] = [];
+  topTrucks: TopPerformer[] = [];
   totalTripsInRange = 0;
 
   // Asset maps for name resolution
   private brokerMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
-  private dispatcherMap = new Map<string, any>();
+  private truckMap = new Map<string, any>();
 
   constructor(
     private carrierFilterService: CarrierFilterService,
@@ -119,7 +122,7 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     ).subscribe(cache => {
       this.brokerMap = cache.brokers;
       this.driverMap = cache.drivers;
-      this.dispatcherMap = cache.dispatchers;
+      this.truckMap = cache.trucks;
     });
   }
 
@@ -147,8 +150,8 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
 
     this.renderRevenueChart();
     this.renderStatusChart();
-    this.renderTopBrokersChart();
-    this.renderTopDispatchersChart();
+    this.renderTopDriversChart();
+    this.renderTopTrucksChart();
   }
 
   private renderRevenueChart(): void {
@@ -228,19 +231,18 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
     this.charts.push(new Chart(ctx, config));
   }
 
-  private renderTopBrokersChart(): void {
-    if (!this.topBrokersChartRef) return;
-
+  private renderTopDriversChart(): void {
+    if (!this.topBrokersChartRef || this.topDrivers.length === 0) return;
     const ctx = this.topBrokersChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
-        labels: this.topBrokers.map(b => b.name),
+        labels: this.topDrivers.map(d => d.name),
         datasets: [{
-          label: 'Revenue ($)',
-          data: this.topBrokers.map(b => b.value),
+          label: 'Trips',
+          data: this.topDrivers.map(d => d.value),
           backgroundColor: ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'],
           borderRadius: 4
         }]
@@ -252,62 +254,32 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (context) => {
-                const value = context.parsed.y || 0;
-                const broker = this.topBrokers[context.dataIndex];
-                return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${broker.count} trips)`;
-              }
+              label: (context) => `${context.parsed.y} trips`
             }
           }
         },
         scales: {
-          x: {
-            ticks: {
-              maxRotation: 45,
-              minRotation: 45
-            }
-          },
-          y: {
-            ticks: {
-              callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
-            }
-          }
+          x: { ticks: { maxRotation: 45, minRotation: 45 } },
+          y: { beginAtZero: true }
         }
       }
     };
-
     this.charts.push(new Chart(ctx, config));
   }
 
-  private renderTopDispatchersChart(): void {
-    if (!this.topDispatchersChartRef) {
-      console.log('No dispatcher chart ref');
-      return;
-    }
-    if (this.topDispatchers.length === 0) {
-      console.log('No dispatcher data');
-      return;
-    }
-
+  private renderTopTrucksChart(): void {
+    if (!this.topDispatchersChartRef || this.topTrucks.length === 0) return;
     const ctx = this.topDispatchersChartRef.nativeElement.getContext('2d');
-    if (!ctx) {
-      console.log('No dispatcher chart context');
-      return;
-    }
-
-    const colors = this.topDispatchers.map((d, i) => {
-      const baseColors = ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6', '#90caf9'];
-      return d.value >= 0 ? baseColors[i] : '#f44336';
-    });
+    if (!ctx) return;
 
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
-        labels: this.topDispatchers.map(d => d.name),
+        labels: this.topTrucks.map(t => t.name),
         datasets: [{
-          label: 'Net Profit ($)',
-          data: this.topDispatchers.map(d => d.value),
-          backgroundColor: colors,
+          label: 'Trips',
+          data: this.topTrucks.map(t => t.value),
+          backgroundColor: ['#2e7d32', '#388e3c', '#4caf50', '#66bb6a', '#81c784'],
           borderRadius: 4
         }]
       },
@@ -318,30 +290,16 @@ export class CarrierChartsWidgetComponent implements OnInit, OnDestroy, AfterVie
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (context) => {
-                const value = context.parsed.y || 0;
-                const dispatcher = this.topDispatchers[context.dataIndex];
-                return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${dispatcher.count} trips)`;
-              }
+              label: (context) => `${context.parsed.y} trips`
             }
           }
         },
         scales: {
-          x: {
-            ticks: {
-              maxRotation: 45,
-              minRotation: 45
-            }
-          },
-          y: {
-            ticks: {
-              callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
-            }
-          }
+          x: { ticks: { maxRotation: 45, minRotation: 45 } },
+          y: { beginAtZero: true }
         }
       }
     };
-
     this.charts.push(new Chart(ctx, config));
   }
 

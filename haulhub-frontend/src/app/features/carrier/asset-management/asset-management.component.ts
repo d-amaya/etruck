@@ -64,10 +64,9 @@ interface Trailer {
 })
 export class AssetManagementComponent implements OnInit {
   // Tab state
-  activeTab: 'dispatchers' | 'drivers' | 'trucks' | 'trailers' = 'dispatchers';
+  activeTab: 'drivers' | 'trucks' | 'trailers' = 'drivers';
 
   // Users
-  dispatchers: any[] = [];
   drivers: any[] = [];
 
   // Trucks
@@ -122,7 +121,6 @@ export class AssetManagementComponent implements OnInit {
     try {
       const assets = await firstValueFrom(this.carrierService.getAllAssets());
       
-      this.dispatchers = assets.dispatchers;
       this.drivers = assets.drivers;
       this.trucks = assets.trucks.map(truck => ({
         ...truck
@@ -141,12 +139,6 @@ export class AssetManagementComponent implements OnInit {
 
   private async loadUsers(): Promise<void> {
     try {
-      // Load dispatchers
-      const dispatchersResponse = await firstValueFrom(
-        this.carrierService.getUsers('DISPATCHER')
-      );
-      this.dispatchers = dispatchersResponse.users;
-
       // Load drivers
       const driversResponse = await firstValueFrom(
         this.carrierService.getUsers('DRIVER')
@@ -591,7 +583,7 @@ export class AssetManagementComponent implements OnInit {
   }
 
   onTabChange(index: number): void {
-    const tabs = ['dispatchers', 'drivers', 'trucks', 'trailers'];
+    const tabs = ['drivers', 'trucks', 'trailers'];
     this.activeTab = tabs[index] as any;
   }
 
@@ -613,7 +605,7 @@ export class AssetManagementComponent implements OnInit {
 
   openCreateUserDialog(role: string): void {
     const dialogData: UserDialogData = {
-      role: role as 'DISPATCHER' | 'DRIVER',
+      role: role as 'DRIVER',
       mode: 'create'
     };
 
@@ -624,11 +616,7 @@ export class AssetManagementComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(async result => {
       if (result?.success) {
-        // Only reload the specific user type that was created
-        if (result.role === 'DISPATCHER') {
-          const response = await firstValueFrom(this.carrierService.getUsers('DISPATCHER'));
-          this.dispatchers = response.users;
-        } else if (result.role === 'DRIVER') {
+        if (result.role === 'DRIVER') {
           const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
           this.drivers = response.users;
         }
@@ -638,19 +626,11 @@ export class AssetManagementComponent implements OnInit {
 
   editUser(user: any): void {
     // Map role from user object to dialog role type
-    let role: 'DISPATCHER' | 'DRIVER';
-    
-    if (user.role === 'Dispatcher' || user.role === 'DISPATCHER') {
-      role = 'DISPATCHER';
-    } else if (user.role === 'Driver' || user.role === 'DRIVER') {
-      role = 'DRIVER';
-    } else {
-      role = 'DRIVER'; // fallback
-    }
+    const role = 'DRIVER';
     
     const dialogData: UserDialogData = {
       user,
-      role: role as 'DISPATCHER' | 'DRIVER',
+      role: role as 'DRIVER',
       mode: 'edit'
     };
 
@@ -661,14 +641,8 @@ export class AssetManagementComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(async result => {
       if (result?.success) {
-        // Only reload the specific user type that was edited
-        if (result.role === 'DISPATCHER') {
-          const response = await firstValueFrom(this.carrierService.getUsers('DISPATCHER'));
-          this.dispatchers = response.users;
-        } else if (result.role === 'DRIVER') {
-          const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
-          this.drivers = response.users;
-        }
+        const response = await firstValueFrom(this.carrierService.getUsers('DRIVER'));
+        this.drivers = response.users;
       }
     });
   }

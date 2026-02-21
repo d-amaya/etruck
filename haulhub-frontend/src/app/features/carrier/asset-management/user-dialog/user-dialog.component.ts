@@ -13,7 +13,7 @@ import { firstValueFrom } from 'rxjs';
 
 export interface UserDialogData {
   user?: any;
-  role: 'DISPATCHER' | 'DRIVER';
+  role: 'DRIVER';
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -103,11 +103,7 @@ export class UserDialogComponent {
   }
 
   getRoleLabel(): string {
-    switch (this.data.role) {
-      case 'DISPATCHER': return 'Dispatcher';
-      case 'DRIVER': return 'Driver';
-      default: return 'User';
-    }
+    return 'Driver';
   }
 
   onCancel(): void {

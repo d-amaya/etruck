@@ -45,10 +45,12 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
 
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
+  fuelColumns: string[] = ['truckName', 'trips', 'totalMiles', 'avgMPG', 'totalCost'];
   truckColumns: string[] = ['truckName', 'totalPayment', 'tripCount'];
   
   enrichedDriverData: any[] = [];
-  enrichedTruckData: any[] = [];
+  enrichedBrokerData: any[] = [];
+  fuelByTruck: any[] = [];
   
   private truckMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
@@ -87,29 +89,55 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
 
   private enrichGroupedData(): void {
     if (!this.report) return;
-    
-    if (this.report.groupedByDriver) {
-      this.enrichedDriverData = Object.entries((this.report as any).driverId || {}).map(([driverId, data]: [string, any]) => {
-        const driver = this.driverMap.get(driverId);
-        return {
-          driverName: driver?.name || driverId.substring(0, 8),
-          totalPayment: data.totalPayment,
-          tripCount: data.tripCount
-        };
-      });
+    const orders = (this.report as any).orders || [];
+
+    // Group by driver — payroll view
+    const driverGroups = new Map<string, { totalPayment: number; tripCount: number }>();
+    for (const o of orders) {
+      if (!o.driverId) continue;
+      const g = driverGroups.get(o.driverId) || { totalPayment: 0, tripCount: 0 };
+      g.totalPayment += o.driverPayment || 0;
+      g.tripCount++;
+      driverGroups.set(o.driverId, g);
     }
-    
-    if (this.report.groupedByTruck) {
-      this.enrichedTruckData = Object.entries((this.report as any).truckId || {}).map(([truckId, data]: [string, any]) => {
-        const truck = this.truckMap.get(truckId);
-        const truckName = truck ? `${truck.plate} (${truck.brand} ${truck.year})` : truckId.substring(0, 8);
-        return {
-          truckName,
-          totalPayment: data.totalPayment,
-          tripCount: data.tripCount
-        };
-      });
+    this.enrichedDriverData = [...driverGroups.entries()].map(([driverId, data]) => ({
+      driverName: this.driverMap.get(driverId)?.name || driverId.substring(0, 8),
+      totalPayment: data.totalPayment,
+      tripCount: data.tripCount
+    })).sort((a, b) => b.totalPayment - a.totalPayment);
+
+    // Group by broker — receivables view
+    const brokerGroups = new Map<string, { totalPayment: number; tripCount: number }>();
+    for (const o of orders) {
+      if (!o.brokerId) continue;
+      const g = brokerGroups.get(o.brokerId) || { totalPayment: 0, tripCount: 0 };
+      g.totalPayment += o.carrierPayment || 0;
+      g.tripCount++;
+      brokerGroups.set(o.brokerId, g);
     }
+    this.enrichedBrokerData = [...brokerGroups.entries()].map(([brokerId, data]) => ({
+      brokerName: this.brokerMap.get(brokerId)?.brokerName || brokerId.substring(0, 8),
+      totalPayment: data.totalPayment,
+      tripCount: data.tripCount
+    })).sort((a, b) => b.totalPayment - a.totalPayment);
+
+    // Group fuel by truck
+    const truckFuel = new Map<string, { trips: number; miles: number; gallons: number; cost: number }>();
+    for (const o of orders) {
+      if (!o.truckId || !o.fuelCost) continue;
+      const g = truckFuel.get(o.truckId) || { trips: 0, miles: 0, gallons: 0, cost: 0 };
+      g.trips++;
+      g.miles += o.mileageTotal || 0;
+      g.gallons += (o.fuelGasAvgGallxMil || 0) * (o.mileageTotal || 0);
+      g.cost += o.fuelCost || 0;
+      truckFuel.set(o.truckId, g);
+    }
+    this.fuelByTruck = [...truckFuel.entries()].map(([truckId, d]) => ({
+      truckName: this.truckMap.get(truckId)?.plate || truckId.substring(0, 8),
+      trips: d.trips, totalMiles: d.miles, totalGallons: d.gallons,
+      totalCost: d.cost,
+      avgMPG: d.gallons > 0 ? d.miles / d.gallons : 0,
+    })).sort((a, b) => b.totalCost - a.totalCost);
   }
 
   loadReport(): void {
@@ -154,13 +182,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   }
 
   getEnrichedBrokerData(): any[] {
-    if (!this.report?.groupedByBroker) return [];
-    
-    return Object.entries((this.report as any).brokerId || {}).map(([brokerId, data]: [string, any]) => ({
-      brokerName: this.getBrokerName(brokerId),
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
-    }));
+    return this.enrichedBrokerData;
   }
 
   formatCurrency(value: number): string {
@@ -179,7 +201,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     
     let yPos = 20;
     
-    // Header with eTrucky banner
+    // Header
     doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
     doc.rect(0, 0, pageWidth, 35, 'F');
     doc.setFontSize(26);
@@ -195,52 +217,27 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     yPos = 50;
     
     // Summary Cards
-    const cardWidth = (pageWidth - 28 - 10) / 3;
+    const cardWidth = (pageWidth - 28 - 15) / 4;
     const cardHeight = 25;
     const cardGap = 5;
     
-    this.drawSummaryCard(doc, 14, yPos, cardWidth, cardHeight, 'Order Rate', 
-      this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
-    this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPos, cardWidth, cardHeight, 'Driver Payments',
-      this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
+    this.drawSummaryCard(doc, 14, yPos, cardWidth, cardHeight, 'Carrier Revenue', 
+      this.formatCurrency(this.report?.totalCarrierPayment || 0), profitGreen);
+    this.drawSummaryCard(doc, 14 + cardWidth + cardGap, yPos, cardWidth, cardHeight, 'Driver Payroll',
+      this.formatCurrency(this.report?.totalDriverPayment || 0), lossRed);
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, yPos, cardWidth, cardHeight, 'Fuel Cost',
       this.formatCurrency(this.report?.totalFuelCost || 0), lossRed);
+    this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 3, yPos, cardWidth, cardHeight, 'Net Profit',
+      this.formatCurrency(this.report?.profit || 0), (this.report?.profit || 0) >= 0 ? profitGreen : lossRed);
     
     yPos += cardHeight + 15;
     
-    // By Broker
-    const brokerData = this.getEnrichedBrokerData();
-    if (brokerData.length > 0) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Payments by Broker', 14, yPos);
-      yPos += 5;
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Broker', 'Total Payment', 'Orders']],
-        body: brokerData.map(b => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
-        theme: 'grid',
-        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
-      });
-      
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
-    
-    // By Driver
+    // Driver Payroll
     if (this.enrichedDriverData.length > 0) {
-      if (yPos > 240) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Payments by Driver', 14, yPos);
+      doc.text('Driver Payroll', 14, yPos);
       yPos += 5;
       
       autoTable(doc, {
@@ -256,31 +253,52 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
     
-    doc.save(`carrier-payments-${new Date().toISOString().split('T')[0]}.pdf`);
+    // Fuel Cost by Truck
+    if (this.fuelByTruck.length > 0) {
+      if (yPos > 220) { doc.addPage(); yPos = 20; }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Fuel Cost by Truck', 14, yPos);
+      yPos += 5;
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Truck', 'Trips', 'Total Miles', 'Avg MPG', 'Total Fuel Cost']],
+        body: this.fuelByTruck.map(f => [
+          f.truckName, f.trips.toString(), `${f.totalMiles.toFixed(0)} mi`,
+          f.avgMPG.toFixed(2), this.formatCurrency(f.totalCost)
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'center' }, 4: { halign: 'right' } }
+      });
+    }
     
-    this.snackBar.open('Payment report exported to PDF successfully', 'Close', {
-      duration: 3000
-    });
+    doc.save(`carrier-payments-${new Date().toISOString().split('T')[0]}.pdf`);
+    this.snackBar.open('Payment report exported to PDF successfully', 'Close', { duration: 3000 });
   }
 
   onExportCSV(): void {
     if (!this.report) return;
     const sheets: any[] = [];
-    if (this.report.groupedByBroker) {
+    if (this.enrichedDriverData?.length > 0) {
       sheets.push({
-        name: 'By Broker',
-        headers: ['Broker Name', 'Total Payment', 'Order Count'],
-        rows: Object.entries((this.report as any).groupedByBroker).map(([brokerId, data]: [string, any]) => [
-          this.getBrokerName(brokerId), data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
+        name: 'Driver Payroll',
+        headers: ['Driver Name', 'Total Payment', 'Order Count'],
+        rows: this.enrichedDriverData.map((d: any) => [
+          d.driverName, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
         ])
       });
     }
-    if (this.enrichedDriverData?.length > 0) {
+    if (this.fuelByTruck?.length > 0) {
       sheets.push({
-        name: 'By Driver',
-        headers: ['Driver Name', 'Total Payment', 'Order Count'],
-        rows: this.enrichedDriverData.map((d: any) => [
-          d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
+        name: 'Fuel Cost by Truck',
+        headers: ['Truck', 'Trips', 'Total Miles', 'Avg MPG', 'Total Fuel Cost'],
+        rows: this.fuelByTruck.map((f: any) => [
+          f.truckName, f.trips, f.totalMiles?.toFixed(0), f.avgMPG?.toFixed(2), f.totalCost?.toFixed(2)
         ])
       });
     }

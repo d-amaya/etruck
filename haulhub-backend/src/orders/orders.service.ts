@@ -221,16 +221,14 @@ export class OrdersService {
   async getOrders(
     userId: string,
     role: UserRole,
-    filters: OrderFilters,
-  ): Promise<{ orders: Order[]; lastEvaluatedKey?: string }> {
+    filters: OrderFilters & { includeAggregates?: boolean },
+  ): Promise<{ orders: Order[]; lastEvaluatedKey?: string; aggregates?: any; entityIds?: string[] }> {
     const { indexName, pkField, pkPrefix } = this.indexSelectorService.selectIndex(role);
+    const skField = pkField.replace('PK', 'SK');
 
-    const keyCondition = `${pkField} = :pk`;
+    // Base query — key condition only (date range on SK)
     const exprValues: Record<string, any> = { ':pk': `${pkPrefix}${userId}` };
     const exprNames: Record<string, string> = { [`#${pkField}`]: pkField };
-
-    // Date range filter on sort key
-    const skField = pkField.replace('PK', 'SK');
     let skCondition = '';
     if (filters.startDate && filters.endDate) {
       skCondition = ` AND #sk BETWEEN :start AND :end`;
@@ -247,75 +245,153 @@ export class OrdersService {
       exprValues[':end'] = filters.endDate + '\uffff';
     }
 
-    // Secondary filters
-    const filterParts: string[] = [];
-    if (filters.orderStatus) {
-      filterParts.push('#orderStatus = :status');
-      exprNames['#orderStatus'] = 'orderStatus';
-      exprValues[':status'] = filters.orderStatus;
-    }
-    if (filters.brokerId) {
-      filterParts.push('#brokerId = :brokerId');
-      exprNames['#brokerId'] = 'brokerId';
-      exprValues[':brokerId'] = filters.brokerId;
-    }
-    if (filters.carrierId && role !== UserRole.Carrier) {
-      filterParts.push('#carrierId = :carrierId');
-      exprNames['#carrierId'] = 'carrierId';
-      exprValues[':carrierId'] = filters.carrierId;
-    }
-    if (filters.dispatcherId && role !== UserRole.Dispatcher) {
-      filterParts.push('#dispatcherId = :dispatcherId');
-      exprNames['#dispatcherId'] = 'dispatcherId';
-      exprValues[':dispatcherId'] = filters.dispatcherId;
-    }
-    if (filters.driverId && role !== UserRole.Driver) {
-      filterParts.push('#driverId = :driverId');
-      exprNames['#driverId'] = 'driverId';
-      exprValues[':driverId'] = filters.driverId;
-    }
-    if (filters.truckId) {
-      filterParts.push('#truckId = :truckId');
-      exprNames['#truckId'] = 'truckId';
-      exprValues[':truckId'] = filters.truckId;
-    }
-
-    const queryInput: any = {
+    const baseQuery: any = {
       TableName: this.tableName,
       IndexName: indexName,
       KeyConditionExpression: `#${pkField} = :pk${skCondition}`,
-      ExpressionAttributeNames: exprNames,
-      ExpressionAttributeValues: exprValues,
+      ExpressionAttributeNames: { ...exprNames },
+      ExpressionAttributeValues: { ...exprValues },
       ScanIndexForward: false,
-      Limit: filters.limit || 25,
     };
 
-    if (filterParts.length > 0) {
-      queryInput.FilterExpression = filterParts.join(' AND ');
+    // ── Pass 1: Aggregates (fetch ALL orders in window, no filters) ──
+    let aggregates: any;
+    let entityIds: string[] | undefined;
+    if (filters.includeAggregates) {
+      const allOrders: Order[] = [];
+      let lastKey: any;
+      do {
+        const q = { ...baseQuery, ExclusiveStartKey: lastKey };
+        const result = await this.ddb.send(new QueryCommand(q));
+        for (const item of result.Items || []) {
+          allOrders.push(this.filterFields(this.mapItem(item), role));
+        }
+        lastKey = result.LastEvaluatedKey;
+      } while (lastKey);
+
+      aggregates = this.computeAggregates(allOrders, role);
+      entityIds = this.collectEntityIds(allOrders);
     }
 
-    if (filters.lastEvaluatedKey) {
-      try {
-        queryInput.ExclusiveStartKey = JSON.parse(
-          Buffer.from(filters.lastEvaluatedKey, 'base64').toString(),
-        );
-      } catch {
-        throw new BadRequestException('Invalid pagination token');
+    // ── Pass 2: Paginated orders with app-layer filtering ──
+    const pageSize = Number(filters.limit) || 25;
+    const matching: Order[] = [];
+    let cursor: any = filters.lastEvaluatedKey
+      ? JSON.parse(Buffer.from(filters.lastEvaluatedKey, 'base64').toString())
+      : undefined;
+
+    while (matching.length < pageSize) {
+      const q = { ...baseQuery, ExclusiveStartKey: cursor };
+      const result = await this.ddb.send(new QueryCommand(q));
+      const items = result.Items || [];
+      let exhaustedBatch = true;
+
+      for (const item of items) {
+        const order = this.filterFields(this.mapItem(item), role);
+        if (this.matchesFilters(order, filters, role)) {
+          matching.push(order);
+          if (matching.length >= pageSize) {
+            // Build cursor from this item's keys so next page resumes after it
+            cursor = this.buildCursorFromItem(item, indexName, pkField);
+            exhaustedBatch = false;
+            break;
+          }
+        }
+      }
+
+      if (exhaustedBatch) {
+        cursor = result.LastEvaluatedKey;
+        if (!cursor) break; // no more data in DynamoDB
       }
     }
 
-    const result = await this.ddb.send(new QueryCommand(queryInput));
-
-    const orders = (result.Items || []).map(item => this.filterFields(this.mapItem(item), role));
-
-    let lastEvaluatedKey: string | undefined;
-    if (result.LastEvaluatedKey) {
-      lastEvaluatedKey = Buffer.from(
-        JSON.stringify(result.LastEvaluatedKey),
-      ).toString('base64');
+    // Check if there's actually more data after our cursor
+    let hasMore = !!cursor;
+    if (hasMore && matching.length < pageSize) {
+      hasMore = false; // we stopped because we ran out of data, not because page is full
     }
 
-    return { orders, lastEvaluatedKey };
+    let lastEvaluatedKey: string | undefined;
+    if (hasMore) {
+      lastEvaluatedKey = Buffer.from(JSON.stringify(cursor)).toString('base64');
+    }
+
+    const result: any = { orders: matching.slice(0, pageSize), lastEvaluatedKey };
+    if (aggregates) result.aggregates = aggregates;
+    if (entityIds) result.entityIds = entityIds;
+    return result;
+  }
+
+  private matchesFilters(order: Order, filters: any, role: UserRole): boolean {
+    if (filters.orderStatus && (order as any).orderStatus !== filters.orderStatus) return false;
+    if (filters.brokerId && (order as any).brokerId !== filters.brokerId) return false;
+    if (filters.carrierId && role !== UserRole.Carrier && (order as any).carrierId !== filters.carrierId) return false;
+    if (filters.dispatcherId && role !== UserRole.Dispatcher && (order as any).dispatcherId !== filters.dispatcherId) return false;
+    if (filters.driverId && role !== UserRole.Driver && (order as any).driverId !== filters.driverId) return false;
+    if (filters.truckId && (order as any).truckId !== filters.truckId) return false;
+    return true;
+  }
+
+  private computeAggregates(orders: Order[], role: UserRole): any {
+    const statusSummary: Record<string, number> = {};
+    const payments: Record<string, number> = {};
+    const brokerMap = new Map<string, { revenue: number; count: number }>();
+    const driverMap = new Map<string, number>();
+    const truckMap = new Map<string, number>();
+    const dispatcherMap = new Map<string, { profit: number; count: number }>();
+
+    for (const o of orders as any[]) {
+      statusSummary[o.orderStatus] = (statusSummary[o.orderStatus] || 0) + 1;
+
+      // Accumulate all visible payment fields
+      for (const key of Object.keys(o).filter(k => k.endsWith('Payment') || k === 'fuelCost' || k === 'lumper' || k === 'detentionValue')) {
+        payments[key] = (payments[key] || 0) + (o[key] || 0);
+      }
+
+      if (o.brokerId) {
+        const b = brokerMap.get(o.brokerId) || { revenue: 0, count: 0 };
+        b.revenue += o.carrierPayment || o.orderRate || 0;
+        b.count++;
+        brokerMap.set(o.brokerId, b);
+      }
+      if (o.driverId) driverMap.set(o.driverId, (driverMap.get(o.driverId) || 0) + 1);
+      if (o.truckId) {
+        const t = truckMap.get(o.truckId) || 0;
+        truckMap.set(o.truckId, t + 1);
+      }
+      if (o.dispatcherId) {
+        const d = dispatcherMap.get(o.dispatcherId) || { profit: 0, count: 0 };
+        d.profit += o.carrierPayment || o.dispatcherPayment || 0;
+        d.count++;
+        dispatcherMap.set(o.dispatcherId, d);
+      }
+    }
+
+    return {
+      totalOrders: orders.length,
+      statusSummary,
+      paymentSummary: payments,
+      topPerformers: {
+        topBrokers: [...brokerMap.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5)
+          .map(([id, v]) => ({ id, revenue: this.round2(v.revenue), count: v.count })),
+        topDrivers: [...driverMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([id, trips]) => ({ id, trips })),
+        topTrucks: [...truckMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([id, trips]) => ({ id, trips })),
+        topDispatchers: [...dispatcherMap.entries()].sort((a, b) => b[1].profit - a[1].profit).slice(0, 5)
+          .map(([id, v]) => ({ id, profit: this.round2(v.profit), count: v.count })),
+      },
+    };
+  }
+
+  private collectEntityIds(orders: Order[]): string[] {
+    const ids = new Set<string>();
+    for (const o of orders as any[]) {
+      for (const field of ['adminId', 'dispatcherId', 'carrierId', 'driverId', 'truckId', 'trailerId', 'brokerId']) {
+        if (o[field]) ids.add(o[field]);
+      }
+    }
+    return [...ids];
   }
 
   // ── Update ──────────────────────────────────────────────────────
@@ -684,6 +760,16 @@ export class OrdersService {
       delete (filtered as any)[field];
     }
     return filtered;
+  }
+
+  private buildCursorFromItem(item: Record<string, any>, indexName: string, pkField: string): Record<string, any> {
+    const skField = pkField.replace('PK', 'SK');
+    return {
+      PK: item.PK,
+      SK: item.SK,
+      [pkField]: item[pkField],
+      [skField]: item[skField],
+    };
   }
 
   private round2(n: number): number {

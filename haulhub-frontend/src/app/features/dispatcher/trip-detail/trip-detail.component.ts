@@ -12,7 +12,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AssetCacheService } from '../dashboard/asset-cache.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
 import { CarrierAssetCacheService } from '../../carrier/shared/carrier-asset-cache.service';
-import { Order, OrderStatus, calcDispatcherProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
+import { Order, OrderStatus, calcDispatcherProfit, calcCarrierProfit, calculateFuelCost, hasFuelData, UserRole } from '@haulhub/shared';
 
 @Component({
   selector: 'app-trip-detail',
@@ -294,7 +294,16 @@ export class TripDetailComponent implements OnInit {
 
   calculateProfit(): number {
     if (!this.trip) return 0;
+    if (this.authService.userRole === UserRole.Carrier) return calcCarrierProfit(this.trip);
     return calcDispatcherProfit(this.trip);
+  }
+
+  isDispatcherView(): boolean {
+    return this.authService.userRole === UserRole.Dispatcher;
+  }
+
+  isCarrierView(): boolean {
+    return this.authService.userRole === UserRole.Carrier;
   }
 
   /**

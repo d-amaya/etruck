@@ -209,41 +209,63 @@
           <mat-card-title>Payment Breakdown</mat-card-title>
         </mat-card-header>
         <mat-card-content>
-          <!-- Column 1: Revenue -->
-          <div class="payment-column">
-            <h4 class="section-title">Revenue</h4>
-            <div class="detail-row">
-              <span class="detail-label">Order Rate:</span>
-              <span class="detail-value payment-positive">{{ formatCurrency(trip.orderRate) }}</span>
+          <!-- Dispatcher Payment View -->
+          <ng-container *ngIf="isDispatcherView()">
+            <div class="payment-column">
+              <h4 class="section-title">Revenue</h4>
+              <div class="detail-row">
+                <span class="detail-label">Order Rate:</span>
+                <span class="detail-value payment-positive">{{ formatCurrency(trip.orderRate) }}</span>
+              </div>
             </div>
-          </div>
-          
-          <!-- Column 2: Expenses (Dispatcher view) -->
-          <div class="payment-column">
-            <h4 class="section-title">Expenses</h4>
-            <div class="detail-row">
-              <span class="detail-label">Dispatcher Rate:</span>
-              <span class="detail-value">{{ trip.dispatcherRate || 0 }}%</span>
+            <div class="payment-column">
+              <h4 class="section-title">Expenses</h4>
+              <div class="detail-row">
+                <span class="detail-label">Dispatcher Rate:</span>
+                <span class="detail-value">{{ trip.dispatcherRate || 0 }}%</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Dispatcher Payment:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.dispatcherPayment || 0) }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Carrier Payment:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.carrierPayment || 0) }}</span>
+              </div>
+              <div class="detail-row" *ngIf="trip.lumperValue && trip.lumperValue > 0">
+                <span class="detail-label">Lumper Fees:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.lumperValue) }}</span>
+              </div>
+              <div class="detail-row" *ngIf="trip.detentionValue && trip.detentionValue > 0">
+                <span class="detail-label">Detention Fees:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.detentionValue) }}</span>
+              </div>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">Dispatcher Payment:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.dispatcherPayment || 0) }}</span>
+          </ng-container>
+
+          <!-- Carrier Payment View -->
+          <ng-container *ngIf="isCarrierView()">
+            <div class="payment-column">
+              <h4 class="section-title">Revenue</h4>
+              <div class="detail-row">
+                <span class="detail-label">Carrier Payment:</span>
+                <span class="detail-value payment-positive">{{ formatCurrency(trip.carrierPayment) }}</span>
+              </div>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">Carrier Payment:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.carrierPayment || 0) }}</span>
+            <div class="payment-column">
+              <h4 class="section-title">Expenses</h4>
+              <div class="detail-row">
+                <span class="detail-label">Driver Payment:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.driverPayment || 0) }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Fuel Cost:</span>
+                <span class="detail-value payment-negative">{{ formatCurrency(trip.fuelCost || 0) }}</span>
+              </div>
             </div>
-            <div class="detail-row" *ngIf="trip.lumperValue && trip.lumperValue > 0">
-              <span class="detail-label">Lumper Fees:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.lumperValue) }}</span>
-            </div>
-            <div class="detail-row" *ngIf="trip.detentionValue && trip.detentionValue > 0">
-              <span class="detail-label">Detention Fees:</span>
-              <span class="detail-value payment-negative">{{ formatCurrency(trip.detentionValue) }}</span>
-            </div>
-          </div>
-          
-          <!-- Column 3: Summary -->
+          </ng-container>
+
+          <!-- Summary -->
           <div class="payment-column">
             <h4 class="section-title">Summary</h4>
             

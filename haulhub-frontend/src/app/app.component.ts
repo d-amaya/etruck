@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { LoadingSpinnerComponent } from './shared/components/loading-spinner/loading-spinner.component';
 import { HeaderComponent } from './shared/components/header/header.component';
+import { CacheCleanupService } from './core/services/cache-cleanup.service';
 
 @Component({
   selector: 'app-root',
@@ -20,4 +21,7 @@ import { HeaderComponent } from './shared/components/header/header.component';
   `]
 })
 export class AppComponent {
+  constructor(cacheCleanup: CacheCleanupService) {
+    cacheCleanup.cleanup();
+  }
 }

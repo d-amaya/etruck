@@ -228,13 +228,8 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     }
     this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: () => {
-        const filters = this.filterService.getCurrentFilters();
-        const pagination = this.dashboardState.getCurrentPagination();
-        this.loadTrips(filters, pagination).subscribe(result => {
-          if (result.chartAggregates) {
-            this.dashboardState.updateDashboardData(result);
-          }
-        });
+        // Reset to page 0 to refresh aggregates
+        this.dashboardState.updatePagination({ page: 0, pageTokens: [] });
       },
       error: (error) => {
         console.error('Failed to update trip status:', error);

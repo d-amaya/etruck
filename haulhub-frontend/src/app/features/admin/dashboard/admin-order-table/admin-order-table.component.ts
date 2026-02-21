@@ -138,6 +138,10 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
     this.loading = true;
     const apiFilters = this.buildApiFilters(filters, pagination);
 
+    if (pagination.page === 0) {
+      (apiFilters as any).includeAggregates = true;
+    }
+
     return this.orderService.getOrders(apiFilters).pipe(
       map((response: any) => {
         this.loading = false;
@@ -153,7 +157,7 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
 
         const itemsBefore = pagination.page * pagination.pageSize;
         const total = response.lastEvaluatedKey ? itemsBefore + orders.length + 1 : itemsBefore + orders.length;
-        return { orders, total, chartAggregates: response.chartAggregates };
+        return { orders, total, chartAggregates: response.aggregates };
       }),
       tap(result => this.dashboardState.setCachedTrips(filters, pagination, result)),
       catchError(error => {
@@ -250,7 +254,7 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
         if (idx >= 0) this.orders[idx] = updated;
         this.editingOrderId = null;
         this.editDispatcherRate = null;
-        this.dashboardState.invalidateViewCaches();
+        this.dashboardState.triggerRefresh();
         this.snackBar.open('Dispatcher rate updated', 'Close', { duration: 3000 });
       },
       error: () => this.snackBar.open('Failed to update dispatcher rate', 'Close', { duration: 5000 })

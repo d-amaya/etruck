@@ -466,13 +466,14 @@ export class TripTableComponent implements OnInit, OnDestroy {
     const apiFilters = this.buildApiFilters(filters, pagination);
 
     // Always fetch aggregates on first page load (page 0)
-    // Table filters don't affect chart aggregates - charts always show all trips in date range
     const isPaginating = pagination.page > 0;
     const needsAggregates = !isPaginating;
 
-    const apiCall$: Observable<any> = needsAggregates 
-      ? this.orderService.getOrders(apiFilters)
-      : this.orderService.getOrders(apiFilters);
+    if (needsAggregates) {
+      (apiFilters as any).includeAggregates = true;
+    }
+
+    const apiCall$: Observable<any> = this.orderService.getOrders(apiFilters);
 
     return apiCall$.pipe(
       map((response: any) => {
@@ -513,7 +514,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
           total = itemsBeforeCurrentPage + currentPageItems;
         }
         
-        return { trips: sortedTrips, total, chartAggregates: response.chartAggregates };
+        return { trips: sortedTrips, total, chartAggregates: response.aggregates };
       }),
       tap(result => {
         this.dashboardState.setCachedTrips(filters, pagination, result);

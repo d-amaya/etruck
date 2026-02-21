@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { Truck, Trailer, Driver } from './trip.service';
 import { Broker } from '@haulhub/shared';
@@ -217,23 +218,27 @@ export class CarrierService {
   // ============================================================================
 
   /**
-   * Get unified dashboard data (aggregates + paginated trips)
+   * Get dashboard data — initial load includes aggregates from ALL orders in window
    */
   getDashboardUnified(filters?: any): Observable<{
     chartAggregates: any;
     trips: any[];
+    entityIds?: string[];
     lastEvaluatedKey?: string;
   }> {
     const { lastEvaluatedKey, ...queryFilters } = filters || {};
-    const options = lastEvaluatedKey 
-      ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
-      : undefined;
-
-    return this.apiService.get('/carrier/dashboard-unified', queryFilters, options);
+    return this.apiService.get('/carrier/orders', queryFilters).pipe(
+      map((res: any) => ({
+        chartAggregates: res.aggregates || {},
+        trips: res.orders || [],
+        entityIds: res.entityIds,
+        lastEvaluatedKey: res.lastEvaluatedKey,
+      }))
+    );
   }
 
   /**
-   * Get trips only (no aggregates) - for pagination
+   * Get next page of orders (no aggregates)
    */
   getTrips(filters?: any): Observable<{
     trips: any[];
@@ -244,7 +249,12 @@ export class CarrierService {
       ? { headers: { 'x-pagination-token': lastEvaluatedKey } as Record<string, string> }
       : undefined;
 
-    return this.apiService.get('/carrier/trips', queryFilters, options);
+    return this.apiService.get('/carrier/orders', queryFilters, options).pipe(
+      map((res: any) => ({
+        trips: res.orders || [],
+        lastEvaluatedKey: res.lastEvaluatedKey,
+      }))
+    );
   }
 
   /**
