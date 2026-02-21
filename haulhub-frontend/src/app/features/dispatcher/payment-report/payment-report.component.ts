@@ -16,7 +16,7 @@ import { MatTabsModule, MatTabChangeEvent } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { OrderService } from '../../../core/services/order.service';
 import { OrderFilters } from '@haulhub/shared';
 type PaymentReportFilters = Partial<OrderFilters>;
@@ -61,15 +61,18 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   // Table columns
   brokerColumns: string[] = ['brokerName', 'totalPayment', 'tripCount'];
   driverColumns: string[] = ['driverName', 'totalPayment', 'tripCount'];
-  carrierColumns: string[] = ['ownerName', 'totalPayment', 'tripCount'];
+  carrierColumns: string[] = ['carrierName', 'totalPayment', 'tripCount'];
   
   // Enriched data for display
   enrichedDriverData: any[] = [];
+  enrichedBrokerData: any[] = [];
+  enrichedCarrierData: any[] = [];
   
   // Asset maps
   private truckMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
   private brokerMap = new Map<string, any>();
+  private carrierMap = new Map<string, string>();
 
   constructor(
     private fb: FormBuilder,
@@ -91,9 +94,16 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     // Load asset maps for enrichment
     this.loadAssetMaps();
 
-    // Subscribe to shared filter changes
+    // Subscribe to shared filter changes (debounced to prevent multiple emissions)
     this.sharedFilterService.filters$
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged((prev, curr) =>
+          prev.dateRange.startDate?.getTime() === curr.dateRange.startDate?.getTime() &&
+          prev.dateRange.endDate?.getTime() === curr.dateRange.endDate?.getTime()
+        ),
+        takeUntil(this.destroy$)
+      )
       .subscribe(filters => {
         this.filterForm.patchValue({
           startDate: filters.dateRange.startDate,
@@ -108,6 +118,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       cache.trucks.forEach((t, id) => this.truckMap.set(id, t));
       cache.drivers.forEach((d, id) => this.driverMap.set(id, d));
       cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
+      cache.carriers.forEach((c: any, id) => this.carrierMap.set(id, c.name || id));
     });
   }
 
@@ -117,20 +128,40 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Enrich grouped data with human-readable names
+   * Enrich grouped data with human-readable names from backend-grouped data
    */
   private enrichGroupedData(): void {
     if (!this.report) return;
-    
-    // Enrich driver data
-    if (this.report.groupedByDriver) {
-      this.enrichedDriverData = Object.entries((this.report as any).groupedByDriver).map(([driverId, data]: any) => {
-        const driver = this.driverMap.get(driverId);
-        return {
-          driverName: driver?.name || driverId.substring(0, 8),
-          totalPayment: data.totalPayment,
-          tripCount: data.tripCount
-        };
+
+    // Use backend-grouped data directly
+    const groupedByBroker = this.report.groupedByBroker || {};
+    const groupedByCarrier = this.report.groupedByCarrier || {};
+
+    this.enrichedBrokerData = Object.entries(groupedByBroker).map(([id, g]: [string, any]) => ({
+      brokerName: this.brokerMap.get(id)?.brokerName || id.substring(0, 8),
+      totalPayment: g.totalPayment,
+      tripCount: g.tripCount
+    })).sort((a, b) => b.totalPayment - a.totalPayment);
+
+    this.enrichedCarrierData = Object.entries(groupedByCarrier).map(([id, g]: [string, any]) => ({
+      carrierName: this.carrierMap.get(id) || id.substring(0, 8),
+      totalPayment: g.totalPayment,
+      tripCount: g.tripCount
+    })).sort((a, b) => b.totalPayment - a.totalPayment);
+
+    // Resolve entity names for any cache misses
+    const entityIds = this.report.entityIds || [];
+    if (entityIds.length > 0) {
+      this.assetCache.resolveEntities(entityIds).subscribe(resolved => {
+        const nameMap = new Map(resolved.map((r: any) => [r.id, r.name]));
+        this.enrichedBrokerData = Object.entries(groupedByBroker).map(([id, g]: [string, any]) => ({
+          brokerName: this.brokerMap.get(id)?.brokerName || nameMap.get(id) || id.substring(0, 8),
+          totalPayment: g.totalPayment, tripCount: g.tripCount
+        })).sort((a, b) => b.totalPayment - a.totalPayment);
+        this.enrichedCarrierData = Object.entries(groupedByCarrier).map(([id, g]: [string, any]) => ({
+          carrierName: this.carrierMap.get(id) || nameMap.get(id) || id.substring(0, 8),
+          totalPayment: g.totalPayment, tripCount: g.tripCount
+        })).sort((a, b) => b.totalPayment - a.totalPayment);
       });
     }
   }
@@ -140,32 +171,9 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Only show component-level loading spinner if not wrapped
-    if (!this.isWrapped) {
-      this.loading = true;
-      // Only set dashboard loading state when not wrapped (standalone mode)
-      this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
-    }
-    
-    // Use shared filter service values instead of form values
-    // This ensures we use the latest filter state from quick filter buttons
     const sharedFilters = this.sharedFilterService.getCurrentFilters();
-    
-    const filters: PaymentReportFilters = {};
-    
-    if (sharedFilters.dateRange.startDate) {
-      const d = sharedFilters.dateRange.startDate;
-      filters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
-    }
-    
-    if (sharedFilters.dateRange.endDate) {
-      const d = sharedFilters.dateRange.endDate;
-      filters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
-    }
 
-    // Don't add groupBy - fetch all grouped data at once
-
-    // Check cache first — avoid redundant API calls when switching views
+    // Check cache first — populated by Table view or Analytics view
     const cached = this.dashboardStateService.getCachedPaymentReport(
       sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate
     );
@@ -178,25 +186,55 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.orderService.getPaymentReport(filters).subscribe({
-      next: (report: any) => {
+    // Cache miss — show loading and fetch via unified endpoint
+    if (!this.isWrapped) {
+      this.loading = true;
+      this.dashboardStateService.setLoadingState(true, false, true, 'Loading payment report...');
+    }
+
+    // Cache miss — fetch via unified endpoint (populates cache for all views)
+    const currentPageSize = this.dashboardStateService['paginationSubject']?.value?.pageSize || 10;
+    const filters: any = { includeAggregates: 'true', includeDetailedAnalytics: 'true', limit: currentPageSize };
+    if (sharedFilters.dateRange.startDate) {
+      const d = sharedFilters.dateRange.startDate;
+      filters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
+    }
+    if (sharedFilters.dateRange.endDate) {
+      const d = sharedFilters.dateRange.endDate;
+      filters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
+    }
+
+    this.orderService.getOrders(filters).subscribe({
+      next: (response: any) => {
+        const report = response.paymentReport;
+        if (report) report.entityIds = response.entityIds || [];
         this.report = report as any;
         this.dashboardStateService.setCachedPaymentReport(
           sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate, report
         );
+        // Cache analytics for Analytics view
+        if (response.detailedAnalytics) {
+          const analyticsData = { ...response.detailedAnalytics, paymentReport: report, entityIds: response.entityIds || [] };
+          this.dashboardStateService.setCachedAnalytics(sharedFilters.dateRange.startDate, sharedFilters.dateRange.endDate, analyticsData);
+        }
+        // Cache orders for Table view (page 0, no table filters)
+        if (response.orders?.length) {
+          const defaultFilters = { dateRange: sharedFilters.dateRange, status: null, brokerId: null, truckId: null, driverId: null, carrierId: null };
+          const defaultPagination = { page: 0, pageSize: currentPageSize, pageTokens: response.lastEvaluatedKey ? [response.lastEvaluatedKey] : [] };
+          this.dashboardStateService.setCachedTrips(defaultFilters as any, defaultPagination, {
+            orders: response.orders, total: response.lastEvaluatedKey ? response.orders.length + 1 : response.orders.length,
+            chartAggregates: response.aggregates, lastEvaluatedKey: response.lastEvaluatedKey
+          });
+        }
         this.enrichGroupedData();
         this.loading = false;
-        // Always complete loading (trip-table does this too)
         this.dashboardStateService.setLoadingState(false);
         this.dashboardStateService.clearError();
       },
       error: (error: any) => {
         console.error('Error loading payment report:', error);
-        this.snackBar.open('Failed to load payment report', 'Close', {
-          duration: 3000
-        });
+        this.snackBar.open('Failed to load payment report', 'Close', { duration: 3000 });
         this.loading = false;
-        // Always complete loading even on error
         this.dashboardStateService.setLoadingState(false);
         this.dashboardStateService.setError('Failed to load payment report. Please try again.');
       }
@@ -274,7 +312,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     // - Lumper fees
     // - Detention fees
     // These are returned as totalAdditionalFees in the report
-    return this.report.totalAdditionalFees || 0;
+    return 0;
   }
 
   onExportData(): void {
@@ -315,44 +353,40 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(color[0], color[1], color[2]);
       doc.text(value, x + cardWidth / 2, yPos + 20, { align: 'center' });
     };
-    drawCard(14, 'Order Rate', this.formatCurrency(this.report?.totalBrokerPayments || 0), profitGreen);
-    drawCard(14 + cardWidth + cardGap, 'Driver Payments', this.formatCurrency(this.report?.totalDriverPayments || 0), lossRed);
-    drawCard(14 + (cardWidth + cardGap) * 2, 'Fuel Cost', this.formatCurrency(this.report?.totalFuelCost || 0), lossRed);
+    drawCard(14, 'Total Order Rate', this.formatCurrency(this.report?.totalOrderRate || 0), profitGreen);
+    drawCard(14 + cardWidth + cardGap, 'Dispatcher Earnings', this.formatCurrency(this.report?.totalDispatcherPayment || 0), profitGreen);
+    drawCard(14 + (cardWidth + cardGap) * 2, 'Total Orders', String(this.report?.orderCount || 0), primaryBlue);
 
     yPos += cardHeight + 15;
 
     // By Broker
-    const brokerData = this.getBrokerGroupedData();
-    if (brokerData.length > 0) {
+    if (this.enrichedBrokerData.length > 0) {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Payments by Broker', 14, yPos); yPos += 5;
+      doc.text('By Broker', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Broker', 'Total Payment', 'Orders']],
-        body: brokerData.map(b => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
+        head: [['Broker', 'Total Order Rate', 'Orders']],
+        body: this.enrichedBrokerData.map((b: any) => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
         bodyStyles: { fontSize: 8 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
       });
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // By Driver
-    if (this.enrichedDriverData.length > 0) {
-      if (yPos > 240) { doc.addPage(); yPos = 20; }
+    // By Carrier
+    if (this.enrichedCarrierData.length > 0) {
+      if (yPos > 220) { doc.addPage(); yPos = 20; }
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Payments by Driver', 14, yPos); yPos += 5;
+      doc.text('By Carrier', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Driver', 'Total Payment', 'Orders']],
-        body: this.enrichedDriverData.map(d => [d.driverName, this.formatCurrency(d.totalPayment), d.tripCount.toString()]),
+        head: [['Carrier', 'Carrier Payment', 'Orders']],
+        body: this.enrichedCarrierData.map((c: any) => [c.carrierName, this.formatCurrency(c.totalPayment), c.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
         bodyStyles: { fontSize: 8 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' } }
       });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
     }
 
     doc.save(`dispatcher-payments-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -362,27 +396,23 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
   onExportCSV(): void {
     if (!this.report) return;
     const sheets: any[] = [];
-    if (this.report.groupedByBroker) {
+    if (this.enrichedBrokerData.length > 0) {
       sheets.push({
         name: 'By Broker',
-        headers: ['Broker Name', 'Total Payment', 'Order Count'],
-        rows: Object.entries((this.report as any).groupedByBroker).map(([brokerId, data]: [string, any]) => [
-          this.brokerMap.get(brokerId)?.brokerName || brokerId, data.totalPayment?.toFixed(2) || 0, data.tripCount || 0
-        ])
+        headers: ['Broker Name', 'Total Order Rate', 'Order Count'],
+        rows: this.enrichedBrokerData.map((b: any) => [b.brokerName, b.totalPayment?.toFixed(2), b.tripCount])
       });
     }
-    if (this.enrichedDriverData?.length > 0) {
+    if (this.enrichedCarrierData.length > 0) {
       sheets.push({
-        name: 'By Driver',
-        headers: ['Driver Name', 'Total Payment', 'Order Count'],
-        rows: this.enrichedDriverData.map((d: any) => [
-          d.driverName || d.driverId, d.totalPayment?.toFixed(2) || 0, d.tripCount || 0
-        ])
+        name: 'By Carrier',
+        headers: ['Carrier Name', 'Carrier Payment', 'Order Count'],
+        rows: this.enrichedCarrierData.map((c: any) => [c.carrierName, c.totalPayment?.toFixed(2), c.tripCount])
       });
     }
     if (sheets.length > 0) {
-      const f = this.filterForm.value;
-      this.excelExportService.exportToExcel('dispatcher-payments', sheets, f.startDate, f.endDate);
+      const f = this.sharedFilterService.getCurrentFilters();
+      this.excelExportService.exportToExcel('dispatcher-payments', sheets, f.dateRange.startDate, f.dateRange.endDate);
     }
   }
 

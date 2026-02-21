@@ -27,7 +27,7 @@ export class DriverPdfExportService {
 
     // Use the currently displayed trips (filtered and paginated data)
     // Get all trips by fetching without pagination
-    const allFilters = { ...filters, limit: 1000 };
+    const allFilters = { ...filters };
     
     // For now, use the dashboard data we have
     // TODO: Fetch all filtered trips if we want complete data beyond current page

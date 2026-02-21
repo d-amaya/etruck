@@ -15,39 +15,30 @@
     <mat-card-content>
       <form [formGroup]="tripForm" (ngSubmit)="onSubmit()">
 
-        <!-- 1. Admin & Carrier -->
-        <div class="form-section">
-          <h3>Organization</h3>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Admin</mat-label>
-              <input matInput formControlName="adminId" [matAutocomplete]="adminAuto" placeholder="Type to search...">
-              <mat-autocomplete #adminAuto="matAutocomplete" [displayWith]="displayAdmin">
-                <mat-option *ngFor="let admin of filteredAdmins$ | async" [value]="admin.userId">
-                  {{ admin.name }}
-                </mat-option>
-              </mat-autocomplete>
-              <mat-error>{{ getErrorMessage('adminId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Carrier</mat-label>
-              <input matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
-              <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier"
-                                (optionSelected)="onCarrierSelected()">
-                <mat-option *ngFor="let carrier of filteredCarriers$ | async" [value]="carrier.userId">
-                  {{ carrier.name }}
-                </mat-option>
-              </mat-autocomplete>
-              <mat-error>{{ getErrorMessage('carrierId') }}</mat-error>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- 2. Order & Broker -->
+        <!-- 1. Order Information -->
         <div class="form-section">
           <h3>Order Information</h3>
           <div class="form-row">
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Scheduled Date</mat-label>
+              <input matInput [matDatepicker]="scheduledPicker" formControlName="scheduledTimestamp">
+              <mat-datepicker-toggle matSuffix [for]="scheduledPicker"></mat-datepicker-toggle>
+              <mat-datepicker #scheduledPicker></mat-datepicker>
+              <mat-error>{{ getErrorMessage('scheduledTimestamp') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Broker</mat-label>
+              <input matInput formControlName="brokerId" [matAutocomplete]="brokerAuto" placeholder="Type to search..."
+                     (focus)="triggerAutocomplete('brokerId')">
+              <mat-autocomplete #brokerAuto="matAutocomplete" [displayWith]="displayBroker">
+                <mat-option *ngFor="let broker of filteredBrokers$ | async" [value]="broker.brokerId">
+                  {{ broker.brokerName }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('brokerId') }}</mat-error>
+            </mat-form-field>
+
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Invoice #</mat-label>
               <input matInput formControlName="invoiceNumber" placeholder="e.g. ORD-001">
@@ -58,35 +49,55 @@
               <mat-label>Broker Load #</mat-label>
               <input matInput formControlName="brokerLoad">
             </mat-form-field>
-
-            <mat-form-field appearance="outline" class="quarter-width">
-              <mat-label>Broker</mat-label>
-              <input matInput formControlName="brokerId" [matAutocomplete]="brokerAuto" placeholder="Type to search...">
-              <mat-autocomplete #brokerAuto="matAutocomplete" [displayWith]="displayBroker">
-                <mat-option *ngFor="let broker of filteredBrokers$ | async" [value]="broker.brokerId">
-                  {{ broker.brokerName }}
-                </mat-option>
-              </mat-autocomplete>
-              <mat-error>{{ getErrorMessage('brokerId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="quarter-width">
-              <mat-label>Scheduled Date</mat-label>
-              <input matInput [matDatepicker]="scheduledPicker" formControlName="scheduledTimestamp">
-              <mat-datepicker-toggle matSuffix [for]="scheduledPicker"></mat-datepicker-toggle>
-              <mat-datepicker #scheduledPicker></mat-datepicker>
-              <mat-error>{{ getErrorMessage('scheduledTimestamp') }}</mat-error>
-            </mat-form-field>
           </div>
         </div>
 
-        <!-- 3. Assignment (cascading from Carrier) -->
+        <!-- 2. Assignment -->
         <div class="form-section">
           <h3>Assignment</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Admin</mat-label>
+              <input matInput formControlName="adminId" [matAutocomplete]="adminAuto" placeholder="Type to search..."
+                     (focus)="triggerAutocomplete('adminId')">
+              <mat-autocomplete #adminAuto="matAutocomplete" [displayWith]="displayAdmin">
+                <mat-option *ngFor="let admin of filteredAdmins$ | async" [value]="admin.userId">
+                  {{ admin.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('adminId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Carrier</mat-label>
+              <input matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search..."
+                     (focus)="triggerAutocomplete('carrierId')">
+              <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier"
+                                (optionSelected)="onCarrierSelected()">
+                <mat-option *ngFor="let carrier of filteredCarriers$ | async" [value]="carrier.userId">
+                  {{ carrier.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('carrierId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="quarter-width">
+              <mat-label>Driver</mat-label>
+              <input matInput formControlName="driverId" [matAutocomplete]="driverAuto" placeholder="Select carrier first..."
+                     (focus)="triggerAutocomplete('driverId')">
+              <mat-autocomplete #driverAuto="matAutocomplete" [displayWith]="displayDriver"
+                                (optionSelected)="onDriverSelected()">
+                <mat-option *ngFor="let driver of filteredDrivers$ | async" [value]="driver.userId">
+                  {{ driver.name }}
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Truck</mat-label>
-              <input matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Select carrier first...">
+              <input matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Select carrier first..."
+                     (focus)="triggerAutocomplete('truckId')">
               <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck"
                                 (optionSelected)="onTruckSelected()">
                 <mat-option *ngFor="let truck of filteredTrucks$ | async" [value]="truck.truckId">
@@ -95,28 +106,18 @@
               </mat-autocomplete>
               <mat-error>{{ getErrorMessage('truckId') }}</mat-error>
             </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
+          </div>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Trailer</mat-label>
-              <input matInput formControlName="trailerId" [matAutocomplete]="trailerAuto" placeholder="Select carrier first...">
+              <input matInput formControlName="trailerId" [matAutocomplete]="trailerAuto" placeholder="Select carrier first..."
+                     (focus)="triggerAutocomplete('trailerId')">
               <mat-autocomplete #trailerAuto="matAutocomplete" [displayWith]="displayTrailer">
                 <mat-option *ngFor="let trailer of filteredTrailers$ | async" [value]="trailer.trailerId">
                   {{ trailer.brand }} {{ trailer.year }} — {{ trailer.plate }}
                 </mat-option>
               </mat-autocomplete>
               <mat-error>{{ getErrorMessage('trailerId') }}</mat-error>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Driver</mat-label>
-              <input matInput formControlName="driverId" [matAutocomplete]="driverAuto" placeholder="Select carrier first...">
-              <mat-autocomplete #driverAuto="matAutocomplete" [displayWith]="displayDriver"
-                                (optionSelected)="onDriverSelected()">
-                <mat-option *ngFor="let driver of filteredDrivers$ | async" [value]="driver.userId">
-                  {{ driver.name }}
-                </mat-option>
-              </mat-autocomplete>
-              <mat-error>{{ getErrorMessage('driverId') }}</mat-error>
             </mat-form-field>
           </div>
         </div>
@@ -268,52 +269,57 @@
           <h3>Finances</h3>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width income-field">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Order Rate ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="orderRate">
               <mat-error>{{ getErrorMessage('orderRate') }}</mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width cost-field">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Lumper Fees ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="lumperValue">
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width cost-field">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Detention Fees ($)</mat-label>
               <input matInput type="number" step="0.01" formControlName="detentionValue">
             </mat-form-field>
           </div>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
+            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Admin Rate (%)</mat-label>
-              <input matInput formControlName="adminRate" readonly>
+              <input matInput type="number" step="0.01" formControlName="adminRate">
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Dispatcher Rate (%)</mat-label>
-              <input matInput formControlName="dispatcherRate" readonly>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width cost-field">
-              <mat-label>Carrier Payment ($)</mat-label>
-              <input matInput [value]="carrierPayment.toFixed(2)" readonly>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Admin Payment ($)</mat-label>
+              <input matInput formControlName="adminPayment" readonly>
             </mat-form-field>
           </div>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width cost-field">
-              <mat-label>Admin Payment ($)</mat-label>
-              <input matInput [value]="adminPayment.toFixed(2)" readonly>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Dispatcher Rate (%)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="dispatcherRate">
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="third-width cost-field">
+            <mat-form-field appearance="outline" class="half-width">
               <mat-label>Dispatcher Payment ($)</mat-label>
-              <input matInput [value]="dispatcherPayment.toFixed(2)" readonly>
+              <input matInput formControlName="dispatcherPayment" readonly>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Carrier Rate (%)</mat-label>
+              <input matInput formControlName="carrierRate" readonly>
             </mat-form-field>
 
-            <div class="third-width"></div>
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Carrier Payment ($)</mat-label>
+              <input matInput formControlName="carrierPayment" readonly>
+            </mat-form-field>
           </div>
         </div>
 

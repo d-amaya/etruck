@@ -22,7 +22,7 @@ export class AdminChartsWidgetComponent implements OnInit, OnDestroy, AfterViewI
   @ViewChild('statusChart') statusChartRef!: ElementRef<HTMLCanvasElement>;
 
   private destroy$ = new Subject<void>();
-  private charts: Chart[] = [];
+  private charts: Chart<any>[] = [];
 
   loading = true;
   Math = Math;
@@ -131,7 +131,7 @@ export class AdminChartsWidgetComponent implements OnInit, OnDestroy, AfterViewI
       case OrderStatus.PickingUp: return 'Picked Up';
       case OrderStatus.Transit: return 'In Transit';
       case OrderStatus.Delivered: return 'Delivered';
-      case OrderStatus.ReadyToPay: return 'Paid';
+      case OrderStatus.ReadyToPay: return 'Ready To Pay';
       case OrderStatus.Canceled: return 'Canceled';
       default: return status;
     }

@@ -637,20 +637,22 @@ export class UsersService {
   /**
    * Batch resolve UUIDs to display info across Users, Trucks, Trailers tables.
    */
-  async resolveEntities(ids: string[]): Promise<Record<string, { name: string; type: string }>> {
+  async resolveEntities(ids: string[]): Promise<Record<string, Record<string, any>>> {
     if (ids.length === 0) return {};
 
     const ddb = this.awsService.getDynamoDBClient();
     const tables = [
-      { table: this.configService.v2UsersTableName, prefix: 'USER#', type: 'user' },
-      { table: this.configService.v2TrucksTableName, prefix: 'TRUCK#', type: 'truck' },
-      { table: this.configService.v2TrailersTableName, prefix: 'TRAILER#', type: 'trailer' },
+      { table: this.configService.v2UsersTableName, prefix: 'USER#', type: 'user',
+        projection: 'PK, #n, #r, email, driverLicenseNumber, cdlClass, cdlState', exprNames: { '#n': 'name', '#r': 'role' } },
+      { table: this.configService.v2TrucksTableName, prefix: 'TRUCK#', type: 'truck',
+        projection: 'PK, plate, brand, #y', exprNames: { '#y': 'year' } },
+      { table: this.configService.v2TrailersTableName, prefix: 'TRAILER#', type: 'trailer',
+        projection: 'PK, plate, brand, #y', exprNames: { '#y': 'year' } },
     ];
 
-    const result: Record<string, { name: string; type: string }> = {};
+    const result: Record<string, Record<string, any>> = {};
 
-    // Try each table — BatchGetItem per table
-    for (const { table, prefix, type } of tables) {
+    for (const { table, prefix, type, projection, exprNames } of tables) {
       const unresolvedIds = ids.filter(id => !result[id]);
       if (unresolvedIds.length === 0) break;
 
@@ -658,16 +660,16 @@ export class UsersService {
 
       try {
         const resp = await ddb.send(new BatchGetCommand({
-          RequestItems: { [table]: { Keys: keys, ProjectionExpression: 'PK, #n, #r, plate, brand',
-            ExpressionAttributeNames: { '#n': 'name', '#r': 'role' } } },
+          RequestItems: { [table]: { Keys: keys, ProjectionExpression: projection,
+            ExpressionAttributeNames: exprNames } },
         }));
 
         for (const item of resp.Responses?.[table] || []) {
           const id = (item.PK as string).split('#')[1];
           if (type === 'user') {
-            result[id] = { name: item.name || 'Unknown', type: (item.role || 'user').toLowerCase() };
+            result[id] = { name: item.name || 'Unknown', type: (item.role || 'user').toLowerCase(), email: item.email, nationalId: item.driverLicenseNumber, cdlClass: item.cdlClass, cdlState: item.cdlState };
           } else {
-            result[id] = { name: item.plate || item.brand || 'Unknown', type };
+            result[id] = { name: item.plate || item.brand || 'Unknown', type, plate: item.plate, brand: item.brand, year: item.year };
           }
         }
       } catch {

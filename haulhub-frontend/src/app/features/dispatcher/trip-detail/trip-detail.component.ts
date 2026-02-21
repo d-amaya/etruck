@@ -40,6 +40,7 @@ export class TripDetailComponent implements OnInit {
   private trailerMap = new Map<string, any>();
   private driverMap = new Map<string, any>();
   private brokerMap = new Map<string, any>();
+  private carrierMap = new Map<string, any>();
 
   constructor(
     private route: ActivatedRoute,
@@ -75,16 +76,16 @@ export class TripDetailComponent implements OnInit {
 
     if (role === UserRole.Carrier) {
       this.carrierAssetCache.loadAssets().subscribe(cache => {
-        this.truckMap = cache.trucks;
-        this.trailerMap = cache.trailers;
-        this.driverMap = cache.drivers;
+        cache.trucks.forEach((v, k) => this.truckMap.set(k, v));
+        cache.trailers.forEach((v, k) => this.trailerMap.set(k, v));
+        cache.drivers.forEach((v, k) => this.driverMap.set(k, v));
         cache.brokers.forEach((b, id) => this.brokerMap.set(id, b));
       });
     } else {
       this.assetCache.loadAssets().subscribe(cache => {
-        this.truckMap = cache.trucks;
-        this.trailerMap = cache.trailers;
-        this.driverMap = cache.drivers;
+        cache.trucks.forEach((v, k) => this.truckMap.set(k, v));
+        cache.trailers.forEach((v, k) => this.trailerMap.set(k, v));
+        cache.drivers.forEach((v, k) => this.driverMap.set(k, v));
       });
       this.dashboardState.brokers$.subscribe(brokers => {
         brokers.forEach(broker => this.brokerMap.set(broker.brokerId, broker));
@@ -98,6 +99,18 @@ export class TripDetailComponent implements OnInit {
       next: (trip: any) => {
         this.trip = trip;
         this.loading = false;
+        // Resolve entity names
+        const ids: string[] = [trip.driverId, trip.truckId, trip.trailerId, trip.carrierId].filter(Boolean);
+        if (ids.length > 0) {
+          this.assetCache.resolveEntities(ids).subscribe(entities => {
+            for (const e of entities) {
+              if (trip.driverId === e.id) this.driverMap.set(e.id, { name: e.name, email: e.email || '', nationalId: e['nationalId'] || '', cdlClass: e['cdlClass'], cdlState: e['cdlState'] });
+              if (trip.truckId === e.id) this.truckMap.set(e.id, { plate: e.plate || e.name, brand: e.brand, year: e.year });
+              if (trip.trailerId === e.id) this.trailerMap.set(e.id, { plate: e.plate || e.name, brand: e.brand, year: e.year });
+              if (trip.carrierId === e.id) this.carrierMap.set(e.id, { name: e.name });
+            }
+          });
+        }
       },
       error: (error: any) => {
         console.error('Error loading trip:', error);
@@ -273,6 +286,8 @@ export class TripDetailComponent implements OnInit {
   getDriverLicense(): string {
     if (!this.trip) return 'N/A';
     const driver = this.driverMap.get(this.trip.driverId);
+    const parts = [driver?.cdlClass ? `Class ${driver.cdlClass}` : null, driver?.cdlState].filter(Boolean);
+    if (parts.length > 0) return parts.join(' — ');
     return driver?.nationalId || 'N/A';
   }
 

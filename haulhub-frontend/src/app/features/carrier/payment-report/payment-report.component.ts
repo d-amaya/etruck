@@ -10,8 +10,8 @@ import { ExcelExportService } from '../../../core/services/excel-export.service'
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import { TripService } from '../../../core/services/trip.service';
+import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { CarrierService } from '../../../core/services/carrier.service';
 type DispatcherPaymentReport = any;
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
@@ -57,7 +57,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
   private brokerMap = new Map<string, any>();
 
   constructor(
-    private tripService: TripService,
+    private carrierService: CarrierService,
     private snackBar: MatSnackBar,
     private excelExportService: ExcelExportService,
     private filterService: CarrierFilterService,
@@ -68,7 +68,14 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     this.loadAssetMaps();
     
     this.filterService.dateFilter$
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged((prev, curr) =>
+          prev.startDate?.getTime() === curr.startDate?.getTime() &&
+          prev.endDate?.getTime() === curr.endDate?.getTime()
+        ),
+        takeUntil(this.destroy$)
+      )
       .subscribe(() => {
         this.loadReport();
       });
@@ -89,61 +96,42 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
 
   private enrichGroupedData(): void {
     if (!this.report) return;
-    const orders = (this.report as any).orders || [];
 
-    // Group by driver — payroll view
-    const driverGroups = new Map<string, { totalPayment: number; tripCount: number }>();
-    for (const o of orders) {
-      if (!o.driverId) continue;
-      const g = driverGroups.get(o.driverId) || { totalPayment: 0, tripCount: 0 };
-      g.totalPayment += o.driverPayment || 0;
-      g.tripCount++;
-      driverGroups.set(o.driverId, g);
-    }
-    this.enrichedDriverData = [...driverGroups.entries()].map(([driverId, data]) => ({
-      driverName: this.driverMap.get(driverId)?.name || driverId.substring(0, 8),
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
+    // Use backend-grouped data directly
+    const groupedByBroker = (this.report as any).groupedByBroker || {};
+    const groupedByCarrier = (this.report as any).groupedByCarrier || {};
+
+    // Driver payroll from backend-grouped data
+    const groupedByDriver = (this.report as any).groupedByDriver || {};
+    this.enrichedDriverData = Object.entries(groupedByDriver).map(([id, g]: [string, any]) => ({
+      driverName: this.driverMap.get(id)?.name || id.substring(0, 8),
+      totalPayment: g.totalPayment,
+      tripCount: g.tripCount
     })).sort((a, b) => b.totalPayment - a.totalPayment);
 
-    // Group by broker — receivables view
-    const brokerGroups = new Map<string, { totalPayment: number; tripCount: number }>();
-    for (const o of orders) {
-      if (!o.brokerId) continue;
-      const g = brokerGroups.get(o.brokerId) || { totalPayment: 0, tripCount: 0 };
-      g.totalPayment += o.carrierPayment || 0;
-      g.tripCount++;
-      brokerGroups.set(o.brokerId, g);
-    }
-    this.enrichedBrokerData = [...brokerGroups.entries()].map(([brokerId, data]) => ({
-      brokerName: this.brokerMap.get(brokerId)?.brokerName || brokerId.substring(0, 8),
-      totalPayment: data.totalPayment,
-      tripCount: data.tripCount
+    this.enrichedBrokerData = Object.entries(groupedByBroker).map(([id, g]: [string, any]) => ({
+      brokerName: this.brokerMap.get(id)?.brokerName || id.substring(0, 8),
+      totalPayment: g.totalPayment,
+      tripCount: g.tripCount
     })).sort((a, b) => b.totalPayment - a.totalPayment);
 
-    // Group fuel by truck
-    const truckFuel = new Map<string, { trips: number; miles: number; gallons: number; cost: number }>();
-    for (const o of orders) {
-      if (!o.truckId || !o.fuelCost) continue;
-      const g = truckFuel.get(o.truckId) || { trips: 0, miles: 0, gallons: 0, cost: 0 };
-      g.trips++;
-      g.miles += o.mileageTotal || 0;
-      g.gallons += (o.fuelGasAvgGallxMil || 0) * (o.mileageTotal || 0);
-      g.cost += o.fuelCost || 0;
-      truckFuel.set(o.truckId, g);
+    // Fuel data from backend analytics (if cached)
+    const filters = this.filterService.getCurrentFilter();
+    const cachedAnalytics = this.filterService.getCachedAnalytics(filters.startDate, filters.endDate);
+    if (cachedAnalytics?.fuelAnalytics?.vehicleFuelEfficiency) {
+      this.fuelByTruck = cachedAnalytics.fuelAnalytics.vehicleFuelEfficiency.map((v: any) => ({
+        truckName: this.truckMap.get(v.vehicleId)?.plate || v.vehicleId?.substring(0, 8),
+        trips: v.totalTrips, totalMiles: v.totalDistance,
+        totalCost: v.totalFuelCost,
+        avgMPG: v.averageMPG || 0,
+      })).sort((a: any, b: any) => b.totalCost - a.totalCost);
     }
-    this.fuelByTruck = [...truckFuel.entries()].map(([truckId, d]) => ({
-      truckName: this.truckMap.get(truckId)?.plate || truckId.substring(0, 8),
-      trips: d.trips, totalMiles: d.miles, totalGallons: d.gallons,
-      totalCost: d.cost,
-      avgMPG: d.gallons > 0 ? d.miles / d.gallons : 0,
-    })).sort((a, b) => b.totalCost - a.totalCost);
   }
 
   loadReport(): void {
     const filters = this.filterService.getCurrentFilter();
 
-    // Check cache first (5-min TTL)
+    // Check cache first (populated by Table view or Analytics view)
     const cached = this.filterService.getCachedPaymentReport(filters.startDate, filters.endDate);
     if (cached) {
       this.report = cached as DispatcherPaymentReport;
@@ -152,15 +140,39 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Cache miss — fetch via unified endpoint
     this.loading = true;
-    
-    this.tripService.getPaymentReport({
-      startDate: filters.startDate ? `${filters.startDate.getFullYear()}-${String(filters.startDate.getMonth()+1).padStart(2,'0')}-${String(filters.startDate.getDate()).padStart(2,'0')}` : undefined,
-      endDate: filters.endDate ? `${filters.endDate.getFullYear()}-${String(filters.endDate.getMonth()+1).padStart(2,'0')}-${String(filters.endDate.getDate()).padStart(2,'0')}` : undefined
-    }).subscribe({
-      next: (report) => {
+    const apiFilters: any = { includeDetailedAnalytics: 'true', limit: 10 };
+    if (filters.startDate) {
+      const d = filters.startDate;
+      apiFilters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
+    }
+    if (filters.endDate) {
+      const d = filters.endDate;
+      apiFilters.endDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T23:59:59.999Z`;
+    }
+
+    this.carrierService.getDashboardUnified(apiFilters).subscribe({
+      next: (response: any) => {
+        const report = response.paymentReport;
+        if (report) report.entityIds = response.entityIds || [];
         this.report = report as DispatcherPaymentReport;
         this.filterService.setCachedPaymentReport(filters.startDate, filters.endDate, report);
+        // Cache analytics for Analytics view
+        if (response.detailedAnalytics) {
+          const analyticsData = { ...response.detailedAnalytics, paymentReport: report, entityIds: response.entityIds || [] };
+          this.filterService.setCachedAnalytics(filters.startDate, filters.endDate, analyticsData);
+        }
+        // Cache orders for Table view (page 0, no table filters)
+        const trips = response.trips || [];
+        if (trips.length) {
+          const defaultFilters = { dateRange: { startDate: filters.startDate, endDate: filters.endDate }, status: null, truckId: null, driverId: null, dispatcherId: null } as any;
+          const defaultPagination = { page: 0, pageSize: 10, pageTokens: response.lastEvaluatedKey ? [response.lastEvaluatedKey] : [] };
+          this.filterService.setCachedTrips(defaultFilters, defaultPagination, {
+            chartAggregates: response.chartAggregates || {}, trips,
+            entityIds: response.entityIds, lastEvaluatedKey: response.lastEvaluatedKey
+          });
+        }
         this.enrichGroupedData();
         this.loading = false;
       },

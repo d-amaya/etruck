@@ -162,3 +162,36 @@
 ::ng-deep .cost-field input {
   color: #c62828 !important;
 }
+
+.subsection-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  margin: 8px 0 4px 0;
+}
+
+.computed-value {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  min-height: 56px;
+
+  .computed-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+
+  .computed-amount {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+
+    &.positive {
+      color: #2e7d32;
+    }
+  }
+}

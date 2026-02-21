@@ -398,3 +398,30 @@ body {
     }
   }
 }
+
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  background: #e3f2fd;
+  border-radius: 8px;
+  color: #1565c0;
+  font-size: 13px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* Global: muted text for disabled form fields */
+.mat-mdc-form-field.mat-form-field-disabled {
+  .mdc-text-field--disabled .mdc-text-field__input,
+  .mat-mdc-select-disabled .mat-mdc-select-value-text,
+  textarea:disabled {
+    color: rgba(0, 0, 0, 0.38) !important;
+  }
+}

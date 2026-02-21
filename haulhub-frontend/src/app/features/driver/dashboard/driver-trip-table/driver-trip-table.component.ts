@@ -5,6 +5,7 @@ import { PageEvent } from '@angular/material/paginator';
 import { Subject, Observable } from 'rxjs';
 import { takeUntil, switchMap, startWith, map } from 'rxjs/operators';
 import { TripService } from '../../../../core/services/trip.service';
+import { OrderService } from '../../../../core/services/order.service';
 import { DriverAssetCacheService } from '../driver-asset-cache.service';
 import { DriverDashboardStateService } from '../driver-dashboard-state.service';
 import { DriverSharedFilterService } from '../driver-shared-filter.service';
@@ -42,6 +43,7 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
 
   constructor(
     private tripService: TripService,
+    private orderService: OrderService,
     private assetCache: DriverAssetCacheService,
     private dashboardState: DriverDashboardStateService,
     private filterService: DriverSharedFilterService,
@@ -263,9 +265,9 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     if (currentFilters.dateRange.endDate) filters.endDate = currentFilters.dateRange.endDate.toISOString();
     if (currentFilters.status) filters.orderStatus = currentFilters.status;
 
-    this.tripService.getTrips(filters).subscribe({
-      next: (res) => {
-        const allTrips = res.trips || [];
+    this.orderService.getOrders({ ...filters, includeAggregates: true, returnAllOrders: true } as any).subscribe({
+      next: (response: any) => {
+        const allTrips = response.orders || [];
         const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Truck', 'Trailer', 'Payment'];
         const rows = allTrips.map((t: any) => [
           t.orderStatus || '',

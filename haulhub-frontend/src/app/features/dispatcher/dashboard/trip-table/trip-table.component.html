@@ -26,15 +26,15 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck</mat-label>
-        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
-        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
+        <mat-label>Carrier</mat-label>
+        <input type="text" matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('carrierId')?.value" matSuffix mat-icon-button (click)="clearCarrierFilter(); $event.stopPropagation()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck" (optionSelected)="onDropdownChange()">
-          <mat-option [value]="null">All Trucks</mat-option>
-          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
-            {{ truck.plate }}
+        <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier" (optionSelected)="onDropdownChange()">
+          <mat-option [value]="null">All Carriers</mat-option>
+          <mat-option *ngFor="let owner of filteredCarriers | async" [value]="owner.userId">
+            {{ owner.name }}
           </mat-option>
         </mat-autocomplete>
       </mat-form-field>
@@ -54,15 +54,15 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Carrier</mat-label>
-        <input type="text" matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
-        <button *ngIf="filterForm.get('carrierId')?.value" matSuffix mat-icon-button (click)="clearCarrierFilter(); $event.stopPropagation()">
+        <mat-label>Truck</mat-label>
+        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier" (optionSelected)="onDropdownChange()">
-          <mat-option [value]="null">All Carriers</mat-option>
-          <mat-option *ngFor="let owner of filteredCarriers | async" [value]="owner.userId">
-            {{ owner.name }}
+        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck" (optionSelected)="onDropdownChange()">
+          <mat-option [value]="null">All Trucks</mat-option>
+          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
+            {{ truck.plate }}
           </mat-option>
         </mat-autocomplete>
       </mat-form-field>

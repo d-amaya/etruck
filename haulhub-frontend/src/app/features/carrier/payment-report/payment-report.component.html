@@ -25,6 +25,11 @@
   <!-- Report Content -->
   <div *ngIf="!loading && report" class="report-content">
     <!-- Summary Cards -->
+    <div class="info-banner">
+      <mat-icon>info</mat-icon>
+      <span>Canceled orders are excluded from payment calculations.</span>
+    </div>
+
     <div class="summary-cards">
       <div class="summary-card income">
         <div class="card-icon">

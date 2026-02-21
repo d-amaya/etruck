@@ -157,6 +157,45 @@ export class CarrierAssetCacheService {
    * into one POST /entities/resolve call, routes results to the
    * correct Map, and persists only the affected Maps to localStorage.
    */
+  resolveEntities(entityIds: string[]): Observable<void> {
+    const cache = this.cacheSubject.value;
+    if (!cache || entityIds.length === 0) return of(undefined);
+
+    const allCached = new Set([
+      ...cache.dispatchers.keys(), ...cache.drivers.keys(),
+      ...cache.trucks.keys(), ...cache.trailers.keys(), ...cache.brokers.keys(),
+    ]);
+    const missIds = entityIds.filter(id => !allCached.has(id));
+    if (missIds.length === 0) return of(undefined);
+
+    return this.orderService.resolveEntities(missIds).pipe(
+      tap((resolved: any) => {
+        const entries: [string, any][] = Array.isArray(resolved)
+          ? resolved.map((e: any) => [e.id, e])
+          : Object.entries(resolved);
+
+        const typeToMap: Record<string, Map<string, any>> = {
+          dispatcher: cache.dispatchers,
+          driver: cache.drivers,
+          carrier: cache.dispatchers, // carriers resolve alongside dispatchers
+          truck: cache.trucks,
+          trailer: cache.trailers,
+          broker: cache.brokers,
+        };
+
+        for (const [id, entity] of entries) {
+          if (!entity || !entity.name || entity.name === 'Unknown') continue;
+          const targetMap = typeToMap[entity.type] || cache.dispatchers;
+          targetMap.set(id, { name: entity.name, userId: id, ...entity });
+        }
+        this.cacheSubject.next({ ...cache });
+        this.saveToLocalStorage(cache);
+      }),
+      map(() => undefined),
+      catchError(() => of(undefined))
+    );
+  }
+
   resolveFromOrders(orders: any[]): Observable<void> {
     const cache = this.cacheSubject.value;
     if (!cache) return of(undefined);

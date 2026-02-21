@@ -192,6 +192,11 @@
                     [matTooltip]="'View order details'">
               <mat-icon>visibility</mat-icon>
             </button>
+            <button mat-icon-button class="action-btn edit-btn"
+                    (click)="editTrip(trip)"
+                    [matTooltip]="'Edit order'">
+              <mat-icon>edit</mat-icon>
+            </button>
           </div>
         </td>
       </ng-container>

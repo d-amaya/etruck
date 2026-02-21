@@ -224,6 +224,8 @@ export class CarrierService {
     chartAggregates: any;
     trips: any[];
     entityIds?: string[];
+    detailedAnalytics?: any;
+    paymentReport?: any;
     lastEvaluatedKey?: string;
   }> {
     const { lastEvaluatedKey, ...queryFilters } = filters || {};
@@ -232,6 +234,8 @@ export class CarrierService {
         chartAggregates: res.aggregates || {},
         trips: res.orders || [],
         entityIds: res.entityIds,
+        detailedAnalytics: res.detailedAnalytics,
+        paymentReport: res.paymentReport,
         lastEvaluatedKey: res.lastEvaluatedKey,
       }))
     );

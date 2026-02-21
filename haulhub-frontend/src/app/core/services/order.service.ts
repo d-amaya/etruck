@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { AdminService } from './admin.service';
 import {
@@ -54,6 +55,12 @@ export interface ResolvedEntity {
   id: string;
   name: string;
   type: string;
+  email?: string;
+  nationalId?: string;
+  plate?: string;
+  brand?: string;
+  year?: string;
+  [key: string]: any;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -95,16 +102,20 @@ export class OrderService {
 
   // ── Asset Loading ─────────────────────────────────────────
 
-  getTrucksByCarrier(carrierId: string): Observable<{ trucks: Truck[] }> {
-    return this.apiService.get<{ trucks: Truck[] }>(`/carrier/trucks`);
+  getCarrierAssets(carrierId: string): Observable<any> {
+    return this.apiService.get<any>(`/orders/carrier-assets/${carrierId}`);
   }
 
-  getTrailersByCarrier(carrierId: string): Observable<{ trailers: Trailer[] }> {
-    return this.apiService.get<{ trailers: Trailer[] }>(`/carrier/trailers`);
+  getTrucksByCarrier(carrierId: string): Observable<{ trucks: any[] }> {
+    return this.apiService.get<any>(`/orders/carrier-assets/${carrierId}`).pipe(map(r => ({ trucks: r.trucks })));
   }
 
-  getDriversByCarrier(carrierId: string): Observable<{ users: Driver[] }> {
-    return this.apiService.get<{ users: Driver[] }>(`/carrier/users`, { role: 'DRIVER' });
+  getTrailersByCarrier(carrierId: string): Observable<{ trailers: any[] }> {
+    return this.apiService.get<any>(`/orders/carrier-assets/${carrierId}`).pipe(map(r => ({ trailers: r.trailers })));
+  }
+
+  getDriversByCarrier(carrierId: string): Observable<{ users: any[] }> {
+    return this.apiService.get<any>(`/orders/carrier-assets/${carrierId}`).pipe(map(r => ({ users: r.drivers })));
   }
 
   getBrokers(): Observable<Broker[]> {

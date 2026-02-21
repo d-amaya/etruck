@@ -1,0 +1,119 @@
+:host {
+  display: block;
+  min-height: calc(100vh - 64px);
+  background-color: #f5f5f5;
+}
+
+.trip-create-container {
+  padding: 24px;
+
+  mat-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+
+    mat-card-header {
+      margin-bottom: 24px;
+      h1 { margin: 0; font-size: 28px; font-weight: 500; color: #1976d2; }
+    }
+
+    mat-card-content form {
+      .form-section {
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        &:last-of-type { border-bottom: none; }
+
+        h3 { font-size: 18px; font-weight: 500; margin: 0 0 16px 0; color: #1976d2; }
+
+        .form-row {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 16px;
+          &:last-child { margin-bottom: 0; }
+        }
+
+        mat-form-field {
+          &.full-width { flex: 1; }
+          &.half-width { flex: 1; min-width: 0; }
+          &.third-width { flex: 1; min-width: 0; }
+          &.quarter-width { flex: 1; min-width: 0; }
+        }
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+        margin-top: 32px;
+        button {
+          min-width: 120px;
+          position: relative;
+          .button-spinner {
+            position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+          }
+        }
+      }
+    }
+  }
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.info-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  background-color: #e3f2fd;
+  border-radius: 8px;
+  border-left: 4px solid #1976d2;
+  mat-icon { color: #1976d2; margin-top: 2px; }
+  .info-content { font-size: 14px; color: #333; }
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.profit-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  max-width: 400px;
+  margin-left: auto;
+
+  .profit-label { font-size: 14px; color: rgba(0, 0, 0, 0.6); }
+  .profit-amount { font-size: 16px; font-weight: 600; }
+  &.profit-positive .profit-amount { color: #2e7d32; }
+  &.profit-negative .profit-amount { color: #c62828; }
+}
+
+@media (max-width: 768px) {
+  .trip-create-container mat-card mat-card-content form {
+    .form-section .form-row {
+      flex-direction: column;
+      gap: 0;
+    }
+    .form-actions {
+      flex-direction: column-reverse;
+      button { width: 100%; }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { DashboardStateService, DashboardFilters } from '../dashboard-state.service';
 import { SharedFilterService } from '../shared-filter.service';
 import { OrderService } from '../../../../core/services';
+import { AssetCacheService } from '../asset-cache.service';
 import { Order, OrderStatus, OrderFilters, calcDispatcherProfit, calculateFuelCost } from '@haulhub/shared';
 
 Chart.register(...registerables);
@@ -44,6 +45,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   revenueData = { revenue: 0, expenses: 0, profit: 0 };
   statusData: { [key: string]: number } = {};
   topBrokers: TopPerformer[] = [];
+  chartAggregates: any = null;
   topDrivers: TopPerformer[] = [];
   topTrucks: TopPerformer[] = [];
   expenseData = { driver: 0, fuel: 0, fees: 0 };
@@ -51,7 +53,8 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
   constructor(
     private dashboardState: DashboardStateService,
     private sharedFilterService: SharedFilterService,
-    private orderService: OrderService
+    private orderService: OrderService,
+    private assetCache: AssetCacheService
   ) {}
 
   ngOnInit(): void {
@@ -61,8 +64,9 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       .subscribe({
         next: (response: any) => {
           if (!response || !response.chartAggregates) return;
-          
+          this.chartAggregates = response.chartAggregates;
           this.processChartAggregates(response.chartAggregates);
+          setTimeout(() => this.tryRenderCharts(), 200);
         }
       });
     
@@ -94,9 +98,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
 
   private buildApiFiltersForCharts(filters: DashboardFilters): OrderFilters {
     // Only use date range for charts, ignore other filters
-    const apiFilters: OrderFilters = {
-      limit: 1000 // Get up to 1000 trips for chart calculations
-    };
+    const apiFilters: OrderFilters = {};
 
     if (filters.dateRange.startDate) {
       const d = filters.dateRange.startDate;
@@ -167,8 +169,8 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     const truckMap = new Map<string, { trips: number }>();
 
     this.trips.forEach(trip => {
-      // Revenue and expenses
-      totalRevenue += trip.orderRate || 0;
+      // Dispatcher revenue = dispatcherPayment
+      totalRevenue += trip.dispatcherPayment || 0;
       const expenses = calcDispatcherProfit(trip);
       totalExpenses += expenses;
 
@@ -249,50 +251,40 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     this.charts.forEach(chart => chart.destroy());
     this.charts = [];
 
-    this.renderRevenueChart();
+    this.renderEarningsChart();
     this.renderStatusChart();
     this.renderTopPerformersChart();
-    this.renderExpenseChart();
+    this.renderTopCarriersChart();
   }
 
-  private renderRevenueChart(): void {
+  private renderEarningsChart(): void {
     if (!this.revenueChartRef) return;
-
     const ctx = this.revenueChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
+    const monthly = this.chartAggregates?.monthlyEarnings || {};
+    const months = Object.keys(monthly).sort();
+    if (months.length === 0) return;
+
     const config: ChartConfiguration = {
-      type: 'doughnut',
+      type: 'bar',
       data: {
-        labels: ['Revenue', 'Expenses'],
-        datasets: [{
-          data: [this.revenueData.revenue, this.revenueData.expenses],
-          backgroundColor: ['#4caf50', '#f44336'],
-          borderWidth: 2,
-          borderColor: '#fff'
-        }]
+        labels: months,
+        datasets: [
+          { label: 'Realized', data: months.map(m => monthly[m].realized || 0), backgroundColor: '#4caf50', borderRadius: 4 },
+          { label: 'Potential', data: months.map(m => monthly[m].potential || 0), backgroundColor: '#42a5f5', borderRadius: 4 },
+        ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 11 } }
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const label = context.label || '';
-                const value = context.parsed || 0;
-                return `${label}: $${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-              }
-            }
-          }
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, ticks: { callback: (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }) } }
         }
       }
     };
-
     this.charts.push(new Chart(ctx, config));
   }
 
@@ -383,64 +375,51 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     this.charts.push(new Chart(ctx, config));
   }
 
-  private renderExpenseChart(): void {
+  private renderTopCarriersChart(): void {
     if (!this.expenseChartRef) return;
-
     const ctx = this.expenseChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    // Sort expenses by value (highest to lowest)
-    const expenses = [
-      { label: 'Driver Pay', value: this.expenseData.driver },
-      { label: 'Fuel Cost', value: this.expenseData.fuel },
-      { label: 'Fees', value: this.expenseData.fees }
-    ].sort((a, b) => b.value - a.value);
+    const topCarriers = this.chartAggregates?.topPerformers?.topCarriers || [];
+    if (topCarriers.length === 0) return;
 
-    // Assign colors from darkest to lightest
-    const colors = ['#1565c0', '#1976d2', '#42a5f5', '#64b5f6'];
+    const cache = this.assetCache.currentCache;
+    const missingIds = topCarriers.filter((c: any) => !cache?.carriers.get(c.id)).map((c: any) => c.id);
 
-    const config: ChartConfiguration = {
-      type: 'bar',
-      data: {
-        labels: ['Expenses'],
-        datasets: expenses.map((expense, index) => ({
-          label: expense.label,
-          data: [expense.value],
-          backgroundColor: colors[index],
-          borderRadius: 4
-        }))
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 11 } }
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const label = context.dataset.label || '';
-                const value = context.parsed.y || 0;
-                return `${label}: $${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-              }
-            }
-          }
+    const render = () => {
+      const existing = Chart.getChart(ctx.canvas);
+      if (existing) existing.destroy();
+      const c2 = this.assetCache.currentCache;
+      const labels = topCarriers.map((c: any) => c2?.carriers.get(c.id)?.name || c2?.resolved.get(c.id)?.name || c.id.substring(0, 8));
+      const config: ChartConfiguration = {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Orders',
+            data: topCarriers.map((c: any) => c.trips),
+            backgroundColor: ['#2e7d32', '#388e3c', '#4caf50', '#66bb6a', '#81c784'],
+            borderRadius: 4
+          }]
         },
-        scales: {
-          x: { stacked: true },
-          y: {
-            stacked: true,
-            ticks: {
-              callback: (value) => '$' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })
-            }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxRotation: 45, minRotation: 45 } },
+            y: { beginAtZero: true }
           }
         }
-      }
+      };
+      this.charts.push(new Chart(ctx, config));
     };
 
-    this.charts.push(new Chart(ctx, config));
+    if (missingIds.length > 0) {
+      this.assetCache.resolveEntities(missingIds).subscribe(() => render());
+    } else {
+      render();
+    }
   }
 
   private getStatusColor(status: string): string {
@@ -462,7 +441,7 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
       case OrderStatus.PickingUp: return 'Picked Up';
       case OrderStatus.Transit: return 'In Transit';
       case OrderStatus.Delivered: return 'Delivered';
-      case OrderStatus.ReadyToPay: return 'Paid';
+      case OrderStatus.ReadyToPay: return 'Ready To Pay';
       default: return status;
     }
   }
@@ -481,23 +460,19 @@ export class DashboardChartsWidgetComponent implements OnInit, OnDestroy, AfterV
     
     const payment = agg.paymentSummary || {};
     
-    // Calculate total expenses - backend already includes all expenses in profit calculation
-    // Total expenses = driver + owner + fuel + fees
-    const totalExpenses = 
-      (payment.totalDriverPayments || 0) + 
-      (payment.totalFuelCost || 0) + 
-      (payment.totalAdditionalFees || 0);
+    // Dispatcher revenue = dispatcherPayment
+    const revenue = payment.dispatcherPayment || 0;
     
     this.revenueData = {
-      revenue: payment.totalBrokerPayments || 0,
-      expenses: totalExpenses,
-      profit: payment.totalProfit || 0
+      revenue: revenue,
+      expenses: 0,
+      profit: revenue
     };
     
     this.expenseData = {
-      driver: payment.totalDriverPayments || 0,
-      fuel: payment.totalFuelCost || 0,
-      fees: payment.totalAdditionalFees || 0
+      driver: payment.driverPayment || 0,
+      fuel: payment.fuelCost || 0,
+      fees: (payment.lumper || 0) + (payment.detention || 0)
     };
     
     // Set top performers - map IDs to names using cache-on-miss

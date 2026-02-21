@@ -21,9 +21,9 @@ export class PdfExportService {
     const filters = this.dashboardState['filtersSubject'].value;
 
     // Load all data in a single API call
-    this.orderService.getOrders(this.buildApiFilters(filters)).subscribe({
-      next: (data: any) => {
-        this.generatePdf(data.orders || [], data.summaryByStatus || {}, data.paymentSummary || {}, data.assets || {}, filters);
+    this.orderService.getOrders({ ...this.buildApiFilters(filters), includeAggregates: true, returnAllOrders: true } as any).subscribe({
+      next: (response: any) => {
+        this.generatePdf(response.orders || [], {}, filters);
       },
       error: (error: any) => {
         console.error('Error loading dashboard data for PDF export:', error);
@@ -34,25 +34,33 @@ export class PdfExportService {
 
   private generatePdf(
     orders: Order[],
-    summaryByStatus: Record<OrderStatus, number>,
-    paymentSummary: any,
-    assets: {
-      brokers: Array<{ brokerId: string; brokerName: string }>;
-      trucks: Array<{ truckId: string; plate: string }>;
-      drivers: Array<{ userId: string; name: string }>;
-      trailers: Array<{ trailerId: string; plate: string }>;
-    },
+    assets: any,
     filters: DashboardFilters
   ): void {
+    // Compute status summary from orders
+    const summaryByStatus: Record<string, number> = {};
+    orders.forEach((o: any) => {
+      const s = o.orderStatus || 'Scheduled';
+      summaryByStatus[s] = (summaryByStatus[s] || 0) + 1;
+    });
     // Create lookup maps
-    const brokerMap = new Map(assets.brokers.map(b => [b.brokerId, b.brokerName]));
-    const truckMap = new Map(assets.trucks.map(t => [t.truckId, t.plate]));
-    const driverMap = new Map(assets.drivers.map(d => [d.userId, d.name]));
-    const trailerMap = new Map(assets.trailers.map(t => [t.trailerId, t.plate]));
+    const brokerMap = new Map<string, string>((assets.brokers || []).map((b: any) => [b.brokerId, b.brokerName]));
+    const truckMap = new Map<string, string>((assets.trucks || []).map((t: any) => [t.truckId, t.plate]));
+    const driverMap = new Map<string, string>((assets.drivers || []).map((d: any) => [d.userId, d.name]));
+    const trailerMap = new Map<string, string>((assets.trailers || []).map((t: any) => [t.trailerId, t.plate]));
     const carrierMap = new Map<string, string>();
     const cache = this.assetCache.currentCache;
-    if (cache?.carriers) {
-      cache.carriers.forEach((o: any, id: string) => carrierMap.set(id, o.name || o.corpName || id));
+    if (cache) {
+      cache.carriers?.forEach((o: any, id: string) => carrierMap.set(id, o.name || o.corpName || id));
+      cache.brokers?.forEach((o: any, id: string) => { if (!brokerMap.has(id)) brokerMap.set(id, o.brokerName || id); });
+      cache.trucks?.forEach((o: any, id: string) => { if (!truckMap.has(id)) truckMap.set(id, o.plate || id); });
+      cache.drivers?.forEach((o: any, id: string) => { if (!driverMap.has(id)) driverMap.set(id, o.name || id); });
+      cache.trailers?.forEach((o: any, id: string) => { if (!trailerMap.has(id)) trailerMap.set(id, o.plate || id); });
+      cache.resolved?.forEach((o: any, id: string) => {
+        if (!brokerMap.has(id) && !truckMap.has(id) && !driverMap.has(id) && !trailerMap.has(id) && !carrierMap.has(id)) {
+          carrierMap.set(id, o.name || id);
+        }
+      });
     }
 
     const doc = new jsPDF('landscape');
@@ -115,24 +123,22 @@ export class PdfExportService {
     this.drawSummaryCard(doc, 14, cardY, cardWidth, cardHeight, 
       'Total Orders', orders.length.toString(), primaryBlue);
 
-    // Card 2: Total Revenue
+    // Compute from orders
+    const totalRevenue = orders.reduce((s, o: any) => s + (o.dispatcherPayment || 0), 0);
+
+    // Card 2: Total Earnings
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
-      'Total Revenue', this.formatCurrency(paymentSummary.totalBrokerPayments), profitGreen);
+      'Dispatcher Earnings', this.formatCurrency(totalRevenue), profitGreen);
 
-    // Card 3: Total Expenses (driver + owner + fuel + fees)
-    const totalExpenses = 
-      (paymentSummary.totalDriverPayments || 0) + 
-      (paymentSummary.totalFuelCost || 0) + 
-      (paymentSummary.totalAdditionalFees || 0);
+    // Card 3: Total Order Rate
+    const totalOrderRate = orders.reduce((s, o: any) => s + (o.orderRate || 0), 0);
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,
-      'Total Expenses', this.formatCurrency(totalExpenses), lossRed);
+      'Total Order Rate', this.formatCurrency(totalOrderRate), primaryBlue);
 
-    // Card 4: Net Profit
-    const isProfit = paymentSummary.totalProfit >= 0;
+    // Card 4: Order Count by status
+    const completedCount = orders.filter((o: any) => ['Delivered', 'ReadyToPay', 'WaitingRC'].includes(o.orderStatus)).length;
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 3, cardY, cardWidth, cardHeight,
-      isProfit ? 'Net Profit' : 'Net Loss', 
-      this.formatCurrency(Math.abs(paymentSummary.totalProfit)), 
-      isProfit ? profitGreen : lossRed);
+      'Completed', `${completedCount} / ${orders.length}`, profitGreen);
 
     yPosition = cardY + cardHeight + 15;
 
@@ -144,11 +150,13 @@ export class PdfExportService {
     yPosition += 6;
 
     const summaryData = [
-      ['Scheduled', summaryByStatus[OrderStatus.Scheduled] || 0],
-      ['Picking Up', summaryByStatus[OrderStatus.PickingUp] || 0],
-      ['In Transit', summaryByStatus[OrderStatus.Transit] || 0],
-      ['Delivered', summaryByStatus[OrderStatus.Delivered] || 0],
-      ['Ready To Pay', summaryByStatus[OrderStatus.ReadyToPay] || 0]
+      ['Scheduled', summaryByStatus['Scheduled'] || 0],
+      ['Picking Up', summaryByStatus['PickingUp'] || 0],
+      ['In Transit', summaryByStatus['Transit'] || 0],
+      ['Delivered', summaryByStatus['Delivered'] || 0],
+      ['Ready to Pay', summaryByStatus['ReadyToPay'] || 0],
+      ['Waiting RC', summaryByStatus['WaitingRC'] || 0],
+      ['Canceled', summaryByStatus['Canceled'] || 0]
     ];
 
     autoTable(doc, {
@@ -192,10 +200,10 @@ export class PdfExportService {
         const profit = (order.orderRate || 0) - expenses;
         const pickupLocation = order.pickupCity && order.pickupState ? `${order.pickupCity}, ${order.pickupState}` : '';
         const dropoffLocation = order.deliveryCity && order.deliveryState ? `${order.deliveryCity}, ${order.deliveryState}` : '';
-        const brokerName = brokerMap.get(order.brokerId) || order.brokerId.substring(0, 8);
-        const truckPlate = truckMap.get(order.truckId) || order.truckId.substring(0, 8);
-        const carrierName = carrierMap.get(order.carrierId) || order.carrierId?.substring(0, 8) || '';
-        const driverName = driverMap.get(order.driverId) || order.driverId.substring(0, 8);
+        const brokerName = brokerMap.get(order.brokerId as any) || String(order.brokerId || '').substring(0, 8);
+        const truckPlate = truckMap.get(order.truckId as any) || String(order.truckId || '').substring(0, 8);
+        const carrierName = carrierMap.get(order.carrierId as any) || String(order.carrierId || '').substring(0, 8);
+        const driverName = driverMap.get(order.driverId as any) || String(order.driverId || '').substring(0, 8);
         
         return [
           this.getStatusLabel(order.orderStatus as any),
@@ -203,9 +211,9 @@ export class PdfExportService {
           this.truncateText(pickupLocation, 20),
           this.truncateText(dropoffLocation, 20),
           this.truncateText(brokerName, 18),
-          this.truncateText(truckPlate, 14),
           this.truncateText(carrierName, 16),
           this.truncateText(driverName, 18),
+          this.truncateText(truckPlate, 14),
           this.formatCurrency(order.orderRate),
           this.formatCurrency(expenses),
           this.formatCurrency(profit)
@@ -214,7 +222,7 @@ export class PdfExportService {
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Carrier', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss']],
+        head: [['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Carrier', 'Driver', 'Truck', 'Revenue', 'Expenses', 'Profit/Loss']],
         body: tripTableData,
         theme: 'striped',
         headStyles: { 

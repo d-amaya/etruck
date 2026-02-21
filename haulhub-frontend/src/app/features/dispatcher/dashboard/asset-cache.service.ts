@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, forkJoin, of } from 'rxjs';
-import { tap, catchError, map } from 'rxjs/operators';
+import { tap, catchError, map, switchMap } from 'rxjs/operators';
 import { OrderService, ResolvedEntity } from '../../../core/services/order.service';
 
 export interface AssetCache {
@@ -46,39 +46,35 @@ export class AssetCacheService {
       brokers: this.orderService.getBrokers().pipe(catchError(() => of([]))),
       subs: this.orderService.getSubscriptions().pipe(catchError(() => of({ subscribedCarrierIds: [], subscribedAdminIds: [] }))),
     }).pipe(
-      tap(({ brokers, subs }) => {
+      switchMap(({ brokers, subs }) => {
         const cache = this.empty();
         cache.brokers = new Map(brokers.map(b => [b.brokerId, b]));
         cache.timestamp = Date.now();
 
-        // Resolve carrier and admin names
         const carrierIds = subs.subscribedCarrierIds || [];
         const adminIds = subs.subscribedAdminIds || [];
         const ids: string[] = [...carrierIds, ...adminIds];
         if (ids.length > 0) {
-          this.orderService.resolveEntities(ids).subscribe({
-            next: (entities) => {
+          return this.orderService.resolveEntities(ids).pipe(
+            tap((result) => {
+              const entities = Array.isArray(result) ? result : Object.entries(result).map(([id, v]: [string, any]) => ({ id, ...v }));
               for (const e of entities) {
-                if ((carrierIds as string[]).includes(e.id)) cache.carriers.set(e.id, e);
-                if ((adminIds as string[]).includes(e.id)) cache.admins.set(e.id, e);
+                if ((carrierIds as string[]).includes(e.id)) cache.carriers.set(e.id, { userId: e.id, name: e.name });
+                if ((adminIds as string[]).includes(e.id)) cache.admins.set(e.id, { userId: e.id, name: e.name });
               }
-              this.cacheSubject.next(cache);
-              this.saveToLocalStorage(cache);
-              this.loading = false;
-            },
-            error: () => {
-              this.cacheSubject.next(cache);
-              this.loading = false;
-            }
-          });
-        } else {
-          this.cacheSubject.next(cache);
-          this.saveToLocalStorage(cache);
-          this.loading = false;
+            }),
+            map(() => cache),
+            catchError(() => of(cache)),
+          );
         }
+        return of(cache);
       }),
-      map(() => this.cacheSubject.value!),
-      catchError(() => { this.loading = false; return of(this.empty()); })
+      tap(cache => {
+        this.cacheSubject.next(cache);
+        this.saveToLocalStorage(cache);
+        this.loading = false;
+      }),
+      catchError(() => { this.loading = false; return of(this.empty()); }),
     );
   }
 
@@ -92,26 +88,33 @@ export class AssetCacheService {
     const cache = this.cacheSubject.value || this.empty();
     const now = Date.now();
     const missing = ids.filter(id => {
+      if (cache.brokers.has(id)) return false;
       const r = cache.resolved.get(id);
       return !r || (now - r.fetchedAt > this.RESOLVED_TTL_MS);
     });
     if (missing.length === 0) {
       return of(ids.map(id => {
+        const b = cache.brokers.get(id);
+        if (b) return { id, name: b.brokerName || b.name || id.substring(0, 8), type: 'broker' };
         const r = cache.resolved.get(id);
-        return { id, name: r?.name || id.substring(0, 8), type: r?.type || 'unknown' };
+        return { id, ...r, name: r?.name || id.substring(0, 8), type: r?.type || 'unknown' };
       }));
     }
     return this.orderService.resolveEntities(missing).pipe(
-      tap(entities => {
+      map(result => {
+        const entities = Array.isArray(result) ? result : Object.entries(result).map(([id, v]: [string, any]) => ({ id, ...v }));
         for (const e of entities) {
-          cache.resolved.set(e.id, { name: e.name, type: e.type, fetchedAt: now });
+          cache.resolved.set(e.id, { ...e, fetchedAt: now });
         }
         this.cacheSubject.next(cache);
-      }),
-      map(entities => {
+        this.saveToLocalStorage(cache);
         const resolved = new Map(entities.map(e => [e.id, e]));
-        return ids.map(id => resolved.get(id) || {
-          id, name: cache.resolved.get(id)?.name || id.substring(0, 8), type: 'unknown'
+        return ids.map(id => {
+          const b = cache.brokers.get(id);
+          if (b) return { id, name: b.brokerName || b.name || id.substring(0, 8), type: 'broker' };
+          return resolved.get(id) || {
+            id, name: cache.resolved.get(id)?.name || id.substring(0, 8), type: 'unknown'
+          };
         });
       }),
       catchError(() => of(ids.map(id => ({ id, name: id.substring(0, 8), type: 'unknown' }))))

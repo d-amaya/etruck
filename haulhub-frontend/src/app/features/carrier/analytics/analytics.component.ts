@@ -15,7 +15,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
-import { takeUntil, distinctUntilChanged } from 'rxjs/operators';
+import { takeUntil, distinctUntilChanged, debounceTime } from 'rxjs/operators';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
@@ -73,7 +73,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
   @Input() isWrapped = false;
   @ViewChild('fuelCostChart') fuelCostChartRef!: ElementRef<HTMLCanvasElement>;
   
-  isLoading = true;
+  isLoading = false;
   error: string | null = null;
   selectedTabIndex = 0;
   private isLoadingAnalytics = false;
@@ -141,9 +141,10 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
       this.dispatcherMap = cache.dispatchers;
     });
     
-    // Subscribe to date filter changes with distinctUntilChanged to prevent duplicate calls
+    // Subscribe to date filter changes with debounce and distinctUntilChanged
     this.filterService.dateFilter$
       .pipe(
+        debounceTime(300),
         distinctUntilChanged((prev, curr) => 
           prev.startDate?.getTime() === curr.startDate?.getTime() && 
           prev.endDate?.getTime() === curr.endDate?.getTime()
@@ -216,7 +217,6 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
     }
     
     this.isLoadingAnalytics = true;
-    this.isLoading = true;
     this.error = null;
 
     // Validate date range (max 365 days)
@@ -251,18 +251,34 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
       return;
     }
 
+    this.isLoading = true;
     this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
           this.filterService.setCachedAnalytics(this.startDate, this.endDate, data);
+          // Cache payment report for Payments view
+          if (data.paymentReport) {
+            const paymentData = { ...data.paymentReport, entityIds: data.entityIds || [] };
+            this.filterService.setCachedPaymentReport(this.startDate, this.endDate, paymentData);
+          }
+          // Cache orders for Table view (page 0, no table filters)
+          if (data.orders?.length) {
+            const defaultFilters = { dateRange: { startDate: this.startDate, endDate: this.endDate }, status: null, truckId: null, driverId: null, dispatcherId: null } as any;
+            const defaultPagination = { page: 0, pageSize: 10, pageTokens: data.lastEvaluatedKey ? [data.lastEvaluatedKey] : [] };
+            this.filterService.setCachedTrips(defaultFilters, defaultPagination, {
+              chartAggregates: data.aggregates || {}, trips: data.orders,
+              entityIds: data.entityIds, lastEvaluatedKey: data.lastEvaluatedKey
+            });
+          }
           this.processUnifiedAnalyticsData(data);
           this.isLoading = false;
           this.isLoadingAnalytics = false;
 
-          // Resolve cache misses then re-map names
-          if (data._rawOrders?.length) {
-            this.assetCache.resolveFromOrders(data._rawOrders).pipe(takeUntil(this.destroy$)).subscribe(() => {
+          // Resolve entity names via asset cache
+          const entityIds = data.entityIds || [];
+          if (entityIds.length > 0) {
+            this.assetCache.resolveEntities(entityIds).pipe(takeUntil(this.destroy$)).subscribe(() => {
               const cache = this.assetCache.getCurrentCache();
               if (cache) {
                 this.dispatcherMap = cache.dispatchers;

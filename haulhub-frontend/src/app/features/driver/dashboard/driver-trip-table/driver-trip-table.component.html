@@ -18,20 +18,6 @@
       </mat-form-field>
 
       <mat-form-field appearance="fill" class="filter-field">
-        <mat-label>Truck</mat-label>
-        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
-        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="getTruckDisplay">
-          <mat-option [value]="null">All Trucks</mat-option>
-          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
-            {{ truck.plate }}
-          </mat-option>
-        </mat-autocomplete>
-      </mat-form-field>
-
-      <mat-form-field appearance="fill" class="filter-field">
         <mat-label>Dispatcher</mat-label>
         <input type="text" matInput formControlName="dispatcherId" [matAutocomplete]="dispatcherAuto" placeholder="Type to search...">
         <button *ngIf="filterForm.get('dispatcherId')?.value" matSuffix mat-icon-button (click)="clearDispatcherFilter(); $event.stopPropagation()">
@@ -41,6 +27,20 @@
           <mat-option [value]="null">All Dispatchers</mat-option>
           <mat-option *ngFor="let dispatcher of filteredDispatchers | async" [value]="dispatcher.userId">
             {{ dispatcher.name }}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="filter-field">
+        <mat-label>Truck</mat-label>
+        <input type="text" matInput formControlName="truckId" [matAutocomplete]="truckAuto" placeholder="Type to search...">
+        <button *ngIf="filterForm.get('truckId')?.value" matSuffix mat-icon-button (click)="clearTruckFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="getTruckDisplay">
+          <mat-option [value]="null">All Trucks</mat-option>
+          <mat-option *ngFor="let truck of filteredTrucks | async" [value]="truck.truckId">
+            {{ truck.plate }}
           </mat-option>
         </mat-autocomplete>
       </mat-form-field>

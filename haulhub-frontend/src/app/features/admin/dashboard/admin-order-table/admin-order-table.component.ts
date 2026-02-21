@@ -20,6 +20,7 @@ import { OrderService } from '../../../../core/services/order.service';
 import { AdminDashboardStateService, AdminDashboardFilters, PaginationState } from '../admin-state.service';
 import { AdminAssetCacheService } from '../admin-asset-cache.service';
 import { AdminChartsWidgetComponent } from '../admin-charts-widget/admin-charts-widget.component';
+import { DashboardStateService } from '../../../dispatcher/dashboard/dashboard-state.service';
 
 @Component({
   selector: 'app-admin-order-table',
@@ -45,7 +46,7 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
 
   orders: Order[] = [];
   totalOrders = 0;
-  pageSize = 25;
+  pageSize = 10;
   pageIndex = 0;
   loading = false;
   hasActiveFilters = false;
@@ -70,6 +71,7 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private orderService: OrderService,
     private dashboardState: AdminDashboardStateService,
+    private dispatcherState: DashboardStateService,
     private assetCache: AdminAssetCacheService,
     private router: Router,
     private snackBar: MatSnackBar
@@ -140,6 +142,9 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
 
     if (pagination.page === 0) {
       (apiFilters as any).includeAggregates = true;
+      if (!this.dispatcherState.getCachedAnalytics(filters.dateRange.startDate, filters.dateRange.endDate)) {
+        (apiFilters as any).includeDetailedAnalytics = true;
+      }
     }
 
     return this.orderService.getOrders(apiFilters).pipe(
@@ -153,6 +158,17 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
           const pageTokens = [...(pagination.pageTokens || [])];
           pageTokens[pagination.page] = response.lastEvaluatedKey;
           this.dashboardState.updatePaginationSilent({ pageTokens });
+        }
+
+        // Cache analytics/payment into Dispatcher's state for wrapped components
+        if (pagination.page === 0 && response.detailedAnalytics) {
+          const start = filters.dateRange.startDate;
+          const end = filters.dateRange.endDate;
+          const analyticsData = { ...response.detailedAnalytics, paymentReport: response.paymentReport, entityIds: response.entityIds || [] };
+          this.dispatcherState.setCachedAnalytics(start, end, analyticsData);
+          if (response.paymentReport) {
+            this.dispatcherState.setCachedPaymentReport(start, end, response.paymentReport);
+          }
         }
 
         const itemsBefore = pagination.page * pagination.pageSize;
@@ -225,7 +241,7 @@ export class AdminOrderTableComponent implements OnInit, OnDestroy {
       case OrderStatus.PickingUp: return 'Picked Up';
       case OrderStatus.Transit: return 'In Transit';
       case OrderStatus.Delivered: return 'Delivered';
-      case OrderStatus.ReadyToPay: return 'Paid';
+      case OrderStatus.ReadyToPay: return 'Ready To Pay';
       case OrderStatus.Canceled: return 'Canceled';
       default: return String(status);
     }

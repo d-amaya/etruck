@@ -25,11 +25,17 @@ import {
   UpdateOrderStatusDto,
   OrderFilters,
 } from '@haulhub/shared';
+import { AssetsService } from '../assets/assets.service';
+import { UsersService } from '../users/users.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly assetsService: AssetsService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post()
   @Roles(UserRole.Dispatcher)
@@ -67,8 +73,21 @@ export class OrdersController {
         ...filters,
         lastEvaluatedKey: paginationToken || filters.lastEvaluatedKey,
         includeAggregates: filters.includeAggregates === 'true',
+        includeDetailedAnalytics: filters.includeDetailedAnalytics === 'true',
+        returnAllOrders: filters.returnAllOrders === 'true',
       },
     );
+  }
+
+  @Get('carrier-assets/:carrierId')
+  @Roles(UserRole.Dispatcher)
+  async getCarrierAssets(@Param('carrierId') carrierId: string) {
+    const [trucks, trailers, drivers] = await Promise.all([
+      this.assetsService.getTrucksByCarrier(carrierId),
+      this.assetsService.getTrailersByCarrier(carrierId),
+      this.usersService.getUsersByCarrier(carrierId, 'DRIVER'),
+    ]);
+    return { trucks, trailers, drivers };
   }
 
   @Get(':id')

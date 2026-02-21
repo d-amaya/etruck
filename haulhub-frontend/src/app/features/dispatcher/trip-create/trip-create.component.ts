@@ -67,6 +67,7 @@ export class TripCreateComponent implements OnInit {
   ngOnInit(): void {
     this.initializeForm();
     this.setupAutocompleteFilters();
+    this.setupPaymentRecalc();
     this.loadBrokers();
 
     // Force-refresh cache for fresh data on create page
@@ -99,8 +100,12 @@ export class TripCreateComponent implements OnInit {
 
       // Financial
       orderRate: ['', [Validators.required, Validators.min(0.01)]],
-      adminRate: [{ value: 5, disabled: true }],
-      dispatcherRate: [{ value: 5, disabled: true }],
+      adminRate: [5, [Validators.required, Validators.min(0), Validators.max(100)]],
+      adminPayment: [{ value: 0, disabled: true }],
+      dispatcherRate: [5, [Validators.required, Validators.min(0), Validators.max(100)]],
+      dispatcherPayment: [{ value: 0, disabled: true }],
+      carrierRate: [{ value: 90, disabled: true }],
+      carrierPayment: [{ value: 0, disabled: true }],
 
       // Pickup
       pickupCompany: ['', Validators.required],
@@ -172,6 +177,29 @@ export class TripCreateComponent implements OnInit {
       startWith(''),
       map(val => this.filterEntities(this.drivers, val, 'name'))
     );
+  }
+
+  private setupPaymentRecalc(): void {
+    const recalc = () => {
+      const rate = parseFloat(this.tripForm.get('orderRate')?.value) || 0;
+      const adminPct = parseFloat(this.tripForm.get('adminRate')?.value) || 0;
+      const dispPct = parseFloat(this.tripForm.get('dispatcherRate')?.value) || 0;
+      const adminPay = Math.round(rate * adminPct) / 100;
+      const dispPay = Math.round(rate * dispPct) / 100;
+      const carrierPay = Math.round((rate - adminPay - dispPay) * 100) / 100;
+      this.tripForm.get('adminPayment')?.setValue(adminPay, { emitEvent: false });
+      this.tripForm.get('dispatcherPayment')?.setValue(dispPay, { emitEvent: false });
+      this.tripForm.get('carrierRate')?.setValue(Math.round((100 - adminPct - dispPct) * 100) / 100, { emitEvent: false });
+      this.tripForm.get('carrierPayment')?.setValue(carrierPay, { emitEvent: false });
+    };
+    this.tripForm.get('orderRate')?.valueChanges.subscribe(recalc);
+    this.tripForm.get('adminRate')?.valueChanges.subscribe(recalc);
+    this.tripForm.get('dispatcherRate')?.valueChanges.subscribe(recalc);
+  }
+
+  triggerAutocomplete(field: string): void {
+    const ctrl = this.tripForm.get(field);
+    ctrl?.setValue(ctrl.value || '', { emitEvent: true });
   }
 
   private filterEntities(list: any[], val: string, displayField: string): any[] {
@@ -320,6 +348,11 @@ export class TripCreateComponent implements OnInit {
       brokerLoad: fv.brokerLoad?.trim() || '',
       scheduledTimestamp,
       orderRate: parseFloat(fv.orderRate),
+      adminRate: parseFloat(fv.adminRate) || 0,
+      dispatcherRate: parseFloat(fv.dispatcherRate) || 0,
+      adminPayment: parseFloat(fv.adminPayment) || 0,
+      dispatcherPayment: parseFloat(fv.dispatcherPayment) || 0,
+      carrierPayment: parseFloat(fv.carrierPayment) || 0,
       mileageOrder: parseFloat(fv.mileageOrder) || undefined,
       mileageEmpty: parseFloat(fv.mileageEmpty) || undefined,
       driverRate: (this as any)._driverRate || undefined,
@@ -339,8 +372,10 @@ export class TripCreateComponent implements OnInit {
 
     if (fv.pickupPhone?.trim()) data.pickupPhone = fv.pickupPhone.trim();
     if (fv.pickupNotes?.trim()) data.pickupNotes = fv.pickupNotes.trim();
+    if (pickupTimestamp) data.pickupTimestamp = pickupTimestamp;
     if (fv.deliveryPhone?.trim()) data.deliveryPhone = fv.deliveryPhone.trim();
     if (fv.deliveryNotes?.trim()) data.deliveryNotes = fv.deliveryNotes.trim();
+    if (deliveryTimestamp) data.deliveryTimestamp = deliveryTimestamp;
     if (fv.notes?.trim()) data.notes = fv.notes.trim();
     if (fv.lumperValue) data.lumperValue = parseFloat(fv.lumperValue);
     if (fv.detentionValue) data.detentionValue = parseFloat(fv.detentionValue);

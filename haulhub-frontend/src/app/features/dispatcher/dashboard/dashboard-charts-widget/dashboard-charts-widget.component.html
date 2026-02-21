@@ -1,19 +1,19 @@
 <div class="dashboard-charts-widget" *ngIf="!loading && hasAggregateData()">
   <div class="charts-grid">
     
-    <!-- Revenue vs Expenses Chart -->
+    <!-- Realized vs Potential Earnings -->
     <mat-card class="chart-card">
       <mat-card-header>
         <mat-card-title>
           <mat-icon>account_balance</mat-icon>
-          Revenue vs Expenses
+          Realized vs Potential Earnings
         </mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <div class="chart-summary">
-          <div class="summary-item profit" [class.loss]="revenueData.profit < 0">
-            <span class="label">Net {{ revenueData.profit >= 0 ? 'Profit' : 'Loss' }}</span>
-            <span class="value">{{ formatCurrency(Math.abs(revenueData.profit)) }}</span>
+          <div class="summary-item profit">
+            <span class="label">Total Earnings</span>
+            <span class="value">{{ formatCurrency(revenueData.revenue) }}</span>
           </div>
         </div>
         <div class="chart-container">
@@ -58,21 +58,15 @@
       </mat-card-content>
     </mat-card>
 
-    <!-- Expense Breakdown Chart -->
+    <!-- Top Carriers Chart -->
     <mat-card class="chart-card">
       <mat-card-header>
         <mat-card-title>
-          <mat-icon>payments</mat-icon>
-          Expense Breakdown
+          <mat-icon>local_shipping</mat-icon>
+          Top 5 Carriers by Orders
         </mat-card-title>
       </mat-card-header>
       <mat-card-content>
-        <div class="chart-summary">
-          <div class="summary-item">
-            <span class="label">Total Expenses</span>
-            <span class="value" style="color: #f44336;">{{ formatCurrency(revenueData.expenses) }}</span>
-          </div>
-        </div>
         <div class="chart-container">
           <canvas #expenseChart></canvas>
         </div>

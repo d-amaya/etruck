@@ -354,13 +354,13 @@ describe('OrdersService', () => {
       expect((result as any).fuelCost).toBeUndefined();
     });
 
-    it('should hide adminRate/adminPayment/driverRate/driverPayment/fuelCost from Dispatcher', async () => {
+    it('should hide driverRate/driverPayment/fuelCost from Dispatcher', async () => {
       mockSend.mockResolvedValueOnce({ Item: { ...fullOrder } });
       const result = await service.getOrderById('order-1', 'disp-1', UserRole.Dispatcher);
       expect(result.orderRate).toBe(5000);
       expect(result.dispatcherPayment).toBe(250);
-      expect((result as any).adminRate).toBeUndefined();
-      expect((result as any).adminPayment).toBeUndefined();
+      expect((result as any).adminRate).toBe(5);
+      expect((result as any).adminPayment).toBe(250);
       expect((result as any).driverRate).toBeUndefined();
       expect((result as any).driverPayment).toBeUndefined();
     });

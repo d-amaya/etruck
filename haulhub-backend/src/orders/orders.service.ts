@@ -32,16 +32,18 @@ import { v4 as uuidv4 } from 'uuid';
 const ALLOWED_UPDATE_FIELDS: Record<UserRole, string[]> = {
   [UserRole.Admin]: ['dispatcherRate', 'notes'],
   [UserRole.Dispatcher]: [
-    'carrierId', 'driverId', 'truckId', 'trailerId', 'brokerId',
+    'orderStatus', 'pickupTimestamp', 'deliveryTimestamp',
+    'adminId', 'carrierId', 'driverId', 'truckId', 'trailerId', 'brokerId',
     'invoiceNumber', 'brokerLoad', 'scheduledTimestamp',
-    'orderRate', 'mileageOrder', 'mileageEmpty',
+    'orderRate', 'adminRate', 'dispatcherRate', 'adminPayment', 'dispatcherPayment', 'carrierPayment', 'mileageOrder', 'mileageEmpty',
     'pickupCompany', 'pickupPhone', 'pickupAddress', 'pickupCity', 'pickupState', 'pickupZip', 'pickupNotes',
     'deliveryCompany', 'deliveryPhone', 'deliveryAddress', 'deliveryCity', 'deliveryState', 'deliveryZip', 'deliveryNotes',
     'lumperValue', 'detentionValue', 'notes',
   ],
   [UserRole.Carrier]: [
-    'driverId', 'truckId', 'trailerId',
-    'driverRate', 'fuelGasAvgCost', 'fuelGasAvgGallxMil', 'notes',
+    'orderStatus', 'driverId', 'truckId', 'trailerId',
+    'driverRate', 'driverPayment', 'fuelGasAvgCost', 'fuelGasAvgGallxMil', 'fuelCost',
+    'pickupNotes', 'deliveryNotes', 'notes',
   ],
   [UserRole.Driver]: ['notes'],
 };
@@ -49,7 +51,7 @@ const ALLOWED_UPDATE_FIELDS: Record<UserRole, string[]> = {
 // Fields to strip from GET responses per role
 const HIDDEN_FIELDS: Record<UserRole, string[]> = {
   [UserRole.Admin]: ['driverRate', 'driverPayment', 'fuelCost', 'fuelGasAvgCost', 'fuelGasAvgGallxMil'],
-  [UserRole.Dispatcher]: ['adminRate', 'adminPayment', 'driverRate', 'driverPayment', 'fuelCost', 'fuelGasAvgCost', 'fuelGasAvgGallxMil'],
+  [UserRole.Dispatcher]: ['driverRate', 'driverPayment', 'fuelCost', 'fuelGasAvgCost', 'fuelGasAvgGallxMil'],
   [UserRole.Carrier]: ['orderRate', 'adminRate', 'adminPayment', 'dispatcherRate', 'dispatcherPayment'],
   [UserRole.Driver]: [
     'orderRate', 'adminRate', 'adminPayment', 'dispatcherRate', 'dispatcherPayment',
@@ -221,8 +223,8 @@ export class OrdersService {
   async getOrders(
     userId: string,
     role: UserRole,
-    filters: OrderFilters & { includeAggregates?: boolean },
-  ): Promise<{ orders: Order[]; lastEvaluatedKey?: string; aggregates?: any; entityIds?: string[] }> {
+    filters: OrderFilters & { includeAggregates?: boolean; includeDetailedAnalytics?: boolean; returnAllOrders?: boolean },
+  ): Promise<{ orders: Order[]; lastEvaluatedKey?: string; aggregates?: any; entityIds?: string[]; detailedAnalytics?: any; paymentReport?: any }> {
     const { indexName, pkField, pkPrefix } = this.indexSelectorService.selectIndex(role);
     const skField = pkField.replace('PK', 'SK');
 
@@ -254,27 +256,51 @@ export class OrdersService {
       ScanIndexForward: false,
     };
 
-    // ── Pass 1: Aggregates (fetch ALL orders in window, no filters) ──
+    // ── Pass 1: Aggregates (fetch ALL orders in window) ──
     let aggregates: any;
+    let detailedAnalytics: any;
+    let paymentReport: any;
     let entityIds: string[] | undefined;
-    if (filters.includeAggregates) {
-      const allOrders: Order[] = [];
+    if (filters.includeAggregates || filters.includeDetailedAnalytics) {
+      const allOrdersUnfiltered: Order[] = [];
+      const allOrdersFiltered: Order[] = [];
       let lastKey: any;
       do {
         const q = { ...baseQuery, ExclusiveStartKey: lastKey };
         const result = await this.ddb.send(new QueryCommand(q));
         for (const item of result.Items || []) {
-          allOrders.push(this.filterFields(this.mapItem(item), role));
+          const order = this.filterFields(this.mapItem(item), role);
+          allOrdersUnfiltered.push(order);
+          if (this.matchesFilters(order, filters, role)) {
+            allOrdersFiltered.push(order);
+          }
         }
         lastKey = result.LastEvaluatedKey;
       } while (lastKey);
 
-      aggregates = this.computeAggregates(allOrders, role);
-      entityIds = this.collectEntityIds(allOrders);
+      // Chart aggregates from FILTERED orders (respond to table filters)
+      aggregates = this.computeAggregates(allOrdersFiltered, role);
+      // Entity IDs from full date range
+      entityIds = this.collectEntityIds(allOrdersUnfiltered);
+      // Analytics + payments from UNFILTERED orders (full date range, ignore table filters)
+      if (filters.includeDetailedAnalytics) {
+        detailedAnalytics = this.computeDetailedAnalytics(allOrdersUnfiltered, role);
+        paymentReport = this.computePaymentSummary(allOrdersUnfiltered, role);
+      }
+
+      // Export mode: return all filtered orders, skip Pass 2
+      if (filters.returnAllOrders) {
+        const result: any = { orders: allOrdersFiltered };
+        if (aggregates) result.aggregates = aggregates;
+        if (entityIds) result.entityIds = entityIds;
+        if (detailedAnalytics) result.detailedAnalytics = detailedAnalytics;
+        if (paymentReport) result.paymentReport = paymentReport;
+        return result;
+      }
     }
 
     // ── Pass 2: Paginated orders with app-layer filtering ──
-    const pageSize = Number(filters.limit) || 25;
+    const pageSize = Number(filters.limit) || 10;
     const matching: Order[] = [];
     let cursor: any = filters.lastEvaluatedKey
       ? JSON.parse(Buffer.from(filters.lastEvaluatedKey, 'base64').toString())
@@ -319,6 +345,8 @@ export class OrdersService {
     const result: any = { orders: matching.slice(0, pageSize), lastEvaluatedKey };
     if (aggregates) result.aggregates = aggregates;
     if (entityIds) result.entityIds = entityIds;
+    if (detailedAnalytics) result.detailedAnalytics = detailedAnalytics;
+    if (paymentReport) result.paymentReport = paymentReport;
     return result;
   }
 
@@ -339,11 +367,13 @@ export class OrdersService {
     const driverMap = new Map<string, number>();
     const truckMap = new Map<string, number>();
     const dispatcherMap = new Map<string, { profit: number; count: number }>();
+    const carrierMap = new Map<string, number>();
+    const monthlyEarnings: Record<string, { realized: number; potential: number }> = {};
+    const paidStatuses = ['WaitingRC', 'ReadyToPay'];
 
     for (const o of orders as any[]) {
       statusSummary[o.orderStatus] = (statusSummary[o.orderStatus] || 0) + 1;
 
-      // Accumulate all visible payment fields
       for (const key of Object.keys(o).filter(k => k.endsWith('Payment') || k === 'fuelCost' || k === 'lumper' || k === 'detentionValue')) {
         payments[key] = (payments[key] || 0) + (o[key] || 0);
       }
@@ -355,15 +385,22 @@ export class OrdersService {
         brokerMap.set(o.brokerId, b);
       }
       if (o.driverId) driverMap.set(o.driverId, (driverMap.get(o.driverId) || 0) + 1);
-      if (o.truckId) {
-        const t = truckMap.get(o.truckId) || 0;
-        truckMap.set(o.truckId, t + 1);
-      }
+      if (o.truckId) truckMap.set(o.truckId, (truckMap.get(o.truckId) || 0) + 1);
+      if (o.carrierId) carrierMap.set(o.carrierId, (carrierMap.get(o.carrierId) || 0) + 1);
       if (o.dispatcherId) {
         const d = dispatcherMap.get(o.dispatcherId) || { profit: 0, count: 0 };
         d.profit += o.carrierPayment || o.dispatcherPayment || 0;
         d.count++;
         dispatcherMap.set(o.dispatcherId, d);
+      }
+
+      // Monthly earnings (dispatcher-relevant)
+      const month = (o.scheduledTimestamp || '').substring(0, 7);
+      if (month && o.orderStatus !== 'Canceled') {
+        if (!monthlyEarnings[month]) monthlyEarnings[month] = { realized: 0, potential: 0 };
+        const amt = o.dispatcherPayment || 0;
+        if (paidStatuses.includes(o.orderStatus)) monthlyEarnings[month].realized += amt;
+        else monthlyEarnings[month].potential += amt;
       }
     }
 
@@ -371,6 +408,7 @@ export class OrdersService {
       totalOrders: orders.length,
       statusSummary,
       paymentSummary: payments,
+      monthlyEarnings,
       topPerformers: {
         topBrokers: [...brokerMap.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5)
           .map(([id, v]) => ({ id, revenue: this.round2(v.revenue), count: v.count })),
@@ -378,10 +416,194 @@ export class OrdersService {
           .map(([id, trips]) => ({ id, trips })),
         topTrucks: [...truckMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
           .map(([id, trips]) => ({ id, trips })),
+        topCarriers: [...carrierMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([id, trips]) => ({ id, trips })),
         topDispatchers: [...dispatcherMap.entries()].sort((a, b) => b[1].profit - a[1].profit).slice(0, 5)
           .map(([id, v]) => ({ id, profit: this.round2(v.profit), count: v.count })),
       },
     };
+  }
+
+  private computeDetailedAnalytics(orders: Order[], role: UserRole): any {
+    const active = orders.filter(o => o.orderStatus !== OrderStatus.Canceled) as any[];
+
+    const driverMap = new Map<string, any[]>();
+    const vehicleMap = new Map<string, any[]>();
+    const brokerMap = new Map<string, any[]>();
+    const dispatcherMap = new Map<string, any[]>();
+    const carrierMap = new Map<string, any[]>();
+
+    for (const o of active) {
+      if (o.driverId) { if (!driverMap.has(o.driverId)) driverMap.set(o.driverId, []); driverMap.get(o.driverId)!.push(o); }
+      if (o.truckId) { if (!vehicleMap.has(o.truckId)) vehicleMap.set(o.truckId, []); vehicleMap.get(o.truckId)!.push(o); }
+      if (o.brokerId) { if (!brokerMap.has(o.brokerId)) brokerMap.set(o.brokerId, []); brokerMap.get(o.brokerId)!.push(o); }
+      if (o.dispatcherId) { if (!dispatcherMap.has(o.dispatcherId)) dispatcherMap.set(o.dispatcherId, []); dispatcherMap.get(o.dispatcherId)!.push(o); }
+      if (o.carrierId) { if (!carrierMap.has(o.carrierId)) carrierMap.set(o.carrierId, []); carrierMap.get(o.carrierId)!.push(o); }
+    }
+
+    const sum = (arr: any[], f: string) => arr.reduce((s, o) => s + (o[f] || 0), 0);
+    const completed = (arr: any[]) => arr.filter(o => o.orderStatus === 'Delivered' || o.orderStatus === 'ReadyToPay').length;
+
+    const revenue = (arr: any[]) => {
+      switch (role) {
+        case UserRole.Admin: return sum(arr, 'adminPayment');
+        case UserRole.Dispatcher: return sum(arr, 'dispatcherPayment');
+        case UserRole.Driver: return sum(arr, 'driverPayment');
+        default: return sum(arr, 'carrierPayment');
+      }
+    };
+    const expenses = (arr: any[]) => {
+      switch (role) {
+        case UserRole.Admin: return sum(arr, 'lumperValue') + sum(arr, 'detentionValue');
+        case UserRole.Dispatcher: return 0;
+        case UserRole.Driver: return 0;
+        default: return sum(arr, 'driverPayment') + sum(arr, 'fuelCost');
+      }
+    };
+    const profit = (arr: any[]) => this.round2(revenue(arr) - expenses(arr));
+
+    // Fuel analytics
+    const fuelOrders = active.filter(o => o.fuelCost > 0);
+    const totalFuel = sum(fuelOrders, 'fuelCost');
+    const totalFuelMiles = sum(fuelOrders, 'mileageTotal');
+    const totalGallons = fuelOrders.reduce((s, o) => s + ((o.fuelGasAvgGallxMil || 0) * (o.mileageTotal || 0)), 0);
+
+    return {
+      tripAnalytics: {
+        totalTrips: active.length,
+        completedTrips: completed(active),
+        statusBreakdown: active.reduce((acc, o) => { acc[o.orderStatus] = (acc[o.orderStatus] || 0) + 1; return acc; }, {} as Record<string, number>),
+        totalRevenue: this.round2(revenue(active)),
+        totalExpenses: this.round2(expenses(active)),
+        totalProfit: profit(active),
+        totalMiles: this.round2(sum(active, 'mileageTotal')),
+      },
+      driverPerformance: [...driverMap.entries()].map(([driverId, trips]) => ({
+        driverId, totalTrips: trips.length, completedTrips: completed(trips),
+        totalDistance: this.round2(sum(trips, 'mileageTotal')), totalEarnings: this.round2(sum(trips, 'driverPayment')),
+        totalRevenue: this.round2(revenue(trips)), totalProfit: profit(trips),
+        averageEarningsPerTrip: this.round2(trips.length ? sum(trips, 'driverPayment') / trips.length : 0),
+        completionRate: this.round2(trips.length ? (completed(trips) / trips.length) * 100 : 0),
+      })),
+      vehicleUtilization: [...vehicleMap.entries()].map(([vehicleId, trips]) => ({
+        vehicleId, totalTrips: trips.length, totalDistance: this.round2(sum(trips, 'mileageTotal')),
+        totalRevenue: this.round2(revenue(trips)), totalProfit: profit(trips),
+        averageRevenue: this.round2(trips.length ? revenue(trips) / trips.length : 0),
+      })),
+      brokerAnalytics: [...brokerMap.entries()].map(([brokerId, trips]) => ({
+        brokerId, totalTrips: trips.length, completedTrips: completed(trips),
+        totalRevenue: this.round2(sum(trips, 'carrierPayment')),
+        averageRevenue: this.round2(trips.length ? sum(trips, 'carrierPayment') / trips.length : 0),
+        totalDistance: this.round2(sum(trips, 'mileageTotal')),
+        completionRate: this.round2(trips.length ? (completed(trips) / trips.length) * 100 : 0),
+      })),
+      dispatcherPerformance: [...dispatcherMap.entries()].map(([dispatcherId, trips]) => ({
+        dispatcherId, totalTrips: trips.length, completedTrips: completed(trips),
+        totalRevenue: this.round2(sum(trips, 'dispatcherPayment')),
+        totalProfit: this.round2(sum(trips, 'dispatcherPayment')),
+        averageProfit: this.round2(trips.length ? sum(trips, 'dispatcherPayment') / trips.length : 0),
+        completionRate: this.round2(trips.length ? (completed(trips) / trips.length) * 100 : 0),
+      })),
+      carrierPerformance: [...carrierMap.entries()].map(([carrierId, trips]) => {
+        const rev = this.round2(sum(trips, 'carrierPayment'));
+        const exp = this.round2(sum(trips, 'driverPayment') + sum(trips, 'fuelCost'));
+        return {
+          carrierId, totalTrips: trips.length, completedTrips: completed(trips),
+          totalRevenue: rev, totalExpenses: exp, totalProfit: this.round2(rev - exp),
+          averageProfit: this.round2(trips.length ? (rev - exp) / trips.length : 0),
+          completionRate: this.round2(trips.length ? (completed(trips) / trips.length) * 100 : 0),
+        };
+      }),
+      fuelAnalytics: {
+        tripsWithFuelData: fuelOrders.length,
+        totalFuelCost: this.round2(totalFuel),
+        averageFuelCost: this.round2(fuelOrders.length ? totalFuel / fuelOrders.length : 0),
+        totalGallonsUsed: this.round2(totalGallons),
+        averageFuelPrice: this.round2(totalGallons > 0 ? totalFuel / totalGallons : 0),
+        averageGallonsPerMile: this.round2(totalFuelMiles > 0 ? totalGallons / totalFuelMiles : 0),
+        vehicleFuelEfficiency: [...vehicleMap.entries()].map(([vehicleId, trips]) => {
+          const vFuel = trips.filter(o => o.fuelCost > 0);
+          const vGallons = vFuel.reduce((s, o) => s + ((o.fuelGasAvgGallxMil || 0) * (o.mileageTotal || 0)), 0);
+          const vMiles = sum(vFuel, 'mileageTotal');
+          return {
+            vehicleId, totalTrips: vFuel.length, totalDistance: this.round2(vMiles),
+            totalFuelCost: this.round2(sum(vFuel, 'fuelCost')),
+            averageGallonsPerMile: this.round2(vMiles > 0 ? vGallons / vMiles : 0),
+            averageMPG: this.round2(vGallons > 0 ? vMiles / vGallons : 0),
+          };
+        }).sort((a, b) => b.averageMPG - a.averageMPG),
+      },
+    };
+  }
+
+  private computePaymentSummary(orders: Order[], role: UserRole): any {
+    const active = orders.filter(o => o.orderStatus !== OrderStatus.Canceled) as any[];
+
+    // Group by broker, carrier, and driver
+    const brokerGroups = new Map<string, { total: number; count: number }>();
+    const carrierGroups = new Map<string, { total: number; count: number }>();
+    const driverGroups = new Map<string, { total: number; count: number }>();
+    for (const o of active) {
+      if (o.brokerId) {
+        const g = brokerGroups.get(o.brokerId) || { total: 0, count: 0 };
+        g.total += o.orderRate || 0;
+        g.count++;
+        brokerGroups.set(o.brokerId, g);
+      }
+      if (o.carrierId) {
+        const g = carrierGroups.get(o.carrierId) || { total: 0, count: 0 };
+        g.total += o.carrierPayment || 0;
+        g.count++;
+        carrierGroups.set(o.carrierId, g);
+      }
+      if (o.driverId) {
+        const g = driverGroups.get(o.driverId) || { total: 0, count: 0 };
+        g.total += o.driverPayment || 0;
+        g.count++;
+        driverGroups.set(o.driverId, g);
+      }
+    }
+
+    const groupedByBroker: Record<string, { totalPayment: number; tripCount: number }> = {};
+    for (const [id, g] of brokerGroups) groupedByBroker[id] = { totalPayment: this.round2(g.total), tripCount: g.count };
+
+    const groupedByCarrier: Record<string, { totalPayment: number; tripCount: number }> = {};
+    for (const [id, g] of carrierGroups) groupedByCarrier[id] = { totalPayment: this.round2(g.total), tripCount: g.count };
+
+    const groupedByDriver: Record<string, { totalPayment: number; tripCount: number }> = {};
+    for (const [id, g] of driverGroups) groupedByDriver[id] = { totalPayment: this.round2(g.total), tripCount: g.count };
+
+    const base = { orderCount: active.length, groupedByBroker, groupedByCarrier, groupedByDriver };
+
+    switch (role) {
+      case UserRole.Admin:
+        return { ...base,
+          totalOrderRate: this.sum(active, 'orderRate'),
+          totalAdminPayment: this.sum(active, 'adminPayment'),
+          totalLumperValue: this.sum(active, 'lumperValue'),
+          totalDetentionValue: this.sum(active, 'detentionValue'),
+          profit: this.round2(this.sum(active, 'adminPayment') - this.sum(active, 'lumperValue') - this.sum(active, 'detentionValue')),
+        };
+      case UserRole.Dispatcher:
+        return { ...base,
+          totalOrderRate: this.sum(active, 'orderRate'),
+          totalDispatcherPayment: this.sum(active, 'dispatcherPayment'),
+          profit: this.sum(active, 'dispatcherPayment'),
+        };
+      case UserRole.Carrier:
+        return { ...base,
+          totalCarrierPayment: this.sum(active, 'carrierPayment'),
+          totalDriverPayment: this.sum(active, 'driverPayment'),
+          totalFuelCost: this.sum(active, 'fuelCost'),
+          profit: this.round2(this.sum(active, 'carrierPayment') - this.sum(active, 'driverPayment') - this.sum(active, 'fuelCost')),
+        };
+      case UserRole.Driver:
+        return { ...base,
+          totalDriverPayment: this.sum(active, 'driverPayment'),
+          totalDistance: this.sum(active, 'mileageOrder'),
+          profit: this.sum(active, 'driverPayment'),
+        };
+    }
   }
 
   private collectEntityIds(orders: Order[]): string[] {
@@ -445,7 +667,7 @@ export class OrdersService {
     // Auto-recalculation — fetch current order once if any recalc needed
     const needsRecalc =
       (role === UserRole.Admin && dto.dispatcherRate !== undefined) ||
-      (role === UserRole.Dispatcher && (dto as any).orderRate !== undefined) ||
+      (role === UserRole.Dispatcher && ((dto as any).orderRate !== undefined || (dto as any).adminRate !== undefined || (dto as any).dispatcherRate !== undefined)) ||
       (role === UserRole.Carrier && (dto.driverRate !== undefined || dto.fuelGasAvgCost !== undefined || dto.fuelGasAvgGallxMil !== undefined));
 
     let current: Record<string, any> | undefined;
@@ -471,10 +693,10 @@ export class OrdersService {
       exprValues[':dispatcherPayment'] = this.round2(orderRate * newDispatcherRate / 100);
     }
 
-    if (role === UserRole.Dispatcher && (dto as any).orderRate !== undefined && current) {
-      const newOrderRate = (dto as any).orderRate;
-      const adminRate = current.adminRate || 5;
-      const dispatcherRate = current.dispatcherRate || 5;
+    if (role === UserRole.Dispatcher && needsRecalc && current) {
+      const newOrderRate = (dto as any).orderRate ?? current.orderRate ?? 0;
+      const adminRate = (dto as any).adminRate ?? current.adminRate ?? 5;
+      const dispatcherRate = (dto as any).dispatcherRate ?? current.dispatcherRate ?? 5;
       const driverRate = current.driverRate || 0;
       const mileageOrder = (dto as any).mileageOrder ?? current.mileageOrder ?? 0;
       const mileageEmpty = (dto as any).mileageEmpty ?? current.mileageEmpty ?? 0;
@@ -482,17 +704,39 @@ export class OrdersService {
       const fuelGasAvgCost = current.fuelGasAvgCost || 0;
       const fuelGasAvgGallxMil = current.fuelGasAvgGallxMil || 0;
 
-      exprParts.push('#adminPayment = :adminPayment');
-      exprNames['#adminPayment'] = 'adminPayment';
-      exprValues[':adminPayment'] = this.round2(newOrderRate * adminRate / 100);
+      const adminPayment = this.round2(newOrderRate * adminRate / 100);
+      const dispatcherPayment = this.round2(newOrderRate * dispatcherRate / 100);
+      const carrierPayment = this.round2(newOrderRate - adminPayment - dispatcherPayment);
 
-      exprParts.push('#dispatcherPayment = :dispatcherPayment');
-      exprNames['#dispatcherPayment'] = 'dispatcherPayment';
-      exprValues[':dispatcherPayment'] = this.round2(newOrderRate * dispatcherRate / 100);
+      if (!exprNames['#adminRate']) {
+        exprParts.push('#adminRate = :adminRate');
+        exprNames['#adminRate'] = 'adminRate';
+      }
+      exprValues[':adminRate'] = adminRate;
 
-      exprParts.push('#carrierPayment = :carrierPayment');
-      exprNames['#carrierPayment'] = 'carrierPayment';
-      exprValues[':carrierPayment'] = this.round2(newOrderRate * 0.9);
+      if (!exprNames['#dispatcherRate']) {
+        exprParts.push('#dispatcherRate = :dispatcherRate');
+        exprNames['#dispatcherRate'] = 'dispatcherRate';
+      }
+      exprValues[':dispatcherRate'] = dispatcherRate;
+
+      if (!exprNames['#adminPayment']) {
+        exprParts.push('#adminPayment = :adminPayment');
+        exprNames['#adminPayment'] = 'adminPayment';
+      }
+      exprValues[':adminPayment'] = adminPayment;
+
+      if (!exprNames['#dispatcherPayment']) {
+        exprParts.push('#dispatcherPayment = :dispatcherPayment');
+        exprNames['#dispatcherPayment'] = 'dispatcherPayment';
+      }
+      exprValues[':dispatcherPayment'] = dispatcherPayment;
+
+      if (!exprNames['#carrierPayment']) {
+        exprParts.push('#carrierPayment = :carrierPayment');
+        exprNames['#carrierPayment'] = 'carrierPayment';
+      }
+      exprValues[':carrierPayment'] = carrierPayment;
 
       exprParts.push('#driverPayment = :driverPayment');
       exprNames['#driverPayment'] = 'driverPayment';
@@ -508,19 +752,22 @@ export class OrdersService {
     }
 
     if (role === UserRole.Carrier && dto.driverRate !== undefined && current) {
-      exprParts.push('#driverPayment = :driverPayment');
-      exprNames['#driverPayment'] = 'driverPayment';
-      exprValues[':driverPayment'] = this.round2(dto.driverRate * (current.mileageOrder || 0));
+      if (!exprNames['#driverPayment']) {
+        exprParts.push('#driverPayment = :driverPayment');
+        exprNames['#driverPayment'] = 'driverPayment';
+        exprValues[':driverPayment'] = this.round2(dto.driverRate * (current.mileageOrder || 0));
+      }
     }
 
     if (role === UserRole.Carrier && (dto.fuelGasAvgCost !== undefined || dto.fuelGasAvgGallxMil !== undefined) && current) {
-      const cost = dto.fuelGasAvgCost ?? current.fuelGasAvgCost ?? 0;
-      const gallxMil = dto.fuelGasAvgGallxMil ?? current.fuelGasAvgGallxMil ?? 0;
-      const mileageTotal = current.mileageTotal || 0;
-
-      exprParts.push('#fuelCost = :fuelCost');
-      exprNames['#fuelCost'] = 'fuelCost';
-      exprValues[':fuelCost'] = this.round2(mileageTotal * gallxMil * cost);
+      if (!exprNames['#fuelCost']) {
+        const cost = dto.fuelGasAvgCost ?? current.fuelGasAvgCost ?? 0;
+        const gallxMil = dto.fuelGasAvgGallxMil ?? current.fuelGasAvgGallxMil ?? 0;
+        const mileageTotal = current.mileageTotal || 0;
+        exprParts.push('#fuelCost = :fuelCost');
+        exprNames['#fuelCost'] = 'fuelCost';
+        exprValues[':fuelCost'] = this.round2(mileageTotal * gallxMil * cost);
+      }
     }
 
     // Always update audit fields

@@ -76,19 +76,20 @@ export class TripEditComponent implements OnInit {
     this.loadBrokers();
 
     this.loadingAssets = true;
-    this.assetCache.forceRefresh().subscribe(cache => {
+    this.assetCache.loadAssets().subscribe(cache => {
       this.admins = Array.from(cache.admins.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
       this.carriers = Array.from(cache.carriers.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
       this.loadingAssets = false;
-    });
 
-    const tripId = this.route.snapshot.paramMap.get('orderId') || this.route.snapshot.paramMap.get('tripId');
-    if (tripId) {
-      this.loadTrip(tripId);
-    } else {
-      this.error = 'No order ID provided';
-      this.loading = false;
-    }
+      // Load trip after cache is ready so admin/carrier autocompletes display correctly
+      const tripId = this.route.snapshot.paramMap.get('orderId') || this.route.snapshot.paramMap.get('tripId');
+      if (tripId) {
+        this.loadTrip(tripId);
+      } else {
+        this.error = 'No order ID provided';
+        this.loading = false;
+      }
+    });
   }
 
   private initializeForm(): void {
@@ -109,8 +110,12 @@ export class TripEditComponent implements OnInit {
       mileageEmpty: ['', [Validators.required, Validators.min(0)]],
 
       orderRate: ['', [Validators.required, Validators.min(0.01)]],
-      adminRate: [{ value: 5, disabled: true }],
-      dispatcherRate: [{ value: 5, disabled: true }],
+      adminRate: [5, [Validators.required, Validators.min(0), Validators.max(100)]],
+      adminPayment: [{ value: 0, disabled: true }],
+      dispatcherRate: [5, [Validators.required, Validators.min(0), Validators.max(100)]],
+      dispatcherPayment: [{ value: 0, disabled: true }],
+      carrierPayment: [{ value: 0, disabled: true }],
+      carrierRate: [{ value: 0, disabled: true }],
 
       pickupCompany: ['', Validators.required],
       pickupPhone: [''],
@@ -144,6 +149,23 @@ export class TripEditComponent implements OnInit {
         this.tripForm.get('deliveryDate')?.reset();
       }
     });
+
+    // Recalculate payments when rates or orderRate change
+    const recalc = () => {
+      const rate = parseFloat(this.tripForm.get('orderRate')?.value) || 0;
+      const adminPct = parseFloat(this.tripForm.get('adminRate')?.value) || 0;
+      const dispPct = parseFloat(this.tripForm.get('dispatcherRate')?.value) || 0;
+      const adminPay = Math.round(rate * adminPct) / 100;
+      const dispPay = Math.round(rate * dispPct) / 100;
+      const carrierPay = Math.round((rate - adminPay - dispPay) * 100) / 100;
+      this.tripForm.get('adminPayment')?.setValue(adminPay, { emitEvent: false });
+      this.tripForm.get('dispatcherPayment')?.setValue(dispPay, { emitEvent: false });
+      this.tripForm.get('carrierPayment')?.setValue(carrierPay, { emitEvent: false });
+      this.tripForm.get('carrierRate')?.setValue(Math.round((100 - adminPct - dispPct) * 100) / 100, { emitEvent: false });
+    };
+    this.tripForm.get('orderRate')?.valueChanges.subscribe(recalc);
+    this.tripForm.get('adminRate')?.valueChanges.subscribe(recalc);
+    this.tripForm.get('dispatcherRate')?.valueChanges.subscribe(recalc);
   }
 
   private setupAutocompleteFilters(): void {
@@ -199,18 +221,20 @@ export class TripEditComponent implements OnInit {
     this.trailers = [];
     this.drivers = [];
 
-    this.loadCarrierAssets(carrierId);
+    this.loadCarrierAssets(carrierId, () => {
+      // Re-trigger autocomplete filters with new asset lists
+      this.tripForm.get('truckId')?.updateValueAndValidity();
+      this.tripForm.get('trailerId')?.updateValueAndValidity();
+      this.tripForm.get('driverId')?.updateValueAndValidity();
+    });
   }
 
-  private loadCarrierAssets(carrierId: string): void {
-    forkJoin({
-      trucks: this.orderService.getTrucksByCarrier(carrierId),
-      trailers: this.orderService.getTrailersByCarrier(carrierId),
-      drivers: this.orderService.getDriversByCarrier(carrierId),
-    }).subscribe(({ trucks, trailers, drivers }) => {
-      this.trucks = (trucks.trucks || []).filter(t => t.isActive).sort((a, b) => a.plate.localeCompare(b.plate));
-      this.trailers = (trailers.trailers || []).filter(t => t.isActive).sort((a, b) => a.plate.localeCompare(b.plate));
-      this.drivers = (drivers.users || []).filter(d => d.isActive).sort((a, b) => a.name.localeCompare(b.name));
+  private loadCarrierAssets(carrierId: string, onComplete?: () => void): void {
+    this.orderService.getCarrierAssets(carrierId).subscribe(assets => {
+      this.trucks = (assets.trucks || []).filter((t: any) => t.isActive).sort((a: any, b: any) => a.plate.localeCompare(b.plate));
+      this.trailers = (assets.trailers || []).filter((t: any) => t.isActive).sort((a: any, b: any) => a.plate.localeCompare(b.plate));
+      this.drivers = (assets.drivers || []).filter((d: any) => d.isActive).sort((a: any, b: any) => a.name.localeCompare(b.name));
+      if (onComplete) onComplete();
     });
   }
 
@@ -218,6 +242,10 @@ export class TripEditComponent implements OnInit {
 
   displayAdmin = (id: string): string => this.admins.find(a => a.userId === id)?.name || '';
   displayCarrier = (id: string): string => this.carriers.find(c => c.userId === id)?.name || '';
+
+  formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  }
   displayBroker = (id: string): string => this.brokers.find(b => b.brokerId === id)?.brokerName || '';
   displayTruck = (id: string): string => {
     const t = this.trucks.find(t => t.truckId === id);
@@ -230,6 +258,13 @@ export class TripEditComponent implements OnInit {
   displayDriver = (id: string): string => this.drivers.find(d => d.userId === id)?.name || '';
 
   // ── Calculated fields ──
+
+  get totalRevenue(): number {
+    const orderRate = parseFloat(this.tripForm.get('orderRate')?.value) || 0;
+    const lumper = parseFloat(this.tripForm.get('lumperValue')?.value) || 0;
+    const detention = parseFloat(this.tripForm.get('detentionValue')?.value) || 0;
+    return Math.round((orderRate + lumper + detention) * 100) / 100;
+  }
 
   get adminPayment(): number {
     const rate = this.tripForm.getRawValue().adminRate || 0;
@@ -261,12 +296,16 @@ export class TripEditComponent implements OnInit {
     this.orderService.getOrderById(tripId).subscribe({
       next: (trip: any) => {
         this.trip = trip;
-        // Load carrier assets before populating form
         if (trip.carrierId) {
-          this.loadCarrierAssets(trip.carrierId);
+          // Load carrier assets THEN populate form so autocompletes can display
+          this.loadCarrierAssets(trip.carrierId, () => {
+            this.populateForm(trip);
+            this.loading = false;
+          });
+        } else {
+          this.populateForm(trip);
+          this.loading = false;
         }
-        this.populateForm(trip);
-        this.loading = false;
       },
       error: (error: any) => {
         this.error = error.error?.message || 'Failed to load order details';
@@ -306,6 +345,8 @@ export class TripEditComponent implements OnInit {
       mileageOrder: trip.mileageOrder || 0,
       mileageEmpty: trip.mileageEmpty || 0,
       orderRate: trip.orderRate,
+      adminRate: trip.adminRate || 0,
+      dispatcherRate: trip.dispatcherRate || 0,
       pickupCompany: trip.pickupCompany || '',
       pickupPhone: trip.pickupPhone || '',
       pickupAddress: trip.pickupAddress || '',
@@ -328,6 +369,15 @@ export class TripEditComponent implements OnInit {
       detentionValue: trip.detentionValue || 0,
       notes: trip.notes || ''
     }, { emitEvent: false });
+
+    // Trigger initial payment calculation
+    const rate = trip.orderRate || 0;
+    const adminPay = Math.round(rate * (trip.adminRate || 0)) / 100;
+    const dispPay = Math.round(rate * (trip.dispatcherRate || 0)) / 100;
+    this.tripForm.get('adminPayment')?.setValue(adminPay, { emitEvent: false });
+    this.tripForm.get('dispatcherPayment')?.setValue(dispPay, { emitEvent: false });
+    this.tripForm.get('carrierPayment')?.setValue(Math.round((rate - adminPay - dispPay) * 100) / 100, { emitEvent: false });
+    this.tripForm.get('carrierRate')?.setValue(Math.round((100 - (trip.adminRate || 0) - (trip.dispatcherRate || 0)) * 100) / 100, { emitEvent: false });
   }
 
   getStatusLabel(status: OrderStatus): string {
@@ -372,12 +422,23 @@ export class TripEditComponent implements OnInit {
 
     const data: any = {
       orderStatus: fv.status,
+      adminId: fv.adminId,
+      carrierId: fv.carrierId,
+      driverId: fv.driverId,
+      truckId: fv.truckId,
+      trailerId: fv.trailerId,
       brokerId: fv.brokerId,
       invoiceNumber: fv.invoiceNumber?.trim() || undefined,
       brokerLoad: fv.brokerLoad?.trim() || undefined,
+      scheduledTimestamp: fv.scheduledTimestamp ? new Date(fv.scheduledTimestamp).toISOString() : undefined,
       mileageOrder: parseFloat(fv.mileageOrder),
       mileageEmpty: parseFloat(fv.mileageEmpty),
       orderRate: parseFloat(fv.orderRate),
+      adminRate: parseFloat(fv.adminRate) || 0,
+      dispatcherRate: parseFloat(fv.dispatcherRate) || 0,
+      adminPayment: parseFloat(fv.adminPayment) || 0,
+      dispatcherPayment: parseFloat(fv.dispatcherPayment) || 0,
+      carrierPayment: parseFloat(fv.carrierPayment) || 0,
       pickupCompany: fv.pickupCompany?.trim(),
       pickupPhone: fv.pickupPhone?.trim() || undefined,
       pickupAddress: fv.pickupAddress?.trim(),

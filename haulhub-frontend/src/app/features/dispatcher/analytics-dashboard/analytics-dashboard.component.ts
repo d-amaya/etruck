@@ -15,7 +15,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { SharedFilterService } from '../dashboard/shared-filter.service';
 import { DashboardStateService } from '../dashboard/dashboard-state.service';
@@ -71,7 +71,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   @Input() isWrapped = false; // Set by wrapper component
   @ViewChild('fuelCostChart') fuelCostChartRef!: ElementRef<HTMLCanvasElement>;
   
-  isLoading = true;
+  isLoading = false;
   error: string | null = null;
   selectedTabIndex = 0;
   
@@ -164,9 +164,16 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       this.brokerMap = cache.brokers;
     });
 
-    // Subscribe to shared filter changes
+    // Subscribe to shared filter changes (debounced to prevent multiple emissions)
     this.sharedFilterService.filters$
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged((prev, curr) =>
+          prev.dateRange.startDate?.getTime() === curr.dateRange.startDate?.getTime() &&
+          prev.dateRange.endDate?.getTime() === curr.dateRange.endDate?.getTime()
+        ),
+        takeUntil(this.destroy$)
+      )
       .subscribe(filters => {
         this.startDate = filters.dateRange.startDate;
         this.endDate = filters.dateRange.endDate;
@@ -191,12 +198,6 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   }
 
   private loadAllAnalytics(): void {
-    // Only show component-level loading spinner if not wrapped
-    if (!this.isWrapped) {
-      this.isLoading = true;
-      // Only set dashboard loading state when not wrapped (standalone mode)
-      this.dashboardStateService.setLoadingState(true, false, true, 'Loading analytics...');
-    }
     this.error = null;
     
     // Clear any errors when wrapped
@@ -236,11 +237,31 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
       return;
     }
 
-    this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined)
+    // Cache miss — show loading and fetch
+    if (!this.isWrapped) {
+      this.isLoading = true;
+      this.dashboardStateService.setLoadingState(true, false, true, 'Loading analytics...');
+    }
+
+    const currentPageSize = this.dashboardStateService['paginationSubject']?.value?.pageSize || 10;
+    this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined, currentPageSize)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data: any) => {
           this.dashboardStateService.setCachedAnalytics(this.startDate, this.endDate, data);
+          // Cache payment report for Payments view
+          if (data.paymentReport) {
+            this.dashboardStateService.setCachedPaymentReport(this.startDate, this.endDate, data.paymentReport);
+          }
+          // Cache orders for Table view (page 0, no table filters)
+          if (data.orders?.length) {
+            const defaultFilters = { dateRange: { startDate: this.startDate, endDate: this.endDate }, status: null, brokerId: null, truckId: null, driverId: null, carrierId: null };
+            const defaultPagination = { page: 0, pageSize: currentPageSize, pageTokens: data.lastEvaluatedKey ? [data.lastEvaluatedKey] : [] };
+            this.dashboardStateService.setCachedTrips(defaultFilters as any, defaultPagination, {
+              orders: data.orders, total: data.lastEvaluatedKey ? data.orders.length + 1 : data.orders.length,
+              chartAggregates: data.aggregates, lastEvaluatedKey: data.lastEvaluatedKey
+            });
+          }
           this.processUnifiedAnalyticsData(data);
           this.isLoading = false;
           this.dashboardStateService.completeLoad();
@@ -259,66 +280,59 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
   private processUnifiedAnalyticsData(data: any): void {
     this.processTripAnalytics(data.tripAnalytics);
 
-    // Group by admin
-    const orders = data._rawOrders || [];
-    const adminMap = new Map<string, any[]>();
-    const carrierMap = new Map<string, any[]>();
-    for (const o of orders) {
-      if (o.adminId) { if (!adminMap.has(o.adminId)) adminMap.set(o.adminId, []); adminMap.get(o.adminId)!.push(o); }
-      if (o.carrierId) { if (!carrierMap.has(o.carrierId)) carrierMap.set(o.carrierId, []); carrierMap.get(o.carrierId)!.push(o); }
-    }
-
-    const sum = (arr: any[], f: string) => arr.reduce((s: number, o: any) => s + (o[f] || 0), 0);
-    const completed = (arr: any[]) => arr.filter((o: any) => o.orderStatus === 'Delivered' || o.orderStatus === 'ReadyToPay').length;
-    const revenue = (arr: any[]) => sum(arr, 'dispatcherPayment');
-    const profit = (arr: any[]) => sum(arr, 'dispatcherPayment');
-
-    this.adminPerformanceData = [...adminMap.entries()].map(([adminId, trips]) => {
-      const rev = revenue(trips);
-      return {
-        name: adminId.substring(0, 8), totalTrips: trips.length, completedTrips: completed(trips),
-        totalRevenue: rev, totalProfit: profit(trips),
-        averageProfit: trips.length ? profit(trips) / trips.length : 0,
-        completionRate: trips.length ? (completed(trips) / trips.length) * 100 : 0,
-      };
-    });
+    // Use backend-computed dispatcher performance as admin performance data
+    this.adminPerformanceData = (data.dispatcherPerformance || []).map((d: any) => ({
+      name: d.dispatcherId?.substring(0, 8),
+      totalTrips: d.totalTrips, completedTrips: d.completedTrips,
+      totalRevenue: d.totalRevenue, totalProfit: d.totalProfit,
+      averageProfit: d.averageProfit, completionRate: d.completionRate,
+    }));
 
     this.brokerAnalyticsData = {
       brokers: (data.brokerAnalytics || []).map((b: any) => ({
         ...b,
         brokerName: this.brokerMap.get(b.brokerId)?.brokerName || b.brokerId?.substring(0, 8),
-        totalProfit: b.totalRevenue, // For dispatcher, revenue = profit
+        totalProfit: b.totalRevenue,
       }))
     };
 
-    this.carrierPerformanceData = [...carrierMap.entries()].map(([carrierId, trips]) => {
-      const rev = revenue(trips);
-      return {
-        name: carrierId.substring(0, 8), totalTrips: trips.length, completedTrips: completed(trips),
-        totalRevenue: rev, totalProfit: profit(trips),
-        averageProfit: trips.length ? profit(trips) / trips.length : 0,
-        completionRate: trips.length ? (completed(trips) / trips.length) * 100 : 0,
-      };
-    });
+    this.carrierPerformanceData = (data.carrierPerformance || []).map((c: any) => ({
+      name: c.carrierId?.substring(0, 8),
+      totalTrips: c.totalTrips, completedTrips: c.completedTrips,
+      totalRevenue: c.totalRevenue, totalProfit: c.totalProfit,
+      averageProfit: c.averageProfit, completionRate: c.completionRate,
+    }));
 
-    // Resolve admin and carrier names
-    const unknownIds = [
-      ...this.adminPerformanceData.filter(a => a.name.length === 8).map((a: any, i: number) => ({ id: [...adminMap.keys()][i], arr: this.adminPerformanceData, index: i })),
-      ...this.carrierPerformanceData.filter(c => c.name.length === 8).map((c: any, i: number) => ({ id: [...carrierMap.keys()][i], arr: this.carrierPerformanceData, index: i })),
-    ];
-    if (unknownIds.length > 0) {
-      const ids = unknownIds.map(u => u.id);
-      this.analyticsService.resolveEntitiesForAnalytics(ids).subscribe((resolved: any) => {
-        const entries: Record<string, any> = Array.isArray(resolved) ? {} : resolved;
-        for (const u of unknownIds) {
-          const entity = entries[u.id];
-          if (entity?.name) u.arr[u.index].name = entity.name;
-        }
+    // Resolve entity names via asset cache
+    const entityIds = data.entityIds || [];
+    if (entityIds.length > 0) {
+      this.assetCache.resolveEntities(entityIds).subscribe(resolved => {
+        const nameMap = new Map(resolved.map((r: any) => [r.id, r.name]));
+        // Update admin performance names
+        this.adminPerformanceData = (data.dispatcherPerformance || []).map((d: any) => ({
+          name: nameMap.get(d.dispatcherId) || d.dispatcherId?.substring(0, 8),
+          totalTrips: d.totalTrips, completedTrips: d.completedTrips,
+          totalRevenue: d.totalRevenue, totalProfit: d.totalProfit,
+          averageProfit: d.averageProfit, completionRate: d.completionRate,
+        }));
+        // Update carrier performance names
+        this.carrierPerformanceData = (data.carrierPerformance || []).map((c: any) => ({
+          name: nameMap.get(c.carrierId) || c.carrierId?.substring(0, 8),
+          totalTrips: c.totalTrips, completedTrips: c.completedTrips,
+          totalRevenue: c.totalRevenue, totalProfit: c.totalProfit,
+          averageProfit: c.averageProfit, completionRate: c.completionRate,
+        }));
+        // Update broker names
+        this.brokerAnalyticsData = {
+          brokers: (data.brokerAnalytics || []).map((b: any) => ({
+            ...b,
+            brokerName: this.brokerMap.get(b.brokerId)?.brokerName || nameMap.get(b.brokerId) || b.brokerId?.substring(0, 8),
+            totalProfit: b.totalRevenue,
+          }))
+        };
       });
     }
   }
-
-
 
   private createFuelCostChart(): void {
 
@@ -521,7 +535,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
         startY: yPos,
         head: [['Broker', 'Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate']],
         body: this.brokerAnalyticsData.brokers.map((b: any) => [
-          b.brokerName, (b.tripCount || 0).toString(), (b.completedTrips || 0).toString(),
+          b.brokerName, (b.totalTrips || 0).toString(), (b.completedTrips || 0).toString(),
           this.formatCurrency(b.totalRevenue || 0), this.formatCurrency(b.totalProfit || 0),
           `${(b.completionRate || 0).toFixed(0)}%`
         ]),
@@ -574,7 +588,7 @@ export class AnalyticsDashboardComponent implements OnInit, OnDestroy, AfterView
         name: 'Broker Performance',
         headers: ['Broker', 'Total Orders', 'Completed', 'Revenue', 'Profit', 'Completion Rate'],
         rows: this.brokerAnalyticsData.brokers.map((b: any) => [
-          b.brokerName, b.tripCount || 0, b.completedTrips || 0, b.totalRevenue?.toFixed(2), b.totalProfit?.toFixed(2), `${(b.completionRate || 0).toFixed(0)}%`
+          b.brokerName, b.totalTrips || 0, b.completedTrips || 0, b.totalRevenue?.toFixed(2), b.totalProfit?.toFixed(2), `${(b.completionRate || 0).toFixed(0)}%`
         ])
       });
     }

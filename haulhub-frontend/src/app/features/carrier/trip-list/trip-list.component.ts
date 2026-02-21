@@ -191,9 +191,7 @@ export class CarrierTripListComponent implements OnInit {
 
   private buildFilters(): Partial<OrderFilters> {
     const formValue = this.filterForm.value;
-    const filters: Partial<OrderFilters> = {
-      limit: 1000
-    };
+    const filters: Partial<OrderFilters> = {};
 
     if (formValue.startDate) {
       const d = new Date(formValue.startDate);

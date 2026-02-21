@@ -21,6 +21,10 @@ export const CARRIER_ROUTES: Routes = [
     path: 'orders/:orderId',
     loadComponent: () => import('../dispatcher/trip-detail/trip-detail.component').then(m => m.TripDetailComponent)
   },
+  {
+    path: 'orders/:orderId/edit',
+    loadComponent: () => import('./trip-edit/carrier-trip-edit.component').then(m => m.CarrierTripEditComponent)
+  },
   // Legacy redirects
   { path: 'trips', redirectTo: 'orders', pathMatch: 'full' },
   { path: 'trips/:tripId', redirectTo: 'orders/:tripId', pathMatch: 'full' },

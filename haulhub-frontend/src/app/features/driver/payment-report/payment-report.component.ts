@@ -12,7 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
-import { TripService } from '../../../core/services';
+import { OrderService } from '../../../core/services/order.service';
 import { OrderFilters } from '@haulhub/shared';
 
 @Component({
@@ -53,7 +53,7 @@ export class PaymentReportComponent implements OnInit {
   ];
 
   constructor(
-    private tripService: TripService,
+    private orderService: OrderService,
     private fb: FormBuilder
   ) {
     this.filterForm = this.fb.group({
@@ -79,9 +79,9 @@ export class PaymentReportComponent implements OnInit {
     this.loading = true;
     const filters = this.buildFilters();
     
-    this.tripService.getPaymentReport(filters).subscribe({
-      next: (report) => {
-        this.report = report;
+    this.orderService.getOrders({ ...filters, includeAggregates: true, includeDetailedAnalytics: true } as any).subscribe({
+      next: (response: any) => {
+        this.report = response.paymentReport || {};
         this.loading = false;
       },
       error: (error) => {

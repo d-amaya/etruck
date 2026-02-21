@@ -1,4 +1,4 @@
-<div class="trip-create-container">
+<div class="trip-create-container" *ngIf="!loading">
   <mat-card>
     <mat-card-header>
       <div class="header-row">
@@ -16,7 +16,7 @@
       <div class="info-alert">
         <mat-icon>info</mat-icon>
         <div class="info-content">
-          <strong>Note:</strong> Scheduled date cannot be changed after order creation.
+          <strong>Note:</strong> You can update the order status, driver rate, fuel cost information, and notes.
         </div>
       </div>
 
@@ -28,19 +28,12 @@
           <div class="form-row">
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Scheduled Date</mat-label>
-              <input matInput [matDatepicker]="scheduledPicker" formControlName="scheduledTimestamp">
-              <mat-datepicker-toggle matSuffix [for]="scheduledPicker"></mat-datepicker-toggle>
-              <mat-datepicker #scheduledPicker></mat-datepicker>
+              <input matInput formControlName="scheduledTimestamp">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Broker</mat-label>
-              <input matInput formControlName="brokerId" [matAutocomplete]="brokerAuto">
-              <mat-autocomplete #brokerAuto="matAutocomplete" [displayWith]="displayBroker">
-                <mat-option *ngFor="let broker of filteredBrokers$ | async" [value]="broker.brokerId">
-                  {{ broker.brokerName }}
-                </mat-option>
-              </mat-autocomplete>
+              <input matInput formControlName="brokerName">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
@@ -50,7 +43,7 @@
 
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Order Status</mat-label>
-              <mat-select formControlName="status">
+              <mat-select formControlName="orderStatus">
                 <mat-option *ngFor="let status of statusOptions" [value]="status">
                   {{ getStatusLabel(status) }}
                 </mat-option>
@@ -63,74 +56,53 @@
         <div class="form-section">
           <h3>Assignment</h3>
           <div class="form-row">
-            <mat-form-field appearance="outline" class="quarter-width">
-              <mat-label>Admin</mat-label>
-              <input matInput formControlName="adminId" [matAutocomplete]="adminAuto" placeholder="Type to search...">
-              <mat-autocomplete #adminAuto="matAutocomplete" [displayWith]="displayAdmin">
-                <mat-option *ngFor="let admin of filteredAdmins$ | async" [value]="admin.userId">
-                  {{ admin.name }}
-                </mat-option>
-              </mat-autocomplete>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="quarter-width">
-              <mat-label>Carrier</mat-label>
-              <input matInput formControlName="carrierId" [matAutocomplete]="carrierAuto" placeholder="Type to search...">
-              <mat-autocomplete #carrierAuto="matAutocomplete" [displayWith]="displayCarrier"
-                                (optionSelected)="onCarrierSelected()">
-                <mat-option *ngFor="let carrier of filteredCarriers$ | async" [value]="carrier.userId">
-                  {{ carrier.name }}
-                </mat-option>
-              </mat-autocomplete>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="quarter-width">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Driver</mat-label>
-              <input matInput formControlName="driverId" [matAutocomplete]="driverAuto">
+              <input matInput formControlName="driverId" [matAutocomplete]="driverAuto"
+                     (focus)="triggerAutocomplete('driverId')">
               <mat-autocomplete #driverAuto="matAutocomplete" [displayWith]="displayDriver">
-                <mat-option *ngFor="let driver of filteredDrivers$ | async" [value]="driver.userId">
-                  {{ driver.name }}
+                <mat-option *ngFor="let d of filteredDrivers$ | async" [value]="d.userId">
+                  {{ d.name }}
                 </mat-option>
               </mat-autocomplete>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="quarter-width">
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Truck</mat-label>
-              <input matInput formControlName="truckId" [matAutocomplete]="truckAuto">
+              <input matInput formControlName="truckId" [matAutocomplete]="truckAuto"
+                     (focus)="triggerAutocomplete('truckId')">
               <mat-autocomplete #truckAuto="matAutocomplete" [displayWith]="displayTruck">
-                <mat-option *ngFor="let truck of filteredTrucks$ | async" [value]="truck.truckId">
-                  {{ truck.brand }} {{ truck.year }} — {{ truck.plate }}
+                <mat-option *ngFor="let t of filteredTrucks$ | async" [value]="t.truckId">
+                  {{ t.brand }} {{ t.year }} — {{ t.plate }}
                 </mat-option>
               </mat-autocomplete>
             </mat-form-field>
-          </div>
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="quarter-width">
+
+            <mat-form-field appearance="outline" class="third-width">
               <mat-label>Trailer</mat-label>
-              <input matInput formControlName="trailerId" [matAutocomplete]="trailerAuto">
+              <input matInput formControlName="trailerId" [matAutocomplete]="trailerAuto"
+                     (focus)="triggerAutocomplete('trailerId')">
               <mat-autocomplete #trailerAuto="matAutocomplete" [displayWith]="displayTrailer">
-                <mat-option *ngFor="let trailer of filteredTrailers$ | async" [value]="trailer.trailerId">
-                  {{ trailer.brand }} {{ trailer.year }} — {{ trailer.plate }}
+                <mat-option *ngFor="let t of filteredTrailers$ | async" [value]="t.trailerId">
+                  {{ t.brand }} {{ t.year }} — {{ t.plate }}
                 </mat-option>
               </mat-autocomplete>
             </mat-form-field>
           </div>
         </div>
 
-        <!-- 4. Pickup -->
+        <!-- 3. Pickup -->
         <div class="form-section">
           <h3>Pickup</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Pickup Date</mat-label>
-              <input matInput [matDatepicker]="pickupPicker" formControlName="pickupDate" [min]="tripForm.get('scheduledTimestamp')?.value">
-              <mat-datepicker-toggle matSuffix [for]="pickupPicker"></mat-datepicker-toggle>
-              <mat-datepicker #pickupPicker></mat-datepicker>
+              <input matInput formControlName="pickupDate">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Pickup Time</mat-label>
-              <input matInput type="time" formControlName="pickupTime">
+              <input matInput formControlName="pickupTime">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
@@ -157,7 +129,7 @@
 
             <mat-form-field appearance="outline" class="small-width">
               <mat-label>State</mat-label>
-              <input matInput formControlName="pickupState" maxlength="2">
+              <input matInput formControlName="pickupState">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="small-width">
@@ -172,20 +144,18 @@
           </mat-form-field>
         </div>
 
-        <!-- 5. Delivery -->
+        <!-- 4. Delivery -->
         <div class="form-section">
           <h3>Delivery</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Delivery Date</mat-label>
-              <input matInput [matDatepicker]="deliveryPicker" formControlName="deliveryDate" [min]="tripForm.get('pickupDate')?.value">
-              <mat-datepicker-toggle matSuffix [for]="deliveryPicker"></mat-datepicker-toggle>
-              <mat-datepicker #deliveryPicker></mat-datepicker>
+              <input matInput formControlName="deliveryDate">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
               <mat-label>Delivery Time</mat-label>
-              <input matInput type="time" formControlName="deliveryTime">
+              <input matInput formControlName="deliveryTime">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="quarter-width">
@@ -212,7 +182,7 @@
 
             <mat-form-field appearance="outline" class="small-width">
               <mat-label>State</mat-label>
-              <input matInput formControlName="deliveryState" maxlength="2">
+              <input matInput formControlName="deliveryState">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="small-width">
@@ -227,85 +197,81 @@
           </mat-form-field>
         </div>
 
-        <!-- 6. Mileage -->
+        <!-- 5. Mileage -->
         <div class="form-section">
           <h3>Mileage</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Loaded Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="mileageOrder">
+              <input matInput formControlName="mileageOrder">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Empty Miles</mat-label>
-              <input matInput type="number" step="0.1" formControlName="mileageEmpty">
+              <input matInput formControlName="mileageEmpty">
             </mat-form-field>
           </div>
         </div>
 
-        <!-- 7. Finances -->
+        <!-- 6. Finances (Carrier view — no admin/dispatcher/order rates, no lumper/detention) -->
         <div class="form-section">
           <h3>Finances</h3>
 
           <div class="form-row">
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Order Rate ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="orderRate">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Lumper Fees ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="lumperValue">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="third-width">
-              <mat-label>Detention Fees ($)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="detentionValue">
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Admin Rate (%)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="adminRate">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Admin Payment ($)</mat-label>
-              <input matInput formControlName="adminPayment" readonly>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Dispatcher Rate (%)</mat-label>
-              <input matInput type="number" step="0.01" formControlName="dispatcherRate">
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Dispatcher Payment ($)</mat-label>
-              <input matInput formControlName="dispatcherPayment" readonly>
-            </mat-form-field>
-          </div>
-
-          <div class="form-row">
-            <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Carrier Rate (%)</mat-label>
-              <input matInput formControlName="carrierRate" readonly>
-            </mat-form-field>
-
             <mat-form-field appearance="outline" class="half-width">
               <mat-label>Carrier Payment ($)</mat-label>
-              <input matInput formControlName="carrierPayment" readonly>
+              <input matInput formControlName="carrierPayment">
             </mat-form-field>
           </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Fuel Avg Cost ($/gal)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="fuelGasAvgCost">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Fuel Avg Gal/Mile</mat-label>
+              <input matInput type="number" step="0.001" formControlName="fuelGasAvgGallxMil">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Fuel Cost ($)</mat-label>
+              <input matInput formControlName="fuelCost" readonly>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Driver Rate ($/mile)</mat-label>
+              <input matInput type="number" step="0.01" formControlName="driverRate">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Driver Payment ($)</mat-label>
+              <input matInput formControlName="driverPayment" readonly>
+            </mat-form-field>
+          </div>
+
+          <div class="profit-display" [class.profit-positive]="profitLoss >= 0" [class.profit-negative]="profitLoss < 0">
+            <span class="profit-label">Expected Profit/Loss</span>
+            <span class="profit-amount">{{ profitLoss.toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <!-- 7. Notes -->
+        <div class="form-section">
+          <h3>Notes</h3>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>General Notes</mat-label>
+            <textarea matInput formControlName="notes" rows="2"></textarea>
+          </mat-form-field>
         </div>
 
         <!-- Actions -->
         <div class="form-actions">
           <button mat-raised-button type="button" (click)="onCancel()" [disabled]="submitting">Cancel</button>
-          <button mat-raised-button color="primary" type="submit"
-                  [disabled]="submitting || loadingAssets">
+          <button mat-raised-button color="primary" type="submit" [disabled]="submitting">
             <mat-spinner *ngIf="submitting" diameter="20" class="button-spinner"></mat-spinner>
             <span *ngIf="!submitting">Update Order</span>
           </button>
@@ -313,4 +279,8 @@
       </form>
     </mat-card-content>
   </mat-card>
+</div>
+
+<div class="loading-state" *ngIf="loading">
+  <mat-spinner diameter="40"></mat-spinner>
 </div>

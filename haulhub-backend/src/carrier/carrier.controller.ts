@@ -58,6 +58,8 @@ export class CarrierController {
         ...filters,
         lastEvaluatedKey: paginationToken,
         includeAggregates: !paginationToken && filters.includeAggregates !== 'false',
+        includeDetailedAnalytics: filters.includeDetailedAnalytics === 'true',
+        returnAllOrders: filters.returnAllOrders === 'true',
       },
     );
   }

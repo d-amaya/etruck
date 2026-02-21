@@ -62,9 +62,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
     'pickupLocation',
     'dropoffLocation',
     'brokerName',
-    'truckId',
     'carrierId',
     'driverName',
+    'truckId',
     'revenue',
     'expenses',
     'profitLoss',
@@ -73,7 +73,7 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   trips: Order[] = [];
   totalTrips = 0;
-  pageSize = 25;
+  pageSize = 10;
   pageIndex = 0;
   loading = false;
   hasActiveFilters = false;
@@ -233,6 +233,9 @@ export class TripTableComponent implements OnInit, OnDestroy {
       
       // Update the dashboard state with the filtered trips for payment summary calculation
       this.dashboardState.updateFilteredOrders(this.trips);
+      
+      // Resolve entity names from orders
+      this.resolveEntityNames(this.trips);
     });
   }
 
@@ -244,6 +247,39 @@ export class TripTableComponent implements OnInit, OnDestroy {
   /**
    * Get broker name from ID
    */
+  private resolveEntityNames(trips: any[]): void {
+    const ids = new Set<string>();
+    for (const t of trips) {
+      if (t.driverId && !this.driverMap.has(t.driverId)) ids.add(t.driverId);
+      if (t.truckId && !this.truckMap.has(t.truckId)) ids.add(t.truckId);
+      if (t.trailerId && !this.trailerMap.has(t.trailerId)) ids.add(t.trailerId);
+      if (t.carrierId && !this.carrierMap.has(t.carrierId)) ids.add(t.carrierId);
+    }
+    const doRebuild = () => {
+      this.drivers = Array.from(this.driverMap.entries()).map(([id, d]) => ({ userId: id, name: d.name || id.substring(0, 8) })).sort((a, b) => a.name.localeCompare(b.name));
+      this.trucks = Array.from(this.truckMap.entries()).map(([id, t]) => ({ truckId: id, plate: t.plate || id.substring(0, 8) })).sort((a, b) => a.plate.localeCompare(b.plate));
+      this.carriers = Array.from(this.carrierMap.entries()).map(([id, c]) => ({ userId: id, name: c.name || id.substring(0, 8) })).sort((a, b) => a.name.localeCompare(b.name));
+    };
+    if (ids.size === 0) { doRebuild(); return; }
+    this.assetCache.resolveEntities(Array.from(ids)).subscribe(entities => {
+      for (const e of entities) {
+        if (e.type === 'driver' || e.type === 'user') this.driverMap.set(e.id, { name: e.name });
+        else if (e.type === 'truck') this.truckMap.set(e.id, { plate: e.name });
+        else if (e.type === 'trailer') this.trailerMap.set(e.id, { plate: e.name });
+        else if (e.type === 'carrier') this.carrierMap.set(e.id, { name: e.name });
+        else {
+          for (const t of trips) {
+            if (t.driverId === e.id) this.driverMap.set(e.id, { name: e.name });
+            if (t.truckId === e.id) this.truckMap.set(e.id, { plate: e.name });
+            if (t.trailerId === e.id) this.trailerMap.set(e.id, { plate: e.name });
+            if (t.carrierId === e.id) this.carrierMap.set(e.id, { name: e.name });
+          }
+        }
+      }
+      doRebuild();
+    });
+  }
+
   getBrokerName(brokerId: string): string {
     return this.brokerMap.get(brokerId)?.brokerName || brokerId.substring(0, 8);
   }
@@ -459,6 +495,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
     const cached = this.dashboardState.getCachedTrips(filters, pagination);
     if (cached) {
       this.loading = false;
+      // Restore pageTokens from cached data so pagination works
+      if (cached.lastEvaluatedKey && pagination.page === 0) {
+        this.dashboardState.updatePaginationSilent({ pageTokens: [cached.lastEvaluatedKey] });
+      }
       return of(cached);
     }
 
@@ -471,6 +511,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
     if (needsAggregates) {
       (apiFilters as any).includeAggregates = true;
+      // Only request detailed analytics if not already cached
+      const hasCachedAnalytics = this.dashboardState.getCachedAnalytics(filters.dateRange.startDate, filters.dateRange.endDate);
+      if (!hasCachedAnalytics) {
+        (apiFilters as any).includeDetailedAnalytics = true;
+      }
     }
 
     const apiCall$: Observable<any> = this.orderService.getOrders(apiFilters);
@@ -479,6 +524,16 @@ export class TripTableComponent implements OnInit, OnDestroy {
       map((response: any) => {
         this.loading = false;
         const trips = response.orders;
+
+        // Cache analytics and payment data for other views
+        if (needsAggregates && response.detailedAnalytics) {
+          const analyticsData = { ...response.detailedAnalytics, paymentReport: response.paymentReport, entityIds: response.entityIds || [] };
+          this.dashboardState.setCachedAnalytics(filters.dateRange.startDate, filters.dateRange.endDate, analyticsData);
+        }
+        if (needsAggregates && response.paymentReport) {
+          const paymentData = { ...response.paymentReport, entityIds: response.entityIds || [] };
+          this.dashboardState.setCachedPaymentReport(filters.dateRange.startDate, filters.dateRange.endDate, paymentData);
+        }
         
         // Backend handles all filtering - just sort the results
         const sortedTrips = trips.sort((a: any, b: any) => {
@@ -752,27 +807,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
 
   getStatusLabel(status: OrderStatus | string): string {
     if (!status) return '';
-    // Handle both OrderStatus enum and string literals
-    const statusStr = typeof status === 'string' ? status : status;
-    
-    switch (statusStr) {
-      case OrderStatus.Scheduled:
-      case 'Scheduled':
-        return 'Scheduled';
-      case OrderStatus.PickingUp:
-      case 'Picked Up':
-        return 'Picked Up';
-      case OrderStatus.Transit:
-      case 'In Transit':
-        return 'In Transit';
-      case OrderStatus.Delivered:
-      case 'Delivered':
-        return 'Delivered';
-      case OrderStatus.ReadyToPay:
-      case 'Paid':
-        return 'Paid';
-      default:
-        return String(status);
+    switch (status) {
+      case 'PickingUp': return 'Picking Up';
+      case 'WaitingRC': return 'Waiting RC';
+      case 'ReadyToPay': return 'Ready to Pay';
+      default: return String(status);
     }
   }
 
@@ -831,13 +870,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
     if (filters.driverId) apiFilters.driverId = filters.driverId;
     if (filters.carrierId) apiFilters.carrierId = filters.carrierId;
 
-    this.orderService.getOrders(apiFilters).subscribe({
-      next: (data: any) => {
-        const allTrips = data.orders || [];
-        const brokerMap = new Map((data.assets?.brokers || []).map((b: any) => [b.brokerId, b.brokerName]));
-        const driverMap = new Map((data.assets?.drivers || []).map((d: any) => [d.userId, d.name]));
-        const truckMap = new Map((data.assets?.trucks || []).map((t: any) => [t.truckId, t.plate]));
-        const headers = ['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Truck', 'Truck Owner', 'Driver', 'Revenue', 'Expenses', 'Profit/Loss'];
+    this.orderService.getOrders({ ...apiFilters, includeAggregates: true, returnAllOrders: true } as any).subscribe({
+      next: (response: any) => {
+        const allTrips = response.orders || [];
+        const headers = ['Status', 'Date', 'Pickup', 'Dropoff', 'Broker', 'Carrier', 'Driver', 'Truck', 'Revenue', 'Expenses', 'Profit/Loss'];
         const rows = allTrips.map((t: any) => {
           const expenses = (t.driverPayment || 0) + (t.dispatcherPayment || 0) + (t.carrierPayment || 0) + (t.fuelCost || 0) + (t.lumperValue || 0) + (t.detentionValue || 0);
           const profit = (t.orderRate || 0) - expenses;
@@ -847,10 +883,10 @@ export class TripTableComponent implements OnInit, OnDestroy {
             t.scheduledTimestamp?.split('T')[0] || '',
             `${t.pickupCity || ''}, ${t.pickupState || ''}`,
             `${t.deliveryCity || ''}, ${t.deliveryState || ''}`,
-            brokerMap.get(t.brokerId) || t.brokerId,
-            truckMap.get(t.truckId) || t.truckId,
+            this.getBrokerName(t.brokerId),
             ownerName,
-            driverMap.get(t.driverId) || t.driverId,
+            this.getDriverName(t.driverId),
+            this.getTruckDisplay(t.truckId),
             t.orderRate || 0,
             expenses,
             profit

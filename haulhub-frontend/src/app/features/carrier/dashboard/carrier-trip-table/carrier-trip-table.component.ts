@@ -208,6 +208,10 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     const cached = this.filterService.getCachedTrips(filters, pagination);
     if (cached) {
       this.loading = false;
+      // Restore pageTokens from cached data so pagination works
+      if (cached.lastEvaluatedKey && pagination.page === 0) {
+        this.dashboardState.updatePaginationSilent({ pageTokens: [cached.lastEvaluatedKey] });
+      }
       return of(cached);
     }
 
@@ -247,12 +251,26 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     
     // Page 0: unified endpoint with aggregates
     // Page N: trips only endpoint
+    if (needsAggregates && !this.filterService.getCachedAnalytics(filters.dateRange.startDate, filters.dateRange.endDate)) {
+      apiFilters.includeDetailedAnalytics = 'true';
+    }
     const apiCall$ = needsAggregates
       ? this.carrierService.getDashboardUnified(apiFilters)
       : this.carrierService.getTrips(apiFilters);
 
     return apiCall$.pipe(
-      tap(result => this.filterService.setCachedTrips(filters, pagination, result))
+      tap(result => {
+        this.filterService.setCachedTrips(filters, pagination, result);
+        // Cache analytics and payment data for other views
+        if (needsAggregates && (result as any).detailedAnalytics) {
+          const analyticsData = { ...(result as any).detailedAnalytics, paymentReport: (result as any).paymentReport, entityIds: (result as any).entityIds || [] };
+          this.filterService.setCachedAnalytics(filters.dateRange.startDate, filters.dateRange.endDate, analyticsData);
+        }
+        if (needsAggregates && (result as any).paymentReport) {
+          const paymentData = { ...(result as any).paymentReport, entityIds: (result as any).entityIds || [] };
+          this.filterService.setCachedPaymentReport(filters.dateRange.startDate, filters.dateRange.endDate, paymentData);
+        }
+      })
     );
   }
 
@@ -288,6 +306,10 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   viewTrip(trip: Order): void {
     this.router.navigate(['/carrier/orders', trip.orderId]);
+  }
+
+  editTrip(trip: Order): void {
+    this.router.navigate(['/carrier/orders', trip.orderId, 'edit']);
   }
 
   createTrip(): void {
@@ -499,9 +521,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   exportPDF(): void {
     const apiFilters = this.buildExportFilters();
-    this.carrierService.getTrips(apiFilters).subscribe({
+    this.carrierService.getDashboardUnified({ ...apiFilters, returnAllOrders: 'true' }).subscribe({
       next: (res: any) => {
-        const allTrips = res.trips || res || [];
+        const allTrips = res.trips || [];
         this.generatePDF(allTrips);
       }
     });

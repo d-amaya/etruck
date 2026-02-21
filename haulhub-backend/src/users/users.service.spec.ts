@@ -72,7 +72,7 @@ describe('UsersService — v2 Methods', () => {
       });
 
       const result = await service.resolveEntities(['t1']);
-      expect(result['t1']).toEqual({ name: 'ABC-123', type: 'truck' });
+      expect(result['t1']).toEqual({ name: 'ABC-123', type: 'truck', plate: 'ABC-123', brand: 'Peterbilt', year: undefined });
     });
 
     it('should return Unknown for non-existent UUIDs', async () => {

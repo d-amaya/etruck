@@ -77,4 +77,10 @@ export class CarrierDashboardStateService {
     this.filtersSubject.next(defaultFilters);
     this.paginationSubject.next(defaultPagination);
   }
+
+  /** Force re-emit to trigger data reload */
+  invalidateAndReload(): void {
+    const current = this.paginationSubject.value;
+    this.paginationSubject.next({ ...current, _refresh: Date.now() } as any);
+  }
 }

@@ -291,17 +291,18 @@ export class AuthService {
    */
   private clearUserData(): void {
     try {
-      localStorage.removeItem(this.USER_DATA_KEY);
-      localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-      localStorage.removeItem('etrucky_dispatcher_asset_cache');
-      localStorage.removeItem('etrucky_carrier_asset_cache');
-      localStorage.removeItem('etrucky_driver_asset_cache');
+      // Clear all etrucky keys
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('etrucky_') || key === this.USER_DATA_KEY || key === this.ACCESS_TOKEN_KEY || key === this.REFRESH_TOKEN_KEY)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
     } catch (error) {
       console.error('Error clearing user data:', error);
     }
-
-    // Update subject
     this.currentUserSubject.next(null);
   }
 

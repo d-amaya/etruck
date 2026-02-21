@@ -36,6 +36,11 @@
   </div>
 
   <!-- Summary Cards (Always Visible) -->
+  <div class="info-banner" *ngIf="!isLoading && !error">
+    <mat-icon>info</mat-icon>
+    <span>Canceled orders are excluded from all analytics calculations.</span>
+  </div>
+
   <div *ngIf="!error" class="summary-cards">
     <div *ngFor="let kpi of kpiCards" class="summary-card" [class]="'card-' + kpi.color">
       <div class="card-icon">
