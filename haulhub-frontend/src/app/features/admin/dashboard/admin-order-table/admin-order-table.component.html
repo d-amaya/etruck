@@ -38,6 +38,17 @@
       <div class="spacer"></div>
 
       <div class="action-buttons-group">
+        <button mat-icon-button [matMenuTriggerFor]="exportMenu" type="button" matTooltip="Export" class="action-btn export-btn">
+          <mat-icon>download</mat-icon>
+        </button>
+        <mat-menu #exportMenu="matMenu">
+          <button mat-menu-item (click)="exportPDF()">
+            <mat-icon>picture_as_pdf</mat-icon> Export PDF
+          </button>
+          <button mat-menu-item (click)="exportCSV()">
+            <mat-icon>grid_on</mat-icon> Export Excel
+          </button>
+        </mat-menu>
         <button mat-icon-button (click)="clearAllFilters()" type="button" matTooltip="Clear all filters" class="action-btn clear-btn">
           <mat-icon>filter_alt_off</mat-icon>
         </button>
@@ -105,15 +116,15 @@
         <td mat-cell *matCellDef="let order">{{ getDispatcherName(order.dispatcherId) }}</td>
       </ng-container>
 
-      <!-- Order Rate -->
+      <!-- Revenue -->
       <ng-container matColumnDef="orderRate">
-        <th mat-header-cell *matHeaderCellDef class="numeric">Order Rate</th>
+        <th mat-header-cell *matHeaderCellDef class="numeric">Revenue</th>
         <td mat-cell *matCellDef="let order" class="numeric">{{ formatCurrency(order.orderRate || 0) }}</td>
       </ng-container>
 
-      <!-- Admin Profit -->
+      <!-- Profit -->
       <ng-container matColumnDef="adminProfit">
-        <th mat-header-cell *matHeaderCellDef class="numeric">Admin Profit</th>
+        <th mat-header-cell *matHeaderCellDef class="numeric">Profit</th>
         <td mat-cell *matCellDef="let order" class="numeric">
           <span [class.positive-profit]="calculateAdminProfit(order) >= 0"
                 [class.negative-profit]="calculateAdminProfit(order) < 0">
@@ -127,29 +138,9 @@
         <th mat-header-cell *matHeaderCellDef>Actions</th>
         <td mat-cell *matCellDef="let order">
           <div class="action-buttons">
-            <button mat-icon-button class="action-btn view-btn" (click)="viewOrder(order)" matTooltip="View order">
-              <mat-icon>visibility</mat-icon>
+            <button mat-icon-button class="action-btn edit-btn" (click)="editOrder(order)" matTooltip="Edit order">
+              <mat-icon>edit</mat-icon>
             </button>
-
-            <!-- Inline dispatcher rate edit -->
-            <ng-container *ngIf="editingOrderId !== order.orderId">
-              <button mat-icon-button class="action-btn edit-btn" (click)="startEdit(order)" matTooltip="Edit dispatcher rate">
-                <mat-icon>edit</mat-icon>
-              </button>
-            </ng-container>
-            <ng-container *ngIf="editingOrderId === order.orderId">
-              <mat-form-field appearance="outline" class="inline-edit-field">
-                <input matInput type="number" [(ngModel)]="editDispatcherRate" min="0" max="10" step="0.5"
-                       [ngModelOptions]="{standalone: true}">
-                <span matSuffix>%</span>
-              </mat-form-field>
-              <button mat-icon-button class="action-btn" (click)="saveDispatcherRate(order)" matTooltip="Save">
-                <mat-icon>check</mat-icon>
-              </button>
-              <button mat-icon-button class="action-btn" (click)="cancelEdit()" matTooltip="Cancel">
-                <mat-icon>close</mat-icon>
-              </button>
-            </ng-container>
           </div>
         </td>
       </ng-container>

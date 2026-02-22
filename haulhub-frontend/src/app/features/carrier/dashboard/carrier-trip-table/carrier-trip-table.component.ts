@@ -112,6 +112,10 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Restore filter form from state
+    const cf = this.dashboardState.getCurrentFilters();
+    this.filterForm.patchValue({ status: cf.status || null, dispatcherId: cf.dispatcherId || null, driverId: cf.driverId || null, truckId: cf.truckId || null }, { emitEvent: false });
+
     // Load assets from cache
     this.assetCache.loadAssets().pipe(
       takeUntil(this.destroy$)
@@ -524,12 +528,12 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     this.carrierService.getDashboardUnified({ ...apiFilters, returnAllOrders: 'true' }).subscribe({
       next: (res: any) => {
         const allTrips = res.trips || [];
-        this.generatePDF(allTrips);
+        this.generatePDF(allTrips, res.chartAggregates);
       }
     });
   }
 
-  private generatePDF(allTrips: any[]): void {
+  private generatePDF(allTrips: any[], chartAggregates?: any): void {
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();
     const primaryBlue: [number, number, number] = [25, 118, 210];
@@ -576,9 +580,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
     }
     
     // Summary cards
-    const response = this.lastDashboardResponse;
-    if (response?.chartAggregates) {
-      const payment = response.chartAggregates.paymentSummary;
+    const aggregates = chartAggregates || this.lastDashboardResponse?.chartAggregates;
+    if (aggregates) {
+      const payment = aggregates.paymentSummary;
       const cardWidth = (pageWidth - 28 - 30) / 4;
       const cardHeight = 25;
       const cardGap = 10;
@@ -624,9 +628,9 @@ export class CarrierTripTableComponent implements OnInit, OnDestroy {
 
   exportCSV(): void {
     const apiFilters = this.buildExportFilters();
-    this.carrierService.getTrips(apiFilters).subscribe({
+    this.carrierService.getDashboardUnified({ ...apiFilters, returnAllOrders: 'true' }).subscribe({
       next: (res: any) => {
-        const allTrips = res.trips || res || [];
+        const allTrips = res.trips || [];
         const headers = ['Status', 'Date', 'Pickup', 'Delivery', 'Dispatcher', 'Driver', 'Truck', 'Trailer', 'Revenue', 'Expenses', 'Profit'];
         const rows = allTrips.map((t: any) => this.buildExportRow(t));
         const df = this.filterService.getCurrentFilter();

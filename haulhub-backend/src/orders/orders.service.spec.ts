@@ -137,8 +137,8 @@ describe('OrdersService', () => {
       mockSend.mockResolvedValueOnce({
         Attributes: {
           orderId: 'order-1', adminId: 'admin-1',
-          dispatcherRate: 7, adminRate: 3,
-          adminPayment: 150, dispatcherPayment: 350,
+          dispatcherRate: 7, adminRate: 5,
+          adminPayment: 250, dispatcherPayment: 350, carrierPayment: 4400,
         },
       });
 
@@ -149,9 +149,10 @@ describe('OrdersService', () => {
       // Verify the UpdateCommand was called with correct recalculated values
       const updateCall = mockSend.mock.calls[1][0];
       const exprValues = updateCall.input.ExpressionAttributeValues;
-      expect(exprValues[':adminRate']).toBe(3); // 10 - 7
-      expect(exprValues[':adminPayment']).toBe(150); // 5000 * 3 / 100
+      expect(exprValues[':adminRate']).toBe(5); // unchanged from current
+      expect(exprValues[':adminPayment']).toBe(250); // 5000 * 5 / 100
       expect(exprValues[':dispatcherPayment']).toBe(350); // 5000 * 7 / 100
+      expect(exprValues[':carrierPayment']).toBe(4400); // 5000 - 250 - 350
     });
 
     it('should recalculate driverPayment when driverRate changes', async () => {
@@ -211,9 +212,75 @@ describe('OrdersService', () => {
         brokerLoad: 'BL-001',
         scheduledTimestamp: '2026-02-20T10:00:00Z',
         orderRate: 5000,
+        adminPayment: 250,
+        dispatcherPayment: 250,
+        carrierPayment: 4500,
       } as any);
 
-      expect(result.carrierPayment).toBe(4500); // 5000 * 0.9
+      expect(result.carrierPayment).toBe(4500);
+    });
+  });
+
+  // ── computePaymentSummary — groupedByDispatcher ────────────
+
+  describe('computePaymentSummary - groupedByDispatcher', () => {
+    const orders = [
+      { orderId: 'o1', orderStatus: 'Delivered', dispatcherId: 'd1', brokerId: 'b1', carrierId: 'c1', driverId: 'dr1', orderRate: 5000, carrierPayment: 4500, driverPayment: 275, adminPayment: 250, lumperValue: 50, detentionValue: 25 },
+      { orderId: 'o2', orderStatus: 'Scheduled', dispatcherId: 'd1', brokerId: 'b1', carrierId: 'c1', driverId: 'dr1', orderRate: 3000, carrierPayment: 2700, driverPayment: 165, adminPayment: 150, lumperValue: 0, detentionValue: 0 },
+      { orderId: 'o3', orderStatus: 'Delivered', dispatcherId: 'd2', brokerId: 'b2', carrierId: 'c1', driverId: 'dr1', orderRate: 4000, carrierPayment: 3600, driverPayment: 220, adminPayment: 200, lumperValue: 30, detentionValue: 0 },
+      { orderId: 'o4', orderStatus: 'Canceled', dispatcherId: 'd1', brokerId: 'b1', carrierId: 'c1', driverId: 'dr1', orderRate: 1000, carrierPayment: 900, driverPayment: 55, adminPayment: 50, lumperValue: 0, detentionValue: 0 },
+    ] as any[];
+
+    it('should return groupedByDispatcher with orderRate totals', () => {
+      const result = (service as any).computePaymentSummary(orders, UserRole.Admin);
+      expect(result.groupedByDispatcher).toBeDefined();
+      expect(result.groupedByDispatcher['d1']).toEqual({ totalPayment: 8000, tripCount: 2 });
+      expect(result.groupedByDispatcher['d2']).toEqual({ totalPayment: 4000, tripCount: 1 });
+    });
+
+    it('should return groupedByDispatcher for all roles', () => {
+      for (const role of [UserRole.Admin, UserRole.Dispatcher, UserRole.Carrier, UserRole.Driver]) {
+        const result = (service as any).computePaymentSummary(orders, role);
+        expect(result.groupedByDispatcher).toBeDefined();
+      }
+    });
+
+    it('should exclude canceled orders from groupedByDispatcher', () => {
+      const result = (service as any).computePaymentSummary(orders, UserRole.Admin);
+      expect(result.groupedByDispatcher['d1'].tripCount).toBe(2);
+    });
+  });
+
+  // ── computeDetailedAnalytics — brokerAnalytics role-aware ───
+
+  describe('computeDetailedAnalytics - brokerAnalytics revenue', () => {
+    const orders = [
+      { orderId: 'o1', orderStatus: 'Delivered', brokerId: 'b1', dispatcherId: 'd1', carrierId: 'c1', driverId: 'dr1', truckId: 't1', orderRate: 5000, carrierPayment: 4500, driverPayment: 275, adminPayment: 250, dispatcherPayment: 250, fuelCost: 100, lumperValue: 50, detentionValue: 25, mileageTotal: 500, mileageOrder: 500, fuelGasAvgGallxMil: 0.15, fuelGasAvgCost: 3.5 },
+      { orderId: 'o2', orderStatus: 'Scheduled', brokerId: 'b1', dispatcherId: 'd1', carrierId: 'c1', driverId: 'dr1', truckId: 't1', orderRate: 3000, carrierPayment: 2700, driverPayment: 165, adminPayment: 150, dispatcherPayment: 150, fuelCost: 60, lumperValue: 0, detentionValue: 0, mileageTotal: 300, mileageOrder: 300, fuelGasAvgGallxMil: 0.15, fuelGasAvgCost: 3.5 },
+    ] as any[];
+
+    it('should use adminPayment for brokerAnalytics revenue when role is Admin', () => {
+      const result = (service as any).computeDetailedAnalytics(orders, UserRole.Admin);
+      const broker = result.brokerAnalytics.find((b: any) => b.brokerId === 'b1');
+      expect(broker.totalRevenue).toBe(400); // 250 + 150
+    });
+
+    it('should use carrierPayment for brokerAnalytics revenue when role is Carrier', () => {
+      const result = (service as any).computeDetailedAnalytics(orders, UserRole.Carrier);
+      const broker = result.brokerAnalytics.find((b: any) => b.brokerId === 'b1');
+      expect(broker.totalRevenue).toBe(7200); // 4500 + 2700
+    });
+
+    it('should use dispatcherPayment for brokerAnalytics revenue when role is Dispatcher', () => {
+      const result = (service as any).computeDetailedAnalytics(orders, UserRole.Dispatcher);
+      const broker = result.brokerAnalytics.find((b: any) => b.brokerId === 'b1');
+      expect(broker.totalRevenue).toBe(400); // 250 + 150
+    });
+
+    it('should use driverPayment for brokerAnalytics revenue when role is Driver', () => {
+      const result = (service as any).computeDetailedAnalytics(orders, UserRole.Driver);
+      const broker = result.brokerAnalytics.find((b: any) => b.brokerId === 'b1');
+      expect(broker.totalRevenue).toBe(440); // 275 + 165
     });
   });
 

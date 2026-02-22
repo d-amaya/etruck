@@ -1,0 +1,152 @@
+<div class="payment-report-container">
+  <!-- Export Button -->
+  <div class="page-header">
+    <div class="header-actions">
+      <button mat-raised-button color="primary" [matMenuTriggerFor]="exportMenu" [disabled]="loading || !report">
+        <mat-icon>download</mat-icon>
+        Export
+      </button>
+      <mat-menu #exportMenu="matMenu">
+        <button mat-menu-item (click)="onExportData()">
+          <mat-icon>picture_as_pdf</mat-icon> Export PDF
+        </button>
+        <button mat-menu-item (click)="onExportCSV()">
+          <mat-icon>grid_on</mat-icon> Export Excel
+        </button>
+      </mat-menu>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <!-- Report Content -->
+  <div *ngIf="!loading && report" class="report-content">
+    <div class="info-banner">
+      <mat-icon>info</mat-icon>
+      <span>Canceled orders are excluded from payment calculations.</span>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="summary-card income">
+        <div class="card-icon">
+          <mat-icon>receipt_long</mat-icon>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Total Orders</span>
+          <span class="card-value">{{ report.orderCount || 0 }}</span>
+        </div>
+      </div>
+
+      <div class="summary-card income">
+        <div class="card-icon">
+          <mat-icon>attach_money</mat-icon>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Total Revenue</span>
+          <span class="card-value">{{ formatCurrency(report.totalOrderRate || 0) }}</span>
+        </div>
+      </div>
+
+      <div class="summary-card income">
+        <div class="card-icon">
+          <mat-icon>payments</mat-icon>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Admin Earnings</span>
+          <span class="card-value">{{ formatCurrency(report.totalAdminPayment || 0) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabbed Views -->
+    <mat-tab-group class="report-tabs" [selectedIndex]="activeTabIndex" (selectedIndexChange)="onTabChange($event)">
+      <!-- By Dispatcher Tab -->
+      <mat-tab label="By Dispatcher">
+        <div class="tab-content">
+          <div class="data-table" *ngIf="enrichedDispatcherData.length > 0">
+            <table mat-table [dataSource]="enrichedDispatcherData" class="analytics-table">
+              <ng-container matColumnDef="dispatcherName">
+                <th mat-header-cell *matHeaderCellDef>Dispatcher Name</th>
+                <td mat-cell *matCellDef="let el">{{ el.dispatcherName }}</td>
+              </ng-container>
+              <ng-container matColumnDef="totalPayment">
+                <th mat-header-cell *matHeaderCellDef>Total Revenue</th>
+                <td mat-cell *matCellDef="let el">{{ formatCurrency(el.totalPayment) }}</td>
+              </ng-container>
+              <ng-container matColumnDef="tripCount">
+                <th mat-header-cell *matHeaderCellDef>Order Count</th>
+                <td mat-cell *matCellDef="let el">{{ el.tripCount }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="dispatcherColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: dispatcherColumns;"></tr>
+            </table>
+          </div>
+          <div *ngIf="enrichedDispatcherData.length === 0" class="no-data">
+            <mat-icon>person</mat-icon>
+            <p>No dispatcher data available for the selected period</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- By Broker Tab -->
+      <mat-tab label="By Broker">
+        <div class="tab-content">
+          <div class="data-table" *ngIf="enrichedBrokerData.length > 0">
+            <table mat-table [dataSource]="enrichedBrokerData" class="analytics-table">
+              <ng-container matColumnDef="brokerName">
+                <th mat-header-cell *matHeaderCellDef>Broker Name</th>
+                <td mat-cell *matCellDef="let el">{{ el.brokerName }}</td>
+              </ng-container>
+              <ng-container matColumnDef="totalPayment">
+                <th mat-header-cell *matHeaderCellDef>Total Revenue</th>
+                <td mat-cell *matCellDef="let el">{{ formatCurrency(el.totalPayment) }}</td>
+              </ng-container>
+              <ng-container matColumnDef="tripCount">
+                <th mat-header-cell *matHeaderCellDef>Order Count</th>
+                <td mat-cell *matCellDef="let el">{{ el.tripCount }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="brokerColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: brokerColumns;"></tr>
+            </table>
+          </div>
+          <div *ngIf="enrichedBrokerData.length === 0" class="no-data">
+            <mat-icon>business</mat-icon>
+            <p>No broker data available for the selected period</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- By Carrier Tab -->
+      <mat-tab label="By Carrier">
+        <div class="tab-content">
+          <div class="data-table" *ngIf="enrichedCarrierData.length > 0">
+            <table mat-table [dataSource]="enrichedCarrierData" class="analytics-table">
+              <ng-container matColumnDef="carrierName">
+                <th mat-header-cell *matHeaderCellDef>Carrier Name</th>
+                <td mat-cell *matCellDef="let el">{{ el.carrierName }}</td>
+              </ng-container>
+              <ng-container matColumnDef="totalPayment">
+                <th mat-header-cell *matHeaderCellDef>Carrier Payment</th>
+                <td mat-cell *matCellDef="let el">{{ formatCurrency(el.totalPayment) }}</td>
+              </ng-container>
+              <ng-container matColumnDef="tripCount">
+                <th mat-header-cell *matHeaderCellDef>Order Count</th>
+                <td mat-cell *matCellDef="let el">{{ el.tripCount }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="carrierColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: carrierColumns;"></tr>
+            </table>
+          </div>
+          <div *ngIf="enrichedCarrierData.length === 0" class="no-data">
+            <mat-icon>local_shipping</mat-icon>
+            <p>No carrier data available for the selected period</p>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>

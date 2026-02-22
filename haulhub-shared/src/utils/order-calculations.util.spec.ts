@@ -37,14 +37,14 @@ function makeOrder(overrides: Partial<Order> = {}): Partial<Order> {
 
 describe('Order Calculations Utility', () => {
   describe('calcAdminProfit', () => {
-    it('should calculate adminPayment - lumper - detention', () => {
+    it('should return adminPayment directly', () => {
       const order = makeOrder();
-      expect(calcAdminProfit(order)).toBe(125); // 250 - 50 - 75
+      expect(calcAdminProfit(order)).toBe(250);
     });
 
-    it('should handle missing fees', () => {
-      const order = makeOrder({ lumperValue: undefined, detentionValue: undefined });
-      expect(calcAdminProfit(order)).toBe(250);
+    it('should handle missing adminPayment', () => {
+      const order = makeOrder({ adminPayment: undefined });
+      expect(calcAdminProfit(order)).toBe(0);
     });
   });
 

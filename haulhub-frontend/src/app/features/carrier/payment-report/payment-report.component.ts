@@ -14,6 +14,7 @@ import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { CarrierService } from '../../../core/services/carrier.service';
 type DispatcherPaymentReport = any;
 import { CarrierFilterService } from '../shared/carrier-filter.service';
+import { CarrierDashboardStateService } from '../shared/carrier-dashboard-state.service';
 import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -61,6 +62,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
     private snackBar: MatSnackBar,
     private excelExportService: ExcelExportService,
     private filterService: CarrierFilterService,
+    private dashboardState: CarrierDashboardStateService,
     private assetCache: CarrierAssetCacheService
   ) {}
 
@@ -142,7 +144,8 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
 
     // Cache miss — fetch via unified endpoint
     this.loading = true;
-    const apiFilters: any = { includeDetailedAnalytics: 'true', limit: 10 };
+    const currentPageSize = (this.dashboardState as any).paginationSubject?.value?.pageSize || 10;
+    const apiFilters: any = { includeDetailedAnalytics: 'true', limit: currentPageSize };
     if (filters.startDate) {
       const d = filters.startDate;
       apiFilters.startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00.000Z`;
@@ -167,7 +170,7 @@ export class CarrierPaymentReportComponent implements OnInit, OnDestroy {
         const trips = response.trips || [];
         if (trips.length) {
           const defaultFilters = { dateRange: { startDate: filters.startDate, endDate: filters.endDate }, status: null, truckId: null, driverId: null, dispatcherId: null } as any;
-          const defaultPagination = { page: 0, pageSize: 10, pageTokens: response.lastEvaluatedKey ? [response.lastEvaluatedKey] : [] };
+          const defaultPagination = { page: 0, pageSize: currentPageSize, pageTokens: response.lastEvaluatedKey ? [response.lastEvaluatedKey] : [] };
           this.filterService.setCachedTrips(defaultFilters, defaultPagination, {
             chartAggregates: response.chartAggregates || {}, trips,
             entityIds: response.entityIds, lastEvaluatedKey: response.lastEvaluatedKey

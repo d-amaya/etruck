@@ -1,0 +1,182 @@
+<div class="analytics-dashboard">
+  <!-- Header with Actions -->
+  <div class="page-header" style="justify-content: flex-end;">
+    <div class="header-actions">
+      <button mat-raised-button color="primary" [matMenuTriggerFor]="exportMenu">
+        <mat-icon>download</mat-icon>
+        Export
+      </button>
+      <mat-menu #exportMenu="matMenu">
+        <button mat-menu-item (click)="onExportData()">
+          <mat-icon>picture_as_pdf</mat-icon> Export PDF
+        </button>
+        <button mat-menu-item (click)="onExportCSV()">
+          <mat-icon>grid_on</mat-icon> Export Excel
+        </button>
+      </mat-menu>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading analytics data...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading" class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error }}</p>
+    <button mat-raised-button color="primary" (click)="onRefresh()">Try Again</button>
+  </div>
+
+  <!-- Info Banner -->
+  <div class="info-banner" *ngIf="!isLoading && !error">
+    <mat-icon>info</mat-icon>
+    <span>Canceled orders are excluded from all analytics calculations.</span>
+  </div>
+
+  <!-- Summary Cards -->
+  <div *ngIf="!error" class="summary-cards">
+    <div *ngFor="let kpi of kpiCards" class="summary-card" [class]="'card-' + kpi.color">
+      <div class="card-icon">
+        <mat-icon>{{ kpi.icon }}</mat-icon>
+      </div>
+      <div class="card-content">
+        <span class="card-label">{{ kpi.title }}</span>
+        <span class="card-value">{{ kpi.value }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <mat-tab-group *ngIf="!isLoading && !error" class="charts-section" (selectedIndexChange)="onTabChange($event)" [selectedIndex]="selectedTabIndex">
+
+    <!-- Dispatcher Performance Tab -->
+    <mat-tab label="Dispatcher Performance">
+      <div class="tab-content">
+        <mat-card class="chart-card">
+          <mat-card-content>
+            <div *ngIf="dispatcherPerformanceData.length > 0" class="data-table">
+              <table class="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Dispatcher Name</th>
+                    <th>Total Orders</th>
+                    <th>Completed</th>
+                    <th>Total Revenue</th>
+                    <th>Completion Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let d of dispatcherPerformanceData">
+                    <td>{{ d.dispatcherName }}</td>
+                    <td>{{ d.totalTrips }}</td>
+                    <td>{{ d.completedTrips }}</td>
+                    <td>{{ formatCurrency(d.totalRevenue) }}</td>
+                    <td>
+                      <span class="completion-badge" [class.high]="d.completionRate >= 90"
+                            [class.medium]="d.completionRate >= 70 && d.completionRate < 90"
+                            [class.low]="d.completionRate < 70">
+                        {{ d.completionRate | number:'1.0-0' }}%
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="no-data" *ngIf="dispatcherPerformanceData.length === 0">
+              <mat-icon>person</mat-icon>
+              <p>No dispatcher performance data available</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <!-- Broker Performance Tab -->
+    <mat-tab label="Broker Performance">
+      <div class="tab-content">
+        <mat-card class="chart-card">
+          <mat-card-content>
+            <div *ngIf="brokerPerformanceData.length > 0" class="data-table">
+              <table class="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Broker Name</th>
+                    <th>Total Orders</th>
+                    <th>Completed</th>
+                    <th>Total Revenue</th>
+                    <th>Completion Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let b of brokerPerformanceData">
+                    <td>{{ b.brokerName }}</td>
+                    <td>{{ b.totalTrips }}</td>
+                    <td>{{ b.completedTrips }}</td>
+                    <td>{{ formatCurrency(b.totalRevenue) }}</td>
+                    <td>
+                      <span class="completion-badge" [class.high]="b.completionRate >= 90"
+                            [class.medium]="b.completionRate >= 70 && b.completionRate < 90"
+                            [class.low]="b.completionRate < 70">
+                        {{ b.completionRate | number:'1.0-0' }}%
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="no-data" *ngIf="brokerPerformanceData.length === 0">
+              <mat-icon>business</mat-icon>
+              <p>No broker performance data available</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <!-- Carrier Performance Tab -->
+    <mat-tab label="Carrier Performance">
+      <div class="tab-content">
+        <mat-card class="chart-card">
+          <mat-card-content>
+            <div *ngIf="carrierPerformanceData.length > 0" class="data-table">
+              <table class="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Carrier Name</th>
+                    <th>Total Orders</th>
+                    <th>Completed</th>
+                    <th>Carrier Payment</th>
+                    <th>Completion Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of carrierPerformanceData">
+                    <td>{{ c.carrierName }}</td>
+                    <td>{{ c.totalTrips }}</td>
+                    <td>{{ c.completedTrips }}</td>
+                    <td>{{ formatCurrency(c.totalRevenue) }}</td>
+                    <td>
+                      <span class="completion-badge" [class.high]="c.completionRate >= 90"
+                            [class.medium]="c.completionRate >= 70 && c.completionRate < 90"
+                            [class.low]="c.completionRate < 70">
+                        {{ c.completionRate | number:'1.0-0' }}%
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="no-data" *ngIf="carrierPerformanceData.length === 0">
+              <mat-icon>local_shipping</mat-icon>
+              <p>No carrier performance data available</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

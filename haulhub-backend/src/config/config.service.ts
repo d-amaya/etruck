@@ -15,11 +15,11 @@ export class ConfigService {
   }
 
   get tripsTableName(): string {
-    return process.env.TRIPS_TABLE_NAME || 'eTrucky-Trips';
+    return process.env.ETRUCKY_ORDERS_TABLE || process.env.TRIPS_TABLE_NAME || 'eTruckyOrders';
   }
 
   get brokersTableName(): string {
-    return process.env.BROKERS_TABLE_NAME || 'eTrucky-Brokers';
+    return process.env.ETRUCKY_V2_BROKERS_TABLE || process.env.BROKERS_TABLE_NAME || 'eTruckyBrokers';
   }
 
   get lorriesTableName(): string {

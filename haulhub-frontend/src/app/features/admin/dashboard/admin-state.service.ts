@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest, Subject, of } from 'rxjs';
-import { distinctUntilChanged, debounceTime, tap, map, catchError } from 'rxjs/operators';
+import { distinctUntilChanged, debounceTime, tap, map, catchError, filter } from 'rxjs/operators';
 import { OrderStatus, Broker, Order } from '@haulhub/shared';
 import { OrderService } from '../../../core/services/order.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -36,7 +36,7 @@ export interface ErrorState {
 @Injectable({ providedIn: 'root' })
 export class AdminDashboardStateService {
   private filtersSubject = new BehaviorSubject<AdminDashboardFilters>(this.getDefaultFilters());
-  private paginationSubject = new BehaviorSubject<PaginationState>({ page: 0, pageSize: 25, pageTokens: [] });
+  private paginationSubject = new BehaviorSubject<PaginationState>({ page: 0, pageSize: 10, pageTokens: [] });
   private loadingSubject = new BehaviorSubject<LoadingState>({
     isLoading: false, isInitialLoad: false, isFilterUpdate: false, loadingMessage: 'Loading...'
   });
@@ -52,8 +52,7 @@ export class AdminDashboardStateService {
   public error$ = this.errorSubject.asObservable();
 
   public filtersAndPagination$ = combineLatest([this.filters$, this.pagination$]).pipe(
-    debounceTime(200),
-    distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))
+    debounceTime(200)
   );
 
   // Brokers
@@ -77,18 +76,26 @@ export class AdminDashboardStateService {
 
   // View caches
   private ordersCache: { data: any; key: string } | null = null;
+  private analyticsCache: { data: any; startKey: number | null; endKey: number | null } | null = null;
+  private paymentCache: { data: any; startKey: number | null; endKey: number | null } | null = null;
   private loadingTimeout: any;
 
   constructor(private orderService: OrderService, private authService: AuthService) {
     this.loadBrokers();
+    this.authService.currentUser$.pipe(filter(u => u === null)).subscribe(() => this.resetState());
+  }
+
+  resetState(): void {
+    this.filtersSubject.next(this.getDefaultFilters());
+    this.paginationSubject.next({ page: 0, pageSize: 10, pageTokens: [] });
+    this.invalidateViewCaches();
   }
 
   updateFilters(filters: Partial<AdminDashboardFilters>): void {
     const current = this.filtersSubject.value;
-    Promise.resolve().then(() => {
-      this.filtersSubject.next({ ...current, ...filters });
-      this.paginationSubject.next({ page: 0, pageSize: this.paginationSubject.value.pageSize, pageTokens: [] });
-    });
+    this.invalidateViewCaches();
+    this.filtersSubject.next({ ...current, ...filters });
+    this.paginationSubject.next({ page: 0, pageSize: this.paginationSubject.value.pageSize, pageTokens: [] });
     this.setLoadingState(true, false, true);
     this.clearError();
   }
@@ -109,7 +116,7 @@ export class AdminDashboardStateService {
 
   clearFilters(): void {
     this.filtersSubject.next(this.getDefaultFilters());
-    this.paginationSubject.next({ page: 0, pageSize: 25, pageTokens: [] });
+    this.paginationSubject.next({ page: 0, pageSize: 10, pageTokens: [] });
   }
 
   getCurrentFilters(): AdminDashboardFilters { return this.filtersSubject.value; }
@@ -138,7 +145,36 @@ export class AdminDashboardStateService {
   setCachedTrips(filters: AdminDashboardFilters, pagination: PaginationState, data: any): void {
     this.ordersCache = { data, key: this.tripsKey(filters, pagination) };
   }
-  invalidateViewCaches(): void { this.ordersCache = null; }
+
+  getCachedAnalytics(start: Date | null, end: Date | null): any | null {
+    if (!this.analyticsCache) return null;
+    if (this.analyticsCache.startKey === (start?.getTime() ?? null) &&
+        this.analyticsCache.endKey === (end?.getTime() ?? null)) {
+      return this.analyticsCache.data;
+    }
+    return null;
+  }
+  setCachedAnalytics(start: Date | null, end: Date | null, data: any): void {
+    this.analyticsCache = { data, startKey: start?.getTime() ?? null, endKey: end?.getTime() ?? null };
+  }
+
+  getCachedPaymentReport(start: Date | null, end: Date | null): any | null {
+    if (!this.paymentCache) return null;
+    if (this.paymentCache.startKey === (start?.getTime() ?? null) &&
+        this.paymentCache.endKey === (end?.getTime() ?? null)) {
+      return this.paymentCache.data;
+    }
+    return null;
+  }
+  setCachedPaymentReport(start: Date | null, end: Date | null, data: any): void {
+    this.paymentCache = { data, startKey: start?.getTime() ?? null, endKey: end?.getTime() ?? null };
+  }
+
+  invalidateViewCaches(): void {
+    this.ordersCache = null;
+    this.analyticsCache = null;
+    this.paymentCache = null;
+  }
 
   getActiveFilterCount(): number {
     const f = this.filtersSubject.value;

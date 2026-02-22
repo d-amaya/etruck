@@ -30,7 +30,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Fields each role is allowed to update
 const ALLOWED_UPDATE_FIELDS: Record<UserRole, string[]> = {
-  [UserRole.Admin]: ['dispatcherRate', 'notes'],
+  [UserRole.Admin]: ['adminRate', 'dispatcherRate', 'notes'],
   [UserRole.Dispatcher]: [
     'orderStatus', 'pickupTimestamp', 'deliveryTimestamp',
     'adminId', 'carrierId', 'driverId', 'truckId', 'trailerId', 'brokerId',
@@ -99,23 +99,16 @@ export class OrdersService {
 
     // Look up admin rate from admin record
     const adminRecord = await this.lookupEntity(this.configService.v2UsersTableName, 'USER', dto.adminId);
-    const adminRate = adminRecord?.rate ?? 5;
-    const dispatcherRate = 10 - adminRate;
-
-    const payments = calculateOrderPayments({
-      orderRate: dto.orderRate,
-      adminRate,
-      dispatcherRate,
-      driverRate,
-      mileageOrder: dto.mileageOrder || 0,
-      mileageEmpty: dto.mileageEmpty || 0,
-      fuelGasAvgCost,
-      fuelGasAvgGallxMil,
-    });
+    const adminRate = dto.adminRate ?? adminRecord?.rate ?? 5;
+    const dispatcherRate = dto.dispatcherRate ?? (10 - adminRate);
 
     const orderId = uuidv4();
     const now = new Date().toISOString();
     const scheduledTimestamp = dto.scheduledTimestamp;
+
+    const mileageTotal = (dto.mileageOrder || 0) + (dto.mileageEmpty || 0);
+    const fuelCost = fuelGasAvgCost * fuelGasAvgGallxMil * mileageTotal;
+    const driverPayment = driverRate * (dto.mileageOrder || 0);
 
     const order: Order = {
       orderId,
@@ -148,19 +141,19 @@ export class OrdersService {
       deliveryNotes: dto.deliveryNotes || '',
       mileageEmpty: dto.mileageEmpty || 0,
       mileageOrder: dto.mileageOrder || 0,
-      mileageTotal: payments.mileageTotal,
+      mileageTotal,
       orderRate: dto.orderRate,
       adminRate,
       dispatcherRate,
       carrierRate: 90,
       driverRate,
-      adminPayment: payments.adminPayment,
-      dispatcherPayment: payments.dispatcherPayment,
-      carrierPayment: payments.carrierPayment,
-      driverPayment: payments.driverPayment,
+      adminPayment: dto.adminPayment || 0,
+      dispatcherPayment: dto.dispatcherPayment || 0,
+      carrierPayment: dto.carrierPayment || 0,
+      driverPayment,
       fuelGasAvgCost,
       fuelGasAvgGallxMil,
-      fuelCost: payments.fuelCost,
+      fuelCost,
       lumperValue: dto.lumperValue || 0,
       detentionValue: dto.detentionValue || 0,
       notes: dto.notes || '',
@@ -366,7 +359,7 @@ export class OrdersService {
     const brokerMap = new Map<string, { revenue: number; count: number }>();
     const driverMap = new Map<string, number>();
     const truckMap = new Map<string, number>();
-    const dispatcherMap = new Map<string, { profit: number; count: number }>();
+    const dispatcherMap = new Map<string, { revenue: number; profit: number; count: number }>();
     const carrierMap = new Map<string, number>();
     const monthlyEarnings: Record<string, { realized: number; potential: number }> = {};
     const paidStatuses = ['WaitingRC', 'ReadyToPay'];
@@ -374,7 +367,8 @@ export class OrdersService {
     for (const o of orders as any[]) {
       statusSummary[o.orderStatus] = (statusSummary[o.orderStatus] || 0) + 1;
 
-      for (const key of Object.keys(o).filter(k => k.endsWith('Payment') || k === 'fuelCost' || k === 'lumper' || k === 'detentionValue')) {
+      const paymentKeys = new Set(['adminPayment', 'dispatcherPayment', 'carrierPayment', 'driverPayment', 'orderRate', 'fuelCost', 'lumperValue', 'detentionValue']);
+      for (const key of Object.keys(o).filter(k => paymentKeys.has(k))) {
         payments[key] = (payments[key] || 0) + (o[key] || 0);
       }
 
@@ -388,7 +382,8 @@ export class OrdersService {
       if (o.truckId) truckMap.set(o.truckId, (truckMap.get(o.truckId) || 0) + 1);
       if (o.carrierId) carrierMap.set(o.carrierId, (carrierMap.get(o.carrierId) || 0) + 1);
       if (o.dispatcherId) {
-        const d = dispatcherMap.get(o.dispatcherId) || { profit: 0, count: 0 };
+        const d = dispatcherMap.get(o.dispatcherId) || { revenue: 0, profit: 0, count: 0 };
+        d.revenue += o.orderRate || 0;
         d.profit += o.carrierPayment || o.dispatcherPayment || 0;
         d.count++;
         dispatcherMap.set(o.dispatcherId, d);
@@ -418,8 +413,8 @@ export class OrdersService {
           .map(([id, trips]) => ({ id, trips })),
         topCarriers: [...carrierMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
           .map(([id, trips]) => ({ id, trips })),
-        topDispatchers: [...dispatcherMap.entries()].sort((a, b) => b[1].profit - a[1].profit).slice(0, 5)
-          .map(([id, v]) => ({ id, profit: this.round2(v.profit), count: v.count })),
+        topDispatchers: [...dispatcherMap.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5)
+          .map(([id, v]) => ({ id, revenue: this.round2(v.revenue), profit: this.round2(v.profit), count: v.count })),
       },
     };
   }
@@ -492,8 +487,8 @@ export class OrdersService {
       })),
       brokerAnalytics: [...brokerMap.entries()].map(([brokerId, trips]) => ({
         brokerId, totalTrips: trips.length, completedTrips: completed(trips),
-        totalRevenue: this.round2(sum(trips, 'carrierPayment')),
-        averageRevenue: this.round2(trips.length ? sum(trips, 'carrierPayment') / trips.length : 0),
+        totalRevenue: this.round2(revenue(trips)),
+        averageRevenue: this.round2(trips.length ? revenue(trips) / trips.length : 0),
         totalDistance: this.round2(sum(trips, 'mileageTotal')),
         completionRate: this.round2(trips.length ? (completed(trips) / trips.length) * 100 : 0),
       })),
@@ -539,10 +534,11 @@ export class OrdersService {
   private computePaymentSummary(orders: Order[], role: UserRole): any {
     const active = orders.filter(o => o.orderStatus !== OrderStatus.Canceled) as any[];
 
-    // Group by broker, carrier, and driver
+    // Group by broker, carrier, driver, and dispatcher
     const brokerGroups = new Map<string, { total: number; count: number }>();
     const carrierGroups = new Map<string, { total: number; count: number }>();
     const driverGroups = new Map<string, { total: number; count: number }>();
+    const dispatcherGroups = new Map<string, { total: number; count: number }>();
     for (const o of active) {
       if (o.brokerId) {
         const g = brokerGroups.get(o.brokerId) || { total: 0, count: 0 };
@@ -562,6 +558,12 @@ export class OrdersService {
         g.count++;
         driverGroups.set(o.driverId, g);
       }
+      if (o.dispatcherId) {
+        const g = dispatcherGroups.get(o.dispatcherId) || { total: 0, count: 0 };
+        g.total += o.orderRate || 0;
+        g.count++;
+        dispatcherGroups.set(o.dispatcherId, g);
+      }
     }
 
     const groupedByBroker: Record<string, { totalPayment: number; tripCount: number }> = {};
@@ -573,7 +575,10 @@ export class OrdersService {
     const groupedByDriver: Record<string, { totalPayment: number; tripCount: number }> = {};
     for (const [id, g] of driverGroups) groupedByDriver[id] = { totalPayment: this.round2(g.total), tripCount: g.count };
 
-    const base = { orderCount: active.length, groupedByBroker, groupedByCarrier, groupedByDriver };
+    const groupedByDispatcher: Record<string, { totalPayment: number; tripCount: number }> = {};
+    for (const [id, g] of dispatcherGroups) groupedByDispatcher[id] = { totalPayment: this.round2(g.total), tripCount: g.count };
+
+    const base = { orderCount: active.length, groupedByBroker, groupedByCarrier, groupedByDriver, groupedByDispatcher };
 
     switch (role) {
       case UserRole.Admin:
@@ -666,7 +671,7 @@ export class OrdersService {
 
     // Auto-recalculation — fetch current order once if any recalc needed
     const needsRecalc =
-      (role === UserRole.Admin && dto.dispatcherRate !== undefined) ||
+      (role === UserRole.Admin && (dto.adminRate !== undefined || dto.dispatcherRate !== undefined)) ||
       (role === UserRole.Dispatcher && ((dto as any).orderRate !== undefined || (dto as any).adminRate !== undefined || (dto as any).dispatcherRate !== undefined)) ||
       (role === UserRole.Carrier && (dto.driverRate !== undefined || dto.fuelGasAvgCost !== undefined || dto.fuelGasAvgGallxMil !== undefined));
 
@@ -675,22 +680,31 @@ export class OrdersService {
       current = await this.getRawOrder(orderId);
     }
 
-    if (role === UserRole.Admin && dto.dispatcherRate !== undefined && current) {
-      const newDispatcherRate = dto.dispatcherRate;
-      const newAdminRate = 10 - newDispatcherRate;
+    if (role === UserRole.Admin && (dto.adminRate !== undefined || dto.dispatcherRate !== undefined) && current) {
+      const newAdminRate = dto.adminRate ?? current.adminRate ?? 5;
+      const newDispatcherRate = dto.dispatcherRate ?? current.dispatcherRate ?? 5;
       const orderRate = current.orderRate || 0;
+      const adminPayment = this.round2(orderRate * newAdminRate / 100);
+      const dispatcherPayment = this.round2(orderRate * newDispatcherRate / 100);
+      const carrierPayment = this.round2(orderRate - adminPayment - dispatcherPayment);
 
-      exprParts.push('#adminRate = :adminRate');
-      exprNames['#adminRate'] = 'adminRate';
+      // Override rate values (may already be in expr from dto loop)
       exprValues[':adminRate'] = newAdminRate;
+      exprValues[':dispatcherRate'] = newDispatcherRate;
+      if (!exprNames['#adminRate']) { exprParts.push('#adminRate = :adminRate'); exprNames['#adminRate'] = 'adminRate'; }
+      if (!exprNames['#dispatcherRate']) { exprParts.push('#dispatcherRate = :dispatcherRate'); exprNames['#dispatcherRate'] = 'dispatcherRate'; }
 
       exprParts.push('#adminPayment = :adminPayment');
       exprNames['#adminPayment'] = 'adminPayment';
-      exprValues[':adminPayment'] = this.round2(orderRate * newAdminRate / 100);
+      exprValues[':adminPayment'] = adminPayment;
 
       exprParts.push('#dispatcherPayment = :dispatcherPayment');
       exprNames['#dispatcherPayment'] = 'dispatcherPayment';
-      exprValues[':dispatcherPayment'] = this.round2(orderRate * newDispatcherRate / 100);
+      exprValues[':dispatcherPayment'] = dispatcherPayment;
+
+      exprParts.push('#carrierPayment = :carrierPayment');
+      exprNames['#carrierPayment'] = 'carrierPayment';
+      exprValues[':carrierPayment'] = carrierPayment;
     }
 
     if (role === UserRole.Dispatcher && needsRecalc && current) {

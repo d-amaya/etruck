@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, forkJoin, of } from 'rxjs';
 import { tap, catchError, map } from 'rxjs/operators';
 import { TripService } from '../../../core/services/trip.service';
+import { OrderService } from '../../../core/services/order.service';
 
 export interface DriverAssetCache {
   trucks: Map<string, any>;
@@ -24,8 +25,9 @@ export class DriverAssetCacheService {
   private failedTruckLookups = new Map<string, number>();
   private failedTrailerLookups = new Map<string, number>();
   private failedDispatcherLookups = new Map<string, number>();
+  private resolved = new Map<string, { name: string; timestamp: number }>();
 
-  constructor(private tripService: TripService) {
+  constructor(private tripService: TripService, private orderService: OrderService) {
     this.loadFromLocalStorage();
   }
 
@@ -75,26 +77,58 @@ export class DriverAssetCacheService {
 
   getTruckName(truckId: string): string {
     const cache = this.cacheSubject.value;
-    if (!cache) return truckId;
-    
-    const truck = cache.trucks.get(truckId);
-    return truck?.plate || truckId;
+    const truck = cache?.trucks.get(truckId);
+    if (truck) return truck.plate || truckId;
+    const r = this.resolved.get(truckId);
+    return r ? r.name : truckId;
   }
 
   getTrailerName(trailerId: string): string {
     const cache = this.cacheSubject.value;
-    if (!cache) return trailerId;
-    
-    const trailer = cache.trailers.get(trailerId);
-    return trailer?.plate || trailerId;
+    const trailer = cache?.trailers.get(trailerId);
+    if (trailer) return trailer.plate || trailerId;
+    const r = this.resolved.get(trailerId);
+    return r ? r.name : trailerId;
   }
 
   getDispatcherName(dispatcherId: string): string {
     const cache = this.cacheSubject.value;
-    if (!cache) return dispatcherId;
-    
-    const dispatcher = cache.dispatchers.get(dispatcherId);
-    return dispatcher?.name || dispatcherId;
+    const dispatcher = cache?.dispatchers.get(dispatcherId);
+    if (dispatcher) return dispatcher.name || dispatcherId;
+    const r = this.resolved.get(dispatcherId);
+    return r ? r.name : dispatcherId;
+  }
+
+  resolveEntities(entityIds: string[]): Observable<{ id: string; name: string }[]> {
+    const cache = this.cacheSubject.value;
+    const unknown = entityIds.filter(id =>
+      !this.resolved.has(id) &&
+      !cache?.trucks.has(id) && !cache?.trailers.has(id) && !cache?.dispatchers.has(id)
+    );
+    if (unknown.length === 0) {
+      return of(entityIds.map(id => ({ id, name: this.getEntityName(id) })));
+    }
+    return this.orderService.resolveEntities(unknown).pipe(
+      tap(results => {
+        const arr = Array.isArray(results) ? results : Object.entries(results).map(([id, name]) => ({ id, name: name as string }));
+        arr.forEach(r => this.resolved.set(r.id, { name: r.name, timestamp: Date.now() }));
+      }),
+      map(() => entityIds.map(id => ({ id, name: this.getEntityName(id) }))),
+      catchError(() => of(entityIds.map(id => ({ id, name: this.getEntityName(id) }))))
+    );
+  }
+
+  getEntityName(id: string): string {
+    const cache = this.cacheSubject.value;
+    const truck = cache?.trucks.get(id);
+    if (truck) return truck.plate || id.substring(0, 8);
+    const trailer = cache?.trailers.get(id);
+    if (trailer) return trailer.plate || id.substring(0, 8);
+    const dispatcher = cache?.dispatchers.get(id);
+    if (dispatcher) return dispatcher.name || id.substring(0, 8);
+    const r = this.resolved.get(id);
+    if (r) return r.name;
+    return id.substring(0, 8);
   }
 
   clearCache(): void {

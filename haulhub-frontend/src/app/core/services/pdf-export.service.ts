@@ -130,10 +130,10 @@ export class PdfExportService {
     this.drawSummaryCard(doc, 14 + cardWidth + cardGap, cardY, cardWidth, cardHeight,
       'Dispatcher Earnings', this.formatCurrency(totalRevenue), profitGreen);
 
-    // Card 3: Total Order Rate
+    // Card 3: Total Revenue
     const totalOrderRate = orders.reduce((s, o: any) => s + (o.orderRate || 0), 0);
     this.drawSummaryCard(doc, 14 + (cardWidth + cardGap) * 2, cardY, cardWidth, cardHeight,
-      'Total Order Rate', this.formatCurrency(totalOrderRate), primaryBlue);
+      'Total Revenue', this.formatCurrency(totalOrderRate), primaryBlue);
 
     // Card 4: Order Count by status
     const completedCount = orders.filter((o: any) => ['Delivered', 'ReadyToPay', 'WaitingRC'].includes(o.orderStatus)).length;

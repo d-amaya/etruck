@@ -20,6 +20,7 @@ import { AnalyticsService } from '../../../core/services/analytics.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CarrierFilterService } from '../shared/carrier-filter.service';
 import { CarrierAssetCacheService } from '../shared/carrier-asset-cache.service';
+import { CarrierDashboardStateService } from '../shared/carrier-dashboard-state.service';
 import { CarrierUnifiedFilterCardComponent } from '../shared/unified-filter-card/unified-filter-card.component';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import jsPDF from 'jspdf';
@@ -119,6 +120,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
     private analyticsService: AnalyticsService,
     private authService: AuthService,
     private filterService: CarrierFilterService,
+    private dashboardState: CarrierDashboardStateService,
     private assetCache: CarrierAssetCacheService,
     private snackBar: MatSnackBar,
     private excelExportService: ExcelExportService
@@ -252,7 +254,8 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
     }
 
     this.isLoading = true;
-    this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined)
+    const currentPageSize = (this.dashboardState as any).paginationSubject?.value?.pageSize || 10;
+    this.analyticsService.getUnifiedAnalytics(this.startDate || undefined, this.endDate || undefined, currentPageSize)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -265,7 +268,7 @@ export class CarrierAnalyticsComponent implements OnInit, OnDestroy, AfterViewIn
           // Cache orders for Table view (page 0, no table filters)
           if (data.orders?.length) {
             const defaultFilters = { dateRange: { startDate: this.startDate, endDate: this.endDate }, status: null, truckId: null, driverId: null, dispatcherId: null } as any;
-            const defaultPagination = { page: 0, pageSize: 10, pageTokens: data.lastEvaluatedKey ? [data.lastEvaluatedKey] : [] };
+            const defaultPagination = { page: 0, pageSize: currentPageSize, pageTokens: data.lastEvaluatedKey ? [data.lastEvaluatedKey] : [] };
             this.filterService.setCachedTrips(defaultFilters, defaultPagination, {
               chartAggregates: data.aggregates || {}, trips: data.orders,
               entityIds: data.entityIds, lastEvaluatedKey: data.lastEvaluatedKey

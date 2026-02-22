@@ -5,6 +5,10 @@ export const ADMIN_ROUTES: Routes = [
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
+  {
+    path: 'orders/:orderId/edit',
+    loadComponent: () => import('./order-edit/admin-order-edit.component').then(m => m.AdminOrderEditComponent)
+  },
   // Legacy redirects
   {
     path: 'brokers',

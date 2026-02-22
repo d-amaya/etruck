@@ -353,7 +353,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(color[0], color[1], color[2]);
       doc.text(value, x + cardWidth / 2, yPos + 20, { align: 'center' });
     };
-    drawCard(14, 'Total Order Rate', this.formatCurrency(this.report?.totalOrderRate || 0), profitGreen);
+    drawCard(14, 'Total Revenue', this.formatCurrency(this.report?.totalOrderRate || 0), profitGreen);
     drawCard(14 + cardWidth + cardGap, 'Dispatcher Earnings', this.formatCurrency(this.report?.totalDispatcherPayment || 0), profitGreen);
     drawCard(14 + (cardWidth + cardGap) * 2, 'Total Orders', String(this.report?.orderCount || 0), primaryBlue);
 
@@ -365,7 +365,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
       doc.text('By Broker', 14, yPos); yPos += 5;
       autoTable(doc, {
         startY: yPos,
-        head: [['Broker', 'Total Order Rate', 'Orders']],
+        head: [['Broker', 'Total Revenue', 'Orders']],
         body: this.enrichedBrokerData.map((b: any) => [b.brokerName, this.formatCurrency(b.totalPayment), b.tripCount.toString()]),
         theme: 'grid',
         headStyles: { fillColor: primaryBlue, textColor: [255, 255, 255], fontSize: 9 },
@@ -399,7 +399,7 @@ export class PaymentReportComponent implements OnInit, OnDestroy {
     if (this.enrichedBrokerData.length > 0) {
       sheets.push({
         name: 'By Broker',
-        headers: ['Broker Name', 'Total Order Rate', 'Order Count'],
+        headers: ['Broker Name', 'Total Revenue', 'Order Count'],
         rows: this.enrichedBrokerData.map((b: any) => [b.brokerName, b.totalPayment?.toFixed(2), b.tripCount])
       });
     }

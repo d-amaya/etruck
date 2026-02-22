@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, combineLatest, Observable, of } from 'rxjs';
-import { switchMap, takeUntil, map, catchError, tap, finalize, startWith } from 'rxjs/operators';
+import { switchMap, takeUntil, map, catchError, tap, finalize, startWith, take } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent, MatPaginator } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -142,6 +142,11 @@ export class TripTableComponent implements OnInit, OnDestroy {
     this.statusOptions = this.statusOptions.sort((a, b) => 
       this.getStatusLabel(a).localeCompare(this.getStatusLabel(b))
     );
+
+    // Restore filter form from state
+    this.dashboardState.filters$.pipe(takeUntil(this.destroy$), take(1)).subscribe(f => {
+      this.filterForm.patchValue({ status: f.status || null, brokerId: f.brokerId || null, truckId: f.truckId || null, driverId: f.driverId || null, carrierId: f.carrierId || null }, { emitEvent: false });
+    });
     
     // Load assets from cache
     this.assetCache.loadAssets().pipe(

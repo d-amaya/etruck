@@ -14,8 +14,8 @@ import { debounceTime, takeUntil } from 'rxjs/operators';
 import { AdminDashboardStateService, LoadingState, ErrorState } from './admin-state.service';
 import { AdminFilterService } from './admin-filter.service';
 import { AdminOrderTableComponent } from './admin-order-table/admin-order-table.component';
-import { AdminAnalyticsWrapperComponent } from './admin-analytics-wrapper.component';
-import { AdminPaymentsWrapperComponent } from './admin-payments-wrapper.component';
+import { AdminAnalyticsComponent } from './admin-analytics/admin-analytics.component';
+import { AdminPaymentReportComponent } from './admin-payment-report/admin-payment-report.component';
 import { ErrorStateComponent } from '../../../shared/components/error-state/error-state.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { TripTableSkeletonComponent } from '../../../shared/components/skeleton-loader/trip-table-skeleton.component';
@@ -27,7 +27,7 @@ import { TripTableSkeletonComponent } from '../../../shared/components/skeleton-
     CommonModule, ReactiveFormsModule,
     MatProgressSpinnerModule, MatButtonModule, MatIconModule, MatCardModule,
     MatFormFieldModule, MatInputModule, MatDatepickerModule, MatNativeDateModule,
-    AdminOrderTableComponent, AdminAnalyticsWrapperComponent, AdminPaymentsWrapperComponent,
+    AdminOrderTableComponent, AdminAnalyticsComponent, AdminPaymentReportComponent,
     ErrorStateComponent, LoadingOverlayComponent, TripTableSkeletonComponent
   ],
   templateUrl: './dashboard.component.html',

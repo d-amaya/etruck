@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl, FormGroup, FormBuilder } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { PageEvent } from '@angular/material/paginator';
-import { Subject, Observable } from 'rxjs';
-import { takeUntil, switchMap, startWith, map } from 'rxjs/operators';
+import { Subject, Observable, of } from 'rxjs';
+import { takeUntil, switchMap, startWith, map, tap } from 'rxjs/operators';
 import { TripService } from '../../../../core/services/trip.service';
 import { OrderService } from '../../../../core/services/order.service';
 import { DriverAssetCacheService } from '../driver-asset-cache.service';
@@ -70,6 +70,10 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Restore filter form from state
+    const cf = this.dashboardState.getCurrentFilters();
+    this.filterForm.patchValue({ status: cf.status || null, truckId: cf.truckId || '', dispatcherId: cf.dispatcherId || '' }, { emitEvent: false });
+
     // Load assets first, then subscribe to trips
     this.assetCache.loadAssets().pipe(
       takeUntil(this.destroy$)
@@ -138,6 +142,18 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
   }
 
   loadTrips(filters: any, pagination: any): Observable<any> {
+    const cached = this.dashboardState.getCachedTrips(filters, pagination);
+    if (cached) {
+      this.trips = cached.trips || [];
+      this.totalTrips = cached.totalTrips ?? this.trips.length;
+      if (cached.lastEvaluatedKey && pagination.page === 0) {
+        this.dashboardState.updatePaginationSilent({ pageTokens: [cached.lastEvaluatedKey] });
+      }
+      this.loading = false;
+      this.dashboardState.setLoadingState(false, false, false);
+      return of(cached);
+    }
+
     this.loading = true;
     this.dashboardState.setLoadingState(true, pagination.page === 0, true);
 
@@ -196,6 +212,8 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.dashboardState.setLoadingState(false, false, false);
         
+        const cacheData = { ...response, totalTrips: this.totalTrips };
+        this.dashboardState.setCachedTrips(filters, pagination, cacheData);
         return response;
       })
     );
@@ -230,6 +248,7 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
     }
     this.tripService.updateTripStatus(tripId, statusDto).subscribe({
       next: () => {
+        this.dashboardState.invalidateViewCaches();
         // Reset to page 0 to refresh aggregates
         this.dashboardState.updatePagination({ page: 0, pageTokens: [] });
       },
@@ -274,9 +293,9 @@ export class DriverTripTableComponent implements OnInit, OnDestroy {
           t.scheduledTimestamp?.split('T')[0] || '',
           `${t.pickupCity || ''}, ${t.pickupState || ''}`,
           `${t.deliveryCity || ''}, ${t.deliveryState || ''}`,
-          this.getDispatcherDisplay(t.dispatcherId),
-          this.getTruckDisplay(t.truckId),
-          this.getTrailerDisplay(t.trailerId),
+          this.assetCache.getDispatcherName(t.dispatcherId),
+          this.assetCache.getTruckName(t.truckId),
+          this.assetCache.getTrailerName(t.trailerId),
           t.driverPayment || 0
         ]);
         this.excelExportService.exportToExcel('driver-orders-export', [{ name: 'Orders', headers, rows }], currentFilters.dateRange.startDate, currentFilters.dateRange.endDate);

@@ -5,28 +5,12 @@
       <mat-card-header>
         <mat-card-title>
           <mat-icon>account_balance</mat-icon>
-          Revenue Overview
+          Payments Breakdown
         </mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <div class="chart-container">
           <canvas #revenueChart></canvas>
-        </div>
-        <div class="chart-summary">
-          <div class="summary-item">
-            <span class="label">Total Revenue</span>
-            <span class="value positive">{{ formatCurrency(revenueData.revenue) }}</span>
-          </div>
-          <div class="summary-item">
-            <span class="label">Admin Profit</span>
-            <span class="value" [class.positive]="revenueData.adminProfit >= 0" [class.negative]="revenueData.adminProfit < 0">
-              {{ formatCurrency(revenueData.adminProfit) }}
-            </span>
-          </div>
-          <div class="summary-item" *ngIf="revenueData.fees > 0">
-            <span class="label">Fees (Lumper + Detention)</span>
-            <span class="value negative">{{ formatCurrency(revenueData.fees) }}</span>
-          </div>
         </div>
       </mat-card-content>
     </mat-card>
@@ -42,6 +26,36 @@
       <mat-card-content>
         <div class="chart-container">
           <canvas #statusChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Top 5 Dispatchers -->
+    <mat-card class="chart-card" *ngIf="topDispatchers.length > 0">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>people</mat-icon>
+          Top 5 Dispatchers by Revenue
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-container">
+          <canvas #topDispatchersChart></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Top 5 Brokers -->
+    <mat-card class="chart-card" *ngIf="topBrokers.length > 0">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>business</mat-icon>
+          Top 5 Brokers by Revenue
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-container">
+          <canvas #topBrokersChart></canvas>
         </div>
       </mat-card-content>
     </mat-card>

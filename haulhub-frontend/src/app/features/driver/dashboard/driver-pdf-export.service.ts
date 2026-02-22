@@ -3,7 +3,9 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DriverDashboardStateService } from './driver-dashboard-state.service';
 import { DriverAssetCacheService } from './driver-asset-cache.service';
+import { OrderService } from '../../../core/services/order.service';
 import { Order, OrderStatus } from '@haulhub/shared';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Injectable({
   providedIn: 'root'
@@ -11,33 +13,35 @@ import { Order, OrderStatus } from '@haulhub/shared';
 export class DriverPdfExportService {
   constructor(
     private dashboardState: DriverDashboardStateService,
-    private assetCache: DriverAssetCacheService
+    private assetCache: DriverAssetCacheService,
+    private orderService: OrderService,
+    private snackBar: MatSnackBar
   ) {}
 
   exportDashboard(): void {
-    // Get current dashboard data and cached assets
-    const dashboardData = this.dashboardState['dashboardDataSubject'].value;
     const cache = this.assetCache['cacheSubject'].value;
     const filters = this.dashboardState['filtersSubject'].value;
 
-    if (!dashboardData || !cache) {
+    if (!cache) {
       alert('Please wait for data to load before exporting.');
       return;
     }
 
-    // Use the currently displayed trips (filtered and paginated data)
-    // Get all trips by fetching without pagination
-    const allFilters = { ...filters };
-    
-    // For now, use the dashboard data we have
-    // TODO: Fetch all filtered trips if we want complete data beyond current page
-    this.generatePdf(
-      dashboardData.trips,
-      dashboardData.chartAggregates.statusSummary,
-      dashboardData.chartAggregates.paymentSummary,
-      cache,
-      filters
-    );
+    const apiFilters: any = { returnAllOrders: 'true', includeAggregates: 'true' };
+    if (filters.dateRange.startDate) apiFilters.startDate = filters.dateRange.startDate.toISOString();
+    if (filters.dateRange.endDate) apiFilters.endDate = filters.dateRange.endDate.toISOString();
+    if (filters.status) apiFilters.orderStatus = filters.status;
+    if (filters.truckId) apiFilters.truckId = filters.truckId;
+    if (filters.dispatcherId) apiFilters.dispatcherId = filters.dispatcherId;
+
+    this.orderService.getOrders(apiFilters).subscribe({
+      next: (response: any) => {
+        const orders = response.orders || response.trips || [];
+        const aggregates = response.chartAggregates || response.aggregates || {};
+        this.generatePdf(orders, aggregates.statusSummary || {}, aggregates.paymentSummary || {}, cache, filters);
+      },
+      error: () => this.snackBar.open('Failed to export PDF', 'Close', { duration: 3000 })
+    });
   }
 
   private generatePdf(

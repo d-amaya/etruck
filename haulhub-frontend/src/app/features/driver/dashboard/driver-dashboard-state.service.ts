@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
+import { AuthService } from '../../../core/services/auth.service';
 
 export interface DriverDashboardFilters {
   dateRange: {
@@ -57,10 +58,18 @@ const defaultLoadingState: LoadingState = {
   providedIn: 'root'
 })
 export class DriverDashboardStateService {
+  constructor(private authService: AuthService) {
+    this.authService.currentUser$.pipe(filter(u => u === null)).subscribe(() => {
+      this.filtersSubject.next(defaultFilters);
+      this.paginationSubject.next(defaultPagination);
+      this.invalidateViewCaches();
+    });
+  }
   private filtersSubject = new BehaviorSubject<DriverDashboardFilters>(defaultFilters);
   private paginationSubject = new BehaviorSubject<PaginationState>(defaultPagination);
   private dashboardDataSubject = new BehaviorSubject<any>(null);
   private loadingSubject = new BehaviorSubject<LoadingState>(defaultLoadingState);
+  private tripsCache: { data: any; key: string } | null = null;
 
   public filters$ = this.filtersSubject.asObservable();
   public pagination$ = this.paginationSubject.asObservable();
@@ -114,10 +123,9 @@ export class DriverDashboardStateService {
       pageTokens: [] 
     };
     
-    Promise.resolve().then(() => {
-      this.filtersSubject.next(newFilters);
-      this.paginationSubject.next(newPagination);
-    });
+    this.invalidateViewCaches();
+    this.filtersSubject.next(newFilters);
+    this.paginationSubject.next(newPagination);
   }
 
   updatePagination(pagination: Partial<PaginationState>): void {
@@ -139,12 +147,7 @@ export class DriverDashboardStateService {
 
   updatePaginationSilent(pagination: Partial<PaginationState>): void {
     const current = this.paginationSubject.value;
-    const updated = { ...current, ...pagination };
-    
-    // Only update if pageTokens changed (don't trigger on same tokens)
-    if (JSON.stringify(current.pageTokens) !== JSON.stringify(updated.pageTokens)) {
-      this.paginationSubject.next(updated);
-    }
+    (this.paginationSubject as any)._value = { ...current, ...pagination };
   }
 
   updateDashboardData(data: any): void {
@@ -167,6 +170,27 @@ export class DriverDashboardStateService {
 
   getCurrentPagination(): PaginationState {
     return this.paginationSubject.value;
+  }
+
+  private tripsKey(filters: DriverDashboardFilters, pagination: PaginationState): string {
+    return JSON.stringify({
+      s: filters.dateRange?.startDate?.getTime(), e: filters.dateRange?.endDate?.getTime(),
+      st: filters.status, t: filters.truckId, d: filters.dispatcherId,
+      p: pagination.page, ps: pagination.pageSize
+    });
+  }
+
+  getCachedTrips(filters: DriverDashboardFilters, pagination: PaginationState): any | null {
+    if (!this.tripsCache) return null;
+    return this.tripsCache.key === this.tripsKey(filters, pagination) ? this.tripsCache.data : null;
+  }
+
+  setCachedTrips(filters: DriverDashboardFilters, pagination: PaginationState, data: any): void {
+    this.tripsCache = { data, key: this.tripsKey(filters, pagination) };
+  }
+
+  invalidateViewCaches(): void {
+    this.tripsCache = null;
   }
 
   private getLoadingMessage(isLoading: boolean, isInitialLoad: boolean, isFilterUpdate: boolean): string {

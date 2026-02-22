@@ -46,6 +46,39 @@ export class CreateOrderDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  adminRate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  dispatcherRate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  adminPayment?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  dispatcherPayment?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  carrierPayment?: number;
+
+  @IsOptional()
+  @IsDateString()
+  pickupTimestamp?: string;
+
+  @IsOptional()
+  @IsDateString()
+  deliveryTimestamp?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   mileageOrder?: number;
 
   @IsOptional()
@@ -109,12 +142,18 @@ export class UpdateOrderDto {
   @IsOptional() @IsString() invoiceNumber?: string;
   @IsOptional() @IsString() brokerLoad?: string;
 
+  @IsOptional() @IsEnum(OrderStatus) orderStatus?: OrderStatus;
   @IsOptional() @IsDateString() scheduledTimestamp?: string;
+  @IsOptional() @IsDateString() pickupTimestamp?: string;
+  @IsOptional() @IsDateString() deliveryTimestamp?: string;
 
   @IsOptional() @Type(() => Number) @IsNumber() orderRate?: number;
   @IsOptional() @Type(() => Number) @IsNumber() adminRate?: number;
   @IsOptional() @Type(() => Number) @IsNumber() dispatcherRate?: number;
   @IsOptional() @Type(() => Number) @IsNumber() driverRate?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() adminPayment?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() dispatcherPayment?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() carrierPayment?: number;
   @IsOptional() @Type(() => Number) @IsNumber() mileageOrder?: number;
   @IsOptional() @Type(() => Number) @IsNumber() mileageEmpty?: number;
   @IsOptional() @Type(() => Number) @IsNumber() fuelGasAvgCost?: number;

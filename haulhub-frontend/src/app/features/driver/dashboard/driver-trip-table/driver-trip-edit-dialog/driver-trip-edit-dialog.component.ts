@@ -21,7 +21,8 @@ export class DriverTripEditDialogComponent {
   ) {
     this.editForm = this.fb.group({
       status: [data.trip.orderStatus || data.trip.status, Validators.required],
-      deliveryTimestamp: ['']
+      deliveryTimestamp: [''],
+      notes: [data.trip.notes || '']
     });
 
     // Add/remove deliveryTimestamp validation when status changes
@@ -61,6 +62,7 @@ export class DriverTripEditDialogComponent {
       if (this.editForm.value.deliveryTimestamp) {
         result.deliveryTimestamp = new Date(this.editForm.value.deliveryTimestamp).toISOString().split('.')[0] + 'Z';
       }
+      result.notes = this.editForm.value.notes;
       this.dialogRef.close(result);
     }
   }

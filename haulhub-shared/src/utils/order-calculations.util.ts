@@ -4,13 +4,9 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Admin profit = adminPayment - lumper - detention */
+/** Admin profit = adminPayment */
 export function calcAdminProfit(order: Partial<Order>): number {
-  return round2(
-    (order.adminPayment || 0) -
-    (order.lumperValue || 0) -
-    (order.detentionValue || 0)
-  );
+  return round2(order.adminPayment || 0);
 }
 
 /** Dispatcher profit = dispatcherPayment */

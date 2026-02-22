@@ -100,12 +100,12 @@
 
         <!-- Analytics View -->
         <div *ngIf="currentViewMode === 'analytics'" class="analytics-view">
-          <app-admin-analytics-wrapper></app-admin-analytics-wrapper>
+          <app-admin-analytics [isWrapped]="true"></app-admin-analytics>
         </div>
 
         <!-- Payments View -->
         <div *ngIf="currentViewMode === 'payments'" class="payments-view">
-          <app-admin-payments-wrapper></app-admin-payments-wrapper>
+          <app-admin-payment-report [isWrapped]="true"></app-admin-payment-report>
         </div>
       </div>
     </div>

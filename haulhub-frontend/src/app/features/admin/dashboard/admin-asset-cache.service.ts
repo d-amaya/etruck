@@ -57,13 +57,19 @@ export class AdminAssetCacheService {
       }));
     }
     return this.orderService.resolveEntities(missing).pipe(
-      tap(entities => {
-        for (const e of entities) cache.resolved.set(e.id, { name: e.name, type: e.type, fetchedAt: now });
+      tap((raw: any) => {
+        const entries: [string, any][] = Array.isArray(raw)
+          ? raw.map((e: any) => [e.id, e])
+          : Object.entries(raw).map(([id, e]: [string, any]) => [id, { id, ...e }]);
+        for (const [id, e] of entries) cache.resolved.set(id, { name: e.name, type: e.type, fetchedAt: now });
         this.cacheSubject.next(cache);
+        this.saveToLocalStorage(cache);
       }),
-      map(entities => {
-        const resolved = new Map(entities.map(e => [e.id, e]));
-        return ids.map(id => resolved.get(id) || { id, name: cache.resolved.get(id)?.name || id.substring(0, 8), type: 'unknown' });
+      map(() => {
+        return ids.map(id => {
+          const r = cache.resolved.get(id);
+          return { id, name: r?.name || id.substring(0, 8), type: r?.type || 'unknown' };
+        });
       }),
       catchError(() => of(ids.map(id => ({ id, name: id.substring(0, 8), type: 'unknown' }))))
     );

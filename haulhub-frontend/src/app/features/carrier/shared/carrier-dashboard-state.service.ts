@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
-import { distinctUntilChanged, debounceTime } from 'rxjs/operators';
+import { distinctUntilChanged, debounceTime, filter } from 'rxjs/operators';
 import { OrderStatus } from '@haulhub/shared';
+import { AuthService } from '../../../core/services/auth.service';
 
 export interface CarrierDashboardFilters {
   dateRange: {
@@ -39,6 +40,9 @@ const defaultPagination: PaginationState = {
 
 @Injectable({ providedIn: 'root' })
 export class CarrierDashboardStateService {
+  constructor(private authService: AuthService) {
+    this.authService.currentUser$.pipe(filter(u => u === null)).subscribe(() => this.resetFilters());
+  }
   private filtersSubject = new BehaviorSubject<CarrierDashboardFilters>(defaultFilters);
   private paginationSubject = new BehaviorSubject<PaginationState>(defaultPagination);
 

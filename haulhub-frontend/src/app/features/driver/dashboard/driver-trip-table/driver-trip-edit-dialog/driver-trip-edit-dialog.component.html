@@ -51,6 +51,11 @@
       <mat-hint>When the delivery was completed</mat-hint>
     </mat-form-field>
 
+    <mat-form-field appearance="outline">
+      <mat-label>Notes</mat-label>
+      <textarea matInput formControlName="notes" rows="3" placeholder="Add notes about this order..."></textarea>
+    </mat-form-field>
+
     <mat-form-field *ngIf="trip.pickupNotes" appearance="outline">
       <mat-label>Pickup Notes</mat-label>
       <textarea matInput [value]="trip.pickupNotes" rows="2" disabled></textarea>

@@ -136,11 +136,9 @@ export class DashboardStateService {
     const currentPagination = this.paginationSubject.value;
     const newPagination = { page: 0, pageSize: currentPagination.pageSize, pageTokens: [] };
     
-    // Batch both updates in a microtask to ensure single emission
-    Promise.resolve().then(() => {
-      this.filtersSubject.next(newFilters);
-      this.paginationSubject.next(newPagination);
-    });
+    this.invalidateViewCaches();
+    this.filtersSubject.next(newFilters);
+    this.paginationSubject.next(newPagination);
     
     // Show filter update loading state
     this.setLoadingState(true, false, true);
@@ -436,6 +434,8 @@ export class DashboardStateService {
   private setupLogoutListener(): void {
     this.authService.currentUser$.subscribe(user => {
       if (!user) {
+        this.filtersSubject.next(this.getDefaultFilters());
+        this.paginationSubject.next({ page: 0, pageSize: 10, pageTokens: [] });
         this.invalidateViewCaches();
       }
     });
