@@ -24,18 +24,6 @@ export interface ApiStackProps extends HaulHubStackProps {
   userPoolId: string;
   userPoolArn: string;
   userPoolClientId: string;
-  // eTrucky tables (old architecture)
-  eTruckyBrokersTableName: string;
-  eTruckyBrokersTableArn: string;
-  eTruckyUsersTableName: string;
-  eTruckyUsersTableArn: string;
-  eTruckyTrucksTableName: string;
-  eTruckyTrucksTableArn: string;
-  eTruckyTrailersTableName: string;
-  eTruckyTrailersTableArn: string;
-  eTruckyTripsTableName: string;
-  eTruckyTripsTableArn: string;
-  // v2 tables (admin-centric hierarchy)
   v2OrdersTableName: string;
   v2OrdersTableArn: string;
   v2UsersTableName: string;
@@ -68,7 +56,7 @@ export class ApiStack extends cdk.Stack {
       ],
     });
 
-    // Grant DynamoDB permissions for eTrucky tables
+    // Grant DynamoDB permissions for v2 tables
     lambdaRole.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
@@ -82,16 +70,6 @@ export class ApiStack extends cdk.Stack {
         'dynamodb:BatchWriteItem',
       ],
       resources: [
-        props.eTruckyBrokersTableArn,
-        props.eTruckyUsersTableArn,
-        `${props.eTruckyUsersTableArn}/index/*`,
-        props.eTruckyTrucksTableArn,
-        `${props.eTruckyTrucksTableArn}/index/*`,
-        props.eTruckyTrailersTableArn,
-        `${props.eTruckyTrailersTableArn}/index/*`,
-        props.eTruckyTripsTableArn,
-        `${props.eTruckyTripsTableArn}/index/*`,
-        // v2 tables
         props.v2OrdersTableArn,
         `${props.v2OrdersTableArn}/index/*`,
         props.v2UsersTableArn,
@@ -157,12 +135,6 @@ export class ApiStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(props.config.lambdaTimeout),
       environment: {
         NODE_ENV: props.environment,
-        // Table names (pointing to eTrucky tables)
-        TRIPS_TABLE_NAME: props.eTruckyTripsTableName,
-        BROKERS_TABLE_NAME: props.eTruckyBrokersTableName,
-        LORRIES_TABLE_NAME: props.eTruckyTrucksTableName,
-        TRAILERS_TABLE_NAME: props.eTruckyTrailersTableName,
-        USERS_TABLE_NAME: props.eTruckyUsersTableName,
         // v2 table names (admin-centric hierarchy)
         ETRUCKY_ORDERS_TABLE: props.v2OrdersTableName,
         ETRUCKY_V2_USERS_TABLE: props.v2UsersTableName,

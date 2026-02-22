@@ -25,34 +25,34 @@ describe('DatabaseStack', () => {
     template = Template.fromStack(stack);
   });
 
-  describe('eTrucky DynamoDB Tables', () => {
-    test('should create eTrucky-Brokers table', () => {
+  describe('v2 DynamoDB Tables', () => {
+    test('should create eTruckyOrders table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Brokers',
+        TableName: 'eTruckyOrders',
       });
     });
 
-    test('should create eTrucky-Users table', () => {
+    test('should create eTruckyUsers table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Users',
+        TableName: 'eTruckyUsers',
       });
     });
 
-    test('should create eTrucky-Trucks table', () => {
+    test('should create eTruckyTrucks table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trucks',
+        TableName: 'eTruckyTrucks',
       });
     });
 
-    test('should create eTrucky-Trailers table', () => {
+    test('should create eTruckyTrailers table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trailers',
+        TableName: 'eTruckyTrailers',
       });
     });
 
-    test('should create eTrucky-Trips table', () => {
+    test('should create eTruckyBrokers table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trips',
+        TableName: 'eTruckyBrokers',
       });
     });
 
@@ -95,167 +95,112 @@ describe('DatabaseStack', () => {
       });
     });
 
-    test('should enable DynamoDB streams on eTrucky-Trips table', () => {
+    test('should enable DynamoDB streams on eTruckyOrders table', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trips',
+        TableName: 'eTruckyOrders',
         StreamSpecification: {
           StreamViewType: 'NEW_AND_OLD_IMAGES',
         },
       });
     });
 
-    test('should have eTrucky Architecture tag', () => {
+    test('should have eTrucky-v2 Architecture tag', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
         Tags: Match.arrayWith([
           {
             Key: 'Architecture',
-            Value: 'eTrucky',
+            Value: 'eTrucky-v2',
           },
         ]),
       });
     });
   });
 
-  describe('Global Secondary Indexes - eTrucky Tables', () => {
-    test('eTrucky-Trucks should have GSI1 for carrier queries', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trucks',
-        GlobalSecondaryIndexes: Match.arrayWith([
-          {
-            IndexName: 'GSI1',
-            KeySchema: [
-              {
-                AttributeName: 'GSI1PK',
-                KeyType: 'HASH',
-              },
-              {
-                AttributeName: 'GSI1SK',
-                KeyType: 'RANGE',
-              },
-            ],
-            Projection: {
-              ProjectionType: 'ALL',
-            },
-          },
-        ]),
-      });
-    });
-
-    test('eTrucky-Trucks should have GSI2 for owner queries', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trucks',
-        GlobalSecondaryIndexes: Match.arrayWith([
-          {
-            IndexName: 'GSI2',
-            KeySchema: [
-              {
-                AttributeName: 'GSI2PK',
-                KeyType: 'HASH',
-              },
-              {
-                AttributeName: 'GSI2SK',
-                KeyType: 'RANGE',
-              },
-            ],
-            Projection: {
-              ProjectionType: 'ALL',
-            },
-          },
-        ]),
-      });
-    });
-
-    test('eTrucky-Trailers should have GSI1 for carrier queries', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'eTrucky-Trailers',
-        GlobalSecondaryIndexes: Match.arrayWith([
-          {
-            IndexName: 'GSI1',
-            KeySchema: [
-              {
-                AttributeName: 'GSI1PK',
-                KeyType: 'HASH',
-              },
-              {
-                AttributeName: 'GSI1SK',
-                KeyType: 'RANGE',
-              },
-            ],
-            Projection: {
-              ProjectionType: 'ALL',
-            },
-          },
-        ]),
-      });
-    });
-
-    test('eTrucky-Trips should have five GSIs', () => {
+  describe('Global Secondary Indexes - v2 Tables', () => {
+    test('eTruckyOrders should have five GSIs', () => {
       const tables = template.findResources('AWS::DynamoDB::Table');
-      const tripsTable = Object.values(tables).find((table: any) => 
-        table.Properties.TableName === 'eTrucky-Trips'
+      const ordersTable = Object.values(tables).find((table: any) => 
+        table.Properties.TableName === 'eTruckyOrders'
       ) as any;
-      expect(tripsTable.Properties.GlobalSecondaryIndexes.length).toBe(5);
+      expect(ordersTable.Properties.GlobalSecondaryIndexes.length).toBe(5);
     });
 
-    test('eTrucky-Users should have two GSIs', () => {
+    test('eTruckyUsers should have two GSIs', () => {
       const tables = template.findResources('AWS::DynamoDB::Table');
       const usersTable = Object.values(tables).find((table: any) => 
-        table.Properties.TableName === 'eTrucky-Users'
+        table.Properties.TableName === 'eTruckyUsers'
       ) as any;
       expect(usersTable.Properties.GlobalSecondaryIndexes.length).toBe(2);
+    });
+
+    test('eTruckyTrucks should have GSI1', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'eTruckyTrucks',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          {
+            IndexName: 'GSI1',
+            KeySchema: [
+              { AttributeName: 'GSI1PK', KeyType: 'HASH' },
+              { AttributeName: 'GSI1SK', KeyType: 'RANGE' },
+            ],
+            Projection: { ProjectionType: 'ALL' },
+          },
+        ]),
+      });
+    });
+
+    test('eTruckyTrailers should have GSI1', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'eTruckyTrailers',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          {
+            IndexName: 'GSI1',
+            KeySchema: [
+              { AttributeName: 'GSI1PK', KeyType: 'HASH' },
+              { AttributeName: 'GSI1SK', KeyType: 'RANGE' },
+            ],
+            Projection: { ProjectionType: 'ALL' },
+          },
+        ]),
+      });
     });
   });
 
   describe('Stack Outputs', () => {
-    test('should export eTrucky-Brokers table name', () => {
-      template.hasOutput('ETruckyBrokersTableName', {
-        Description: 'eTrucky Brokers DynamoDB Table Name',
-        Export: {
-          Name: 'HaulHub-ETruckyBrokersTableName-dev',
-        },
+    test('should export v2 Orders table name', () => {
+      template.hasOutput('V2OrdersTableName', {
+        Description: 'v2 Orders DynamoDB Table Name',
       });
     });
 
-    test('should export eTrucky-Trucks table name', () => {
-      template.hasOutput('ETruckyTrucksTableName', {
-        Description: 'eTrucky Trucks DynamoDB Table Name',
-        Export: {
-          Name: 'HaulHub-ETruckyTrucksTableName-dev',
-        },
+    test('should export v2 Users table name', () => {
+      template.hasOutput('V2UsersTableName', {
+        Description: 'v2 Users DynamoDB Table Name',
       });
     });
 
-    test('should export eTrucky-Trailers table name', () => {
-      template.hasOutput('ETruckyTrailersTableName', {
-        Description: 'eTrucky Trailers DynamoDB Table Name',
-        Export: {
-          Name: 'HaulHub-ETruckyTrailersTableName-dev',
-        },
+    test('should export v2 Trucks table name', () => {
+      template.hasOutput('V2TrucksTableName', {
+        Description: 'v2 Trucks DynamoDB Table Name',
       });
     });
 
-    test('should export eTrucky-Trips table name', () => {
-      template.hasOutput('ETruckyTripsTableName', {
-        Description: 'eTrucky Trips DynamoDB Table Name',
-        Export: {
-          Name: 'HaulHub-ETruckyTripsTableName-dev',
-        },
+    test('should export v2 Trailers table name', () => {
+      template.hasOutput('V2TrailersTableName', {
+        Description: 'v2 Trailers DynamoDB Table Name',
       });
     });
 
-    test('should export eTrucky-Users table name', () => {
-      template.hasOutput('ETruckyUsersTableName', {
-        Description: 'eTrucky Users DynamoDB Table Name',
-        Export: {
-          Name: 'HaulHub-ETruckyUsersTableName-dev',
-        },
+    test('should export v2 Brokers table name', () => {
+      template.hasOutput('V2BrokersTableName', {
+        Description: 'v2 Brokers DynamoDB Table Name',
       });
     });
   });
 
   describe('Resource Count', () => {
-    test('should create ten DynamoDB tables', () => {
-      template.resourceCountIs('AWS::DynamoDB::Table', 10);
+    test('should create five DynamoDB tables', () => {
+      template.resourceCountIs('AWS::DynamoDB::Table', 5);
     });
   });
 

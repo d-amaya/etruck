@@ -61,17 +61,6 @@ const apiStack = new ApiStack(app, `HaulHub-Api-${environment}`, {
   userPoolId: authStack.userPool.userPoolId,
   userPoolArn: authStack.userPool.userPoolArn,
   userPoolClientId: authStack.userPoolClient.userPoolClientId,
-  // eTrucky tables (use direct table names to avoid export dependencies)
-  eTruckyBrokersTableName: 'eTrucky-Brokers',
-  eTruckyBrokersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Brokers`,
-  eTruckyUsersTableName: 'eTrucky-Users',
-  eTruckyUsersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Users`,
-  eTruckyTrucksTableName: 'eTrucky-Trucks',
-  eTruckyTrucksTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Trucks`,
-  eTruckyTrailersTableName: 'eTrucky-Trailers',
-  eTruckyTrailersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Trailers`,
-  eTruckyTripsTableName: 'eTrucky-Trips',
-  eTruckyTripsTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTrucky-Trips`,
   // v2 tables (admin-centric hierarchy)
   v2OrdersTableName: 'eTruckyOrders',
   v2OrdersTableArn: `arn:aws:dynamodb:${stackProps.env?.region}:${stackProps.env?.account}:table/eTruckyOrders`,

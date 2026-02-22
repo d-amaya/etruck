@@ -14,24 +14,28 @@ export class ConfigService {
     return process.env.COGNITO_CLIENT_ID || '';
   }
 
-  get tripsTableName(): string {
-    return process.env.ETRUCKY_ORDERS_TABLE || process.env.TRIPS_TABLE_NAME || 'eTruckyOrders';
-  }
-
-  get brokersTableName(): string {
-    return process.env.ETRUCKY_V2_BROKERS_TABLE || process.env.BROKERS_TABLE_NAME || 'eTruckyBrokers';
-  }
-
-  get lorriesTableName(): string {
-    return process.env.ETRUCKY_V2_TRUCKS_TABLE || process.env.LORRIES_TABLE_NAME || 'eTruckyTrucks';
+  get ordersTableName(): string {
+    return process.env.ETRUCKY_ORDERS_TABLE || 'eTruckyOrders';
   }
 
   get usersTableName(): string {
-    return process.env.ETRUCKY_V2_USERS_TABLE || process.env.USERS_TABLE_NAME || 'eTruckyUsers';
+    return process.env.ETRUCKY_V2_USERS_TABLE || 'eTruckyUsers';
   }
 
-  get trailersTableName(): string {
-    return process.env.ETRUCKY_V2_TRAILERS_TABLE || process.env.TRAILERS_TABLE_NAME || 'eTruckyTrailers';
+  get v2UsersTableName(): string {
+    return this.usersTableName;
+  }
+
+  get v2TrucksTableName(): string {
+    return process.env.ETRUCKY_V2_TRUCKS_TABLE || 'eTruckyTrucks';
+  }
+
+  get v2TrailersTableName(): string {
+    return process.env.ETRUCKY_V2_TRAILERS_TABLE || 'eTruckyTrailers';
+  }
+
+  get v2BrokersTableName(): string {
+    return process.env.ETRUCKY_V2_BROKERS_TABLE || 'eTruckyBrokers';
   }
 
   get s3DocumentsBucketName(): string {
@@ -56,22 +60,5 @@ export class ConfigService {
 
   get kmsKeyId(): string {
     return process.env.KMS_KEY_ID || '';
-  }
-
-  // v2 tables (admin-centric hierarchy)
-  get ordersTableName(): string {
-    return process.env.ETRUCKY_ORDERS_TABLE || 'eTruckyOrders';
-  }
-  get v2UsersTableName(): string {
-    return process.env.ETRUCKY_V2_USERS_TABLE || 'eTruckyUsers';
-  }
-  get v2TrucksTableName(): string {
-    return process.env.ETRUCKY_V2_TRUCKS_TABLE || 'eTruckyTrucks';
-  }
-  get v2TrailersTableName(): string {
-    return process.env.ETRUCKY_V2_TRAILERS_TABLE || 'eTruckyTrailers';
-  }
-  get v2BrokersTableName(): string {
-    return process.env.ETRUCKY_V2_BROKERS_TABLE || 'eTruckyBrokers';
   }
 }
